@@ -34,7 +34,7 @@ coherences = (evidences + 1) / 2  # From 0 (left) to 1 (right) so 0 net evidence
 ########################################################################################################################
 
 # Select the folder and create it if it doesn't exists
-folder = '/home/alexis/Música/sounds7/'
+folder = '/home/alexis/Música/sounds/'
 
 if not os.path.exists(folder):
     os.mkdir(folder)
@@ -55,15 +55,15 @@ sound_number = 0  # Initialize counter
 
 for k in range(len(chars)):
     for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
-        # Sound number from 1 to 361, name from aaa to srr
+        # Sound number (name) from 1 (aaa) to 9261 (uuu)
         sound_number += 1
         name = folder + chars[k] + i + j
 
         filename = chars[k] + i + j  # for the CSV file
 
         path_wav = name + '.wav'
-        path_mp3 = name + '.mp3'
-        path_ogg = name + '.ogg'
+        #path_mp3 = name + '.mp3'
+        #path_ogg = name + '.ogg'
         print(sound_number, name)
 
         SL, SR, EL, ER = UtilsR.envelope(coherences[k], whiteNoise, dur=1, nframes=10, samplingR=44100, variance=0.015,
@@ -80,7 +80,7 @@ for k in range(len(chars)):
         sound_wav = AudioSegment.from_wav(path_wav)
         # Export the wav sound to a mp3 file
         #sound_wav.export(path_mp3, format='mp3')
-        sound_wav.export(path_ogg, format='ogg')
+        #sound_wav.export(path_ogg, format='ogg')
 
 df.index.name = 'filename'  # Change index name from 'Unnamed: 0' to 'filename'
-df.to_csv('sounds7.csv')  # Save df as csv file
+df.to_csv('sounds.csv')  # Save df as csv file

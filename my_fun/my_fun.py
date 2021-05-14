@@ -4,6 +4,13 @@ import pandas as pd
 import string
 from matplotlib import pyplot as plt
 
+# For compute_psych_curve
+from scipy import stats
+from scipy.optimize import minimize
+from collections import namedtuple
+
+
+########################################################################################################################
 
 # Function to generate white noise
 def my_whiteNoiseGen():  # Adapted from UtilsR
@@ -189,7 +196,7 @@ def evi2coh(x):
 def coh2evi(x):
     return 2 * x - 1
 
-
+"""
 # Under development
 
 # 1 Convert to coherence
@@ -215,7 +222,7 @@ for i in range(len(df)):
     col = col[0] + col[1]  # Same as np.add(x[0], x[1]). As EL is negative and ER is positive, adding them = difference
     col = abs(col)
     df2_idl = pd.DataFrame([col], index=[i], columns=columns)
-    df2_idl = power_dB(df2_idl)-error
+    df2_idl = power_dB(df2_idl) - error
     df_ild = df_ild.append(df2_idl)
 
 
@@ -224,13 +231,14 @@ def power_dB(amp):
     return 20 * np.log10(amp / amp_ref)
 
 
+
 # Do the sexy plot
 evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
                       0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
 coherences = evi2coh(evidences)
 
 emp_left_dB = np.array([33, 43.3, 53.9, 56.9, 59.2, 62.2, 64.5, 64.9, 65.4, 66.4, 68.6, 69.8, 70.7, 70.5, 70.85, 70.35,
-                    70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB recorded with micro from left speaker
+                        70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB recorded with micro from left speaker
 # of box 8 with Rafa on March 3rd 2021
 exp_right_dB = np.flip(emp_left_dB)
 
@@ -253,3 +261,77 @@ plt.ylabel('dB')
 plt.legend()
 plt.title('SPL')
 plt.savefig('SPL.png')
+"""
+
+
+# From datahandler's utils.py
+
+# COMPUTE WINDOW AVERAGE
+def compute_window(data, runningwindow):
+    """
+    Computes a rolling average with a length of runningwindow samples.
+    """
+    performance = []
+    for i in range(len(data)):
+        if i < runningwindow:
+            performance.append(round(np.mean(data[0:i + 1]), 2))
+        else:
+            performance.append(round(np.mean(data[i - runningwindow:i]), 2))
+    return performance
+
+
+# COMPUTE PSYCHOMETRIC CURVE
+def compute_psych_curve(x, y):
+    """
+    Computes a psychometric function.
+    """
+
+    def sigmoid_mme(fit_params: tuple):
+        k, x0, b, p = fit_params
+
+        # Function to fit:
+        y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
+
+        # Calculate negative log likelihood:
+        ll = - np.sum(stats.norm.logpdf(ydata, loc=y_pred))
+
+        return ll
+
+    coherence_dataframe = pd.DataFrame({'r_resp': y, 'evidence': x})
+
+    info = coherence_dataframe.groupby(['evidence'])['r_resp'].mean()
+    ydata = [np.around(elem, 3) for elem in info.values]
+    xdata = info.index.values
+    fit_error = [np.around(elem, 3) for elem in coherence_dataframe.groupby(['evidence'])['r_resp'].sem().values]
+
+    initial_guess = np.array([1, 1, 0, 0])
+
+    # Run the minimizer:
+    ll = minimize(sigmoid_mme, initial_guess)
+
+    # Fit parameters:
+    k, x0, b, p = [np.around(param, 2) for param in ll['x']]
+
+    # Compute the fit with 30 points:
+    fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(-1, 1, 30) - x0)))
+    fit = [np.around(elem, 3) for elem in fit]
+
+    psych_curve = namedtuple('psych_curve',
+                             ['xdata',
+                              'ydata',
+                              'fit',
+                              'params',
+                              'fit_error'])
+
+    if len(ydata) == 0:
+        return psych_curve(xdata=[np.nan],
+                           ydata=[np.nan],
+                           fit=[np.nan] * 30,
+                           params=[np.nan] * 4,
+                           fit_error=[np.nan])
+    else:
+        return psych_curve(xdata=xdata,
+                           ydata=ydata,
+                           fit=fit,
+                           params=[k, x0, b, p],
+                           fit_error=fit_error)
