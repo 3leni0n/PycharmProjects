@@ -67,7 +67,8 @@ water_right = rewards_right * reward_size
 
 ########################################################################################################################
 
-fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches
+fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
+# fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
 ########################################################################################################################
 
@@ -120,11 +121,13 @@ ra_left = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.Sid
 ra_right = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 1)], 20)  # Right valid trials
 
 # Prepares the grid for the plots
-ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=1, colspan=3)
+ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=3)
 # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
-# Plot horizontal line at chance level
-ax1.axhline(0.5, color='tab:gray', linestyle='--')
+# Plot horizontal lines
+ax1.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+ax1.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+ax1.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
 # Plot accuracy rolling average
 ax1.plot(df_session.Hit[df_session.Miss == 0].index, ra_total, marker='o', color='black', label='Total')
@@ -138,12 +141,20 @@ ax1.set_xticklabels([])
 ax1.set_ylabel('Acc.\n(%)')
 ax1.set_ylim([0, 1.1])
 ax1.set_yticks(list(np.arange(0, 1.1, 0.1)))
-# ax1.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-ax1.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+ax1.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+# ax1.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
 ax1.legend(loc='lower right', fontsize='xx-small', frameon=True)
 ax1.spines['top'].set_visible(False)
 ax1.spines['bottom'].set_visible(False)
 #ax1.spines['right'].set_visible(False)
+
+# Instantiate a second axes that shares the same x-axis
+ax1_twin = ax1.twinx()
+ax1_twin.set_ylim([0, 1.1])
+ax1_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+ax1_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+ax1_twin.spines['top'].set_visible(False)
+ax1_twin.spines['bottom'].set_visible(False)
 
 # Plot text
 ax1.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
@@ -157,11 +168,13 @@ ra_rep = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.RepT
 ra_alt = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 0)], 20)
 
 # Prepares the grid for the plots
-ax2 = plt.subplot2grid((16, 4), (1, 0), rowspan=1, colspan=3)
+ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=3)
 # ax = plt.subplot2grid((4, 1), (1, 0))
 
-# Plot horizontal line at chance level
-ax2.axhline(0.5, color='tab:gray', linestyle='--')
+# Plot horizontal lines
+ax2.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+ax2.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
 # Plot accuracy rolling average
 ax2.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 0)].index, ra_alt, marker='o',
@@ -174,12 +187,20 @@ ax2.set_xticklabels([])
 ax2.set_ylabel('Acc.\n(%)')
 ax2.set_ylim([0, 1.1])
 ax2.set_yticks(list(np.arange(0, 1.1, 0.1)))
-# ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+# ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
 ax2.legend(loc='lower right', fontsize='xx-small', frameon=True)
 ax2.spines['top'].set_visible(False)
 ax2.spines['bottom'].set_visible(False)
 #ax2.spines['right'].set_visible(False)
+
+# Instantiate a second axes that shares the same x-axis
+ax2_twin = ax2.twinx()
+ax2_twin.set_ylim([0, 1.1])
+ax2_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+ax2_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+ax2_twin.spines['top'].set_visible(False)
+ax2_twin.spines['bottom'].set_visible(False)
 
 ########################################################################################################################
 
@@ -191,11 +212,13 @@ ra_left_miss = compute_window(df_session.Miss[df_session.Side == 0], 20)  # Left
 ra_right_miss = compute_window(df_session.Miss[df_session.Side == 1], 20)  # Right valid trials
 
 # Prepares the grid for the plots
-ax3 = plt.subplot2grid((16, 4), (2, 0), rowspan=1, colspan=3)
+ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=3)
 #ax3 = plt.subplot2grid((4, 1), (2, 0))
 
-# Plot horizontal line at chance level
-ax3.axhline(0.5, color='tab:gray', linestyle='--')
+# Plot horizontal lines
+ax3.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+ax3.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
 # Plot misses rolling average
 ax3.plot(df_session.index, ra_total_miss, marker='o', color='black', label='Total')
@@ -208,19 +231,27 @@ ax3.set_xticklabels([])
 ax3.set_ylim([0, 1.1])
 ax3.set_ylabel('Miss\n(%)')
 ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
-# ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-#ax3.legend(loc='lower right', fontsize='xx-small', frameon=True)
+ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+# ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+ax3.legend(loc='lower right', fontsize='xx-small', frameon=True)
 ax3.spines['top'].set_visible(False)
 ax3.spines['bottom'].set_visible(False)
 #ax3.spines['right'].set_visible(False)
+
+# Instantiate a second axes that shares the same x-axis
+ax3_twin = ax3.twinx()
+ax3_twin.set_ylim([0, 1.1])
+ax3_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+ax3_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+ax3_twin.spines['top'].set_visible(False)
+ax3_twin.spines['bottom'].set_visible(False)
 
 ########################################################################################################################
 
 # PLOT 4: HIT SCATTER PLOT
 
 # Prepares the grid for the plots
-ax4 = plt.subplot2grid((16, 4), (3, 0), rowspan=1, colspan=3)
+ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=2, colspan=3)
 # ax4 = plt.subplot2grid((4, 1), (3, 0))
 
 palette = ['tab:red', 'tab:green', 'grey']
@@ -236,24 +267,32 @@ if df_session.Stage.unique()[0] <= 3:  # No coherences, plot sides
 
 else:  # Plot coherences
     scatter = sns.scatterplot(df_session.index, df_session.Evidence, hue=hue, palette=palette, hue_order=hue_order)
-    # Plot horizontal line at chance level
-    ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence
-    # ax.axhline(0.5, color='tab:gray', linestyle='--')  # Coherence
+    # Plot horizontal lines
+    ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
+    ax4.axhline(-0.5, color='tab:gray', linestyle=':')  # Evidence -0.5
+    ax4.axhline(0.5, color='tab:gray', linestyle=':')  # Evidence 0.5
     ax4.set_ylim(-1.1, 1.1)  # Evidences
     # ax.set_ylim(0, 1)  # Coherences
     ax4.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-    ax4.set_yticklabels(['L', '', '', '', '', '', '', '', 'R'])  # Evidences
+    ax4.set_yticklabels(['L', '', '', '', '0', '', '', '', 'R'])  # Evidences
     # ax.set_yticklabels(['Left', '', '', '', '0.5', '', '',  '', 'Right'])  # Coherences
     ax4.set_ylabel('Evi.')
     # ax.set_ylabel('Coherence')
 
 ax4.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
-# ax4.set_xlabel('Trial')
+ax4.set_xlabel('Trial')
 # scatter.legend(bbox_to_anchor=(1, 1))
-#scatter.legend(loc='lower right', fontsize='xx-small', frameon=True)
-scatter.get_legend().remove()
+scatter.legend(loc='lower right', fontsize='xx-small', frameon=True)
+# scatter.get_legend().remove()
 ax4.spines['top'].set_visible(False)
 #ax4.spines['right'].set_visible(False)
+
+# Instantiate a second axes that shares the same x-axis
+ax4_twin = ax4.twinx()
+ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
+ax4_twin.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
+ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
+ax4_twin.spines['top'].set_visible(False)
 
 ########################################################################################################################
 
@@ -266,7 +305,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
 
     if k == 0:  # Left subplot: left trials
         # ax = plt.subplot2grid((1, 2), (0, 0))
-        ax = plt.subplot2grid((16, 4), (5, 0), rowspan=6, colspan=2)
+        ax = plt.subplot2grid((16, 4), (9, 0), rowspan=4, colspan=2)
         stim_color = 'tab:blue'
         ax.set_title('Left trials')
         # ax.set_xlabel('Time (s)')
@@ -277,7 +316,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
         ax.spines['right'].set_visible(False)
     else:  # Right subplot: right trials
         # ax = plt.subplot2grid((1, 2), (0, 1))
-        ax = plt.subplot2grid((16, 4), (5, 2), rowspan=6, colspan=2)
+        ax = plt.subplot2grid((16, 4), (9, 2), rowspan=4, colspan=2)
         stim_color = 'tab:orange'
         ax.set_title('Right trials')
         # ax.set_xlabel('Time (s)')
@@ -317,7 +356,9 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
             else:
                 ax.plot(df_session[df_session.Side == k].reset_index().Port1In[j][i] -
                         df_session[df_session.Side == k].reset_index().StimStart[j],
-                        df_session[df_session.Side == k].Port1In.reset_index().index[j], marker='o', color='tab:blue', markersize=200/len(df_session.Side==0))
+                        df_session[df_session.Side == k].Port1In.reset_index().index[j], marker='o', color='tab:blue',
+                        markersize=200/len(df_session.Side == 0))
+                        # markersize = ax.containers[1][0].get_height()
 
         # Right licks
         for i in range(len(df_session[df_session.Side == k].reset_index().Port2In[j])):  # n licks
@@ -327,7 +368,9 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
             else:
                 ax.plot(df_session[df_session.Side == k].reset_index().Port2In[j][i] -
                         df_session[df_session.Side == k].reset_index().StimStart[j],
-                        df_session[df_session.Side == k].reset_index().Port2In.index[j], marker='o', color='tab:orange', markersize=200/len(df_session.Side==1))
+                        df_session[df_session.Side == k].reset_index().Port2In.index[j], marker='o', color='tab:orange',
+                        markersize=200/len(df_session.Side == 1))
+                        # markersize = ax.containers[1][0].get_height()
 
     xlim[k] = [ax.get_xlim()]  # Store xlim from left and right plots
 
@@ -357,7 +400,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
 
     if k == 0:  # Left subplot: left trials
         # ax = plt.subplot2grid((1, 2), (0, 0))
-        ax = plt.subplot2grid((16, 4), (11, 0), rowspan=3, colspan=2)
+        ax = plt.subplot2grid((16, 4), (13, 0), rowspan=1, colspan=2)
         # ax.set_title('Left trials')
         #ax.set_xlabel('Time (s)')
         ax.set_xlim(xlim[k][0])  # Use the same xlim that left raster
@@ -367,7 +410,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
         ax.spines['right'].set_visible(False)
     else:  # Right subplot: right trials
         # ax = plt.subplot2grid((1, 2), (0, 1))
-        ax = plt.subplot2grid((16, 4), (11, 2), rowspan=3, colspan=2)
+        ax = plt.subplot2grid((16, 4), (13, 2), rowspan=1, colspan=2)
         # ax.set_title('Right trials')
         #ax.set_xlabel('Time (s)')
         ax.set_xlim(xlim[k][0])  # Use the same xlim that right raster
@@ -405,7 +448,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
             weights=np.repeat((1 / len(df_session[(df_session.Miss == 0) & (df_session.Side == 1)])) / bin_size,
                               len(histcounts_R)))
 
-ax.legend(loc='upper right', frameon=False)
+ax.legend(loc='upper right', fontsize='xx-small', frameon=True)
 
 ########################################################################################################################
 
@@ -472,6 +515,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
             weights=np.repeat((1 / len(df_session[(df_session.Miss == 0) & (df_session.Side == 1)])) / bin_size,
                               len(first_lick_R)))
 
+    ax.patch.set_facecolor('none')  # Make axes transparent so the xaxes labels from the upper plot are visible
 # ax.legend(loc='upper right')
 
 ########################################################################################################################
@@ -480,7 +524,7 @@ for k in range(len(df_session.Side.unique())):  # k=0 left trials and k=1 right 
 
 # fig = plt.figure()
 
-ax11 = plt.subplot2grid((16, 4), (2, 3), rowspan=2, colspan=1)
+ax11 = plt.subplot2grid((16, 4), (3, 3), rowspan=3, colspan=1)
 
 # Compute psychometric curves
 psych_curve = compute_psych_curve(df_session.Evidence[df_session.Miss == 0], df_session.Choice[df_session.Miss == 0])
@@ -532,7 +576,7 @@ ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
 
 # fig = plt.figure()
 
-ax12 = plt.subplot2grid((16, 4), (0, 3), rowspan=2, colspan=1)
+ax12 = plt.subplot2grid((16, 4), (0, 3), rowspan=3, colspan=1)
 ax12.set_xticks([])
 ax12.set_xticklabels([])
 ax12.set_yticks([])

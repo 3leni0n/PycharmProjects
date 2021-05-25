@@ -1,4 +1,7 @@
 # To do:
+# Add filename2 (sounds from Arduino)
+# Add envelopes per trial
+# Add Bpod variables per trial
 
 ########################################################################################################################
 
