@@ -151,7 +151,8 @@ def enterthematrix(filepath):
     # Import sounds DataFrame but only the filenames
     # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     # filepath_setup2 = '/home/setup2/'  # setup2 pc
-    df = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0]
+    # df = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
+    df = pd.read_csv(filepath)  # Import all columns
     # Create relevant arrays to build DataFrame columns
     evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
                           0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
@@ -162,11 +163,17 @@ def enterthematrix(filepath):
     # substages = np.array([0, 1, 2, 3, 1, 2, 3, 1, 2, 3, 0, 3, 2, 1, 3, 2, 1, 3, 2, 1, 0])
     substages = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
     # Create new DataFrame columns and fill them with the arrays created above
-    df['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
-    df['coherence'] = np.repeat(coherences, len(coherences) ** 2)
-    df['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
-    # df['stage'] = np.repeat(stages, len(stages) ** 2)
-    df['substage'] = np.repeat(substages, len(substages) ** 2)
+    df.insert(1, 'evidence', np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
+    df.insert(2, 'coherence', np.repeat(coherences, len(coherences) ** 2))
+    df.insert(3, 'difficulty', np.repeat(difficulties, len(difficulties) ** 2))
+    # df.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
+    df.insert(4, 'substage', np.repeat(substages, len(substages) ** 2))
+
+    # df['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
+    # df['coherence'] = np.repeat(coherences, len(coherences) ** 2)
+    # df['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
+    # # df['stage'] = np.repeat(stages, len(stages) ** 2)
+    # df['substage'] = np.repeat(substages, len(substages) ** 2)
     return df
 
 

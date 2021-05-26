@@ -129,11 +129,6 @@ for i in range(len(index) - 1):  # -1 to not take into account last trial
         miss.append(0)
         response.append(1)
 
-    # if pd.isnull(band[(band.TYPE == 'STATE') & (band.MSG == 'WrongLick')]['+INFO'].iloc[0]) == False:
-    #     wrong_lick.append(1)
-    # else:
-    #     wrong_lick.append(0)
-
     # I prefer to avoid try-except code blocks. Workaround: if stage 1 do this else pass
     try:
         if pd.isnull(band[(band.TYPE == 'STATE') & (band.MSG == 'WrongLick')]['+INFO'].iloc[0]) == False:
