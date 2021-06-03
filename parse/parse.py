@@ -1,40 +1,29 @@
 # To do:
 # Add envelopes per trial
 # Add Bpod variables per trial
+# Not to do las trial if session crashed
+# If CB was on, take the last REWARD_SIDE
+########################################################################################################################
+
+# Import modules
+import pandas as pd
+import numpy as np
+
 ########################################################################################################################
 
 # Define function
 def parse(path):
-
-    #####################################################################################################################
-
-    # Import modules
-    import pandas as pd
-    import numpy as np
 
     ####################################################################################################################
 
     # Path to csv (laptop)
     # path = '/home/alexis/PycharmProjects/parse/Test_Untitled task 30_20210408-193104/Test_Untitled task 30_20210408-193104.csv'  # 100 trials stage 4 with evidences
 
-    # 911
-    # path = '/home/alexis/PycharmProjects/parse/911_stage_training_20210526-200213.csv'
-    # path = '/home/alexis/PycharmProjects/parse/911_stage_training_20210527-192119.csv'  # No funka, delete
-    # path = '/home/alexis/PycharmProjects/parse/911_stage_training_20210527-193155.csv'
-    # path = '/home/alexis/PycharmProjects/parse/911_stage_training_20210528-172112.csv'
-    # path = '/home/alexis/2AFC/setups/911/sessions/911_stage_training_20210531-164052/911_stage_training_20210531-164052.csv'
-    # path = '/home/alexis/2AFC/setups/911/sessions/911_stage_training_20210531-170434/911_stage_training_20210531-170434.csv'
+    # path = '/home/alexis/2AFC/setups/911/sessions/911_stage_training_20210527-192119/911_stage_training_20210527-192119.csv'  # No funka, delete
 
-    # 913
-    # path = '/home/alexis/PycharmProjects/parse/913_stage_training_20210526-200753.csv'
-    # path = '/home/alexis/PycharmProjects/parse/913_stage_training_20210527-183854.csv'
-    # path = '/home/alexis/2AFC/setups/913/sessions/913_stage_training_20210531-155554/913_stage_training_20210531-155554.csv'
+    # path = '/home/alexis/2AFC/setups/913/sessions/913_stage_training_20210601-162220/913_stage_training_20210601-162220.csv'  # No funka, delete
 
-    # 915
-    # path = '/home/alexis/PycharmProjects/parse/915_stage_training_20210526-222555.csv'
-    # path = '/home/alexis/PycharmProjects/parse/915_stage_training_20210527-183235.csv'
-    # path = '/home/alexis/2AFC/setups/915/sessions/915_stage_training_20210531-154814/915_stage_training_20210531-154814.csv'
-    # path = '/home/alexis/2AFC/setups/915/sessions/915_stage_training_20210531-160354/915_stage_training_20210531-160354.csv'
+    # path = '/home/alexis/2AFC/setups/913/sessions/913_stage_training_20210601-164042/913_stage_training_20210601-164042.csv'
 
     # Path to csv (setup2)
 
@@ -63,7 +52,11 @@ def parse(path):
     bpod_api_version = [df[df.MSG == 'BPOD-API-VERSION']['+INFO'].iloc[0]] * n_trials
     session = [df[df.MSG == 'SESSION-NAME']['+INFO'].iloc[0]] * n_trials
     session_started = df[df.MSG == 'SESSION-STARTED']['+INFO'].iloc[0]
-    session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
+    # If the session ends abruptly due to an error, 'SESSION-ENDED' don't will show up
+    try:
+        session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
+    except IndexError:
+        session_ended = df.iloc[-1]['PC-TIME']
 
     # VAL
     # Bpod's VARs
@@ -176,17 +169,16 @@ def parse(path):
         trial_len.append(float(band[band.TYPE == 'INFO']['+INFO'].iloc[0]))
 
         # Stimulus timestamps (take BPOD-FINAL-TIME as the real timestamp of the TTL = BPOD-INITIAL-TIME + TTL duration)
-        stim_start.append(
-            band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0])
+        stim_start.append(float(
+            band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
         # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
         if miss[i] == 1:
-            stim_end.append(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0])
+            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
         elif punish[i] == 1:
-            stim_end.append(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0])
+            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
         else:  # Reward or WrongLick
-            stim_end.append(
-                band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0])
+            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
         stim_len.append(stim_end[i] - stim_start[i])
 
@@ -257,7 +249,7 @@ def parse(path):
     # Construct DataFrame
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
-               'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename 2', 'Evidence', 'EviRep', 'Coherence',
+               'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
                'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Timeout', 'Fixation', 'Stage', 'Substage', 'Motor',
                'REC',
                'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject',
@@ -277,5 +269,5 @@ def parse(path):
     return df_session
 
 
-if __name__ == "__main__":
-    parse()
+# if __name__ == "__main__":
+#     parse()
