@@ -7,5 +7,6 @@
     <orderEntry type="module" module-name="tasks" />
     <orderEntry type="module" module-name="toolsr" />
     <orderEntry type="module" module-name="datahandler" />
+    <orderEntry type="module" module-name="2AFC" />
   </component>
 </module>

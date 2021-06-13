@@ -4,6 +4,30 @@
 # Create and keep a different axis for every subplot (ax1, ax2, ax3, etc) instead of overwriting a single axis 'ax'
 # Psychometric curves for repeating and alternating evidence
 # Clean, dense to read!
+# Set timers per plot to know which one is causing the code to run slow af
+# Finish fixing bin_size --> weights
+
+"""
+# Tiffany's comments:
+
+1. Markers are too big in the trend plots (miss, accuracy, repeat).DONE
+2. You need to have better resolution of the Accuracy plot than of the Miss plot, so they shouldn't have the same size.
+   Same for Repeat/Alternate, especially in this early stages. DONE
+3. I see that you are plotting the psycometric already. I would have removed it and only display it when necessary,
+   specially in order to increase the size of other more important plots. You wanna have all the information needed at a
+   glance. DONE
+4. Raster plot.
+    a. Why are you plotting the stimulus? You already segregated by stimulus in two rasters, left and right. This is
+    only obscuring the view and adding confusion. If you wanna mark the sound duration, much lighter neutral color. DONE
+    b. Something still looks funny in the licks for me. Too much aligned to the left. Also, why do licks suddenly stop
+    on the right? DONE
+    c. Also, the display from -3 to 2 is not helpful. You wanna now what they do after reward as well, this -3 is not
+    useful and it will become even less useful in the future. Put something more like from -1 until end of trial (6?)
+    d. The psth for all the fist lick should have a much narrower window, you are mainly insterested in only the first 1
+     or 2s tops. Then you should also change the bin size to add more resolution. DONE
+    3. Also, but this is a more personal opinion, I wouldn't use bars to mark reward, punish and miss but rather an icon.
+    It's a single event, reward doesn't last the duration of the bar, for instance. Also it happens after a lick, not before.
+"""
 
 ########################################################################################################################
 
@@ -17,18 +41,16 @@ import pandas as pd
 import time
 import os
 
-from my_fun.my_fun import *
-from parse.parse import *
+from my_fun.my_fun import *  # Or from daily_report.daily_report import daily_report
+from parse.parse import *  # Or from parse.parse import parse
 
 ########################################################################################################################
 
 # Define function
 def daily_report(path):
 
-    ####################################################################################################################
-
     # Register time
-    time1 = time.time()
+    time_start_total = time.time()
 
     ####################################################################################################################
 
@@ -46,6 +68,12 @@ def daily_report(path):
 
     ####################################################################################################################
 
+    # Plotting style
+    ms = 3  # (mpl default for plt.plot=6 and for plt.scatter=6**2)
+    lw = 1.5  # mpl default
+
+    ####################################################################################################################
+
     # SUMMARY VARIABLES
     # Trials
     trials = len(df_session)
@@ -56,6 +84,11 @@ def daily_report(path):
     hits = df_session.Hit.sum().astype(int)
     hits_left = df_session.Hit[df_session.Side == 0].sum().astype(int)
     hits_right = df_session.Hit[df_session.Side == 1].sum().astype(int)
+
+    # Errors
+    errors = df_session.WrongLick.sum().astype(int) + df_session.Punish.sum().astype(int)
+    errors_left = df_session.WrongLick[df_session.Side == 0].sum().astype(int) + df_session.Punish[df_session.Side == 0].sum().astype(int)
+    errors_right = df_session.WrongLick[df_session.Side == 1].sum().astype(int) + df_session.Punish[df_session.Side == 1].sum().astype(int)
 
     # Performance
     performance = hits / trials
@@ -95,7 +128,6 @@ def daily_report(path):
 
     ####################################################################################################################
 
-    # with PdfPages('multipage_pdf.pdf') as pdf:
     with PdfPages(df_session.Session.unique()[0]) as pdf:
 
         # PAGE 1
@@ -103,51 +135,69 @@ def daily_report(path):
         fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
         # fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
-        ####################################################################################################################
+        ################################################################################################################
 
         # SUMMARY TEXT
 
         s1 = ('Date: ' + df_session.Date.unique()[0] + ', ' +
-              'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][
-                                                                             0:-7] + '\n')
+              'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][0:-7] + ', ' +
+              'Subject: ' + df_session.Subject.unique()[0] + ', ' +
+              'Box: ' + df_session.Board.unique()[0][4] +
+              '\n')
         # [0:-7] to get rid of the floating numbers in the seconds
 
-        s2 = ('Subject: ' + df_session.Subject.unique()[0] + ', ' +
-              'Box: ' + df_session.Board.unique()[0][4] + ', ' +
-              'Stage: ' + str(df_session.Stage.unique()[0]) + ', ' +
+        s2 = ('Stage: ' + str(df_session.Stage.unique()[0]) + ', ' +
               'Substage: ' + str(df_session.Substage.unique()[0]) + ', ' +
               'Fixation: ' + str(df_session.Fixation.unique()[0]) + ', ' +
               'Timeout: ' + str(df_session.Timeout.unique()[0]) + ', ' +
-              # 'Switch: ' + tr(df_session.Switch.unique()[0]) + ', ' +
-              'Motor: ' + str(df_session.Motor.unique()[0]) + '\n')
+              'Switch: ' + str(df_session.Switch.unique()[0]) + ', ' +
+              'Motor: ' + str(df_session.Motor.unique()[0]) + ', ' +
+              'CB: ' + str(df_session.CB.unique()[0]) + ', ' +
+              'Progression: ' + str(df_session.Progression.unique()[0]) +
+              '\n')
 
-        s3 = ('Total trials: ' + str(trials) + ', ' +
-              'Performance: ' + str(round(performance * 100)) + '%' + ', ' +
-              'Hits left:' + str(hits_left) + ' (' + str(round(performance_left * 100)) + '%)' + ', ' +
-              'Hits right: ' + str(hits_right) + ' (' + str(round(performance_right * 100)) + '%)' + '\n')
+        # s3 = ('Total trials: ' + str(trials) + ', ' +
+        #       'Performance: ' + str(round(performance * 100)) + '%' + ', ' +
+        #       'Hits left:' + str(hits_left) + ' (' + str(round(performance_left * 100)) + '%)' + ', ' +
+        #       'Hits right: ' + str(hits_right) + ' (' + str(round(performance_right * 100)) + '%)' +
+        #       '\n')
 
-        s4 = ('Responses: ' + str(responses) + ', ' +
-              'Accuracy: ' + str(round(accuracy * 100)) + '%' + ', ' +
-              'Hits left: ' + str(hits_left) + ' (' + str(round(accuracy_left * 100)) + '%)' + ', ' +
-              'Hits right: ' + str(hits_right) + ' (' + str(round(accuracy_right * 100)) + '%)' + '\n')
+        s3 = ('Total trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
+              'Performance: ' + str(round(performance * 100)) + '% (' + str(round(performance_left * 100)) + '% L, ' + str(round(performance_right * 100)) + '% R)' + ', ' +
+              'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(round(accuracy_right * 100)) + '% R)' +
+              '\n')
+
+        # s4 = ('Responses: ' + str(responses) + ', ' +
+        #       'Accuracy: ' + str(round(accuracy * 100)) + '%' + ', ' +
+        #       'Hits left: ' + str(hits_left) + ' (' + str(round(accuracy_left * 100)) + '%)' + ', ' +
+        #       'Hits right: ' + str(hits_right) + ' (' + str(round(accuracy_right * 100)) + '%)' +
+        #       '\n')
+
+        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(responses_right) + ' R)' + ', ' +
+              'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
+              'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' +
+              '\n')
 
         s5 = ('Misses: ' + str(misses) + ' (' + str(round(miss_rate * 100, 1)) + '%)' + ', ' +
               'Miss left: ' + str(misses_left) + ' (' + str(round(miss_rate_left * 100)) + '%)' + ', ' +
-              'Miss right: ' + str(misses_right) + ' (' + str(round(miss_rate_right * 100)) + '%)' + '\n')
+              'Miss right: ' + str(misses_right) + ' (' + str(round(miss_rate_right * 100)) + '%)' +
+              '\n')
 
         s6 = ('Water: ' + str(water) + 'μL' + ', ' +
               'Water left: ' + str(water_left) + 'μL' + ', ' +
               'Water right: ' + str(water_right) + 'μL' + ', ' +
-              'AW: ' + str(df_session.AW.unique()[0]) + 'μL' + '\n')
+              'AW: ' + str(df_session.AW.unique()[0]) + 'μL' +
+              '\n')
 
         # plt.text(0.1, 0.90, s1 + s2 + s3 + s4 + s5 + s6, fontsize=8, transform=plt.gcf().transFigure)
-        # plt.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
 
         ####################################################################################################################
 
         # fig = plt.figure()
 
         # PLOT 1: ACCURACY PER SIDE
+
+        time_start_acc_side = time.time()
 
         # Compute accuracy rolling average
         ra_total = compute_window(df_session.Hit[df_session.Miss == 0], 20)  # All valid trials
@@ -157,7 +207,7 @@ def daily_report(path):
                                   20)  # Right valid trials
 
         # Prepares the grid for the plots
-        ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
+        ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
         # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
         # Plot horizontal lines
@@ -166,11 +216,14 @@ def daily_report(path):
         ax1.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot accuracy rolling average
-        ax1.plot(df_session.Hit[df_session.Miss == 0].index, ra_total, marker='o', color='black', label='Total')
-        ax1.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 0)].index, ra_left, marker='o',
+        ax1.plot(df_session.Hit[df_session.Miss == 0].index, ra_total, marker='o', ms=ms, lw=lw, color='black',
+                 label='Total')
+        ax1.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 0)].index, ra_left, marker='o', ms=ms,
+                 lw=lw,
                  color='tab:blue',
                  label='Left')
-        ax1.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 1)].index, ra_right, marker='o',
+        ax1.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 1)].index, ra_right, marker='o', ms=ms,
+                 lw=lw,
                  color='tab:orange',
                  label='Right')
 
@@ -194,19 +247,25 @@ def daily_report(path):
         ax1_twin.spines['top'].set_visible(False)
         ax1_twin.spines['bottom'].set_visible(False)
 
+        time_end_acc_side = time.time()
+        runtime_acc_side = time_end_acc_side - time_start_acc_side
+        print("'Plot 1: accuracy per side' took", round(runtime_acc_side, 2), 'seconds to run')
+
         # Plot text
         ax1.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
 
-        ####################################################################################################################
+        ################################################################################################################
 
         # PLOT 2: REPEATING VS ALTERNATING ACCURACY
+
+        time_start_acc_repalt = time.time()
 
         # Compute accuracy rolling average for repeating vs alternating trials
         ra_rep = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 1)], 20)
         ra_alt = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 0)], 20)
 
         # Prepares the grid for the plots
-        ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
+        ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
         # ax = plt.subplot2grid((4, 1), (1, 0))
 
         # Plot horizontal lines
@@ -215,10 +274,10 @@ def daily_report(path):
         ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot accuracy rolling average
-        ax2.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 0)].index, ra_alt, marker='o',
-                 color='tab:purple', label='Alt')
-        ax2.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 1)].index, ra_rep, marker='o',
-                 color='tab:brown', label='Rep')
+        ax2.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 0)].index, ra_alt, marker='o', ms=ms,
+                 lw=lw, color='tab:purple', label='Alt')
+        ax2.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 1)].index, ra_rep, marker='o', ms=ms,
+                 lw=lw, color='tab:brown', label='Rep')
 
         ax2.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
         ax2.set_xticklabels([])
@@ -240,9 +299,15 @@ def daily_report(path):
         ax2_twin.spines['top'].set_visible(False)
         ax2_twin.spines['bottom'].set_visible(False)
 
-        ####################################################################################################################
+        time_end_acc_repalt = time.time()
+        runtime_acc_repalt = time_end_acc_repalt - time_start_acc_repalt
+        print("'Plot 2: accuracy repeating vs alternating' took", round(runtime_acc_repalt, 2), 'seconds to run')
+
+        ################################################################################################################
 
         # PLOT 3: MISSES
+
+        time_start_miss = time.time()
 
         # Compute accuracy rolling average
         ra_total_miss = compute_window(df_session.Miss, 20)  # All valid trials
@@ -250,7 +315,7 @@ def daily_report(path):
         ra_right_miss = compute_window(df_session.Miss[df_session.Side == 1], 20)  # Right valid trials
 
         # Prepares the grid for the plots
-        ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
+        ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
         # ax3 = plt.subplot2grid((4, 1), (2, 0))
 
         # Plot horizontal lines
@@ -259,9 +324,11 @@ def daily_report(path):
         ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot misses rolling average
-        ax3.plot(df_session.index, ra_total_miss, marker='o', color='black', label='Total')
-        ax3.plot(df_session[df_session.Side == 0].index, ra_left_miss, marker='o', color='tab:blue', label='Left')
-        ax3.plot(df_session[df_session.Side == 1].index, ra_right_miss, marker='o', color='tab:orange', label='Right')
+        ax3.plot(df_session.index, ra_total_miss, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax3.plot(df_session[df_session.Side == 0].index, ra_left_miss, marker='o', ms=ms, lw=lw, color='tab:blue',
+                 label='Left')
+        ax3.plot(df_session[df_session.Side == 1].index, ra_right_miss, marker='o', ms=ms, lw=lw, color='tab:orange',
+                 label='Right')
 
         ax3.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
         ax3.set_xticklabels([])
@@ -284,12 +351,18 @@ def daily_report(path):
         ax3_twin.spines['top'].set_visible(False)
         ax3_twin.spines['bottom'].set_visible(False)
 
+        time_end_miss = time.time()
+        runtime_miss = time_end_miss - time_start_miss
+        print("'Plot 3: misses' took", round(runtime_miss, 2), 'seconds to run')
+
         ####################################################################################################################
 
         # PLOT 4: HIT SCATTER PLOT
 
+        time_start_hit = time.time()
+
         # Prepares the grid for the plots
-        ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=2, colspan=4)
+        ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
         # ax4 = plt.subplot2grid((4, 1), (3, 0))
 
         palette = ['tab:red', 'tab:green', 'grey']
@@ -297,15 +370,23 @@ def daily_report(path):
         hue_order = ['Error', 'Hit', 'Miss']
 
         if df_session.Stage.unique()[0] <= 3:  # No coherences, plot sides
-            scatter = sns.scatterplot(df_session.index, df_session.Side, hue=hue, palette=palette, hue_order=hue_order)
+            scatter = sns.scatterplot(x=df_session.index, y=df_session.Side, hue=hue, palette=palette, hue_order=hue_order,
+                                      s=ms ** 2)
             ax4.set_ylim(-0.8, 1.8)
             ax4.set_yticks([0, 1])
             ax4.set_yticklabels(['L', 'R'])
             ax4.set_ylabel('Sides')
 
+            # Instantiate a second axes that shares the same x-axis
+            ax4_twin = ax4.twinx()
+            ax4_twin.set_ylim(-0.8, 1.8)  # Evidences
+            ax4_twin.set_yticks([0, 1])
+            ax4_twin.set_yticklabels(['L', 'R'])
+            ax4_twin.spines['top'].set_visible(False)
+
         else:  # Plot coherences
-            scatter = sns.scatterplot(df_session.index, df_session.Evidence, hue=hue, palette=palette,
-                                      hue_order=hue_order)
+            scatter = sns.scatterplot(x=df_session.index, y=df_session.Evidence, hue=hue, palette=palette,
+                                      hue_order=hue_order, s=ms ** 2)
             # Plot horizontal lines
             ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
             ax4.axhline(-0.5, color='tab:gray', linestyle=':')  # Evidence -0.5
@@ -318,6 +399,13 @@ def daily_report(path):
             ax4.set_ylabel('Evi.')
             # ax.set_ylabel('Coherence')
 
+            # Instantiate a second axes that shares the same x-axis
+            ax4_twin = ax4.twinx()
+            ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
+            ax4_twin.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
+            ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
+            ax4_twin.spines['top'].set_visible(False)
+
         ax4.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
         ax4.set_xlabel('Trial')
         # scatter.legend(bbox_to_anchor=(1, 1))
@@ -326,12 +414,9 @@ def daily_report(path):
         ax4.spines['top'].set_visible(False)
         # ax4.spines['right'].set_visible(False)
 
-        # Instantiate a second axes that shares the same x-axis
-        ax4_twin = ax4.twinx()
-        ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
-        ax4_twin.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-        ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
-        ax4_twin.spines['top'].set_visible(False)
+        time_end_hit = time.time()
+        runtime_hit = time_end_hit - time_start_hit
+        print("'Plot 4: misses' took", round(runtime_hit, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -340,7 +425,7 @@ def daily_report(path):
         # if len(df_session.Evidence.unique()) > 2:  # Only draw PC if evidences are introduced
 
         # fig = plt.figure()
-
+        """
         ax11 = plt.subplot2grid((16, 4), (10, 2), rowspan=7, colspan=2)
 
         # Compute psychometric curves
@@ -404,12 +489,17 @@ def daily_report(path):
         ax12.set_yticklabels([])
         ax12.text(0.5, 0.5, 'Intersession\ndata will go here', horizontalalignment='center', verticalalignment='center',
                   transform=ax12.transAxes)
-
+        """
+        time_start_savepag1 = time.time()
         pdf.savefig()  # saves the current figure into a pdf page
+        time_end_savepag1 = time.time()
+        runtime_savepag1 = time_end_savepag1 - time_start_savepag1
+        print("'Saving 1st page in pdf' took", round(runtime_savepag1, 2), 'seconds to run')
+
         plt.close()
 
-        ####################################################################################################################
-        ####################################################################################################################
+        ################################################################################################################
+        ################################################################################################################
 
         # PAGE 2
 
@@ -417,6 +507,8 @@ def daily_report(path):
         # fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
         # PLOT 5: PERISTIMULUS LICK RASTER
+
+        time_start_raster = time.time()
 
         # fig = plt.figure()
         xlim = [[], []]  # Initialize empty list to store left and right xlim
@@ -452,13 +544,13 @@ def daily_report(path):
                         df_session[df_session.Side == k].reset_index().StimLen,
                         left=df_session[df_session.Side == k].reset_index().StimStart[j] -
                              df_session[df_session.Side == k].reset_index().StimStart[j],
-                        color=stim_color, label='Stim', zorder=1)  # Need to specify zorder otherwise response window is
-                # plotted under stimulus length and can't be seen
+                        color=stim_color, alpha=0.01, label='Stim', zorder=1)  # Need to specify zorder otherwise
+                # response window is plotted under stimulus length and can't be seen
 
                 # Define response window color according to trial outcome
-                # if df_session[df_session.Side == k].reset_index().WrongLick[j] == 1.0:
-                #     resp_win_color = 'tab:pink'
-                if df_session[df_session.Side == k].reset_index().Hit[j] == 0.0:
+                if df_session[df_session.Side == k].reset_index().WrongLick[j] == 1.0:
+                    resp_win_color = 'tab:pink'
+                elif df_session[df_session.Side == k].reset_index().Hit[j] == 0.0:
                     resp_win_color = 'tab:red'
                 elif df_session[df_session.Side == k].reset_index().Hit[j] == 1.0:
                     resp_win_color = 'tab:green'
@@ -495,8 +587,8 @@ def daily_report(path):
                         ax.plot(df_session[df_session.Side == k].reset_index().Port1In[j][i] -
                                 df_session[df_session.Side == k].reset_index().StimStart[j],
                                 df_session[df_session.Side == k].Port1In.reset_index().index[j], marker='o', ms=ms,
-                                mec=mec, mew=mew, color='tab:blue')
-                                # markersize=200 / len(df_session.Side == 0))
+                                mec=mec, mew=mew, color='tab:blue', zorder=3)
+                        # markersize=200 / len(df_session.Side == 0))
                         # markersize = ax.containers[1][0].get_height()
 
                 # Right licks
@@ -522,27 +614,34 @@ def daily_report(path):
                         ax.plot(df_session[df_session.Side == k].reset_index().Port2In[j][i] -
                                 df_session[df_session.Side == k].reset_index().StimStart[j],
                                 df_session[df_session.Side == k].reset_index().Port2In.index[j], marker='o', ms=ms,
-                                mec=mec, mew=mew, color='tab:orange')
-                                # markersize=200 / len(df_session.Side == 1))
+                                mec=mec, mew=mew, color='tab:orange', zorder=3)
+                        # markersize=200 / len(df_session.Side == 1))
                         # markersize = ax.containers[1][0].get_height()
 
             xlim[k] = [ax.get_xlim()]  # Store xlim from left and right plots
+            ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
 
         # Custom legend
         legend_elements = [Patch(facecolor='tab:blue', label='Stim. left'),
                            Patch(facecolor='tab:orange', label='Stim. right'),
                            Patch(facecolor='tab:green', label='Correct'),
                            Patch(facecolor='tab:red', label='Error'),
-                           # Patch(facecolor='tab:pink', label='WrongLick'),
+                           Patch(facecolor='tab:pink', label='WrongLick'),
                            Patch(facecolor='tab:gray', label='Miss'),
                            Line2D([0], [0], marker='o', color='w', label='Left licks', markerfacecolor='tab:blue'),
                            Line2D([0], [0], marker='o', color='w', label='Right licks', markerfacecolor='tab:orange')]
 
         ax.legend(handles=legend_elements, loc='upper right', fontsize='xx-small', frameon=True)
 
-        ####################################################################################################################
+        time_end_raster = time.time()
+        runtime_raster = time_end_raster - time_start_raster
+        print("'Plot 5: peristimulus lick raster' took", round(runtime_raster, 2), 'seconds to run')
 
-        # PLOT 6: PERISTIMULUS LICK HISTOGRAM
+        ################################################################################################################
+
+        # PLOT 6: PERISTIMULUS ALL LICKS HISTOGRAM
+
+        time_start_psth_all = time.time()
 
         # fig = plt.figure()
 
@@ -596,19 +695,28 @@ def daily_report(path):
             # ax.hist(histcounts_L, density=True, histtype='step', color='tab:blue', label='Left licks')
             # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
 
-            ax.hist(histcounts_L, histtype='step', color='tab:blue', label='Left licks', bins=np.arange(0, 4, bin_size),
+            ax.hist(histcounts_L, histtype='step', color='tab:blue', label='Left licks',
+                    bins=np.linspace(-2, xlim[k][0][1]),
                     weights=np.repeat((1 / len(df_session[(df_session.Miss == 0) & (df_session.Side == 0)])) / bin_size,
                                       len(histcounts_L)))
             ax.hist(histcounts_R, histtype='step', color='tab:orange', label='Right licks',
-                    bins=np.arange(0, 4, bin_size),
+                    bins=np.linspace(-2, xlim[k][0][1]),
                     weights=np.repeat((1 / len(df_session[(df_session.Miss == 0) & (df_session.Side == 1)])) / bin_size,
                                       len(histcounts_R)))
 
+            ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+
         ax.legend(loc='upper right', fontsize='xx-small', frameon=True)
 
-        ####################################################################################################################
+        time_end_psth_all = time.time()
+        runtime_psth_all = time_end_psth_all - time_start_psth_all
+        print("'Plot 6: peristimulus lick histogram (all licks)' took", round(runtime_psth_all, 2), 'seconds to run')
+
+        ################################################################################################################
 
         # PLOT 7: PERISTIMULUS FIRST LICK HISTOGRAM
+
+        time_start_psth_first = time.time()
 
         # fig = plt.figure()
 
@@ -621,6 +729,7 @@ def daily_report(path):
                 # ax = plt.subplot2grid((1, 2), (0, 0))
                 ax = plt.subplot2grid((16, 4), (15, 0), rowspan=1, colspan=2)
                 # ax.set_title('Left trials')
+                ax.set_xlim([0, 2])  # Only interested in what happens during the first 2s
                 ax.set_xlabel('Time (s)')
                 ax.set_ylabel('First lick\n(licks/s)')
                 ax.spines['top'].set_visible(False)
@@ -630,6 +739,7 @@ def daily_report(path):
                 # ax = plt.subplot2grid((1, 2), (0, 1))
                 ax = plt.subplot2grid((16, 4), (15, 2), rowspan=1, colspan=2)
                 # ax.set_title('Right trials')
+                ax.set_xlim([0, 2])
                 ax.set_xlabel('Time (s)')
                 ax.spines['top'].set_visible(False)
                 ax.spines['right'].set_visible(False)
@@ -676,29 +786,35 @@ def daily_report(path):
             # ax.hist(first_lick_L, density=True, histtype='step', color='tab:blue', label='Left')
             # ax.hist(first_lick_R, density=True, histtype='step', color='tab:orange', label='Right')
 
-            ax.hist(first_lick_L, histtype='step', color='tab:blue', label='Left licks', bins=np.arange(0, 4, bin_size),
+            ax.hist(first_lick_L, histtype='step', color='tab:blue', label='Left licks', bins=np.linspace(0, 2),
                     weights=np.repeat((1 / len(df_session[(df_session.Miss == 0) & (df_session.Side == 0)])) / bin_size,
                                       len(first_lick_L)))
             ax.hist(first_lick_R, histtype='step', color='tab:orange', label='Right licks',
-                    bins=np.arange(0, 4, bin_size),
+                    bins=np.linspace(0, 2),
                     weights=np.repeat((1 / len(df_session[(df_session.Miss == 0) & (df_session.Side == 1)])) / bin_size,
                                       len(first_lick_R)))
 
             ax.patch.set_facecolor('none')  # Make axes transparent so the xaxes labels from the upper plot are visible
         # ax.legend(loc='upper right')
 
+        time_end_psth_first = time.time()
+        runtime_psth_first = time_end_psth_first - time_start_psth_first
+        print("'Plot 7: peristimulus lick histogram (first licks)' took", round(runtime_psth_first, 2), 'seconds to run')
+
+        time_start_savepag2 = time.time()
         pdf.savefig()  # saves the current figure into a pdf page
+        time_end_savepag2 = time.time()
+        runtime_savepag2 = time_end_savepag2 - time_start_savepag2
+        print("'Saving 2nd page in pdf' took", round(runtime_savepag2, 2), 'seconds to run')
+
         plt.close()
 
     ####################################################################################################################
 
     # Register time again and compute the total run time of the script
-    time2 = time.time()
-    run_time = time2 - time1
-    print('The script took', run_time, 'seconds to run')
-
-# daily_report('/home/alexis/2AFC/setups/913/sessions/913_stage_training_20210601-164042/913_stage_training_20210601-164042.csv')
-
+    time_end_total = time.time()
+    runtime_total = time_end_total - time_start_total
+    print('The script took', round(runtime_total, 2), 'seconds to run')
 
 # if __name__ == "__main__":
 #     daily_report()

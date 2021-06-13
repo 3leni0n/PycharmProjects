@@ -3,6 +3,9 @@
 # Add Bpod variables per trial
 # Not to do las trial if session crashed
 # If CB was on, take the last REWARD_SIDE
+# Include the new VARs in upper text
+# Changed reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[0] to ...[-1], so it takes the last vector when
+# overwritten by CB
 ########################################################################################################################
 
 # Import modules
@@ -19,12 +22,6 @@ def parse(path):
     # Path to csv (laptop)
     # path = '/home/alexis/PycharmProjects/parse/Test_Untitled task 30_20210408-193104/Test_Untitled task 30_20210408-193104.csv'  # 100 trials stage 4 with evidences
 
-    # path = '/home/alexis/2AFC/setups/911/sessions/911_stage_training_20210527-192119/911_stage_training_20210527-192119.csv'  # No funka, delete
-
-    # path = '/home/alexis/2AFC/setups/913/sessions/913_stage_training_20210601-162220/913_stage_training_20210601-162220.csv'  # No funka, delete
-
-    # path = '/home/alexis/2AFC/setups/913/sessions/913_stage_training_20210601-164042/913_stage_training_20210601-164042.csv'
-
     # Path to csv (setup2)
 
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
@@ -32,9 +29,8 @@ def parse(path):
 
     ####################################################################################################################
 
-    index = df[
-        df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous one
-    # index = df[df['TYPE'] == 'END-TRIAL'].index
+    index = df[df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous
+    # one index = df[df['TYPE'] == 'END-TRIAL'].index
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
     # METADATA (multiply by n_trials)
@@ -61,15 +57,18 @@ def parse(path):
     # VAL
     # Bpod's VARs
     aw = [int(df[df.MSG == 'VAR_AW']['+INFO'].iloc[0])] * n_trials
+    switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
     timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
     fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
     stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
     substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
     motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
     rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
+    progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
+    cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
 
     # Registered values (out of loop)
-    reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[0]
+    reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
     valve_1 = [float(df[df.MSG == 'VALVE_1']['+INFO'].iloc[0])] * n_trials
     valve_2 = [float(df[df.MSG == 'VALVE_2']['+INFO'].iloc[0])] * n_trials
 
@@ -197,7 +196,13 @@ def parse(path):
 
         # Registered values (within loop)
         filename.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME')]['+INFO'].iloc[0])  # Bpod sounds
-        filename2.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME2')]['+INFO'].iloc[0])  # Arduino sounds
+
+        try:
+            filename2.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME2')]['+INFO'].iloc[0])  # Arduino
+            # sounds
+        except IndexError:
+            filename2.append(np.nan)
+
         evidence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'EVIDENCE')]['+INFO'].iloc[0]))
         coherence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'COHERENCE')]['+INFO'].iloc[0]))
         # Sound filename + sound2 filename + coherence/evidence + presented coherences/evidences
@@ -250,16 +255,15 @@ def parse(path):
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
-               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Timeout', 'Fixation', 'Stage', 'Substage', 'Motor',
-               'REC',
-               'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject',
-               'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
+               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Substage',
+               'Motor', 'REC', 'Progression', 'CB', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment',
+               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
-                    port1in, port1out, port2in, port2out, aw, timeout, fixation, stage, substage, motor, rec,
-                    serial_port, protocol, creator, project, experiment, board, setup, net_port, subject,
+                    port1in, port1out, port2in, port2out, aw, switch, timeout, fixation, stage, substage, motor, rec,
+                    progression, cb, serial_port, protocol, creator, project, experiment, board, setup, net_port, subject,
                     bpod_api_version, session, date, time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)

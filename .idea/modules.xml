@@ -2,10 +2,11 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$USER_HOME$/2AFC/.idea/2AFC.iml" filepath="$USER_HOME$/2AFC/.idea/2AFC.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/PycharmProjects.iml" filepath="$PROJECT_DIR$/.idea/PycharmProjects.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../datahandler/.idea/datahandler.iml" filepath="$PROJECT_DIR$/../datahandler/.idea/datahandler.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../pv_nmdar_eranet/tasks/.idea/tasks.iml" filepath="$PROJECT_DIR$/../pv_nmdar_eranet/tasks/.idea/tasks.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../toolsr/.idea/toolsr.iml" filepath="$PROJECT_DIR$/../toolsr/.idea/toolsr.iml" />
+      <module fileurl="file://$USER_HOME$/datahandler/.idea/datahandler.iml" filepath="$USER_HOME$/datahandler/.idea/datahandler.iml" />
+      <module fileurl="file://$USER_HOME$/pv_nmdar_eranet/tasks/.idea/tasks.iml" filepath="$USER_HOME$/pv_nmdar_eranet/tasks/.idea/tasks.iml" />
+      <module fileurl="file://$USER_HOME$/toolsr/.idea/toolsr.iml" filepath="$USER_HOME$/toolsr/.idea/toolsr.iml" />
     </modules>
   </component>
 </project>
