@@ -814,7 +814,7 @@ def daily_report(path):
     # Register time again and compute the total run time of the script
     time_end_total = time.time()
     runtime_total = time_end_total - time_start_total
-    print('The script took', round(runtime_total, 2), 'seconds to run')
+    print('The script took', round(runtime_total, 2), 'seconds to run', '\n')
 
 # if __name__ == "__main__":
 #     daily_report()

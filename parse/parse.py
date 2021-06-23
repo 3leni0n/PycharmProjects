@@ -52,7 +52,9 @@ def parse(path):
     try:
         session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
     except IndexError:
-        session_ended = df.iloc[-1]['PC-TIME']
+        # session_ended = df['PC-TIME'].iloc[-1]
+        session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
+        print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
 
     # VAL
     # Bpod's VARs
