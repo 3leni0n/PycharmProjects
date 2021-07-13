@@ -1,8 +1,14 @@
+# To do:
+# Select what sessions to do the reports
+# Choose between plotting together sessions from the same day (with maybe a vertical red line) to separate them, or
+# in separate reports
+
+########################################################################################################################
+
 import os
 import time
 
 from daily_report.daily_report import daily_report
-
 
 ########################################################################################################################
 

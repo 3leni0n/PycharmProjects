@@ -6,6 +6,7 @@
 # Clean, dense to read!
 # Set timers per plot to know which one is causing the code to run slow af
 # Finish fixing bin_size --> weights
+# In motor 2 the stimulus is only plotted in miss and error trials (but not incorrect ones)
 
 """
 # Tiffany's comments:
@@ -183,10 +184,10 @@ def daily_report(path):
               'Miss right: ' + str(misses_right) + ' (' + str(round(miss_rate_right * 100)) + '%)' +
               '\n')
 
-        s6 = ('Water: ' + str(water) + 'μL' + ', ' +
-              'Water left: ' + str(water_left) + 'μL' + ', ' +
-              'Water right: ' + str(water_right) + 'μL' + ', ' +
-              'AW: ' + str(df_session.AW.unique()[0]) + 'μL' +
+        s6 = ('Water: ' + str(water) + ' μL' + ', ' +
+              'Water left: ' + str(water_left) + ' μL' + ', ' +
+              'Water right: ' + str(water_right) + ' μL' + ', ' +
+              'AW: ' + str(df_session.AW.unique()[0]) + ' μL' +
               '\n')
 
         # plt.text(0.1, 0.90, s1 + s2 + s3 + s4 + s5 + s6, fontsize=8, transform=plt.gcf().transFigure)
@@ -206,8 +207,15 @@ def daily_report(path):
         ra_right = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 1)],
                                   20)  # Right valid trials
 
+        # # Prepares the grid for the plots
+        # ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
+        # # ax1 = plt.subplot2grid((4, 1), (0, 0))
+
         # Prepares the grid for the plots
-        ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
+        if df_session.Stage.unique()[0] == 4:
+            ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=3, colspan=4)
+        else:
+            ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
         # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
         # Plot horizontal lines
@@ -265,8 +273,11 @@ def daily_report(path):
         ra_alt = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 0)], 20)
 
         # Prepares the grid for the plots
-        ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
-        # ax = plt.subplot2grid((4, 1), (1, 0))
+        if df_session.Stage.unique()[0] == 4:
+            ax2 = plt.subplot2grid((16, 4), (3, 0), rowspan=2, colspan=4)
+        else:
+            ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
+        # ax2 = plt.subplot2grid((4, 1), (1, 0))
 
         # Plot horizontal lines
         ax2.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -315,7 +326,10 @@ def daily_report(path):
         ra_right_miss = compute_window(df_session.Miss[df_session.Side == 1], 20)  # Right valid trials
 
         # Prepares the grid for the plots
-        ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
+        if df_session.Stage.unique()[0] == 4:
+            ax3 = plt.subplot2grid((16, 4), (5, 0), rowspan=2, colspan=4)
+        else:
+            ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
         # ax3 = plt.subplot2grid((4, 1), (2, 0))
 
         # Plot horizontal lines
@@ -362,7 +376,10 @@ def daily_report(path):
         time_start_hit = time.time()
 
         # Prepares the grid for the plots
-        ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
+        if df_session.Stage.unique()[0] == 4:
+            ax4 = plt.subplot2grid((16, 4), (7, 0), rowspan=3, colspan=4)
+        else:
+            ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
         # ax4 = plt.subplot2grid((4, 1), (3, 0))
 
         palette = ['tab:red', 'tab:green', 'grey']
@@ -422,66 +439,68 @@ def daily_report(path):
 
         # PLOT 8: PSYCOMETRIC CURVE
 
-        # if len(df_session.Evidence.unique()) > 2:  # Only draw PC if evidences are introduced
+        # Only draw PC if evidences are introduced (stage 4)
+        if len(df_session.Evidence.unique()) > 2 and df_session.Stage.unique()[0] == 4:
 
-        # fig = plt.figure()
-        """
-        ax11 = plt.subplot2grid((16, 4), (10, 2), rowspan=7, colspan=2)
+            # fig = plt.figure()
 
-        # Compute psychometric curves
-        psych_curve = compute_psych_curve(df_session.Evidence[df_session.Miss == 0],
-                                          df_session.Choice[df_session.Miss == 0])
-        psych_curve_rep = compute_psych_curve(df_session.EviRep, df_session.RepChoice)
+            ax11 = plt.subplot2grid((16, 4), (11, 0), rowspan=5, colspan=2)
 
-        # Plot horizontal and vertical lines
-        ax11.axhline(0.5, color='tab:gray', ls='--')
-        ax11.axvline(0., color='tab:gray', ls='--')
+            # Compute psychometric curves
+            psych_curve = compute_psych_curve(df_session.Evidence[df_session.Miss == 0],
+                                              df_session.Choice[df_session.Miss == 0])
+            psych_curve_rep = compute_psych_curve(df_session.EviRep, df_session.RepChoice)
 
-        # Plot psychometric curve and errorbars
-        ax11.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='k', label='L-R')
-        ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, fmt='ko',
-                      markerfacecolor='none')
+            # Plot horizontal and vertical lines
+            ax11.axhline(0.5, color='tab:gray', ls='--')
+            ax11.axvline(0., color='tab:gray', ls='--')
 
-        ax11.plot(np.linspace(-1, 1, 30), psych_curve_rep.fit, color='g', label='Alt-Rep')
-        ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error, fmt='go',
-                      markerfacecolor='none')
+            # Plot left-right psychometric curve and errorbars
+            ax11.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
+            ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
+                          markerfacecolor='none')
 
-        ax11.set_xlabel('Evi.')
-        ax11.set_xlim([-1.05, 1.05])
-        ax11.set_ylabel('Prob. right')
-        ax11.set_ylim([-0.025, 1.025])
-        # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
-        ax11.legend(loc="lower right", frameon=False)
+            # # Plot alt-rep psychometric curve and errorbars
+            # ax11.plot(np.linspace(-1, 1, 30), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
+            # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
+            #               color='tab:brown', fmt='o', markerfacecolor='none')
 
-        ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
-        # ax11_right_yaxis.set_ylabel('Prob. right')
-        ax11.set_yticklabels([])  # Remove left yticklabels
-        ax11.set_yticks([])  # Remove left yticks
+            ax11.set_xlabel('Evi.')
+            ax11.set_xlim([-1.05, 1.05])
+            ax11.set_ylabel('Prob. right')
+            ax11.set_ylim([-0.025, 1.025])
+            # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
+            ax11.legend(loc="lower right", frameon=False)
 
-        ax11.spines['top'].set_visible(False)
-        ax11.spines['left'].set_visible(False)
-        ax11_right_yaxis.spines['top'].set_visible(False)
-        ax11_right_yaxis.spines['left'].set_visible(False)
+            ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
+            # ax11_right_yaxis.set_ylabel('Prob. right')
+            ax11.set_yticklabels([])  # Remove left yticklabels
+            ax11.set_yticks([])  # Remove left yticks
 
-        ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
-                      xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
-        ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
-                      xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:red')
+            ax11.spines['top'].set_visible(False)
+            ax11.spines['left'].set_visible(False)
+            ax11_right_yaxis.spines['top'].set_visible(False)
+            ax11_right_yaxis.spines['left'].set_visible(False)
 
-        sensitivity, bias, lr_left, lr_right = psych_curve.params
+            ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
+                          xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
+            ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
+                          xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:red')
 
-        ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-                      "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                      "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                      "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),
-                      fontsize='xx-small')  # Right lapse rate
+            sensitivity, bias, lr_left, lr_right = psych_curve.params
+
+            ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
+                          "B=" + str(round(bias, 2)) + "\n" +  # Bias
+                          "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
+                          "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
+                          fontsize='xx-small')
 
         ####################################################################################################################
-
+        """
         # PLOT 9: INTERSESSION
 
         # fig = plt.figure()
-
+        
         ax12 = plt.subplot2grid((16, 4), (10, 0), rowspan=7, colspan=2)
         ax12.set_xticks([])
         ax12.set_xticklabels([])
