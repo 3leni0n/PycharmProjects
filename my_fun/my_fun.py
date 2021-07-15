@@ -203,24 +203,32 @@ def evi2coh(x):
 def coh2evi(x):
     return 2 * x - 1
 
-"""
-# Under development
 
-# 1 Convert to coherence
-# 2 Convert to db
+def power_dB(amp):
+    amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
+    return 20 * np.log10(amp / amp_ref)
+
+
+""""Under development
+# 1 Convert evidence to coherence (same as amplitude)
+# 2 Convert coherence (amplitude) to dB
 # 3 Compute difference
 filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
 df = pd.read_csv(filepath)
 # df = pd.read_csv(filepath).drop('filename', 1)
 df_coh = evi2coh(df.loc[:, df.columns != 'filename'])  # Take all rows from all columns but 'filename'
-df_db = power_dB(df_coh)
+df_dB = power_dB(df_coh)
+dB_cal = 73  # Calibration value of the spekaers in dB
+dB_max = np.max(df_dB)
+diff_max_cal = dB_max.unique()[0] - dB_cal
+df_dB_cal = df_dB - diff_max_cal
 
 # Create DataFrame column labels
 columns = ['ILD0', 'ILD1', 'ILD2', 'ILD3', 'ILD4', 'ILD5', 'ILD6', 'ILD7', 'ILD8', 'ILD9']
 df_ild = pd.DataFrame(data=None, columns=columns)  # ILD =  # Interaural Level Difference. Difference between the volume
 # (amplitude) of the sounds from both sides
 
-# Think this si wrong. This is first calculating the amplitude diff and from there the ILD, but I think it must be the
+# Think this is wrong. This is first calculating the amplitude diff and from there the ILD, but I think it must be the
 # opposite (first calculate dB), then diff between them?
 for i in range(len(df)):
     row = df.iloc[i].drop('filename')  # Take a row (series) without the filename (kkk)
@@ -232,20 +240,14 @@ for i in range(len(df)):
     df2_idl = power_dB(df2_idl) - error
     df_ild = df_ild.append(df2_idl)
 
-
-def power_dB(amp):
-    amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
-    return 20 * np.log10(amp / amp_ref)
-
-
-
 # Do the sexy plot
 evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
                       0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
 coherences = evi2coh(evidences)
 
-emp_left_dB = np.array([33, 43.3, 53.9, 56.9, 59.2, 62.2, 64.5, 64.9, 65.4, 66.4, 68.6, 69.8, 70.7, 70.5, 70.85, 70.35,
-                        70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB recorded with micro from left speaker
+emp_left_dB = np.array([33, 43.3, 53.9, 56.9, 59.2, 62.2, 64.5, 64.9, 65.4, 66.4,
+                        68.6, 69.8, 70.7, 70.5, 70.85, 70.35, 70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB
+# recorded with micro from left speaker
 # of box 8 with Rafa on March 3rd 2021
 exp_right_dB = np.flip(emp_left_dB)
 
@@ -268,9 +270,8 @@ plt.ylabel('dB')
 plt.legend()
 plt.title('SPL')
 plt.savefig('SPL.png')
+
 """
-
-
 # From datahandler's utils.py
 
 # COMPUTE WINDOW AVERAGE
