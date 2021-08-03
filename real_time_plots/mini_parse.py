@@ -1,91 +1,81 @@
-# To do:
-# Add envelopes per trial
-# Add Bpod variables per trial
-# Not to do las trial if session crashed
-# If CB was on, take the last REWARD_SIDE
-# Include the new VARs in upper text
-# Changed reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[0] to ...[-1], so it takes the last vector when
-# overwritten by CB
-########################################################################################################################
-
-# Import modules
 import pandas as pd
 import numpy as np
+import time
 
-########################################################################################################################
 
-# Define function
-def parse(path):
+def mini_parse(file):
 
-    ####################################################################################################################
+    colnames = ['TYPE', 'PC-TIME', 'BPOD-INITIAL-TIME', 'BPOD-FINAL-TIME', 'MSG', '+INFO']
+    df = pd.read_csv(file.path, skiprows=file.skip, sep=';', names=colnames, header=None)
 
-    # Path to csv (laptop)
-    # path = '/home/alexis/PycharmProjects/parse/Test_Untitled task 30_20210408-193104/Test_Untitled task 30_20210408-193104.csv'  # 100 trials stage 4 with evidences
+    index = df[df['TYPE'] == 'TRIAL'].index
 
-    # Path to csv (setup2)
+    if len(index) < 2:
+        return
 
-    # Don't take first 6 lines (they start with __underscores__ and it crashes)
-    df = pd.read_csv(path, skiprows=6, sep=';')
-
-    ####################################################################################################################
-
-    index = df[df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous
-    # one index = df[df['TYPE'] == 'END-TRIAL'].index
+    if file.df is None:
+        reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+        file.reward_side = reward_side
+        stage = int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])
+        file.stage = stage
+    else:
+        reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+        file.reward_side = reward_side
+        stage = file.stage
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
     # METADATA (multiply by n_trials)
 
-    # INFO
-    serial_port = [df[df.MSG == 'SERIAL-PORT']['+INFO'].iloc[0]] * n_trials
-    protocol = [df[df.MSG == 'PROTOCOL-NAME']['+INFO'].iloc[0]] * n_trials  # Task
-    creator = df[df.MSG == 'CREATOR-NAME']['+INFO'].iloc[0]
-    project = [df[df.MSG == 'PROJECT-NAME']['+INFO'].iloc[0]] * n_trials
-    experiment = [df[df.MSG == 'EXPERIMENT-NAME']['+INFO'].iloc[0]] * n_trials
-    board = [df[df.MSG == 'BOARD-NAME']['+INFO'].iloc[0]] * n_trials  # Box
-    setup = [df[df.MSG == 'SETUP-NAME']['+INFO'].iloc[0]] * n_trials
-    net_port = [df[df.MSG == 'NET-PORT']['+INFO'].iloc[0]] * n_trials
-    subject = df[df.MSG == 'SUBJECT-NAME']['+INFO'].iloc[0]
-    bpod_api_version = [df[df.MSG == 'BPOD-API-VERSION']['+INFO'].iloc[0]] * n_trials
-    session = [df[df.MSG == 'SESSION-NAME']['+INFO'].iloc[0]] * n_trials
-    session_started = df[df.MSG == 'SESSION-STARTED']['+INFO'].iloc[0]
-    # If the session ends abruptly due to an error, 'SESSION-ENDED' don't will show up
-    try:
-        session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
-    except IndexError:
-        # session_ended = df['PC-TIME'].iloc[-1]
-        session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
-        # print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
-        print(f"The session '{np.unique(session)[0]}' ended abruptly, probably due to Bpod crashed. Using last PC_TIME "
-              f"timestamp instead")
+    # # INFO
+    # serial_port = [df[df.MSG == 'SERIAL-PORT']['+INFO'].iloc[0]] * n_trials
+    # protocol = [df[df.MSG == 'PROTOCOL-NAME']['+INFO'].iloc[0]] * n_trials  # Task
+    # creator = df[df.MSG == 'CREATOR-NAME']['+INFO'].iloc[0]
+    # project = [df[df.MSG == 'PROJECT-NAME']['+INFO'].iloc[0]] * n_trials
+    # experiment = [df[df.MSG == 'EXPERIMENT-NAME']['+INFO'].iloc[0]] * n_trials
+    # board = [df[df.MSG == 'BOARD-NAME']['+INFO'].iloc[0]] * n_trials  # Box
+    # setup = [df[df.MSG == 'SETUP-NAME']['+INFO'].iloc[0]] * n_trials
+    # net_port = [df[df.MSG == 'NET-PORT']['+INFO'].iloc[0]] * n_trials
+    # subject = df[df.MSG == 'SUBJECT-NAME']['+INFO'].iloc[0]
+    # bpod_api_version = [df[df.MSG == 'BPOD-API-VERSION']['+INFO'].iloc[0]] * n_trials
+    # session = [df[df.MSG == 'SESSION-NAME']['+INFO'].iloc[0]] * n_trials
+    # session_started = df[df.MSG == 'SESSION-STARTED']['+INFO'].iloc[0]
+    # # If the session ends abruptly due to an error, 'SESSION-ENDED' don't will show up
+    # try:
+    #     session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
+    # except IndexError:
+    #     # session_ended = df['PC-TIME'].iloc[-1]
+    #     session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
+    #     print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
 
     # VAL
     # Bpod's VARs
-    aw = [int(df[df.MSG == 'VAR_AW']['+INFO'].iloc[0])] * n_trials
-    switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
-    timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
-    fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
-    stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
-    substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
-    motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
-    rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
-    progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
-    cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
+    # aw = [int(df[df.MSG == 'VAR_AW']['+INFO'].iloc[0])] * n_trials
+    # switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
+    # timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
+    # fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
+    # stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
+    # substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
+    # motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
+    # rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
+    # progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
+    # cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
 
     # Registered values (out of loop)
-    reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
-    valve_1 = [float(df[df.MSG == 'VALVE_1']['+INFO'].iloc[0])] * n_trials
-    valve_2 = [float(df[df.MSG == 'VALVE_2']['+INFO'].iloc[0])] * n_trials
+    # reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+    # valve_1 = [float(df[df.MSG == 'VALVE_1']['+INFO'].iloc[0])] * n_trials
+    # valve_2 = [float(df[df.MSG == 'VALVE_2']['+INFO'].iloc[0])] * n_trials
 
     # Data curation
-    creator = [creator.split()[0][2:-2]] * n_trials
-    subject = [subject.split()[0][2:-2]] * n_trials
-    date = [session_started.split()[0]] * n_trials
-    time_session_started = [session_started.split()[1]] * n_trials
-    time_session_ended = [session_ended.split()[1]] * n_trials
+    # creator = [creator.split()[0][2:-2]] * n_trials
+    # subject = [subject.split()[0][2:-2]] * n_trials
+    # date = [session_started.split()[0]] * n_trials
+    # time_session_started = [session_started.split()[1]] * n_trials
+    # time_session_ended = [session_ended.split()[1]] * n_trials
     reward_side = reward_side[1:-1].split(',')  # Convert string to list, [1:-1] to get rid of the square brackets []
     reward_side = list(map(int, reward_side))  # Convert list elements from string to integers
     # reward_side = np.array(reward_side, dtype=int)  # Convert to array
     reward_side = reward_side[:n_trials]
+    stage = [stage] * n_trials
 
     ####################################################################################################################
 
@@ -259,23 +249,18 @@ def parse(path):
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
-               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Substage',
-               'Motor', 'REC', 'Progression', 'CB', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment',
-               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
+               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'Stage']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
-                    port1in, port1out, port2in, port2out, aw, switch, timeout, fixation, stage, substage, motor, rec,
-                    progression, cb, serial_port, protocol, creator, project, experiment, board, setup, net_port, subject,
-                    bpod_api_version, session, date, time_session_started, time_session_ended))
+                    port1in, port1out, port2in, port2out, stage))
 
-    df_session = pd.DataFrame(data=data, columns=columns)
+    new_df = pd.DataFrame(data=data, columns=columns)
 
-    # df_session.to_csv(str('parsed_') + path.split('/')[-1])  # Save df as csv file
+    if file.df is None:
+        file.df = new_df
+    else:
+        file.df = pd.concat([file.df, new_df])
 
-    return df_session
-
-
-# if __name__ == "__main__":
-#     parse()
+    file.skip += index[-1] - 1

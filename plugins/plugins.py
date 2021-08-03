@@ -14,9 +14,7 @@ warnings.filterwarnings('ignore')
 
 
 def plot(df_session):
-
     ax1.clear()
-
 
     ####################################################################################################################
 
@@ -39,8 +37,10 @@ def plot(df_session):
 
     # Errors
     errors = df_session.WrongLick.sum().astype(int) + df_session.Punish.sum().astype(int)
-    errors_left = df_session.WrongLick[df_session.Side == 0].sum().astype(int) + df_session.Punish[df_session.Side == 0].sum().astype(int)
-    errors_right = df_session.WrongLick[df_session.Side == 1].sum().astype(int) + df_session.Punish[df_session.Side == 1].sum().astype(int)
+    errors_left = df_session.WrongLick[df_session.Side == 0].sum().astype(int) + df_session.Punish[
+        df_session.Side == 0].sum().astype(int)
+    errors_right = df_session.WrongLick[df_session.Side == 1].sum().astype(int) + df_session.Punish[
+        df_session.Side == 1].sum().astype(int)
 
     # Performance
     performance = hits / trials
@@ -80,12 +80,11 @@ def plot(df_session):
 
     ####################################################################################################################
 
-
-
     # SUMMARY TEXT
 
     s1 = ('Date: ' + df_session.Date.unique()[0] + ', ' +
-          'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][0:-7] + ', ' +
+          'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][
+                                                                         0:-7] + ', ' +
           'Subject: ' + df_session.Subject.unique()[0] + ', ' +
           'Box: ' + df_session.Board.unique()[0][4] +
           '\n')
@@ -108,8 +107,10 @@ def plot(df_session):
     #       '\n')
 
     s3 = ('Total trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
-          'Performance: ' + str(round(performance * 100)) + '% (' + str(round(performance_left * 100)) + '% L, ' + str(round(performance_right * 100)) + '% R)' + ', ' +
-          'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(round(accuracy_right * 100)) + '% R)' +
+          'Performance: ' + str(round(performance * 100)) + '% (' + str(round(performance_left * 100)) + '% L, ' + str(
+                round(performance_right * 100)) + '% R)' + ', ' +
+          'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(
+                round(accuracy_right * 100)) + '% R)' +
           '\n')
 
     # s4 = ('Responses: ' + str(responses) + ', ' +
@@ -150,8 +151,6 @@ def plot(df_session):
                              20)  # Left valid trials
     ra_right = compute_window(df_session.Hit[(df_session.Miss == 0) & (df_session.Side == 1)],
                               20)  # Right valid trials
-
-
 
     # Plot horizontal lines
     ax1.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -197,8 +196,6 @@ def plot(df_session):
     # Plot text
     ax1.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
 
-
-
     trials['y_val'] = 1
     labels = trials.trial_result.unique().tolist()
     colors = trials.color.unique().tolist()
@@ -222,7 +219,6 @@ def plot(df_session):
     ax2.set_yticks(np.arange(0, 1.1, 0.1))
     ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
     ax2.set_ylim(0, 1.1)
-
 
 
 def animate(i):

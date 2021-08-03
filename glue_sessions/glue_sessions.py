@@ -32,6 +32,7 @@ def glue_sessions():
     protocols = list(np.unique(protocols))
     protocol = input('Enter protocol (choose number)')
     protocol = str(protocols[int(protocol)])
+    print('Gluing sessions of animal ' + animal + '...')
 
     df = pd.DataFrame()
 
@@ -45,7 +46,6 @@ def glue_sessions():
         else:
             pass
 
-    print('Glueing sessions of ' + animal + '...')
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')

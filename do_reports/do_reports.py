@@ -3,6 +3,9 @@
 # Choose between plotting together sessions from the same day (with maybe a vertical red line) to separate them, or
 # in separate reports
 
+# Line of bash code to sync the cluster data with the local machine:
+# rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/
+
 ########################################################################################################################
 
 import os
@@ -17,7 +20,7 @@ def do_reports():
 
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
-    folder = '/home/alexis/2AFC/setups/'
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups'
     # animal = input('Enter animal')
     animals = os.listdir(folder)
     animals.sort()
@@ -29,7 +32,7 @@ def do_reports():
 
     for i in range(len(animals)):
 
-        folder2 = '/home/alexis/2AFC/setups/' + animals[
+        folder2 = folder + animals[
             i] + '/sessions/'  # Replace 0 with i in for loop with n = len(animals)
         sessions = os.listdir(folder2)
         sessions.sort()  # Sort them by date
