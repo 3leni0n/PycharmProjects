@@ -8,5 +8,7 @@
     <orderEntry type="module" module-name="2AFC" />
     <orderEntry type="module" module-name="datahandler" />
     <orderEntry type="module" module-name="toolsr" />
+    <orderEntry type="module" module-name="setups" />
+    <orderEntry type="module" module-name="setups" />
   </component>
 </module>

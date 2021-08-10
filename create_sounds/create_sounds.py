@@ -1,7 +1,6 @@
 # Import libraries
+import time
 import numpy as np
-import sys  # Module that provides access to interpreter variables and functions
-# sys.path.insert(1, '/home/alexis/Bitbucket/PycharmProjects/toolsR')  # Tell python to look this directory besides the cd
 from toolsR import UtilsR
 import os
 import itertools
@@ -10,77 +9,98 @@ from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
 import string
+from my_fun.my_fun import evi2coh
+
 
 ########################################################################################################################
 
-# Generate white noise
-#whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
-whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
+def create_sounds(save=False):
+    """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
+    amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since, the task consist in
+    determining from what side, left or right, the sound is louder on average, and the evidence represent the inforamtion
+    available to make a choice for each sound, being -1 left speaker only and +1 right speaker only. The total number of
+    sounds produces is n evidences ** 2. The filename is a combination of 3 lowercase letters. The function saves the
+    files and a table with an envelope value per frame per side in amplitude.
+    """
 
-# band_fs=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
-# FsOut=44100 the most used (audio CD)
+    time_start = time.time()
 
-########################################################################################################################
+    # Generate white noise
+    # whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
+    whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
+    # band_fs=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
+    # FsOut=44100 the most used (audio CD)
 
-# Generate evidences and coherences (aim for 9 data points psychometric curves)
-evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
-                      0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
-# Evidences spaced 0.1 because len(np.arange(-1, 1, 0.1)) < len(list(string.ascii_lowercase)). In words, they can be
-# expressed only with letters (20 characters), while an spacing of 0.05 would require 40 characters and use numbers too
-# Evidences finished in .05 for the final task and psychometric curves
-coherences = (evidences + 1) / 2  # From 0 (left) to 1 (right) so 0 net evidence returns 0.5. Input argument needed to
-# calculate beta distribution in envelope function
+    ####################################################################################################################
 
-########################################################################################################################
+    # Generate evidences and coherences
+    evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
+                          0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
+    # Evidences spaced 0.1 because len(np.arange(-1, 1, 0.1)) < len(list(string.ascii_lowercase)). In words, the sounds'
+    # filename can be expressed only with letters (20 characters), while an spacing of 0.05 would require 40 characters
+    # and use numbers too
+    # Evidences finished in .05 for the final task and psychometric curves
+    coherences = evi2coh(evidences)  # From 0 (left) to 1 (right) so 0 net evidence returns 0.5. Input argument needed
+    # to calculate beta distribution in envelope function
 
-# Select the folder and create it if it doesn't exists
-folder = '/home/alexis/Música/sounds/'
+    ####################################################################################################################
 
-if not os.path.exists(folder):
-    os.mkdir(folder)
+    # Select the folder and create it if it doesn't exists
+    # folder = '/home/alexis/Música/sounds/'
+    folder = '/home/alexis/Escritorio/test/'
 
-# 21 * 21 chars = 441 possible sounds per evidence
-# chars = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u']
+    if not os.path.exists(folder):
+        os.mkdir(folder)
 
-# More elegant:
-chars = list(string.ascii_lowercase[:len(evidences)])  # Make a list of all the lowercase letters as long as evidences
+    # 21 * 21 chars = 441 possible sounds per evidence
+    chars = list(string.ascii_lowercase[:len(evidences)])  # Make a list of all the lowercase letters as long as
+    # evidences
 
-# Create DataFrame column labels
-columns = ['EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
-           'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
+    # Create DataFrame column labels
+    columns = ['EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
+               'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
 
-df = pd.DataFrame(data=None, index=None, columns=columns)  # Create empty data frame with column labels
+    df = pd.DataFrame(data=None, index=None, columns=columns)  # Create empty data frame with column labels
 
-sound_number = 0  # Initialize counter
+    sound_number = 0  # Initialize counter
 
-for k in range(len(chars)):
-    for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
-        # Sound number (name) from 1 (aaa) to 9261 (uuu)
-        sound_number += 1
-        name = folder + chars[k] + i + j
+    for k in range(len(chars)):
 
-        filename = chars[k] + i + j  # for the CSV file
+        for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
+            # Sound number (name) from 1 (aaa) to 9261 (uuu)
+            sound_number += 1
+            name = folder + chars[k] + i + j
 
-        path_wav = name + '.wav'
-        #path_mp3 = name + '.mp3'
-        #path_ogg = name + '.ogg'
-        print(sound_number, name)
+            filename = chars[k] + i + j  # For the csv file
 
-        SL, SR, EL, ER = UtilsR.envelope(coherences[k], whiteNoise, dur=1, nframes=10, samplingR=44100, variance=0.015,
-                                         randomized=False, paired=False, LAmp=1.0, RAmp=1.0, oldbug=False, randgen=None)
+            path_wav = name + '.wav'
+            # path_mp3 = name + '.mp3'
+            # path_ogg = name + '.ogg'
+            print(sound_number, name)
 
-        ELER = np.concatenate((EL, ER))  # Concatenate EL and ER
-        df2 = pd.DataFrame([ELER], index=[filename], columns=columns)  # Fill data frame
-        df = df.append(df2)  # Append last row of data to existing data frame
+            SL, SR, EL, ER = UtilsR.envelope(coherences[k], whiteNoise, dur=1, nframes=10, samplingR=44100,
+                                             variance=0.015, randomized=False, paired=False, LAmp=1.0, RAmp=1.0,
+                                             oldbug=False, randgen=None)
 
-        sound = np.column_stack((SL, SR))
-        # Write the array sound to a wav file
-        wavio.write(path_wav, sound, 44100, sampwidth=1)
-        # Read the wav file to a wav sound
-        sound_wav = AudioSegment.from_wav(path_wav)
-        # Export the wav sound to a mp3 file
-        #sound_wav.export(path_mp3, format='mp3')
-        #sound_wav.export(path_ogg, format='ogg')
+            ELER = np.concatenate((EL, ER))  # Concatenate EL and ER (envelope)
+            df2 = pd.DataFrame([ELER], index=[filename], columns=columns)  # Fill data frame
+            df = df.append(df2)  # Append last row of data to existing data frame
 
-df.index.name = 'filename'  # Change index name from 'Unnamed: 0' to 'filename'
-df.to_csv('sounds.csv')  # Save df as csv file
+            if save == True:  # Save sounds only if specified (don't wanna for simulation purposes)
+                sound = np.column_stack((SL, SR))
+                wavio.write(path_wav, sound, 44100, sampwidth=1)  # Write the array sound to a wav file
+                # sound_wav = AudioSegment.from_wav(path_wav)  # Read the wav file to a wav sound
+                # sound_wav.export(path_mp3, format='mp3')  # Export the wav sound to a mp3 file
+                # sound_wav.export(path_ogg, format='ogg')  # Export the wav sound to a ogg file
+
+    df.index.name = 'filename'  # Change index name from 'Unnamed: 0' to 'filename'
+
+    if save == True:
+        # df.to_csv('sounds.csv')  # Save df as csv file
+        df.to_csv(folder + 'test.csv')
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('\nThe script took', round(runtime, 2), 'seconds to run')
+
+    return df

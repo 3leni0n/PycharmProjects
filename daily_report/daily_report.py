@@ -45,11 +45,11 @@ import os
 from my_fun.my_fun import *  # Or from daily_report.daily_report import daily_report
 from parse.parse import *  # Or from parse.parse import parse
 
+
 ########################################################################################################################
 
 # Define function
 def daily_report(path):
-
     # Register time
     time_start_total = time.time()
 
@@ -88,8 +88,10 @@ def daily_report(path):
 
     # Errors
     errors = df_session.WrongLick.sum().astype(int) + df_session.Punish.sum().astype(int)
-    errors_left = df_session.WrongLick[df_session.Side == 0].sum().astype(int) + df_session.Punish[df_session.Side == 0].sum().astype(int)
-    errors_right = df_session.WrongLick[df_session.Side == 1].sum().astype(int) + df_session.Punish[df_session.Side == 1].sum().astype(int)
+    errors_left = df_session.WrongLick[df_session.Side == 0].sum().astype(int) + df_session.Punish[
+        df_session.Side == 0].sum().astype(int)
+    errors_right = df_session.WrongLick[df_session.Side == 1].sum().astype(int) + df_session.Punish[
+        df_session.Side == 1].sum().astype(int)
 
     # Performance
     performance = hits / trials
@@ -141,7 +143,8 @@ def daily_report(path):
         # SUMMARY TEXT
 
         s1 = ('Date: ' + df_session.Date.unique()[0] + ', ' +
-              'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][0:-7] + ', ' +
+              'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][
+                                                                             0:-7] + ', ' +
               'Subject: ' + df_session.Subject.unique()[0] + ', ' +
               'Box: ' + df_session.Board.unique()[0][4] +
               '\n')
@@ -164,8 +167,10 @@ def daily_report(path):
         #       '\n')
 
         s3 = ('Total trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
-              'Performance: ' + str(round(performance * 100)) + '% (' + str(round(performance_left * 100)) + '% L, ' + str(round(performance_right * 100)) + '% R)' + ', ' +
-              'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(round(accuracy_right * 100)) + '% R)' +
+              'Performance: ' + str(round(performance * 100)) + '% (' + str(
+                    round(performance_left * 100)) + '% L, ' + str(round(performance_right * 100)) + '% R)' + ', ' +
+              'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(
+                    round(accuracy_right * 100)) + '% R)' +
               '\n')
 
         # s4 = ('Responses: ' + str(responses) + ', ' +
@@ -174,7 +179,8 @@ def daily_report(path):
         #       'Hits right: ' + str(hits_right) + ' (' + str(round(accuracy_right * 100)) + '%)' +
         #       '\n')
 
-        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(responses_right) + ' R)' + ', ' +
+        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
+            responses_right) + ' R)' + ', ' +
               'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
               'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' +
               '\n')
@@ -387,7 +393,8 @@ def daily_report(path):
         hue_order = ['Error', 'Hit', 'Miss']
 
         if df_session.Stage.unique()[0] <= 3:  # No coherences, plot sides
-            scatter = sns.scatterplot(x=df_session.index, y=df_session.Side, hue=hue, palette=palette, hue_order=hue_order,
+            scatter = sns.scatterplot(x=df_session.index, y=df_session.Side, hue=hue, palette=palette,
+                                      hue_order=hue_order,
                                       s=ms ** 2)
             ax4.set_ylim(-0.8, 1.8)
             ax4.set_yticks([0, 1])
@@ -441,7 +448,6 @@ def daily_report(path):
 
         # Only draw PC if evidences are introduced (stage 4)
         if len(df_session.Evidence.unique()) > 2 and df_session.Stage.unique()[0] == 4:
-
             # fig = plt.figure()
 
             ax11 = plt.subplot2grid((16, 4), (11, 0), rowspan=5, colspan=2)
@@ -818,7 +824,8 @@ def daily_report(path):
 
         time_end_psth_first = time.time()
         runtime_psth_first = time_end_psth_first - time_start_psth_first
-        print("'Plot 7: peristimulus lick histogram (first licks)' took", round(runtime_psth_first, 2), 'seconds to run')
+        print("'Plot 7: peristimulus lick histogram (first licks)' took", round(runtime_psth_first, 2),
+              'seconds to run')
 
         time_start_savepag2 = time.time()
         pdf.savefig()  # saves the current figure into a pdf page

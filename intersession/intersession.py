@@ -13,8 +13,8 @@ from glue_sessions.glue_sessions import glue_sessions
 
 # ACCURACY:
 # Example with the last 2 sessions of 915:
-df_915_1 = parse('/setups/915/sessions/915_stage_training_20210728-155222/915_stage_training_20210728-155222.csv')
-df_915_2 = parse('/setups/915/sessions/915_stage_training_20210729-191156/915_stage_training_20210729-191156.csv')
+df_915_1 = parse('/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/915/sessions/915_stage_training_20210728-155222/915_stage_training_20210728-155222.csv')
+df_915_2 = parse('/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/915/sessions/915_stage_training_20210729-191156/915_stage_training_20210729-191156.csv')
 df_915_1and2 = pd.concat([df_915_1, df_915_2])
 df_grouped = df_915_1and2.groupby('Session')
 df_grouped.Hit.sum()

@@ -20,7 +20,7 @@ def do_reports():
 
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups'
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'
     # animal = input('Enter animal')
     animals = os.listdir(folder)
     animals.sort()
@@ -32,8 +32,7 @@ def do_reports():
 
     for i in range(len(animals)):
 
-        folder2 = folder + animals[
-            i] + '/sessions/'  # Replace 0 with i in for loop with n = len(animals)
+        folder2 = folder + animals[i] + '/sessions/'  # Replace 0 with i in for loop with n = len(animals)
         sessions = os.listdir(folder2)
         sessions.sort()  # Sort them by date
         index = -1  # last session

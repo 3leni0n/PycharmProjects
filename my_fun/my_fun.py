@@ -52,7 +52,7 @@ def envelope(coh, whitenoise, dur, nframes, samplingR=192000, variance=0.015, ra
 
     Lout y Rout son los vectores de broadband noise  modulados por  'modwave' y la staircase (escalera) esto pesa mucho
     porque hay muchos puntos por segundo en las sesiones de bpod solo guardamos la escalera (20 valores) estos 20
-    puntos/(sacados de la distribuci'on beta) son los stairs_envelope
+    puntos/(sacados de la distribucióon beta) son los stairs_envelope
     """
     if randgen is None:
         randgen = np.random
@@ -196,59 +196,68 @@ def floatingpoints(x):
     return str_len
 
 
-def evi2coh(x):
-    return (x + 1) / 2
+def evi2coh(evi):
+    """Transform evidence (-1=left, 1=right) to coherence (0=left, 1=right)"""
+    coh = (evi + 1) / 2
+    return coh
 
 
-def coh2evi(x):
-    return 2 * x - 1
+def coh2evi(coh):
+    """Transform coherence (0=left, 1=right) into evidence (-1=left, 1=right)"""
+    evi = 2 * coh - 1
+    return evi
+
+
+# def power_dB(amp):
+#     """Transform amplitude into dB"""
+#     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
+#     dB = 20 * np.log10(amp / amp_ref)
+#     return dB
 
 
 def power_dB(amp):
+    """Transform amplitude into dB"""
     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
-    return 20 * np.log10(amp / amp_ref)
+    dB = 15.535 * np.log10((amp + 0.00267) / amp_ref)
+    return dB
 
 
-""""Under development
-# 1 Convert evidence to coherence (same as amplitude)
-# 2 Convert coherence (amplitude) to dB
-# 3 Compute difference
-filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
-df = pd.read_csv(filepath)
-# df = pd.read_csv(filepath).drop('filename', 1)
-df_coh = evi2coh(df.loc[:, df.columns != 'filename'])  # Take all rows from all columns but 'filename'
-df_dB = power_dB(df_coh)
-dB_cal = 73  # Calibration value of the spekaers in dB
-dB_max = np.max(df_dB)
-diff_max_cal = dB_max.unique()[0] - dB_cal
-df_dB_cal = df_dB - diff_max_cal
+def ild():
+    """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
+    The input should be a csv file to convert to DataFrame
+    """
+    path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
+    df = pd.read_csv(path)
+    # df = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
+    df_dB = df  # Copy DataFrame
+    df_dB.iloc[:, 1:21] = power_dB(
+        abs(df.iloc[:, 1:21]))  # Apply the function to entire DataFrame except 'filename' column.
+    # abs because can't do log10 of negative number. To retrieve the negative sign for left the ILD will be computed as right - left later
+    df_dB_left = df_dB.iloc[:, 1:11]  # Index left skipping 'filename'
+    df_dB_left.columns = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']  # DataFrames needs to have BOTH the same
+    # row and column indices in order to perform an element-wise subtraction
+    df_dB_right = df_dB.iloc[:, 11:21]  # Index right
+    df_dB_right.columns = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+    df_ild = df_dB_right - df_dB_left  # Interaural level difference. Right minus left so we get negative for left and
+    # positive for right
+    df_ild.columns = ['ILD0', 'ILD1', 'ILD2', 'ILD3', 'ILD4', 'ILD5', 'ILD6', 'ILD7', 'ILD8',
+                      'ILD9']  # Change column labels
+    df_ild['Mean'] = df_ild.mean(axis=1)  # Add mean ILD per sound at the end of the DataFrame
+    df_ild.insert(0, 'Filename', df.filename)  # Insert in 'filename' i the first column
+    evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
+                          0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])  # Define evidences
+    df_ild.insert(1, 'Evidence',
+                  np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
+    # df_ild_summary = df_ild.groupby('Evidence', as_index=False).mean()  # SQL-style index
+    df_ild_summary = df_ild.groupby('Evidence').mean()  # Group labels asn index
+    return df_ild
 
-# Create DataFrame column labels
-columns = ['ILD0', 'ILD1', 'ILD2', 'ILD3', 'ILD4', 'ILD5', 'ILD6', 'ILD7', 'ILD8', 'ILD9']
-df_ild = pd.DataFrame(data=None, columns=columns)  # ILD =  # Interaural Level Difference. Difference between the volume
-# (amplitude) of the sounds from both sides
-
-# Think this is wrong. This is first calculating the amplitude diff and from there the ILD, but I think it must be the
-# opposite (first calculate dB), then diff between them?
-for i in range(len(df)):
-    row = df.iloc[i].drop('filename')  # Take a row (series) without the filename (kkk)
-    row = row.values  # From series to ndarray
-    col = np.split(row, 2)  # Split by 2, but return list
-    col = col[0] + col[1]  # Same as np.add(x[0], x[1]). As EL is negative and ER is positive, adding them = difference
-    col = abs(col)
-    df2_idl = pd.DataFrame([col], index=[i], columns=columns)
-    df2_idl = power_dB(df2_idl) - error
-    df_ild = df_ild.append(df2_idl)
-
-# Do the sexy plot
-evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
-                      0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
-coherences = evi2coh(evidences)
-
+"""
+dB_cal = 73  # Calibration value of the speakers in dB
+ambient_noise = 33  # Ambient noise in the behavioral box measured with the microphone
 emp_left_dB = np.array([33, 43.3, 53.9, 56.9, 59.2, 62.2, 64.5, 64.9, 65.4, 66.4,
                         68.6, 69.8, 70.7, 70.5, 70.85, 70.35, 70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB
-# recorded with micro from left speaker
-# of box 8 with Rafa on March 3rd 2021
+# recorded with micro from left speaker of box 8 with Rafa on March 3rd 2021
 exp_right_dB = np.flip(emp_left_dB)
 
 theor_left_dB = power_dB(coherences)
@@ -270,9 +279,9 @@ plt.ylabel('dB')
 plt.legend()
 plt.title('SPL')
 plt.savefig('SPL.png')
-
-"""
 # From datahandler's utils.py
+"""
+
 
 # COMPUTE WINDOW AVERAGE
 def compute_window(data, runningwindow):
