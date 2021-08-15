@@ -1,6 +1,7 @@
 # Import libraries
 import pandas as pd
 import numpy as np
+import sympy
 from matplotlib import pyplot as plt
 from my_fun.my_fun import ild, my_select_evidence, compute_psych_curve
 
@@ -11,11 +12,11 @@ trial_types = [0, 1]  # 0=left, 1=right
 trial_list = np.random.choice(trial_types, n_trials).tolist()  # Generate random trial vector of length n_trials
 evidences = df.Evidence.unique()
 target_evidences = [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]
-target_ilds = list(df_summary.Mean[df_summary.Evidence.isin(target_evidences)].round())
+target_ilds = list(df_summary.Mean[df_summary.Evidence.isin(target_evidences)].round().astype('int'))
 ilds = df_summary.Mean[df_summary.Evidence.isin(evidences)].reset_index(drop=True, inplace=False).round()
 df_sample = df[df.Evidence.isin(evidences)].reset_index(drop=True, inplace=False)
 
-# Initialize empty lists
+# Initialize empty lists for simulated data
 sim_sound = []
 sim_evidence = []
 sim_mean_ild = []
@@ -60,8 +61,9 @@ plt.errorbar(psych_curve_cheater_agent.xdata, psych_curve_cheater_agent.ydata, y
 plt.title('Psychometric curves \n(' + str(n_trials) + ' trials, ' + str(len(unfair_trials)) + ' unfair)')
 # plt.xlabel('Evidence')
 plt.xlabel('Interaural Level Difference')
-plt.xticks(target_evidences, target_ilds)
-plt.ylabel('Probability right')
+# plt.xticks(target_evidences, target_ilds)
+plt.xticks(evidences, ['-40', '', '', '-17', '', '-8', '', '', '-4', '', '0', '', '-4', '', '', '-8', '', '-17', '', '', '-40'])
+plt.ylabel('Probability choose right')
 plt.legend(loc="lower right", frameon=False)
 # plt.spines['top'].set_visible(False)
 # plt.spines['right'].set_visible(False)
@@ -80,52 +82,6 @@ plt.legend(loc="lower right", frameon=False)
 #               "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
 #               fontsize='xx-small')
 
+########################################################################################################################
 
 
-
-
-
-
-
-
-from sympy import symbols, Eq, solve, nsolve, nonlinsolve
-from scipy.optimize import fsolve
-
-""""tu primero calculas para amplitud 1 sin poner el 0.00267 porque ya veras que si lo quitas para amplitud 1 no cambia nada practicamente
-entonces vas buscando numeros hasta que encuentras uno que te de 73 y cuando ya tienes el 15.535 pones amplitud = 0 y buscas el numero de dentro que te de 33
-no me lo he inventado, eh, es el sistema que se usa al ser escalas arbitrarias"""
-
-# Equations to solve
-# 73 = x * np.log10((1 + y) / 0.0002)  # 73 = calibration value in dB
-# 33 = x * np.log10((0 + y) / 0.0002)  # 33 = ambient noise in dB
-
-73 = A * log( (1 + B) / 0.00002)
-33 = A * log( (0 + B) / 0.00002)
-
-73 = x * np.log10((1 + y) / 0.00002)
-33 = x * np.log10((0 + y) / 0.00002)
-
-
-# Approach with scipy's fsolve
-def equations(var):
-    x, y = var
-    eq1 = x * np.log10((1 + y) / 0.00002) - 73
-    eq2 = x * np.log10((0 + y) / 0.00002) - 33
-    return [eq1, eq2]
-
-x, y =  fsolve(equations, (1, 1), maxfev=10000)
-print(equations((x, y)))
-
-
-# Approach with sympy's nsolve
-x, y = symbols('x y')
-
-# Define equations as sympy equation objects
-eq1 = Eq(x * np.log10((1 + y) / 0.00002) - 73)
-eq2 = Eq(x * np.log10((0 + y) / 0.00002) - 33)
-
-# Solve equations
-nsolve((eq1, eq2), (x, y), (1, 1))
-nonlinsolve([x * np.log10((1 + y) / 0.00002) - 73, x * np.log10((0 + y) / 0.00002) - 33], (x, y))
-
-nsolve([Eq(x * np.log10((1 + y) / 0.00002) - 73)], [Eq(x * np.log10((0 + y) / 0.00002) - 33)], [x, y], [1, 1])

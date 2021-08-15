@@ -16,11 +16,13 @@ from my_fun.my_fun import evi2coh
 
 def create_sounds(save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
-    amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since, the task consist in
-    determining from what side, left or right, the sound is louder on average, and the evidence represent the inforamtion
+    amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
+    determining from what side, left or right, the sound is louder on average, the evidence represent the information
     available to make a choice for each sound, being -1 left speaker only and +1 right speaker only. The total number of
-    sounds produces is n evidences ** 2. The filename is a combination of 3 lowercase letters. The function saves the
+    sounds produced is n evidences ** 2. The filename is a combination of 3 lowercase letters. The function saves the
     files and a table with an envelope value per frame per side in amplitude.
+    save: To save or not the sound files and its corresponding csv. False by default to avoid overwriting the current
+    files by mistake and for performance reasons when calling the function to simulate sound sets.
     """
 
     time_start = time.time()

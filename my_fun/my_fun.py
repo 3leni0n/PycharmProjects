@@ -1,8 +1,9 @@
 import numpy as np
-from scipy.signal import firwin, lfilter  # Filters
+from scipy.signal import firwin, lfilter  # For white_noise
 import pandas as pd
-import string
+from string import ascii_lowercase
 from matplotlib import pyplot as plt
+from sympy import symbols, Eq, log, nsolve
 
 # For compute_psych_curve
 from scipy import stats
@@ -12,22 +13,50 @@ from collections import namedtuple
 
 ########################################################################################################################
 
-# Function to generate white noise
-def my_whiteNoiseGen():  # Adapted from UtilsR
-    fs = 44100  # sampling frequency
-    cutoff = [2000, 20000]  # low and high band edges. Must be positive and monotonically increasing between 0 and fs/2
+def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=1000):  # Adapted from UtilsR's 'whiteNoiseGen'
+    """Create 'white noise' (between quotes as the signal is actually being band pass filtered).
+    Note: if it takes too long try reducing the sampling rate or the filter length.
+    """
+    mean = 0
+    std = 1
+    # fs = 44100  # Sampling frequency
+    # cutoff = [2000, 20000]  # Low and high frequency band edges. Should be positive and monotonically increasing
+    # between 0 and fs/2 (not included)
     nyq = fs / 2  # Nyquist frequency (also found as fs * 0.5)
     normalized_cutoff = [cutoff[0] / nyq, cutoff[1] / nyq]  # Normalize by Nyquist frequency
-    amp = 1  # amplitude
-    duration = 1  # secs
-    white_noise = amp * np.random.normal(0, 1, (fs * (duration + 1)))  # +1 to make the length double and then chop the
+    # amp = 1  # Amplitude
+    # dur = 1  # Duration in seconds
+    noise = amp * np.random.normal(mean, std, (fs * (dur + 1)))  # +1 to make the length double and then chop the
     # the first half
-    fil_len = 10000
-    band_pass = firwin(fil_len, normalized_cutoff, pass_zero=False)  # FIR filter with window method
-    band_noise = lfilter(band_pass, 1, white_noise)  # Filter data with the FIR filter
-    signal = band_noise[fs:int(fs * (duration + 1))]  # Indexing from fs to fs * 2, taking the second half of band_noise
+    # fn = 10000  # Filter length
+    band_pass = firwin(fn, normalized_cutoff, pass_zero=False)  # FIR filter with window method
+    band_noise = lfilter(band_pass, 1, noise)  # Filter data with the FIR filter
+    signal = band_noise[fs:int(fs * (dur + 1))]  # Indexing from fs to fs * 2, taking the second half of band_noise
     # (plot to understand)
     return signal
+
+
+def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=False):
+    """Function that returns a sine wave (https://en.wikipedia.org/wiki/Sine_wave)."""
+    # length = 1  # In seconds
+    # fs = 44100  # Sampling frequency
+    # cycles = 10  # Number of oscillations
+    x = np.arange(0, length, 1 / fs)  # Time vector of 'length' seconds and 'fs' points
+    # amp = 1  # Amplitude: peak deviation of the function from 0
+    f = cycles / length  # Ordinary frequency: number of oscillations (cycles) that occur each second of time (Hz)
+    ang_freq = 2 * np.pi * f  # Angular frequency (ω -omega-): rate of change of the function in rad/s
+    # phase = 0  # Phase (φ -phi-) or horizontal shift: where in its cycle the oscillation is at t = 0 in rad/s
+    # v_shift = 0  # Vertical shift
+    y = amp * np.sin(ang_freq * x + phase) + v_shift  # Sine wave function
+
+    if plot == True:
+        plt.plot(x, y)
+        plt.title('Sine wave')
+        plt.xlabel('$\it{t}$ (s)')
+        plt.xticks(np.linspace(0, length, cycles + 1))
+        plt.ylabel('$\it{y}$ (t)')
+
+    return x, y
 
 
 def envelope(coh, whitenoise, dur, nframes, samplingR=192000, variance=0.015, randomized=False, paired=True, LAmp=1.0,
@@ -181,12 +210,12 @@ def sounds_dict(start, stop, num, decimals):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")
-    chars = list(string.ascii_lowercase[:num])  # Make a list of all the lowercase letters as long as num
+    chars = list(ascii_lowercase[:num])  # Make a list of all the lowercase letters as long as num
     pulses = np.around(np.linspace(start, stop, num), decimals)  # Make evenly spaced TTL pulses rounded to round2
     return dict(zip(chars, pulses))
 
 
-def floatingpoints(x):
+def floating_points(x):
     float2str = str(x)
     str_len = len(float2str)
     if '.' in float2str:
@@ -208,17 +237,34 @@ def coh2evi(coh):
     return evi
 
 
-# def power_dB(amp):
-#     """Transform amplitude into dB"""
-#     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
-#     dB = 20 * np.log10(amp / amp_ref)
-#     return dB
+def find_power_dB_par(amp_ref=0.00002, dB_cal=73, ambient_noise=33):
+    """Find the parameters to input the amplitude to dB transformation function so it returns values matching reality
+    (calibration value and ambient noise in dB)"""
+
+    # Define equations symbols
+    x, y = symbols('x y')
+
+    # amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
+    # dB_cal = 73  # Calibration value of the speakers in dB
+    # ambient_noise = 33  # Ambient noise in the behavioral box measured with the microphone
+
+    # Define system of nonlinear equations
+    eq1 = Eq(x * log((1 + y) / amp_ref, 10) - dB_cal, 0)  # --> x * np.log10((1 + y) / 0.00002) = 73
+    eq2 = Eq(x * log((0 + y) / amp_ref, 10) - ambient_noise, 0)  # --> x * np.log10((0 + y) / 0.00002) = 33
+
+    # Solve equations numerically
+    sol = np.array(nsolve((eq1, eq2), (x, y), (20, 0.01))).astype(float)
+
+    return sol
 
 
 def power_dB(amp):
     """Transform amplitude into dB"""
     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
-    dB = 15.535 * np.log10((amp + 0.00267) / amp_ref)
+    # dB = 20 * np.log10(amp / amp_ref)
+    x, y = find_power_dB_par()
+    # dB = 15.535 * np.log10((amp + 0.00267) / amp_ref)
+    dB = x * np.log10((amp + y) / amp_ref)
     return dB
 
 
