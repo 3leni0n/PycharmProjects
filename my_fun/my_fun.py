@@ -1,5 +1,7 @@
+# Import libraries (need to reduce scipy's entries)
 import numpy as np
 from scipy.signal import firwin, lfilter  # For white_noise
+from scipy.stats import beta  # Important! If using this, can't call any variable 'beta'!
 import pandas as pd
 from string import ascii_lowercase
 from matplotlib import pyplot as plt
@@ -10,10 +12,10 @@ from scipy import stats
 from scipy.optimize import minimize
 from collections import namedtuple
 
-
 ########################################################################################################################
 
-def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=1000):  # Adapted from UtilsR's 'whiteNoiseGen'
+
+def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000):  # Adapted from UtilsR's 'whiteNoiseGen'
     """Create 'white noise' (between quotes as the signal is actually being band pass filtered).
     Note: if it takes too long try reducing the sampling rate or the filter length.
     """
@@ -59,80 +61,123 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
     return x, y
 
 
-def envelope(coh, whitenoise, dur, nframes, samplingR=192000, variance=0.015, randomized=False, paired=True, LAmp=1.0,
-             RAmp=1.0, oldbug=True, randgen=None):  # From UtilsR
+def envelope(coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=True):
     """
-    coherences: coherences from 0(left only)to 1(right). ! var < coherences < (1-var). Else this wont work
-    whitenoise: vec containing sound (not necessarily whitenoise)
-    dur: total duration of the stimulus (secs)
-    nframes: total frames in the whole stimulus
-    samplingR: soundcard sampling rate (ie 96000). Need to match with EVERYTHING
-    variance: fixed var
-    randomized: shuffles noise vec
-    paired: each instantaneous evidence is paired with its counterpart so their sum = 1
-    randgen: np.random.RandomState instance to sample from
-    returns: left noise vec, right noise vec, left coherences stairs, right coherences stairs [being them all 1d-arrays]
-
-    From conver with Jordi: Hay varios argumentos que no tienen sentido (randomized, oldbug), siguen ahí por
-    compatibilidad y que no peten las tareas del bpod, pero estarían borrados ya. El oldbug genera el doble de
-    "envelopes" aunque la información cambia cada 2. El randomized corta y pega el vector de ruido para que no sea
-    exactamente el mismo, lo que no es bueno (petardea) y se va a la     porra el filtro de tu rango de Hz. Siempre
-    tienen que estar en False.
-
-    Lout y Rout son los vectores de broadband noise  modulados por  'modwave' y la staircase (escalera) esto pesa mucho
-    porque hay muchos puntos por segundo en las sesiones de bpod solo guardamos la escalera (20 valores) estos 20
-    puntos/(sacados de la distribucióon beta) son los stairs_envelope
+    Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
+    :param coh: coherence [0=left, 1=right]
+    :param fs: sampling frequency (needs to match the fs of white noise and sine wave)
+    :param amp: amplitude
+    :param dur: duration (in seconds)
+    :param n_frames: number of frames
+    :param var: variance of the beta distribution
+    :param paired: if True, the sum of both sides = 1
+    :return: sound left, sound right, stairs left (* n_frames), stairs_right (* n_frames)
     """
-    if randgen is None:
-        randgen = np.random
-    totpoints = dur * samplingR  # should be an integer
-    if len(whitenoise) < totpoints:
-        raise ValueError('whitenoise is shorter than expected')
 
-    # If True, this block basically takes whitenoise vector, reshape it in length/10 rows and 10 columns, shuffle it and then
-    # flatten it again in a 1-D array (like it was at the beginning). While for noise this might not be relevant
-    # (because the sound is sampled randomly from a distribution anyways), it would be necessary to make the function
-    # generic to other sounds like pure tones
-    if randomized == True:
-        svec = whitenoise[:int(totpoints)]  # Yield the exact same variable than whitenoise (i.e. no change a all)
-        svec = svec.reshape(int(len(svec) / 10), 10)
-        randgen.shuffle(svec)
-        svec = svec.flatten()
-    else:
-        svec = whitenoise[:int(totpoints)]
-    modfreq = nframes / dur
-    if oldbug:  # when freq was doubled, maintaining it because of compatibility issues. #envs = #stairs*2
-        modwave = 1 * np.sin(2 * np.pi * (modfreq) * np.arange(0, dur, step=1 / samplingR) + np.pi)
-    else:  # bug fixed, stairs paired with envelopes (#envs = #stairs)
-        modwave = 0.5 * (
-                np.sin(2 * np.pi * (modfreq) * np.arange(0, dur, step=1 / samplingR) - np.pi / 2) + 1)  # Ask Jordi
+    noise = white_noise(fs=fs, cutoff=[2000, 20000], amp=amp, dur=dur, fn=10000)
+    n_points = dur * fs  # Should be an integer
+
+    if len(noise) != n_points:
+        raise ValueError('whitenoise and n_points need to be the same length')
+
+    x, mod_wave = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
+    # amp = 0.5 so the length of y domain is 1 (-0.5, 0.5) instead of 2 (-1, 1)
+    # phase = -np.pi/2 so the function starts at its minimum
+    # v_shift = amp = 0.5 so the function y domain starts at 0 and is positive
 
     if coh < 0 or coh > 1:
-        raise ValueError(f'{coh} is an invalid coherences, it must fall w/i range 0 ~ 1')
+        raise ValueError(f'{coh} is an invalid coherence, it must be within the range [0, 1]')
 
     elif coh == 0 or coh == 1:
-        staircaseR = np.repeat(coh, dur * samplingR)
-        staircaseL = staircaseR - 1
-        Lout = staircaseL * svec * modwave * LAmp
-        Rout = staircaseR * svec * modwave * RAmp
-        return Lout, Rout, np.repeat(coh - 1, nframes), np.repeat(coh, nframes)
-    elif coh <= (variance * 1.1) or coh >= 1 - variance * 1.1:
+        # If coh == 0, stairsR = 0 and stairsL = -1; elif coh == 1, stairsR == 1 and stairsL == 0
+        envelope_R = np.repeat(coh, n_points)
+        envelope_L = envelope_R - 1
+        sound_R = envelope_R * noise * mod_wave * amp
+        sound_L = envelope_L * noise * mod_wave * amp  # Change svec for white_noise
+        stairs_R = np.repeat(coh, n_frames)
+        stairs_L = np.repeat(coh - 1, n_frames)  # Change name to envelope
+        return sound_L, sound_R, stairs_L, stairs_R
+
+    # Don't understand this if block (fix it or remove)
+    elif coh <= var * 1.1 or coh >= 1 - var * 1.1:  # Why this variance (0.015) and why 1.1??
         raise ValueError(
-            'invalid coherences for given variance or viceversa (if coherences!=0|1, 1.1*var<coherences<1-var*1.1)')
+            'Invalid coherences for given variance or viceversa (if coherences!=0|1, 1.1*var<coherences<1-var*1.1)')
+
     else:
-        alpha = ((1 - coh) / variance - 1 / coh) * coh ** 2
-        beta = alpha * (1 / coh - 1)
-        stairs_envelopeR = randgen.beta(alpha, beta, size=nframes)
-        staircaseR = np.repeat(stairs_envelopeR, int(totpoints / nframes))
-        staircaseL = staircaseR - 1
-        Rout = staircaseR * svec * modwave * RAmp
+        # Resources to understand the beta distribution (the core of the envelope function):
+        # https://en.wikipedia.org/wiki/Beta_distribution
+        # https://stats.stackexchange.com/questions/12232/calculating-the-parameters-of-a-beta-distribution-using-the-mean-and-variance
+        # http://varianceexplained.org/statistics/beta_distribution_and_baseball/
+        # https://www.youtube.com/watch?v=juF3r12nM5A
+        a, b = get_alpha_beta(coh, var)
+        # a = ((1 - coh) / var - 1 / coh) * coh ** 2  # 2: Substituting solved beta in variance formula
+        # b = a * (1 / coh - 1)  # 1: Solving beta in mean formula (given mean -coh- and variance are known)
+        stairs_R = np.random.beta(a, b, size=n_frames)  # Draw samples from a Beta distribution
+        stairs_L = stairs_R - 1  # This line is what makes it 'paired'
+        # (stairs_envelopeR + abs(stairs_envelopeL) = 1 * n_frames
+        envelope_R = np.repeat(stairs_R, int(n_points / n_frames))
+        envelope_L = envelope_R - 1
+        sound_R = envelope_R * noise * mod_wave * amp
+
         if paired == False:
-            stairs_envelopeL = randgen.beta(alpha, beta, size=nframes) - 1
-            staircaseL = np.repeat(stairs_envelopeL, int(totpoints / nframes))
-            Lout = staircaseL * svec * modwave * LAmp
-            return Lout, Rout, stairs_envelopeL, stairs_envelopeR
-        Lout = staircaseL * svec * modwave * LAmp
-        return Lout, Rout, stairs_envelopeR - 1, stairs_envelopeR
+            stairs_L = np.random.beta(a, b, size=n_frames) - 1
+            envelope_L = np.repeat(stairs_L, int(n_points / n_frames))  # When 'paired=False' it draws it from
+            # the beta distro
+            sound_L = envelope_L * noise * mod_wave * amp
+            return sound_L, sound_R, stairs_L, stairs_R
+
+        sound_L = envelope_L * noise * mod_wave * amp
+
+        return sound_L, sound_R, stairs_L, stairs_R
+
+
+def get_alpha_beta(mean, var, plot=False):
+    """
+    Get the alpha and beta parameters of a beta distribution given the mean and variance. Optional plot of the distro.
+    """
+
+    a = ((1 - mean) / var - 1 / mean) * mean ** 2  # 2: Substituting solved beta in variance formula
+    b = a * (1 / mean - 1)  # 1: Solving beta in mean formula (given mean -coh- and variance are known)
+    # Note: can't call it 'beta' as it would overwrite the scipy's 'beta' object imported
+
+    # Both alpha and beta parameters must be real positive numbers (>0)
+    if a <= 0:
+        raise ValueError(f'alpha = {a}  <= 0')
+    elif b <= 0:
+        raise ValueError(f'beta = {b} <=0')
+    else:
+        if plot == True:  # Plot the beta distribution with parameters a, b
+            mean, var, skew, kurt = beta.stats(a, b, moments='mvsk')
+            x = np.linspace(beta.ppf(0.01, a, b), beta.ppf(0.99, a, b), 100)
+            plt.plot(x, beta.pdf(x, a, b), 'r-', lw=5, alpha=0.6, label='beta pdf')
+        return a, b
+
+
+def get_beta_var_range(mean, num=1000, size=10):
+    """
+    Get the range of valid variances of a beta distribution for a given mean.
+    :param mean: coherence [0, 1]. A coherence returns the same variance ranges regardless of its sign (-/+)
+    :param num: number of samples of the variances vector
+    :param size: number of samples to be drawn from the beta distribution
+    :return: range of valid variances
+    """
+
+    vars = np.linspace(0.01, 1, num)  # Variance can't start at 0 (otherwise ZeroDivisionError)
+    samples = []  # Initiate empty lists
+    valid_vars = []
+    a_list = []
+    b_list = []
+
+    for i in range(len(vars)):
+        try:
+            a, b = get_alpha_beta(mean, vars[i])
+            samples.append(np.random.beta(a, b, size=size))
+            valid_vars.append(vars[i])
+            a_list.append(a)
+            b_list.append(b)
+        except ValueError:
+            print(f'iteration {i}: alpha or beta <= 0')
+    return samples, valid_vars, a_list, b_list
 
 
 def getWaterCalib(board, ports):  # From UtilsR
@@ -192,7 +237,8 @@ def enterthematrix(filepath):
     # substages = np.array([0, 1, 2, 3, 1, 2, 3, 1, 2, 3, 0, 3, 2, 1, 3, 2, 1, 3, 2, 1, 0])
     substages = np.array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0])
     # Create new DataFrame columns and fill them with the arrays created above
-    df.insert(1, 'evidence', np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
+    df.insert(1, 'evidence',
+              np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
     df.insert(2, 'coherence', np.repeat(coherences, len(coherences) ** 2))
     df.insert(3, 'difficulty', np.repeat(difficulties, len(difficulties) ** 2))
     # df.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
@@ -298,6 +344,7 @@ def ild():
     df_ild_summary = df_ild.groupby('Evidence').mean()  # Group labels asn index
     return df_ild
 
+
 """
 dB_cal = 73  # Calibration value of the speakers in dB
 ambient_noise = 33  # Ambient noise in the behavioral box measured with the microphone
@@ -329,7 +376,6 @@ plt.savefig('SPL.png')
 """
 
 
-# COMPUTE WINDOW AVERAGE
 def compute_window(data, runningwindow):
     """
     Computes a rolling average with a length of runningwindow samples.
@@ -343,11 +389,8 @@ def compute_window(data, runningwindow):
     return performance
 
 
-# COMPUTE PSYCHOMETRIC CURVE
 def compute_psych_curve(x, y):
-    """
-    Computes a psychometric function.
-    """
+    """Computes a psychometric function."""
 
     def sigmoid_mme(fit_params: tuple):
         k, x0, b, p = fit_params
