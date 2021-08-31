@@ -61,7 +61,7 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
     return x, y
 
 
-def envelope(coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=True):
+def envelope(coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False):
     """
     Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
     :param coh: coherence [0=left, 1=right]
@@ -225,7 +225,7 @@ def enterthematrix(filepath):
     # Import sounds DataFrame but only the filenames
     # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     # filepath_setup2 = '/home/setup2/'  # setup2 pc
-    # df = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
+    # df_ild = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
     df = pd.read_csv(filepath)  # Import all columns
     # Create relevant arrays to build DataFrame columns
     evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
@@ -241,14 +241,14 @@ def enterthematrix(filepath):
               np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
     df.insert(2, 'coherence', np.repeat(coherences, len(coherences) ** 2))
     df.insert(3, 'difficulty', np.repeat(difficulties, len(difficulties) ** 2))
-    # df.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
+    # df_ild.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
     df.insert(4, 'substage', np.repeat(substages, len(substages) ** 2))
 
-    # df['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
-    # df['coherence'] = np.repeat(coherences, len(coherences) ** 2)
-    # df['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
-    # # df['stage'] = np.repeat(stages, len(stages) ** 2)
-    # df['substage'] = np.repeat(substages, len(substages) ** 2)
+    # df_ild['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
+    # df_ild['coherence'] = np.repeat(coherences, len(coherences) ** 2)
+    # df_ild['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
+    # # df_ild['stage'] = np.repeat(stages, len(stages) ** 2)
+    # df_ild['substage'] = np.repeat(substages, len(substages) ** 2)
     return df
 
 
@@ -301,11 +301,14 @@ def find_power_dB_par(amp_ref=0.00002, dB_cal=73, ambient_noise=33):
     # Solve equations numerically
     sol = np.array(nsolve((eq1, eq2), (x, y), (20, 0.01))).astype(float)
 
-    return sol
+    x = float(sol[0])
+    y = float(sol[1])
+
+    return x, y
 
 
 def power_dB(amp):
-    """Transform amplitude into dB"""
+    """Transform amplitude into decibels (dB)"""
     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
     # dB = 20 * np.log10(amp / amp_ref)
     x, y = find_power_dB_par()
@@ -314,13 +317,13 @@ def power_dB(amp):
     return dB
 
 
-def ild():
+def ild(df):
     """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
     The input should be a csv file to convert to DataFrame
     """
     path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     df = pd.read_csv(path)
-    # df = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
+    # df_ild = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
     df_dB = df  # Copy DataFrame
     df_dB.iloc[:, 1:21] = power_dB(
         abs(df.iloc[:, 1:21]))  # Apply the function to entire DataFrame except 'filename' column.

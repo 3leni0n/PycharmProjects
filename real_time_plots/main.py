@@ -70,7 +70,7 @@ def animate(i, parameters):
         mini_parse(file)
         print('parsing file', file.path, time.time() - start)
         start = time.time()
-        real_time_plot(file.df, file.axis1, file.axis2, file.axis3)
+        real_time_plot(file.df_ild, file.axis1, file.axis2, file.axis3)
         print('ploting file', file.path, time.time() - start)
     print('total time', time.time() - start0)
 

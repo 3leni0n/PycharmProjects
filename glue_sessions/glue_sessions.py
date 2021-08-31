@@ -9,20 +9,20 @@ from parse.parse import parse
 def glue_sessions():
 
     time_start = time.time()
-    folder = '/home/alexis/2AFC/setups'  # Where the data for all animals is
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'  # Where the data for all animals is
     animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
     print('Animals: ' + str(animals)[1:-1])  # Remove square brackets
     animal = input('Enter animal')  # Ask user to input animal to glue sessions from
 
-    folder = '/home/alexis/2AFC/setups/' + animal + '/sessions'  # Update folder with selected animal
+    folder = folder + animal + '/sessions'  # Update folder with selected animal
     sessions = os.listdir(folder)  # List sessions
     sessions.sort()  # Sort them by date
 
     protocols = []  # Initiate list
     for i, session in enumerate(sessions):
         # print(i, session)
-        protocols.append(sessions[i][4:-16])  # Remove animal ID (beginning) and date and time (end)
+        protocols.append(sessions[i][5:-16])  # Remove animal ID (beginning) and date and time (end)
 
     print('There are ' + str(len(sessions)) + ' sessions of this animal, ' + str(len(np.unique(protocols))) +
           ' protocols found:')

@@ -61,7 +61,7 @@ def create_duration_states(df,params):
 def alignment(df,params,zero):
         ''' Substract to timestamps of a dataframe a specific value to set the 0 in different positions 
             Takes:
-                df = Dataframe of trials
+                df_ild = Dataframe of trials
                 params = list with overall session values
                 zero = State at from which reset timing
         '''
@@ -109,7 +109,7 @@ def wm_daily_report(trials_path, params_path, daily_report_path):
     df.index = df.trials
     df = df[:-1]
     
-    # transform params df that only contains one row in a Series object
+    # transform params df_ild that only contains one row in a Series object
     params = params.iloc[0]
 
     df = Utils.convert_strings_to_floats(df, ['ResponseWindow_start','ResponseWindow_end', 'AW_start','StimulusDuration_start',
@@ -137,7 +137,7 @@ def wm_daily_report(trials_path, params_path, daily_report_path):
     pokes_df_right = Utils.unnesting(df, ['C_s', 'C_e'])    
      
     #Duration of states for faster raster plot
-    #df = create_duration_states(df,params)
+    #df_ild = create_duration_states(df_ild,params)
     
     # SUB-DATAFRAMES    
     left_trials_df = df[df.reward_side == 0]
@@ -417,7 +417,7 @@ ax.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         #
             elif float(params.delay_progression_value) == 0:                    
                 sns.scatterplot(df.trials, df.delay_times, hue=df.hithistory, palette=palette, s=12, ax=axes)
-                #axes.set_yticks([str(df.delay_times.unique())]) 
+                #axes.set_yticks([str(df_ild.delay_times.unique())])
             
             axes.set_ylabel('Delay (ms)')     
             axes.set_xlabel('Trials')          
@@ -475,7 +475,7 @@ ax.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
                     for item in sublist:
                         histogram.append(item)
 #                        if item > 5:
-#                            truevalue -= item - df[df.reward_side == 1]['ITI_end'][j]
+#                            truevalue -= item - df_ild[df_ild.reward_side == 1]['ITI_end'][j]
 #                            axes3.plot(truevalue,j+1, '.',color=color, zorder=1)
 #                            histogram.append(truevalue)                            
                                           
@@ -526,8 +526,8 @@ ax.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
             axes5.set_xlabel('Time (s)')
             axes6.set_xlabel('Time (s)')
     
-    #        axes5.axvspan(df['StimulusTrigger_end'][1],df['StimulusDuration_end'][1],color ='c',alpha=0.3)
-    #        axes7.axvspan(df['StimulusTrigger_end'][1],df['StimulusDuration_end'][1],color ='c',alpha=0.3)
+    #        axes5.axvspan(df_ild['StimulusTrigger_end'][1],df_ild['StimulusDuration_end'][1],color ='c',alpha=0.3)
+    #        axes7.axvspan(df_ild['StimulusTrigger_end'][1],df_ild['StimulusDuration_end'][1],color ='c',alpha=0.3)
     
             ITI_DURATION = df['ITI_end'].median()-df['ITI_start'].median()            
             limitx = [-params.fixation-2,ITI_DURATION+3]
@@ -815,22 +815,22 @@ ax.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
 #                      str(round(lr_l, 2)), xy=(0, 0), xytext=(-1, 0.85), fontsize=7)
             
             
-#        df = Utils.unnesting(df, ['Fixation_start', 'Fixation_end'])
-#        df = Utils.unnesting(df, ['ResponseWindow_start', 'ResponseWindow_end'])
+#        df_ild = Utils.unnesting(df_ild, ['Fixation_start', 'Fixation_end'])
+#        df_ild = Utils.unnesting(df_ild, ['ResponseWindow_start', 'ResponseWindow_end'])
 #        
-#        df['StimulusDuration'] = df['StimulusDuration_end'] - df['StimulusDuration_start']
+#        df_ild['StimulusDuration'] = df_ild['StimulusDuration_end'] - df_ild['StimulusDuration_start']
 #        if params.fixation != 0:
-#            df['Fixation'] = df['Fixation_end'] - df['Fixation_start']
+#            df_ild['Fixation'] = df_ild['Fixation_end'] - df_ild['Fixation_start']
 #        else:
-#            df['Fixation'] = 0
+#            df_ild['Fixation'] = 0
 #       
-#        df['ResponseWindow'] = df['ResponseWindow_end'] - df['ResponseWindow_start']
-#        df['ITI'] = df['ITI_end'] - df['ITI_start']
+#        df_ild['ResponseWindow'] = df_ild['ResponseWindow_end'] - df_ild['ResponseWindow_start']
+#        df_ild['ITI'] = df_ild['ITI_end'] - df_ild['ITI_start']
 #        
 #        if params.stage_number == 3:
-#            df['Delay'] = df['Delay_end'] - df['Delay_start']
+#            df_ild['Delay'] = df_ild['Delay_end'] - df_ild['Delay_start']
 #        else:
-#            df['Delay'] = 0
+#            df_ild['Delay'] = 0
             
         
         params['performance'] = per_performance

@@ -180,7 +180,7 @@ def wm_parse(file):
     length = int(len(trial_end))  # only ended trials
     trials = range(length)
 
-    #        trial_num = len(df.query("TYPE=='TRIAL' and MSG=='New trial'"))
+    #        trial_num = len(df_ild.query("TYPE=='TRIAL' and MSG=='New trial'"))
     #        length = trial_num
     #        print(trial_num)
 
@@ -269,7 +269,7 @@ def wm_parse(file):
     if motor == 6:
         # If the session has delay progression activated, it takes the delay value from the register option as well asthe delay progression value.
 #        if delay_progression_value == 1:
-##            delay_progression = df.query("TYPE=='VAL' and MSG=='DELAY_PROGRESSION'")['+INFO'].values[:length].astype(float)
+##            delay_progression = df_ild.query("TYPE=='VAL' and MSG=='DELAY_PROGRESSION'")['+INFO'].values[:length].astype(float)
 ##            delay_progression = np.concatenate((np.repeat(delay_l, 20), delay_progression))
 ##        else:
 #            delay_progression = np.repeat(delay_progression_value, length)

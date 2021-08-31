@@ -1,20 +1,22 @@
 # Import libraries
-import pandas as pd
 import numpy as np
-import sympy
 from matplotlib import pyplot as plt
-from my_fun.my_fun import ild, my_select_evidence, compute_psych_curve
+from my_fun.my_fun import power_dB, ild, my_select_evidence, compute_psych_curve
+from glue_sessions.glue_sessions import glue_sessions
+from create_sounds.create_sounds import create_sounds
 
-df = ild()
-df_summary = df.groupby('Evidence', as_index=False).mean()  # SQL-style index
+########################################################################################################################
+
+df_ild = ild()
+df_ild_summary = df_ild.groupby('Evidence', as_index=False).mean()  # SQL-style index
 n_trials = 1000
 trial_types = [0, 1]  # 0=left, 1=right
 trial_list = np.random.choice(trial_types, n_trials).tolist()  # Generate random trial vector of length n_trials
-evidences = df.Evidence.unique()
+evidences = df_ild.Evidence.unique()
 target_evidences = [-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1]
-target_ilds = list(df_summary.Mean[df_summary.Evidence.isin(target_evidences)].round().astype('int'))
-ilds = df_summary.Mean[df_summary.Evidence.isin(evidences)].reset_index(drop=True, inplace=False).round()
-df_sample = df[df.Evidence.isin(evidences)].reset_index(drop=True, inplace=False)
+target_ilds = list(df_ild_summary.Mean[df_ild_summary.Evidence.isin(target_evidences)].round().astype('int'))
+ilds = df_ild_summary.Mean[df_ild_summary.Evidence.isin(evidences)].reset_index(drop=True, inplace=False).round()
+df_sample = df_ild[df_ild.Evidence.isin(evidences)].reset_index(drop=True, inplace=False)
 
 # Initialize empty lists for simulated data
 sim_sound = []
@@ -40,48 +42,100 @@ for i in range(n_trials):
 
 unfair_trials = np.where(np.array(trial_list) != sim_choice)[0]  # Return indices where the choice of the perfect agent
 # doesn't match with the known outcome of the trial
+errors = len(unfair_trials)
+hits = n_trials - errors
+accuracy = hits / n_trials
 
 # Compute psychometric curves
-psych_curve_perfect_agent = compute_psych_curve(sim_evidence, sim_choice)
-psych_curve_cheater_agent = compute_psych_curve(sim_evidence, trial_list)
+psych_curve_perfect_agent = compute_psych_curve(sim_evidence, sim_choice)  # Perfect agent
+psych_curve_cheater_agent = compute_psych_curve(sim_evidence, trial_list)  # Cheater agent
 
 # Plot horizontal and vertical lines
 plt.axhline(0.5, color='tab:gray', ls='--')
 plt.axvline(0., color='tab:gray', ls='--')
 
 # Plot psychometric curves and errorbars
-plt.plot(np.linspace(-1, 1, 30), psych_curve_perfect_agent.fit, color='tab:orange', label='Perfect agent')
+plt.plot(np.linspace(-1, 1, 30), psych_curve_perfect_agent.fit, color='tab:blue', label='Perfect agent')
 plt.errorbar(psych_curve_perfect_agent.xdata, psych_curve_perfect_agent.ydata, yerr=psych_curve_perfect_agent.fit_error,
-             color='tab:orange', fmt='o', markerfacecolor='none')
-
-plt.plot(np.linspace(-1, 1, 30), psych_curve_cheater_agent.fit, color='tab:blue', label='Cheater agent')
-plt.errorbar(psych_curve_cheater_agent.xdata, psych_curve_cheater_agent.ydata, yerr=psych_curve_cheater_agent.fit_error,
              color='tab:blue', fmt='o', markerfacecolor='none')
 
-plt.title('Psychometric curves \n(' + str(n_trials) + ' trials, ' + str(len(unfair_trials)) + ' unfair)')
+plt.plot(np.linspace(-1, 1, 30), psych_curve_cheater_agent.fit, color='tab:orange', label='Cheater agent')
+plt.errorbar(psych_curve_cheater_agent.xdata, psych_curve_cheater_agent.ydata, yerr=psych_curve_cheater_agent.fit_error,
+             color='tab:orange', fmt='o', markerfacecolor='none')
+
+plt.title('Psychometric curves \n(' + str(n_trials) + ' trials, ' + str(errors) + ' unfair)')
 # plt.xlabel('Evidence')
-plt.xlabel('Interaural Level Difference')
+plt.xlabel('Interaural Level Difference (dB)')
 # plt.xticks(target_evidences, target_ilds)
-plt.xticks(evidences, ['-40', '', '', '-17', '', '-8', '', '', '-4', '', '0', '', '-4', '', '', '-8', '', '-17', '', '', '-40'])
+plt.xticks(evidences,
+           ['-40', '', '', '-17', '', '-8', '', '', '-4', '', '0', '', '-4', '', '', '-8', '', '-17', '', '', '-40'])
 plt.ylabel('Probability choose right')
 plt.legend(loc="lower right", frameon=False)
 # plt.spines['top'].set_visible(False)
 # plt.spines['right'].set_visible(False)
 
+########################################################################################################################
 
-# plt.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
-#               xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
-# plt.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
-#               xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:red')
-#
-# sensitivity, bias, lr_left, lr_right = psych_curve.params
-#
-# plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-#               "B=" + str(round(bias, 2)) + "\n" +  # Bias
-#               "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-#               "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
-#               fontsize='xx-small')
+# Same but running the perfect and cheating agents on the same trials I did (instead of simulating them)
+
+# Glue sessions I (Alexis) did
+df_Alexis = glue_sessions()
+df_Alexis = df_Alexis[df_Alexis.Response == 1].reset_index(drop=True, inplace=False)  # Discard missed trials
+# df_Alexis = df_Alexis[df_Alexis.Response == 1][:1000].reset_index(drop=True, inplace=False)  # Discard missed trials
+n_trials = len(df_Alexis)
+evidences = df_ild.Evidence.unique()
+
+# Perfect agent
+df_Alexis_filenames = df_Alexis.Filename  # Get filenames of the dataset
+alexis_ild = []  # Create empty list
+perfect_agent_choice = []
+
+for i in range(n_trials):
+    alexis_ild.append(
+        df_ild.Mean[df_ild.Filename == df_Alexis_filenames[i]].values[0])  # Append the mean ILD for that sound
+
+    alexis_ild.append(df_ild[df_ild.Filename == df_Alexis_filenames[i]].values[0][2:7])  # First 5 frames
+    alexis_ild.append(df_ild[df_ild.Filename == df_Alexis_filenames[i]].values[0][7:12])  # First 5 frames
+
+    if alexis_ild[i] < 0:
+        perfect_agent_choice.append(0)
+    else:
+        perfect_agent_choice.append(1)
+
+unfair_trials = np.where(np.array(df_Alexis.Side) != perfect_agent_choice)[
+    0]  # Return indices where the choice of the perfect agent
+# doesn't match with the known outcome of the trial
+
+# Compute psychometric curves
+psych_curve_Alexis_agent = compute_psych_curve(df_Alexis.Evidence, df_Alexis.Choice)  # Alexis agent
+psych_curve_perfect_agent = compute_psych_curve(df_Alexis.Evidence, perfect_agent_choice)  # Perfect agent
+psych_curve_cheater_agent = compute_psych_curve(df_Alexis.Evidence, df_Alexis.Side)  # Cheater agent
+
+# Plot horizontal and vertical lines
+plt.axhline(0.5, color='tab:gray', ls='--')
+plt.axvline(0., color='tab:gray', ls='--')
+
+# Plot psychometric curves and errorbars
+plt.plot(np.linspace(-1, 1, 30), psych_curve_Alexis_agent.fit, color='tab:blue', label='Alexis agent')
+plt.errorbar(psych_curve_Alexis_agent.xdata, psych_curve_Alexis_agent.ydata, yerr=psych_curve_Alexis_agent.fit_error,
+             color='tab:blue', fmt='o', markerfacecolor='none')
+
+plt.plot(np.linspace(-1, 1, 30), psych_curve_perfect_agent.fit, color='tab:orange', label='Perfect agent')
+plt.errorbar(psych_curve_perfect_agent.xdata, psych_curve_perfect_agent.ydata, yerr=psych_curve_perfect_agent.fit_error,
+             color='tab:orange', fmt='o', markerfacecolor='none')
+
+plt.plot(np.linspace(-1, 1, 30), psych_curve_cheater_agent.fit, color='tab:green', label='Cheater agent')
+plt.errorbar(psych_curve_cheater_agent.xdata, psych_curve_cheater_agent.ydata, yerr=psych_curve_cheater_agent.fit_error,
+             color='tab:green', fmt='o', markerfacecolor='none')
+
+plt.title('Psychometric curves \n(' + str(len(df_Alexis)) + ' trials, ' + str(len(unfair_trials)) + ' unfair)')
+# plt.xlabel('Evidence')
+plt.xlabel('Interaural Level Difference (dB)')
+plt.xticks(target_evidences, target_ilds)
+plt.ylabel('Probability choose right')
+plt.legend(loc="lower right", frameon=False)
 
 ########################################################################################################################
 
-
+df_sounds = create_sounds()
+df_ild = ild(df_sounds)

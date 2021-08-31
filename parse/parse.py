@@ -4,7 +4,7 @@
 # Not to do las trial if session crashed
 # If CB was on, take the last REWARD_SIDE
 # Include the new VARs in upper text
-# Changed reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[0] to ...[-1], so it takes the last vector when
+# Changed reward_side = df_ild[df_ild.MSG == 'REWARD_SIDE']['+INFO'].iloc[0] to ...[-1], so it takes the last vector when
 # overwritten by CB
 ########################################################################################################################
 
@@ -30,7 +30,7 @@ def parse(path):
     ####################################################################################################################
 
     index = df[df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous
-    # one index = df[df['TYPE'] == 'END-TRIAL'].index
+    # one index = df_ild[df_ild['TYPE'] == 'END-TRIAL'].index
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
     # METADATA (multiply by n_trials)
@@ -52,7 +52,7 @@ def parse(path):
     try:
         session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
     except IndexError:
-        # session_ended = df['PC-TIME'].iloc[-1]
+        # session_ended = df_ild['PC-TIME'].iloc[-1]
         session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
         # print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
         print(f"The session '{np.unique(session)[0]}' ended abruptly, probably due to Bpod crashed. Using last PC_TIME "
@@ -121,6 +121,7 @@ def parse(path):
     port1out = []
     port2in = []
     port2out = []
+    substage = []
 
     ####################################################################################################################
 
@@ -212,6 +213,7 @@ def parse(path):
         # Sound filename + sound2 filename + coherence/evidence + presented coherences/evidences
         # Stage, motor, substage for tracking changes within session when running a single script
         # Register running window
+        substage.append(int(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'SUBSTAGE')]['+INFO'].iloc[0]))
 
         if i == 0:
             after_hit.append(np.nan)
@@ -272,7 +274,7 @@ def parse(path):
 
     df_session = pd.DataFrame(data=data, columns=columns)
 
-    # df_session.to_csv(str('parsed_') + path.split('/')[-1])  # Save df as csv file
+    # df_session.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_ild as csv file
 
     return df_session
 

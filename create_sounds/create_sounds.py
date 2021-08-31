@@ -9,7 +9,7 @@ from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
 import string
-from my_fun.my_fun import evi2coh
+from my_fun.my_fun import evi2coh, envelope
 
 
 ########################################################################################################################
@@ -28,7 +28,6 @@ def create_sounds(save=False):
     time_start = time.time()
 
     # Generate white noise
-    # whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
     whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
     # band_fs=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
     # FsOut=44100 the most used (audio CD)
@@ -61,6 +60,10 @@ def create_sounds(save=False):
     # Create DataFrame column labels
     columns = ['EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
                'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
+    # Create DataFrame column labels
+    # columns = ['filename',
+    #            'EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
+    #            'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
 
     df = pd.DataFrame(data=None, index=None, columns=columns)  # Create empty data frame with column labels
 
@@ -74,6 +77,7 @@ def create_sounds(save=False):
             name = folder + chars[k] + i + j
 
             filename = chars[k] + i + j  # For the csv file
+            # filename = np.array([filename])  # np.concatenate needs 1-dimensional arrays
 
             path_wav = name + '.wav'
             # path_mp3 = name + '.mp3'
@@ -84,9 +88,14 @@ def create_sounds(save=False):
                                              variance=0.015, randomized=False, paired=False, LAmp=1.0, RAmp=1.0,
                                              oldbug=False, randgen=None)
 
+            # SL, SR, EL, ER = envelope(coherences[k], fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False)  # Too slow
+
             ELER = np.concatenate((EL, ER))  # Concatenate EL and ER (envelope)
+            # ELER = np.concatenate((filename, EL, ER))  # Concatenate EL and ER (envelope)
             df2 = pd.DataFrame([ELER], index=[filename], columns=columns)  # Fill data frame
+            # df2 = pd.DataFrame([ELER], columns=columns)  # Fill data frame
             df = df.append(df2)  # Append last row of data to existing data frame
+            # df = df.append(df2, ignore_index=True)  # If True, the resulting axis will be labeled 0, 1, …, n - 1
 
             if save == True:  # Save sounds only if specified (don't wanna for simulation purposes)
                 sound = np.column_stack((SL, SR))
@@ -98,7 +107,7 @@ def create_sounds(save=False):
     df.index.name = 'filename'  # Change index name from 'Unnamed: 0' to 'filename'
 
     if save == True:
-        # df.to_csv('sounds.csv')  # Save df as csv file
+        # df_ild.to_csv('sounds.csv')  # Save df_ild as csv file
         df.to_csv(folder + 'test.csv')
 
     time_end = time.time()
