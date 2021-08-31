@@ -65,7 +65,7 @@ def parse(path):
     timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
     fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
     stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
-    substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
+    # substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
     motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
     rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
     progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
