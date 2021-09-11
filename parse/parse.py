@@ -274,7 +274,7 @@ def parse(path):
 
     df_session = pd.DataFrame(data=data, columns=columns)
 
-    # df_session.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_ild as csv file
+    # df.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_ild as csv file
 
     return df_session
 

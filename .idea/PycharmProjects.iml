@@ -6,13 +6,12 @@
     </content>
     <orderEntry type="jdk" jdkName="Python 3.6 (pybpod-environment)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="module" module-name="2AFC" />
-    <orderEntry type="module" module-name="setups" />
-    <orderEntry type="module" module-name="setups" />
     <orderEntry type="module" module-name="setups" />
     <orderEntry type="module" module-name="tasks" />
-    <orderEntry type="module" module-name="toolsr" />
-    <orderEntry type="module" module-name="datahandler" />
     <orderEntry type="module" module-name="setups" />
+  </component>
+  <component name="PyDocumentationSettings">
+    <option name="format" value="PLAIN" />
+    <option name="myDocStringFormat" value="Plain" />
   </component>
 </module>

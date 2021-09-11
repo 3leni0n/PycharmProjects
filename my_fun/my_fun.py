@@ -61,9 +61,10 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
     return x, y
 
 
-def envelope(coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False):
+def envelope(noise, coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False):
     """
     Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
+    :param noise: white noise vector
     :param coh: coherence [0=left, 1=right]
     :param fs: sampling frequency (needs to match the fs of white noise and sine wave)
     :param amp: amplitude
@@ -74,11 +75,11 @@ def envelope(coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False):
     :return: sound left, sound right, stairs left (* n_frames), stairs_right (* n_frames)
     """
 
-    noise = white_noise(fs=fs, cutoff=[2000, 20000], amp=amp, dur=dur, fn=10000)
+    # noise = white_noise(fs=fs, cutoff=[2000, 20000], amp=amp, dur=dur, fn=10000)
     n_points = dur * fs  # Should be an integer
 
     if len(noise) != n_points:
-        raise ValueError('whitenoise and n_points need to be the same length')
+        raise ValueError('whitenoise and n_points need to  be the same length')
 
     x, mod_wave = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
     # amp = 0.5 so the length of y domain is 1 (-0.5, 0.5) instead of 2 (-1, 1)
@@ -317,7 +318,7 @@ def power_dB(amp):
     return dB
 
 
-def ild(df):
+def ild():
     """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
     The input should be a csv file to convert to DataFrame
     """
@@ -325,9 +326,9 @@ def ild(df):
     df = pd.read_csv(path)
     # df_ild = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
     df_dB = df  # Copy DataFrame
-    df_dB.iloc[:, 1:21] = power_dB(
-        abs(df.iloc[:, 1:21]))  # Apply the function to entire DataFrame except 'filename' column.
-    # abs because can't do log10 of negative number. To retrieve the negative sign for left the ILD will be computed as right - left later
+    df_dB.iloc[:, 1:21] = power_dB(abs(df.iloc[:, 1:21]))  # Apply the function to entire DataFrame except 'filename'
+    # column. abs because can't do log10 of negative number. To retrieve the negative sign for left the ILD will be
+    # computed as right - left later
     df_dB_left = df_dB.iloc[:, 1:11]  # Index left skipping 'filename'
     df_dB_left.columns = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']  # DataFrames needs to have BOTH the same
     # row and column indices in order to perform an element-wise subtraction

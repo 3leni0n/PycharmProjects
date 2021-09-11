@@ -10,14 +10,12 @@
 
 import os
 import time
-
 from daily_report.daily_report import daily_report
 
 ########################################################################################################################
 
 # Define function
 def do_reports():
-
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
     folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'
@@ -43,7 +41,7 @@ def do_reports():
         # mice and protocol names
         split_sessions = [s for s in sessions if date_sessionID in s]
 
-        # This block look if there are more than one session with the same date and do the reports for each if so
+        # This block looks if there are more than one session with the same date and do the reports for each if so
         if len(split_sessions) > 1:
             for j in range(len(split_sessions)):
                 path = folder2 + split_sessions[j] + '/' + split_sessions[

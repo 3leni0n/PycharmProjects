@@ -35,7 +35,7 @@ def real_time_plot(df_session, ax1, ax2, ax3):
     # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
     # Prepares the grid for the plots
-    # if df_session.Stage.unique()[0] == 4:
+    # if df.Stage.unique()[0] == 4:
     #     ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=3, colspan=4)
     # else:
     #     ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
@@ -83,7 +83,7 @@ def real_time_plot(df_session, ax1, ax2, ax3):
     # PLOT 4: HIT SCATTER PLOT
 
     # # Prepares the grid for the plots
-    # if df_session.Stage.unique()[0] == 4:
+    # if df.Stage.unique()[0] == 4:
     #     ax4 = plt.subplot2grid((16, 4), (7, 0), rowspan=3, colspan=4)
     # else:
     #     ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
@@ -140,8 +140,8 @@ def real_time_plot(df_session, ax1, ax2, ax3):
 
 
 
-    # sns.scatterplot(x=df_session.Reward, y=df_session.Response, color='black', s=100, ax=ax1)
-    # sns.scatterplot(x=df_session.Response, y=df_session.Reward, color='black', s=100, ax=ax2)
-    # sns.scatterplot(x=df_session.Response, y=df_session.Reward, color='black', s=100, ax=ax3)
+    # sns.scatterplot(x=df.Reward, y=df.Response, color='black', s=100, ax=ax1)
+    # sns.scatterplot(x=df.Response, y=df.Reward, color='black', s=100, ax=ax2)
+    # sns.scatterplot(x=df.Response, y=df.Reward, color='black', s=100, ax=ax3)
 
     sns.despine()

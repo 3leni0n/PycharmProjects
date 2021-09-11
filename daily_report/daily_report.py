@@ -50,6 +50,7 @@ from parse.parse import *  # Or from parse.parse import parse
 
 # Define function
 def daily_report(path):
+
     # Register time
     time_start_total = time.time()
 
@@ -72,10 +73,14 @@ def daily_report(path):
     # Plotting style
     ms = 3  # (mpl default for plt.plot=6 and for plt.scatter=6**2)
     lw = 1.5  # mpl default
+    # width = lw  # Arrow
+    # head_width = 3 * width
+    # head_length = 0.1 # 1.5 * head_width
 
     ####################################################################################################################
 
     # SUMMARY VARIABLES
+
     # Trials
     trials = len(df_session)
     trials_left = df_session.Side.value_counts()[0]
@@ -143,15 +148,15 @@ def daily_report(path):
         # SUMMARY TEXT
 
         s1 = ('Date: ' + df_session.Date.unique()[0] + ', ' +
-              'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][
-                                                                             0:-7] + ', ' +
+              'Time: ' + df_session.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][0:-7] + ', ' +
+              # [0:-7] to get rid of the floating numbers in the seconds
               'Subject: ' + df_session.Subject.unique()[0] + ', ' +
               'Box: ' + df_session.Board.unique()[0][4] +
               '\n')
-        # [0:-7] to get rid of the floating numbers in the seconds
 
         s2 = ('Stage: ' + str(df_session.Stage.unique()[0]) + ', ' +
-              'Substage: ' + str(df_session.Substage.unique()[0]) + ', ' +
+              'Substage(s): ' + str(df_session.Substage.sort_values().unique()[0]) + '-' +
+              str(df_session.Substage.sort_values().unique()[-1]) + ', ' +
               'Fixation: ' + str(df_session.Fixation.unique()[0]) + ', ' +
               'Timeout: ' + str(df_session.Timeout.unique()[0]) + ', ' +
               'Switch: ' + str(df_session.Switch.unique()[0]) + ', ' +
@@ -160,24 +165,12 @@ def daily_report(path):
               'Progression: ' + str(df_session.Progression.unique()[0]) +
               '\n')
 
-        # s3 = ('Total trials: ' + str(trials) + ', ' +
-        #       'Performance: ' + str(round(performance * 100)) + '%' + ', ' +
-        #       'Hits left:' + str(hits_left) + ' (' + str(round(performance_left * 100)) + '%)' + ', ' +
-        #       'Hits right: ' + str(hits_right) + ' (' + str(round(performance_right * 100)) + '%)' +
-        #       '\n')
-
-        s3 = ('Total trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
+        s3 = ('Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
               'Performance: ' + str(round(performance * 100)) + '% (' + str(
                     round(performance_left * 100)) + '% L, ' + str(round(performance_right * 100)) + '% R)' + ', ' +
               'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(
                     round(accuracy_right * 100)) + '% R)' +
               '\n')
-
-        # s4 = ('Responses: ' + str(responses) + ', ' +
-        #       'Accuracy: ' + str(round(accuracy * 100)) + '%' + ', ' +
-        #       'Hits left: ' + str(hits_left) + ' (' + str(round(accuracy_left * 100)) + '%)' + ', ' +
-        #       'Hits right: ' + str(hits_right) + ' (' + str(round(accuracy_right * 100)) + '%)' +
-        #       '\n')
 
         s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
             responses_right) + ' R)' + ', ' +
@@ -198,9 +191,12 @@ def daily_report(path):
 
         # plt.text(0.1, 0.90, s1 + s2 + s3 + s4 + s5 + s6, fontsize=8, transform=plt.gcf().transFigure)
 
-        ####################################################################################################################
+        ################################################################################################################
 
         # fig = plt.figure()
+
+        change_substage = df_session.Substage.diff()  # Find trials in which substage changes
+        change_substage = change_substage[change_substage != 0].dropna()  # Omit 0s and drop first nan
 
         # PLOT 1: ACCURACY PER SIDE
 
@@ -219,7 +215,7 @@ def daily_report(path):
 
         # Prepares the grid for the plots
         if df_session.Stage.unique()[0] == 4:
-            ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=3, colspan=4)
+            ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
         # ax1 = plt.subplot2grid((4, 1), (0, 0))
@@ -240,6 +236,23 @@ def daily_report(path):
                  lw=lw,
                  color='tab:orange',
                  label='Right')
+
+        if df_session.Progression.unique()[0] == 1:
+            for i in range(len(change_substage.index)):
+                if change_substage[change_substage.index[i]] == 1:
+                    # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='->', color='green'))
+                    ax1.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+                    ax1.annotate(s=str(df_session.Substage[change_substage.index[i]]),
+                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+                                 color='tab:green', ha='center')
+                elif change_substage[change_substage.index[i]] == -1:
+                    # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='<-', color='red'))
+                    ax1.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+                    ax1.annotate(s=str(df_session.Substage[change_substage.index[i]]),
+                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+                                 color='tab:red', ha='center')
 
         ax1.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
         ax1.set_xticklabels([])
@@ -280,7 +293,7 @@ def daily_report(path):
 
         # Prepares the grid for the plots
         if df_session.Stage.unique()[0] == 4:
-            ax2 = plt.subplot2grid((16, 4), (3, 0), rowspan=2, colspan=4)
+            ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
             ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
         # ax2 = plt.subplot2grid((4, 1), (1, 0))
@@ -295,6 +308,23 @@ def daily_report(path):
                  lw=lw, color='tab:purple', label='Alt')
         ax2.plot(df_session.Hit[(df_session.Miss == 0) & (df_session.RepTrial == 1)].index, ra_rep, marker='o', ms=ms,
                  lw=lw, color='tab:brown', label='Rep')
+
+        if df_session.Progression.unique()[0] == 1:
+            for i in range(len(change_substage.index)):
+                if change_substage[change_substage.index[i]] == 1:
+                    # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='->', color='green'))
+                    ax2.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+                    ax2.annotate(s=str(df_session.Substage[change_substage.index[i]]),
+                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+                                 color='tab:green', ha='center')
+                elif change_substage[change_substage.index[i]] == -1:
+                    # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='<-', color='red'))
+                    ax2.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+                    ax2.annotate(s=str(df_session.Substage[change_substage.index[i]]),
+                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+                                 color='tab:red', ha='center')
 
         ax2.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
         ax2.set_xticklabels([])
@@ -333,7 +363,7 @@ def daily_report(path):
 
         # Prepares the grid for the plots
         if df_session.Stage.unique()[0] == 4:
-            ax3 = plt.subplot2grid((16, 4), (5, 0), rowspan=2, colspan=4)
+            ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
             ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
         # ax3 = plt.subplot2grid((4, 1), (2, 0))
@@ -350,9 +380,25 @@ def daily_report(path):
         ax3.plot(df_session[df_session.Side == 1].index, ra_right_miss, marker='o', ms=ms, lw=lw, color='tab:orange',
                  label='Right')
 
+        if df_session.Progression.unique()[0] == 1:
+            for i in range(len(change_substage.index)):
+                if change_substage[change_substage.index[i]] == 1:
+                    # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='->', color='green'))
+                    ax3.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+                    ax3.annotate(s=str(df_session.Substage[change_substage.index[i]]),
+                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+                                 color='tab:green', ha='center')
+                elif change_substage[change_substage.index[i]] == -1:
+                    # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='<-', color='red'))
+                    ax3.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+                    ax3.annotate(s=str(df_session.Substage[change_substage.index[i]]),
+                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+                                 color='tab:red', ha='center')
+
         ax3.set_xlim([1, len(df_session)])  # 1 to not plot trial 0
         ax3.set_xticklabels([])
-
         ax3.set_ylim([0, 1.1])
         ax3.set_ylabel('Miss\n(%)')
         ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
@@ -375,7 +421,7 @@ def daily_report(path):
         runtime_miss = time_end_miss - time_start_miss
         print("'Plot 3: misses' took", round(runtime_miss, 2), 'seconds to run')
 
-        ####################################################################################################################
+        ################################################################################################################
 
         # PLOT 4: HIT SCATTER PLOT
 
@@ -383,7 +429,7 @@ def daily_report(path):
 
         # Prepares the grid for the plots
         if df_session.Stage.unique()[0] == 4:
-            ax4 = plt.subplot2grid((16, 4), (7, 0), rowspan=3, colspan=4)
+            ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
         # ax4 = plt.subplot2grid((4, 1), (3, 0))
@@ -444,13 +490,14 @@ def daily_report(path):
 
         ################################################################################################################
 
-        # PLOT 8: PSYCOMETRIC CURVE
+        # PLOTS 8-9: PSYCOMETRIC CURVES
 
         # Only draw PC if evidences are introduced (stage 4)
         if len(df_session.Evidence.unique()) > 2 and df_session.Stage.unique()[0] == 4:
             # fig = plt.figure()
 
-            ax11 = plt.subplot2grid((16, 4), (11, 0), rowspan=5, colspan=2)
+            # Psychometric curve of the whole session (all trials)
+            ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
 
             # Compute psychometric curves
             psych_curve = compute_psych_curve(df_session.Evidence[df_session.Miss == 0],
@@ -478,15 +525,15 @@ def daily_report(path):
             # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
             ax11.legend(loc="lower right", frameon=False)
 
-            ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
-            # ax11_right_yaxis.set_ylabel('Prob. right')
-            ax11.set_yticklabels([])  # Remove left yticklabels
-            ax11.set_yticks([])  # Remove left yticks
+            # ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
+            # # ax11_right_yaxis.set_ylabel('Prob. right')
+            # ax11.set_yticklabels([])  # Remove left yticklabels
+            # ax11.set_yticks([])  # Remove left yticks
 
             ax11.spines['top'].set_visible(False)
-            ax11.spines['left'].set_visible(False)
-            ax11_right_yaxis.spines['top'].set_visible(False)
-            ax11_right_yaxis.spines['left'].set_visible(False)
+            ax11.spines['right'].set_visible(False)
+            # ax11_right_yaxis.spines['top'].set_visible(False)
+            # ax11_right_yaxis.spines['left'].set_visible(False)
 
             ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
                           xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
@@ -501,20 +548,65 @@ def daily_report(path):
                           "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
                           fontsize='xx-small')
 
-        ####################################################################################################################
-        """
-        # PLOT 9: INTERSESSION
+            if df_session.Progression.unique()[0] == 1:
 
-        # fig = plt.figure()
-        
-        ax12 = plt.subplot2grid((16, 4), (10, 0), rowspan=7, colspan=2)
-        ax12.set_xticks([])
-        ax12.set_xticklabels([])
-        ax12.set_yticks([])
-        ax12.set_yticklabels([])
-        ax12.text(0.5, 0.5, 'Intersession\ndata will go here', horizontalalignment='center', verticalalignment='center',
-                  transform=ax12.transAxes)
-        """
+                # Psychometric curves per substage
+                ax_list = [plt.subplot2grid((16, 6), (10, 3), rowspan=2, colspan=1),  # Substage 1
+                           plt.subplot2grid((16, 6), (10, 4), rowspan=2, colspan=1),  # Substage 2
+                           plt.subplot2grid((16, 6), (10, 5), rowspan=2, colspan=1),  # Substage 3
+                           plt.subplot2grid((16, 6), (12, 3), rowspan=2, colspan=1),  # Substage 4
+                           plt.subplot2grid((16, 6), (12, 4), rowspan=2, colspan=1),  # Substage 5
+                           plt.subplot2grid((16, 6), (12, 5), rowspan=2, colspan=1),  # Substage 6
+                           plt.subplot2grid((16, 6), (14, 3), rowspan=2, colspan=1),  # Substage 7
+                           plt.subplot2grid((16, 6), (14, 4), rowspan=2, colspan=1),  # Substage 8
+                           plt.subplot2grid((16, 6), (14, 5), rowspan=2, colspan=1)]  # Substage 9
+
+                substages_session = df_session.Substage.unique()
+                df_substages = {}  # Create empty dictionary
+
+                for i in range(len(ax_list)):
+                    if i + 1 not in substages_session:  # +1 because ax_list is from 0 to 8 and substages can go from 1 to 9
+                        ax_list[i].set_visible(False)  # Make axes invisible
+                        continue
+                    else:
+                        df_substages[i + 1] = df_session[df_session.Substage == i + 1]
+
+                    # Compute psychometric curves
+                    psych_curve = compute_psych_curve(
+                        df_substages[i + 1].Evidence[df_substages[i + 1].Miss == 0],
+                        df_substages[i + 1].Choice[df_substages[i + 1].Miss == 0])
+
+                    ax = ax_list[i]
+
+                    # Plot horizontal and vertical lines
+                    ax.axhline(0.5, color='tab:gray', ls='--')
+                    ax.axvline(0., color='tab:gray', ls='--')
+
+                    # Plot left-right psychometric curve and errorbars
+                    ax.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
+                    ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
+                                fmt='o', markerfacecolor='none')
+
+                    ax.set_title(f'Sub.{i+1}, n={len(df_substages[i+1])}')
+                    ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
+                    ax.set_xticks([], [])
+                    ax.set_ylim([-0.1, 1.1])
+                    ax.set_yticks([], [])
+                    # plt.axis('equal')
+
+                    # x0, x1 = plt.gca().get_xlim()
+                    # y0, y1 = plt.gca().get_ylim()
+                    # plt.gca().set_aspect((x1 - x0) / (y1 - y0))  # Height is float times the width
+
+                # plt.tight_layout()
+
+                # This won't work unless updating matplotlib
+                # plt.suptitle('Substage')
+                # fig.supxlabel('Prob. right')
+                # fig.supylabel('Evidence')
+
+        ################################################################################################################
+
         time_start_savepag1 = time.time()
         pdf.savefig()  # saves the current figure into a pdf page
         time_end_savepag1 = time.time()
@@ -606,14 +698,14 @@ def daily_report(path):
                         mew = None
 
                     if df_session[df_session.Side == k].reset_index().Port1In[j] == []:
-                        # if not df_session.Port1In[j]:  # Equivalent
+                        # if not df.Port1In[j]:  # Equivalent
                         pass
                     else:
                         ax.plot(df_session[df_session.Side == k].reset_index().Port1In[j][i] -
                                 df_session[df_session.Side == k].reset_index().StimStart[j],
                                 df_session[df_session.Side == k].Port1In.reset_index().index[j], marker='o', ms=ms,
                                 mec=mec, mew=mew, color='tab:blue', zorder=3)
-                        # markersize=200 / len(df_session.Side == 0))
+                        # markersize=200 / len(df.Side == 0))
                         # markersize = ax.containers[1][0].get_height()
 
                 # Right licks
@@ -633,14 +725,14 @@ def daily_report(path):
                         mew = None
 
                     if df_session[df_session.Side == k].reset_index().Port2In[j] == []:
-                        # if not df_session.Port1In[j]:  # Equivalent
+                        # if not df.Port1In[j]:  # Equivalent
                         pass
                     else:
                         ax.plot(df_session[df_session.Side == k].reset_index().Port2In[j][i] -
                                 df_session[df_session.Side == k].reset_index().StimStart[j],
                                 df_session[df_session.Side == k].reset_index().Port2In.index[j], marker='o', ms=ms,
                                 mec=mec, mew=mew, color='tab:orange', zorder=3)
-                        # markersize=200 / len(df_session.Side == 1))
+                        # markersize=200 / len(df.Side == 1))
                         # markersize = ax.containers[1][0].get_height()
 
             xlim[k] = [ax.get_xlim()]  # Store xlim from left and right plots
@@ -702,7 +794,7 @@ def daily_report(path):
                 # Left licks
                 for i in range(len(df_session[df_session.Side == k].reset_index().Port1In[j])):  # n licks
                     if df_session[df_session.Side == k].reset_index().Port1In[j] == []:
-                        # if not df_session.Port1In[j]:  # Equivalent
+                        # if not df.Port1In[j]:  # Equivalent
                         pass
                     else:
                         histcounts_L.append(df_session[df_session.Side == k].reset_index().Port1In[j][i] -
@@ -711,7 +803,7 @@ def daily_report(path):
                 # Right licks
                 for i in range(len(df_session[df_session.Side == k].reset_index().Port2In[j])):  # n licks
                     if df_session[df_session.Side == k].reset_index().Port2In[j] == []:
-                        # if not df_session.Port1In[j]:  # Equivalent
+                        # if not df.Port1In[j]:  # Equivalent
                         pass
                     else:
                         histcounts_R.append(df_session[df_session.Side == k].reset_index().Port2In[j][i] -
@@ -775,7 +867,7 @@ def daily_report(path):
                 # Left licks
                 for i in range(len(df_session[df_session.Side == k].reset_index().Port1In[j])):  # n licks
                     if df_session[df_session.Side == k].reset_index().Port1In[j] == []:
-                        # if not df_session.Port1In[j]:  # Equivalent
+                        # if not df.Port1In[j]:  # Equivalent
                         pass
                     else:
                         if df_session[df_session.Side == k].reset_index().Port1In[j][i] - \
@@ -793,7 +885,7 @@ def daily_report(path):
                 # Right licks
                 for i in range(len(df_session[df_session.Side == k].reset_index().Port2In[j])):  # n licks
                     if df_session[df_session.Side == k].reset_index().Port2In[j] == []:
-                        # if not df_session.Port1In[j]:  # Equivalent
+                        # if not df.Port1In[j]:  # Equivalent
                         pass
                     else:
                         if df_session[df_session.Side == k].reset_index().Port2In[j][i] - \
