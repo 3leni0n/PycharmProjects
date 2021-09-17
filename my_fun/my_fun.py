@@ -223,7 +223,6 @@ def getWaterCalib(board, ports):  # From UtilsR
 
 def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
 # def my_select_evidence(trial_type, evidences, shape='uniform'):  # Adapted from UtilsR
-
     """
     Reduce the prob of 0 evidence to 1/2 as it is part of both left and right trials. This function would be equivalent
     to repeat each evidence in the array except for 0
