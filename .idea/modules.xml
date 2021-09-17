@@ -5,6 +5,7 @@
       <module fileurl="file://$PROJECT_DIR$/.idea/PycharmProjects.iml" filepath="$PROJECT_DIR$/.idea/PycharmProjects.iml" />
       <module fileurl="file://$PROJECT_DIR$/../pv_nmdar_eranet/experiments/2AFC/setups/.idea/setups.iml" filepath="$PROJECT_DIR$/../pv_nmdar_eranet/experiments/2AFC/setups/.idea/setups.iml" />
       <module fileurl="file://$PROJECT_DIR$/../pv_nmdar_eranet/tasks/.idea/tasks.iml" filepath="$PROJECT_DIR$/../pv_nmdar_eranet/tasks/.idea/tasks.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../toolsr/.idea/toolsr.iml" filepath="$PROJECT_DIR$/../toolsr/.idea/toolsr.iml" />
     </modules>
   </component>
 </project>

@@ -24,7 +24,7 @@ from glue_sessions.glue_sessions import glue_sessions
 ########################################################################################################################
 
 
-def intersession(path):
+def intersession_test(path):
 
     # Register time
     time_start_total = time.time()
@@ -34,18 +34,22 @@ def intersession(path):
     # Import sessions
 
     # Group by date (not session as animals sometimes do several sessions within a day)
-    # df = glue_sessions()
+    # df = glue_sessions()  # '910', 'stage_training'
     # path = '/home/alexis/PycharmProjects/glue_sessions/' + str(animal) + '.csv'  # Where the data for all animals is
     df = pd.read_csv(path)
     df.reset_index(drop=True, inplace=True)  # Don't create index column and modify it on the go
     # df_grouped = df.groupby('Date')  # Group by date instead of session
     sessions = df.groupby('Date').ngroup().unique()  # Array with number of dates: x axis
 
+    dates = df.Date.unique()
+    date_of_interest = '2021-08-31'  # Select a date of interest to plot a vertical line
+    date_of_interest_index = np.where(dates == date_of_interest)[0][0]
+
     ####################################################################################################################
 
     # Select the folder and create it if it doesn't exists
     # setup = df_session.Setup.unique()[0]  # Animal ID
-    folder = '/home/alexis/Documentos/intersession reports/' #+ setup
+    folder = '/home/alexis/Documentos/intersession_test/' #+ setup
     if not os.path.exists(folder):
         os.mkdir(folder)
     os.chdir(folder)
@@ -69,6 +73,8 @@ def intersession(path):
     hits = df.groupby('Date').Hit.sum()
     hits_left = df[df.Side == 0].groupby('Date').Hit.sum()
     hits_right = df[df.Side == 1].groupby('Date').Hit.sum()
+    hits_rep = df[df.RepTrial == 1].groupby('Date').Hit.sum()  # Inlude in daily_report
+    hits_alt = alternations = df[df.RepTrial == 0].groupby('Date').Hit.sum()  # Inlude in daily_report
 
     # Errors
     errors = df.groupby('Date').WrongLick.sum().astype(int) + df.groupby('Date').Punish.sum().astype(int)
@@ -88,15 +94,15 @@ def intersession(path):
     responses_right = df[df.Side == 1].groupby('Date').Response.sum()
 
     # Repetitions/Alternations
-    repetitions = df[df.RepTrial == 1].groupby('Date').Hit.sum()  # Inlude in daily_report
-    alternations = df[df.RepTrial == 0].groupby('Date').Hit.sum()  # Inlude in daily_report
+    repetitions = df[df.RepTrial == 1].groupby('Date').sum()  # Inlude in daily_report
+    alternations = df[df.RepTrial == 0].groupby('Date').sum()  # Inlude in daily_report
 
     # Accuracy (hit rate)
     accuracy = hits / responses
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
-    accuracy_rep = repetitions / responses  # Inlude in daily_report
-    accuracy_alt = alternations / responses  # Inlude in daily_report
+    accuracy_rep = hits_rep / repetitions  # Inlude in daily_report
+    accuracy_alt = hits_alt / alternations  # Inlude in daily_report
 
     # Misses (invalid trials)
     misses = df.groupby('Date').Miss.sum()
@@ -119,14 +125,17 @@ def intersession(path):
     water_left = rewards_left * reward_size
     water_right = rewards_right * reward_size
 
+    # Substage
+    substage = df.groupby('Date').Substage.mean()
+
     ####################################################################################################################
 
     with PdfPages(df.Setup.unique()[0].astype(str) + '_intersession') as pdf:
 
         # PAGE 1
 
-        fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
-        # fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
+        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
+        fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
         ################################################################################################################
 
@@ -136,7 +145,8 @@ def intersession(path):
               # 'Time: ' + df.SessionStart.unique()[0][0:-7] + ' - ' + df_session.SessionEnd.unique()[0][0:-7] + ', ' +
               # [0:-7] to get rid of the floating numbers in the seconds
               'Subject: ' + df.Subject.unique()[0].astype(str) + ', ' +
-              'Box: ' + df.Board.mode()[0][4] +
+              'Box: ' + df.Board.mode()[0][4] + ', ' +
+              'Sessions: ' + str(sessions.max()) +
               '\n')
 
         s2 = ('Sessions: ' + str(sessions.max()))
@@ -147,12 +157,15 @@ def intersession(path):
 
         time_start_acc_side = time.time()
 
-        ax1 = plt.subplot2grid((4, 1), (0, 0), rowspan=1, colspan=1)
+        ax1 = plt.subplot2grid((3, 1), (0, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax1.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
         ax1.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
         ax1.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+        # Plot vertical line for date of interest
+        # ax1.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
 
         # Plot sides accuracy per session
         ax1.plot(sessions, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -189,44 +202,47 @@ def intersession(path):
 
         ################################################################################################################
 
-        # PLOT 2: REPEATING VS ALTERNATING ACCURACY
+        # # PLOT 2: REPEATING VS ALTERNATING ACCURACY
+        #
+        # time_start_acc_repalt = time.time()
+        #
+        # ax2 = plt.subplot2grid((4, 1), (1, 0), rowspan=1, colspan=1)
+        #
+        # # Plot horizontal lines
+        # ax2.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+        # ax2.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        # ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
-        time_start_acc_repalt = time.time()
-
-        ax2 = plt.subplot2grid((4, 1), (1, 0), rowspan=1, colspan=1)
-
-        # Plot horizontal lines
-        ax2.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
-        ax2.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
-        ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
-
-        # Plot rep/alt accuracy per session
-        ax2.plot(sessions, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
-        ax2.plot(sessions, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
-
-        ax2.set_xlim([0, len(sessions)])
-        ax2.set_xticklabels([])
-        ax2.set_ylabel('Acc.\n(%)')
-        ax2.set_ylim([0, 1.1])
-        ax2.set_yticks(list(np.arange(0, 1.1, 0.1)))
-        ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax2.legend(loc='lower right', fontsize='xx-small', frameon=True)
-        ax2.spines['top'].set_visible(False)
-        ax2.spines['bottom'].set_visible(False)
-        # ax2.spines['right'].set_visible(False)
-
-        # Instantiate a second axes that shares the same x-axis
-        ax2_twin = ax2.twinx()
-        ax2_twin.set_ylim([0, 1.1])
-        ax2_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
-        ax2_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax2_twin.spines['top'].set_visible(False)
-        ax2_twin.spines['bottom'].set_visible(False)
-
-        time_end_acc_repalt = time.time()
-        runtime_acc_repalt = time_end_acc_repalt - time_start_acc_repalt
-        print("'Plot 2: accuracy repeating vs alternating' took", round(runtime_acc_repalt, 2), 'seconds to run')
+        # Plot vertical line for date of interest
+        # ax2.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+        #
+        # # Plot rep/alt accuracy per session
+        # ax2.plot(sessions, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
+        # ax2.plot(sessions, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
+        #
+        # ax2.set_xlim([0, len(sessions)])
+        # ax2.set_xticklabels([])
+        # ax2.set_ylabel('Acc.\n(%)')
+        # ax2.set_ylim([0, 1.1])
+        # ax2.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        # ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        # # ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        # ax2.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        # ax2.spines['top'].set_visible(False)
+        # ax2.spines['bottom'].set_visible(False)
+        # # ax2.spines['right'].set_visible(False)
+        #
+        # # Instantiate a second axes that shares the same x-axis
+        # ax2_twin = ax2.twinx()
+        # ax2_twin.set_ylim([0, 1.1])
+        # ax2_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        # ax2_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        # ax2_twin.spines['top'].set_visible(False)
+        # ax2_twin.spines['bottom'].set_visible(False)
+        #
+        # time_end_acc_repalt = time.time()
+        # runtime_acc_repalt = time_end_acc_repalt - time_start_acc_repalt
+        # print("'Plot 2: accuracy repeating vs alternating' took", round(runtime_acc_repalt, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -234,19 +250,22 @@ def intersession(path):
 
         time_start_miss = time.time()
 
-        ax3 = plt.subplot2grid((4, 1), (2, 0), rowspan=1, colspan=1)
+        ax3 = plt.subplot2grid((3, 1), (1, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax3.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
         ax3.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
         ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
+        # Plot vertical line for date of interest
+        # ax3.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+
         # Plot misses per session
         ax3.plot(sessions, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
         ax3.plot(sessions, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
         ax3.plot(sessions, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
-        ax3.set_xlabel('Sessions')
+        # ax3.set_xlabel('Sessions')
         ax3.set_xlim([0, len(sessions)])
         # ax3.set_xticklabels([])
         ax3.set_ylim([0, 1.1])
@@ -273,12 +292,57 @@ def intersession(path):
 
         ################################################################################################################
 
+        # PLOT 4: SUBSTAGES
+
+        time_start_substages = time.time()
+
+        ax4 = plt.subplot2grid((3, 1), (2, 0), rowspan=1, colspan=1)
+
+        # Plot horizontal lines
+        ax4.axhline(5, color='tab:gray', linestyle='--')  # Chance level
+        # ax4.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        # ax4.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+        # Plot vertical line for date of interest
+        # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+
+        # Plot substage mode per session
+        ax4.plot(sessions, substage, marker='o', ms=ms, lw=lw, color='black', label='Total')
+
+        ax4.set_xlabel('Sessions')
+        ax4.set_xlim([0, len(sessions)])
+        # ax3.set_xticklabels([])
+        ax4.set_ylim([0, 10])
+        ax4.set_ylabel('Substage\n(mean)')
+        # ax4.set_yticks(list(np.arange(0, 11, 1)))
+        # ax4.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        # ax4.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        # ax4.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax4.spines['top'].set_visible(False)
+        # ax4.spines['bottom'].set_visible(False)
+        # ax4.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax4_twin = ax4.twinx()
+        ax4_twin.set_ylim([0, 10])
+        # ax4_twin.set_yticks(list(np.arange(0, 11, 1)))
+        ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax4_twin.spines['top'].set_visible(False)
+        # ax4_twin.spines['bottom'].set_visible(False)
+
+        time_end_substages = time.time()
+        runtime_substages = time_end_miss - time_start_substages
+        print("'Plot 3: misses' took", round(runtime_substages, 2), 'seconds to run')
+
+        ################################################################################################################
+
         time_start_savepag1 = time.time()
         pdf.savefig()  # saves the current figure into a pdf page
         time_end_savepag1 = time.time()
         runtime_savepag1 = time_end_savepag1 - time_start_savepag1
         print("'Saving 1st page in pdf' took", round(runtime_savepag1, 2), 'seconds to run')
 
+        plt.savefig(df.Setup.unique()[0].astype(str) + '_intersession.png')
         plt.close()
 
         ################################################################################################################

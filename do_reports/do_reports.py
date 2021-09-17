@@ -14,8 +14,10 @@ from daily_report.daily_report import daily_report
 
 ########################################################################################################################
 
+
 # Define function
 def do_reports():
+
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
     folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'

@@ -9,6 +9,8 @@
     <orderEntry type="module" module-name="setups" />
     <orderEntry type="module" module-name="tasks" />
     <orderEntry type="module" module-name="setups" />
+    <orderEntry type="module" module-name="setups" />
+    <orderEntry type="module" module-name="toolsr" />
   </component>
   <component name="PyDocumentationSettings">
     <option name="format" value="PLAIN" />

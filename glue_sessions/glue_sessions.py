@@ -5,7 +5,9 @@ import pandas as pd
 from parse.parse import parse
 
 # To do:
+# Instead of re-doing parse of all sessions each time, save the df with all sessions and just add last one
 # When a session's file  is corrupted, continue but catch that session's ID
+# Fix the unnamed: 0 column (indexes)
 
 
 # Define function
