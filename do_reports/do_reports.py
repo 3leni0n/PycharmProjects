@@ -27,6 +27,7 @@ def do_reports():
 
     try:
         animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
+        animals.remove('.idea')  # Pycharm's archive
     except ValueError:
         pass
 
