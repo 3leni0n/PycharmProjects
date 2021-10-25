@@ -8,7 +8,10 @@
 # Finish fixing bin_size --> weights
 # In motor 2 the stimulus is only plotted in miss and error trials (but not incorrect ones)
 
-# Make code detect OS and fill the destiny apth automatically
+# Make code detect OS and fill the destiny path automatically
+# Check if Filename and Filename2 match: df.Filename.equals(df.Filename2), np.unique(np.equal(df.Filename, df.Filename2))
+# np.where(df.Filename != df.Filename2)
+# Fix the len os stim bar in error and misses trials
 
 """
 # Tiffany's comments:
@@ -154,7 +157,9 @@ def daily_report(path):
               'Time: ' + df.SessionStart.unique()[0][0:-7] + ' - ' + df.SessionEnd.unique()[0][0:-7] + ', ' +
               # [0:-7] to get rid of the floating numbers in the seconds
               'Subject: ' + df.Subject.unique()[0] + ', ' +
-              'Box: ' + df.Board.unique()[0][4] +
+              'Box: ' + df.Board.unique()[0][4] + ', ' +
+              'Sounds mismatch: ' + str(len(np.where(df.Filename != df.Filename2))) + ' (' +
+              str(round((len(np.where(df.Filename != df.Filename2))/trials)*100, 1)) + '%)'
               '\n')
 
         s2 = ('Stage: ' + str(df.Stage.unique()[0]) + ', ' +
@@ -169,21 +174,20 @@ def daily_report(path):
               '\n')
 
         s3 = ('Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
-              'Performance: ' + str(round(performance * 100)) + '% (' + str(
-                    round(performance_left * 100)) + '% L, ' + str(round(performance_right * 100)) + '% R)' + ', ' +
-              'Accuracy: ' + str(round(accuracy * 100)) + '% (' + str(round(accuracy_left * 100)) + '% L, ' + str(
-                    round(accuracy_right * 100)) + '% R)' +
+              'Performance: ' + str(int(round(performance * 100))) + '% (' + str(int(round(performance_left * 100))) +
+              '% L, ' + str(int(round(performance_right * 100))) + '% R)' + ', ' +
+              'Accuracy: ' + str(int(round(accuracy * 100))) + '% (' + str(int(round(accuracy_left * 100))) + '% L, ' +
+              str(int(round(accuracy_right * 100))) + '% R)' +
               '\n')
 
-        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
-            responses_right) + ' R)' + ', ' +
+        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(responses_right) + ' R)' + ', ' +
               'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
               'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' +
               '\n')
 
-        s5 = ('Misses: ' + str(misses) + ' (' + str(round(miss_rate * 100, 1)) + '%)' + ', ' +
-              'Miss left: ' + str(misses_left) + ' (' + str(round(miss_rate_left * 100)) + '%)' + ', ' +
-              'Miss right: ' + str(misses_right) + ' (' + str(round(miss_rate_right * 100)) + '%)' +
+        s5 = ('Misses: ' + str(misses) + ' (' + str(int(round(miss_rate * 100, 1))) + '%)' + ', ' +
+              'Miss left: ' + str(misses_left) + ' (' + str(int(round(miss_rate_left * 100))) + '%)' + ', ' +
+              'Miss right: ' + str(misses_right) + ' (' + str(int(round(miss_rate_right * 100))) + '%)' +
               '\n')
 
         s6 = ('Water: ' + str(water) + ' μL' + ', ' +
@@ -217,7 +221,7 @@ def daily_report(path):
         # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4:
+        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
@@ -295,7 +299,7 @@ def daily_report(path):
         ra_alt = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)], 20)
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4:
+        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
             ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
@@ -307,10 +311,10 @@ def daily_report(path):
         ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot accuracy rolling average
-        ax2.plot(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)].index, ra_alt, marker='o', ms=ms,
-                 lw=lw, color='tab:purple', label='Alt')
         ax2.plot(df.Hit[(df.Miss == 0) & (df.RepTrial == 1)].index, ra_rep, marker='o', ms=ms,
                  lw=lw, color='tab:brown', label='Rep')
+        ax2.plot(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)].index, ra_alt, marker='o', ms=ms,
+                 lw=lw, color='tab:purple', label='Alt')
 
         if df.Progression.unique()[0] == 1:
             for i in range(len(change_substage.index)):
@@ -365,7 +369,7 @@ def daily_report(path):
         ra_right_miss = compute_window(df.Miss[df.Side == 1], 20)  # Right valid trials
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4:
+        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
             ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
@@ -431,7 +435,7 @@ def daily_report(path):
         time_start_hit = time.time()
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4:
+        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)

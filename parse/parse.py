@@ -12,17 +12,11 @@
 import pandas as pd
 import numpy as np
 
+
 ########################################################################################################################
 
 # Define function
 def parse(path):
-
-    ####################################################################################################################
-
-    # Path to csv (laptop)
-    # path = '/home/alexis/PycharmProjects/parse/Test_Untitled task 30_20210408-193104/Test_Untitled task 30_20210408-193104.csv'  # 100 trials stage 4 with evidences
-
-    # Path to csv (setup2)
 
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
     df = pd.read_csv(path, skiprows=6, sep=';')
@@ -176,13 +170,17 @@ def parse(path):
         stim_start.append(float(
             band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
-        # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
-        if miss[i] == 1:
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
-        elif punish[i] == 1:
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
-        else:  # Reward or WrongLick
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+        # # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
+        # if miss[i] == 1:
+        #     stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
+        # elif punish[i] == 1:
+        #     stim_end.append(
+        #         float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
+        # else:  # Reward or WrongLick
+        #     stim_end.append(
+        #         float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+
+        stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
         stim_len.append(stim_end[i] - stim_start[i])
 
@@ -263,13 +261,15 @@ def parse(path):
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
                'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Substage',
                'Motor', 'REC', 'Progression', 'CB', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment',
-               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
+               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart',
+               'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
                     port1in, port1out, port2in, port2out, aw, switch, timeout, fixation, stage, substage, motor, rec,
-                    progression, cb, serial_port, protocol, creator, project, experiment, board, setup, net_port, subject,
+                    progression, cb, serial_port, protocol, creator, project, experiment, board, setup, net_port,
+                    subject,
                     bpod_api_version, session, date, time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
@@ -277,7 +277,6 @@ def parse(path):
     # df.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_ild as csv file
 
     return df_session
-
 
 # if __name__ == "__main__":
 #     parse()

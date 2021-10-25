@@ -13,57 +13,54 @@ def mini_parse(file):
     if len(index) < 2:
         return
 
-    if file.df_ild is None:
+    if file.df is None:
         reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
         file.reward_side = reward_side
-        stage = int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])
-        file.stage = stage
     else:
-        reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
-        file.reward_side = reward_side
-        stage = file.stage
+        reward_side = file.reward_side
+
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
     # METADATA (multiply by n_trials)
 
     # # INFO
-    # serial_port = [df_ild[df_ild.MSG == 'SERIAL-PORT']['+INFO'].iloc[0]] * n_trials
-    # protocol = [df_ild[df_ild.MSG == 'PROTOCOL-NAME']['+INFO'].iloc[0]] * n_trials  # Task
-    # creator = df_ild[df_ild.MSG == 'CREATOR-NAME']['+INFO'].iloc[0]
-    # project = [df_ild[df_ild.MSG == 'PROJECT-NAME']['+INFO'].iloc[0]] * n_trials
-    # experiment = [df_ild[df_ild.MSG == 'EXPERIMENT-NAME']['+INFO'].iloc[0]] * n_trials
-    # board = [df_ild[df_ild.MSG == 'BOARD-NAME']['+INFO'].iloc[0]] * n_trials  # Box
-    # setup = [df_ild[df_ild.MSG == 'SETUP-NAME']['+INFO'].iloc[0]] * n_trials
-    # net_port = [df_ild[df_ild.MSG == 'NET-PORT']['+INFO'].iloc[0]] * n_trials
-    # subject = df_ild[df_ild.MSG == 'SUBJECT-NAME']['+INFO'].iloc[0]
-    # bpod_api_version = [df_ild[df_ild.MSG == 'BPOD-API-VERSION']['+INFO'].iloc[0]] * n_trials
-    # session = [df_ild[df_ild.MSG == 'SESSION-NAME']['+INFO'].iloc[0]] * n_trials
-    # session_started = df_ild[df_ild.MSG == 'SESSION-STARTED']['+INFO'].iloc[0]
+    # serial_port = [df[df.MSG == 'SERIAL-PORT']['+INFO'].iloc[0]] * n_trials
+    # protocol = [df[df.MSG == 'PROTOCOL-NAME']['+INFO'].iloc[0]] * n_trials  # Task
+    # creator = df[df.MSG == 'CREATOR-NAME']['+INFO'].iloc[0]
+    # project = [df[df.MSG == 'PROJECT-NAME']['+INFO'].iloc[0]] * n_trials
+    # experiment = [df[df.MSG == 'EXPERIMENT-NAME']['+INFO'].iloc[0]] * n_trials
+    # board = [df[df.MSG == 'BOARD-NAME']['+INFO'].iloc[0]] * n_trials  # Box
+    # setup = [df[df.MSG == 'SETUP-NAME']['+INFO'].iloc[0]] * n_trials
+    # net_port = [df[df.MSG == 'NET-PORT']['+INFO'].iloc[0]] * n_trials
+    # subject = df[df.MSG == 'SUBJECT-NAME']['+INFO'].iloc[0]
+    # bpod_api_version = [df[df.MSG == 'BPOD-API-VERSION']['+INFO'].iloc[0]] * n_trials
+    # session = [df[df.MSG == 'SESSION-NAME']['+INFO'].iloc[0]] * n_trials
+    # session_started = df[df.MSG == 'SESSION-STARTED']['+INFO'].iloc[0]
     # # If the session ends abruptly due to an error, 'SESSION-ENDED' don't will show up
     # try:
-    #     session_ended = df_ild[df_ild.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
+    #     session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
     # except IndexError:
-    #     # session_ended = df_ild['PC-TIME'].iloc[-1]
-    #     session_ended = df_ild[df_ild.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
+    #     # session_ended = df['PC-TIME'].iloc[-1]
+    #     session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
     #     print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
 
     # VAL
     # Bpod's VARs
-    # aw = [int(df_ild[df_ild.MSG == 'VAR_AW']['+INFO'].iloc[0])] * n_trials
-    # switch = [float(df_ild[df_ild.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
-    # timeout = [float(df_ild[df_ild.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
-    # fixation = [float(df_ild[df_ild.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
-    # stage = [int(df_ild[df_ild.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
-    # substage = [int(df_ild[df_ild.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
-    # motor = [int(df_ild[df_ild.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
-    # rec = [int(df_ild[df_ild.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
-    # progression = [int(df_ild[df_ild.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
-    # cb = [int(df_ild[df_ild.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
+    # aw = [int(df[df.MSG == 'VAR_AW']['+INFO'].iloc[0])] * n_trials
+    # switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
+    # timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
+    # fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
+    # stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
+    # substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
+    # motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
+    # rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
+    # progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
+    # cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
 
     # Registered values (out of loop)
-    # reward_side = df_ild[df_ild.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
-    # valve_1 = [float(df_ild[df_ild.MSG == 'VALVE_1']['+INFO'].iloc[0])] * n_trials
-    # valve_2 = [float(df_ild[df_ild.MSG == 'VALVE_2']['+INFO'].iloc[0])] * n_trials
+    # reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+    # valve_1 = [float(df[df.MSG == 'VALVE_1']['+INFO'].iloc[0])] * n_trials
+    # valve_2 = [float(df[df.MSG == 'VALVE_2']['+INFO'].iloc[0])] * n_trials
 
     # Data curation
     # creator = [creator.split()[0][2:-2]] * n_trials
@@ -75,7 +72,6 @@ def mini_parse(file):
     reward_side = list(map(int, reward_side))  # Convert list elements from string to integers
     # reward_side = np.array(reward_side, dtype=int)  # Convert to array
     reward_side = reward_side[:n_trials]
-    stage = [stage] * n_trials
 
     ####################################################################################################################
 
@@ -249,18 +245,20 @@ def mini_parse(file):
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
-               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'Stage']
+               'Port1In', 'Port1Out', 'Port2In', 'Port2Out']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
-                    port1in, port1out, port2in, port2out, stage))
+                    port1in, port1out, port2in, port2out))
 
     new_df = pd.DataFrame(data=data, columns=columns)
 
-    if file.df_ild is None:
-        file.df_ild = new_df
+    if file.df is None:
+        file.df = new_df
     else:
-        file.df_ild = pd.concat([file.df_ild, new_df])
+        trials = file.df.shape[0]
+        new_df.Trial = new_df.Trial + trials
+        file.df = pd.concat([file.df, new_df])
 
     file.skip += index[-1] - 1

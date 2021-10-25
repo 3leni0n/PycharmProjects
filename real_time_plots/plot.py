@@ -5,18 +5,18 @@ from mini_parse import mini_parse
 from real_time_plot import real_time_plot
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+# from my_fun.my_fun import *  # Or from daily_report.daily_report import daily_report
 
 
 class File:
-    def __init__(self, path, axis1, axis2, axis3):
+    def __init__(self, path, axis1, axis2, axis3, axis4):
         self.path = path
         self.skip = 7
         self.df = None
         self.axis1 = axis1
         self.axis2 = axis2
         self.axis3 = axis3
-        self.reward_side = None
-        self.stage = None
+        self.axis4 = axis4
 
 
 class Parameters:
@@ -46,40 +46,52 @@ def get_paths(parameters):
     paths = path_generator(parameters.data_path, parameters.minutes_ago, parameters.max_sessions)
     if paths != parameters.paths:
         parameters.paths = paths
+        parameters.files = []
         for index, path in enumerate(paths):
-            axis1 = parameters.axis[index * 3]
-            axis2 = parameters.axis[index * 3 + 1]
-            axis3 = parameters.axis[index * 3 + 2]
-            file = File(path, axis1, axis2, axis3)
+            axis1 = parameters.axis[index * 4]
+            axis2 = parameters.axis[index * 4 + 1]
+            axis3 = parameters.axis[index * 4 + 2]
+            axis4 = parameters.axis[index * 4 + 3]
+            file = File(path, axis1, axis2, axis3, axis4)
             mini_parse(file)
             parameters.files.append(file)
 
 
-def animate(i, parameters):
+def animate(i, parameters, trials):
 
-    start0 = time.time()
+    start = time.time()
     print('')
     print('iteration', i)
 
     if i % 10 == 0:
-        start = time.time()
         get_paths(parameters)
-        print('checking for files', time.time() - start)
+        print('checking for files')
     for file in parameters.files:
-        start = time.time()
+        filename = os.path.basename(file.path)
+
         mini_parse(file)
-        print('parsing file', file.path, time.time() - start)
-        start = time.time()
-        real_time_plot(file.df_ild, file.axis1, file.axis2, file.axis3)
-        print('ploting file', file.path, time.time() - start)
-    print('total time', time.time() - start0)
+        real_time_plot(file.df, filename, file.axis1, file.axis2, file.axis3, file.axis4, trials)
+        print('OK file:', filename)
+
+
+            # try:
+            #     mini_parse(file)
+            #     real_time_plot(file.df, filename, file.axis1, file.axis2, file.axis3, file.axis4, trials)
+            #     print('OK file:', filename)
+            # except:
+            #     print('error in file:', filename)
+
+    print('time:', time.time() - start)
 
 
 def main():
 
-    data_path = '/home/alexis/2AFC/setups'
-    minutes_ago = 60
+    # data_path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC/setups'
+    data_path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups'
+    minutes_ago = 240 * 60
     max_sessions = 4
+    interval = 5000  # in ms, the larger the name the less demanding
+    trials = 100
 
     try:
         sessions_number = int(sys.argv[1])
@@ -93,12 +105,14 @@ def main():
     fig = plt.figure()
     axis = []
 
-    for i in range(sessions_number * 3):  # n subplots per animal
-        axis.append(fig.add_subplot(sessions_number, 3, i + 1))
+    for i in range(sessions_number * 4):
+        axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
 
     parameters = Parameters(axis, minutes_ago, sessions_number, data_path)
 
-    ani = FuncAnimation(fig, animate, fargs=(parameters, ), interval=5000)  # interval is ms
+    ani = FuncAnimation(fig, animate, fargs=(parameters, trials, ), interval=interval)
+
+    plt.subplots_adjust(hspace=.9)
     plt.show()
 
 

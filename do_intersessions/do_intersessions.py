@@ -1,6 +1,6 @@
 import os
 import time
-from intersession.intersession_test import intersession_test
+from intersession.intersession import intersession
 
 ########################################################################################################################
 
