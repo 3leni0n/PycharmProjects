@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from parse.parse import parse
+import csv
 
 
 # To do:
@@ -12,6 +13,7 @@ from parse.parse import parse
 
 # Define function
 def glue_sessions(animal=None, protocol=None, to_csv=False):
+
     time_start = time.time()
 
     folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'  # Where the data for all animals is
@@ -89,7 +91,28 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
+    print('The corrupted sessions are:', *corrupted_sessions, sep='\n')
+
+    column_name = 'corrupted sessions'
+
+    with open('/home/alexis/PycharmProjects/glue_sessions/' + animal + '_corrupted_sessions.csv', 'w', newline='') as f:
+        wr = csv.writer(f)
+        wr.writerow(corrupted_sessions)
 
     return df, corrupted_sessions
 
-# glue_sessions('910', 'stage_training', to_csv=True)
+
+def update_glued_sessions():
+
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'  # Where the data for all animals is
+    animals = os.listdir(folder)  # List animals
+    animals.sort()  # Sort them by name
+
+    try:
+        animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
+        animals.remove('.idea')  # Pycharm's archive
+    except ValueError:
+        pass
+
+    for i in range(len(animals)):
+        glue_sessions(animal=animals[i], protocol='stage_training', to_csv=True)

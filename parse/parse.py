@@ -171,6 +171,7 @@ def parse(path):
             band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
         # # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
+        # # Leads to erroneous stimulus length in stage 4, but probably waas there for stage 1. Readjust if needed
         # if miss[i] == 1:
         #     stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
         # elif punish[i] == 1:
