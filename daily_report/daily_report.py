@@ -46,6 +46,7 @@ import numpy as np
 import pandas as pd
 import time
 import os
+import slack
 
 from my_fun.my_fun import *  # Or from daily_report.daily_report import daily_report
 from parse.parse import *  # Or from parse.parse import parse
@@ -54,8 +55,7 @@ from parse.parse import *  # Or from parse.parse import parse
 ########################################################################################################################
 
 # Define function
-def daily_report(path):
-
+def daily_report(path, send_slack=False):
     # Register time
     time_start_total = time.time()
 
@@ -140,6 +140,11 @@ def daily_report(path):
     water_left = rewards_left * reward_size
     water_right = rewards_right * reward_size
 
+    # Sound
+    sounds_mismatch = len(np.where(df.Filename != df.Filename2)[0])
+    no_sound = len(np.where(df.Sound == 0)[0])
+    message_count = len(np.where(df.Message != 'nan')[0])
+
     ####################################################################################################################
 
     with PdfPages(df.Session.unique()[0]) as pdf:
@@ -158,8 +163,6 @@ def daily_report(path):
               # [0:-7] to get rid of the floating numbers in the seconds
               'Subject: ' + df.Subject.unique()[0] + ', ' +
               'Box: ' + df.Board.unique()[0][4] + ', ' +
-              'Sounds mismatch: ' + str(len(np.where(df.Filename != df.Filename2))) + ' (' +
-              str(round((len(np.where(df.Filename != df.Filename2))/trials)*100, 1)) + '%)'
               '\n')
 
         s2 = ('Stage: ' + str(df.Stage.unique()[0]) + ', ' +
@@ -180,14 +183,17 @@ def daily_report(path):
               str(int(round(accuracy_right * 100))) + '% R)' +
               '\n')
 
-        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(responses_right) + ' R)' + ', ' +
+        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
+            responses_right) + ' R)' + ', ' +
               'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
-              'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' +
+              'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' + ', ' +
+              'Misses: ' + str(misses) + ' (' + str(int(round(miss_rate * 100, 1))) + '%)' +
               '\n')
 
-        s5 = ('Misses: ' + str(misses) + ' (' + str(int(round(miss_rate * 100, 1))) + '%)' + ', ' +
-              'Miss left: ' + str(misses_left) + ' (' + str(int(round(miss_rate_left * 100))) + '%)' + ', ' +
-              'Miss right: ' + str(misses_right) + ' (' + str(int(round(miss_rate_right * 100))) + '%)' +
+        s5 = ('Miss left: ' + str(misses_left) + ' (' + str(int(round(miss_rate_left * 100))) + '%)' + ', ' +
+              'Miss right: ' + str(misses_right) + ' (' + str(int(round(miss_rate_right * 100))) + '%)' + ', ' +
+              'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
+              'No sound: ' + str(no_sound) + ' (' + str(round((no_sound / trials) * 100, 1)) + '%)' +
               '\n')
 
         s6 = ('Water: ' + str(water) + ' μL' + ', ' +
@@ -507,8 +513,7 @@ def daily_report(path):
             ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
 
             # Compute psychometric curves
-            psych_curve = compute_psych_curve(df.Evidence[df.Miss == 0],
-                                              df.Choice[df.Miss == 0])
+            psych_curve = compute_psych_curve(df.Evidence, df.Choice)  # No need to filter out the misses
             psych_curve_rep = compute_psych_curve(df.EviRep, df.RepChoice)
 
             # Plot horizontal and vertical lines
@@ -594,7 +599,7 @@ def daily_report(path):
                     ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
                                 fmt='o', markerfacecolor='none')
 
-                    ax.set_title(f'Sub.{i+1}, n={len(df_substages[i+1])}')
+                    ax.set_title(f'Sub.{i + 1}, n={len(df_substages[i + 1])}')
                     ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
                     ax.set_xticks([], [])
                     ax.set_ylim([-0.1, 1.1])
@@ -946,6 +951,83 @@ def daily_report(path):
     time_end_total = time.time()
     runtime_total = time_end_total - time_start_total
     print('The script took', round(runtime_total, 2), 'seconds to run', '\n')
+
+    # This block needs to be the last otherwise it sends the file too soon and corrupted
+    if send_slack:
+        with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token
+            slack_bot_token = f.read().replace('\n', '')
+
+        os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
+        filepath = folder + '/' + df.Session.unique()[0]
+        slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet')  # Alexis: 'U01DDHH7LLX'
+
+
+########################################################################################################################
+
+# To do:
+# Select what sessions to do the reports
+# Choose between plotting together sessions from the same day (with maybe a vertical red line) to separate them, or
+# in separate reports
+
+# Line of bash code to sync the cluster data with the local machine:
+# rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/
+# rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
+
+
+# Define function
+def do_daily_reports(send_slack=False):
+    time_start = time.time()
+    # print('Doing daily reports of: ' + animal)
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'
+    # animal = input('Enter animal')
+    animals = os.listdir(folder)
+    animals.sort()
+
+    try:
+        animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
+        animals.remove('.idea')  # Pycharm's archive
+
+        # Remove animals not training
+        animals.remove('902')
+        animals.remove('904')
+        animals.remove('909')
+        animals.remove('911')
+        # animals.remove('915')
+    except ValueError:
+        pass
+
+    for i in range(len(animals)):
+
+        folder2 = folder + animals[i] + '/sessions/'  # Replace 0 with i in for loop with n = len(animals)
+        sessions = os.listdir(folder2)
+        sessions.sort()  # Sort them by date
+        index = -1  # last session
+
+        sessionID = sessions[index]  # Add scenario in which there are several sessions per day
+        date_sessionID = sessionID[
+                         -15:-7]  # Indexing from the end because length of date + time won't change, opposite to
+        # mice and protocol names
+        split_sessions = [s for s in sessions if date_sessionID in s]
+
+        # This block looks if there are more than one session with the same date and do the reports for each if so
+        if len(split_sessions) > 1:
+            for j in range(len(split_sessions)):
+                path = folder2 + split_sessions[j] + '/' + split_sessions[
+                    j] + '.csv'  # Get csv file path to input parse.py
+                print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
+                      ' sessions found in the same date(s)'"", sep='')
+                # print(path)
+                daily_report(path, send_slack=send_slack)
+        else:
+            path = folder2 + sessionID + '/' + sessionID + '.csv'  # Get csv file path to input parse.py
+            print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
+                  ' sessions found in the same date(s)'"", sep='')
+            # print(path)
+            daily_report(path, send_slack=send_slack)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
 
 # if __name__ == "__main__":
 #     daily_report()

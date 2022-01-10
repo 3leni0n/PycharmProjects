@@ -6,6 +6,8 @@ import pandas as pd
 from string import ascii_lowercase
 from matplotlib import pyplot as plt
 from sympy import symbols, Eq, log, nsolve
+import slack
+import os
 
 # For compute_psych_curve
 from scipy import stats
@@ -368,11 +370,116 @@ def find_power_dB_par(amp_ref=0.00002, dB_cal=73, ambient_noise=33):
 def power_dB(amp):
     """Transform amplitude into decibels (dB)"""
     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
-    # dB = 20 * np.log10(amp / amp_ref)
-    x, y = find_power_dB_par()
+    dB = 20 * np.log10(amp / amp_ref)
+    # x, y = find_power_dB_par()
     # dB = 15.535 * np.log10((amp + 0.00267) / amp_ref)
-    dB = x * np.log10((amp + y) / amp_ref)
+    # dB = x * np.log10((amp + y) / amp_ref)
     return dB
+
+
+def find_dB_evi0(max_vol):
+    """Find dB for evidence 0 (how much volume when evidence is 0?)"""
+    amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
+    dB = 20 * np.log10(10**(max_vol/20)/2)
+    return dB
+
+
+# Set of functions with Rafa on December 14th 2021 to create sounds sampling in the dB space
+def find_constant(max_vol):
+    """Find the constant that produces max_vol dB when amplitude is maximum (1). Depends on speaker, amplifier,
+    calibation..."""
+    constant = (1 / 10 ** (max_vol / 20))
+    return constant
+
+
+def get_dB_from_amp(amp, max_vol):
+    """Transform amplitude into decibels (dB). A reduction of amplitude in half = -6dB
+    https://stackoverflow.com/questions/6571894/calculate-decibel-from-amplitude-android-media-recorder
+    Minimum amp is 0.001 = 10dB; 0.0001 = -10dB"""
+    if amp < 0.001:
+        dB = 0
+        return dB
+    if amp > 1:
+        amp = 1
+    constant = find_constant(max_vol)
+    dB = 20 * np.log10(amp / constant)
+    if dB < 0:
+        dB = 0
+    return dB
+
+
+def get_amp_from_dB(dB, max_vol):
+    """Transform amplitude into decibels (dB). A reduction of amplitude in half = -6dB"""
+    constant = find_constant(max_vol)
+    amp = constant*(10**(dB/20))
+    if amp < 0.001:
+        return 0.001
+    return amp
+
+
+def get_complementary_amp(amp):
+    complementary_amp = 1 - amp
+    return complementary_amp
+
+
+def get_complementary_dB(dB, max_vol):
+    amp = get_amp_from_dB(dB, max_vol)
+    complementary_amp = 1 - amp
+    complementary_dB = get_dB_from_amp(complementary_amp, max_vol)
+    return complementary_dB
+
+
+def get_diff_amp(amp):
+    complementary_amp = get_complementary_amp(amp)
+    diff = amp - complementary_amp
+    return diff
+
+
+def get_diff_dB(dB, max_vol):
+    complementary_dB = get_complementary_dB(dB, max_vol)
+    diff = dB - complementary_dB
+    return diff
+
+
+def get_amps_from_diff(diff):
+    val1 = 0.5 - diff / 2
+    val2 = 0.5 + diff / 2
+    return (val1, val2)
+
+
+def get_dBs_from_diff(diff, max_vol):
+
+    diff_amp = get_amp_from_dB(diff, max_vol / 2)
+
+    val1 = 0.5 - diff_amp / 2
+    val2 = 0.5 + diff_amp / 2
+
+    val1_dB = get_dB_from_amp(val1, max_vol)
+    val2_dB = get_dB_from_amp(val2, max_vol)
+
+    return (val1_dB, val2_dB)
+
+
+def find_dBs_from_diff(diff, max_vol):
+    """Find the parameters to input the amplitude to dB transformation function so it returns values matching reality
+    (calibration value and ambient noise in dB)"""
+
+    # Define equations symbols
+    x, y = symbols('x y')
+
+    constant = find_constant(max_vol)
+
+    # Define system of nonlinear equations
+    eq1 = Eq(constant*10**(x/20) + constant*10**(y/20) - 1, 0)
+    eq2 = Eq(x - y - diff, 0)
+
+    # Solve equations numerically
+    sol = np.array(nsolve((eq1, eq2), (x, y), (40, 40))).astype(float)
+
+    x = float(sol[0])
+    y = float(sol[1])
+
+    return x, y
 
 
 def ild():
@@ -502,3 +609,45 @@ def compute_psych_curve(x, y):
                            fit=fit,
                            params=[k, x0, b, p],
                            fit_error=fit_error)
+
+
+def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapted from UtilsR (Jordi's)
+    """This sends msgs through the bot. Avoid spamming too much else it will get banned or timed-out. Atm not possible
+    to update several files at the same time (https://github.com/slackapi/python-slack-sdk/issues/442)
+    """
+
+    ids_dic = {
+        'alexis': 'U01DDHH7LLX',
+        'jaime': 'U7UTKNN0P',
+        'carles': 'UPZPM32UC',
+        'jordi': 'U8J8YA66S',
+        'my_channel': '#pv_nmdar_eranet'
+    }
+
+    if (userid[0] != 'U') and (userid[0] != '#'):  # Assumes it is a first name
+        try:
+            userid = ids_dic[userid.lower()]
+        except:
+            raise ValueError('Double-check slack channel ID (receiver)')
+
+    token = os.environ.get('SLACK_BOT_TOKEN')
+
+    if token is None:
+        print('No SLACK_BOT_TOKEN in environ')
+        raise EnvironmentError('no SLACK_BOT_TOKEN in environ')
+    else:
+        try:
+            client = slack.WebClient(token=token)
+            if filepath is None:
+                response = client.chat_postMessage(
+                    channel=userid,
+                    text=msg)
+            elif os.path.exists(filepath):
+                response = client.files_upload(
+                    channels=userid,
+                    file=filepath,
+                    initial_comment=msg)
+            else:
+                print(f"filepath '{filepath}' doesn't exist")
+        except Exception as e:
+            print(e)  # Perhaps prints are caught by pybpod

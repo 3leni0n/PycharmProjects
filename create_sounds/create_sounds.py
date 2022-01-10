@@ -11,7 +11,7 @@ from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
 import string
-from my_fun.my_fun import evi2coh, envelope
+from my_fun.my_fun import white_noise, evi2coh, envelope
 
 
 ########################################################################################################################
@@ -39,6 +39,9 @@ def create_sounds(save=False):
     # Generate evidences and coherences
     evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
                           0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
+
+    # (max_vol/min_value)^(1/n-1)
+
     # Evidences spaced 0.1 because len(np.arange(-1, 1, 0.1)) < len(list(string.ascii_lowercase)). In words, the sounds'
     # filename can be expressed only with letters (20 characters), while an spacing of 0.05 would require 40 characters
     # and use numbers too
@@ -62,10 +65,6 @@ def create_sounds(save=False):
     # Create DataFrame column labels
     columns = ['EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
                'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
-    # Create DataFrame column labels
-    # columns = ['filename',
-    #            'EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
-    #            'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
 
     df = pd.DataFrame(data=None, index=None, columns=columns)  # Create empty data frame with column labels
 
@@ -89,8 +88,6 @@ def create_sounds(save=False):
             SL, SR, EL, ER = UtilsR.envelope(coherences[k], whiteNoise, dur=1, nframes=10, samplingR=44100,
                                              variance=0.015, randomized=False, paired=False, LAmp=1.0, RAmp=1.0,
                                              oldbug=False, randgen=None)
-
-            # SL, SR, EL, ER = envelope(coherences[k], fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False)  # Too slow
 
             ELER = np.concatenate((EL, ER))  # Concatenate EL and ER (envelope)
             # ELER = np.concatenate((filename, EL, ER))  # Concatenate EL and ER (envelope)

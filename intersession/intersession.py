@@ -4,9 +4,10 @@ import pandas as pd
 from matplotlib.backends.backend_pdf import PdfPages
 import numpy as np
 from matplotlib import pyplot as plt
+
+from my_fun.my_fun import compute_psych_curve
 from parse.parse import parse
 from glue_sessions.glue_sessions import glue_sessions
-
 
 ########################################################################################################################
 
@@ -40,17 +41,36 @@ def intersession(path):
     # df_grouped = df.groupby('Date')  # Group by date instead of session
     dates_indexes = df.groupby('Date').ngroup().unique()  # Array with number of dates: x axis
     n_dates = dates_indexes.max()
-
     dates = df.Date.unique()
-    # date_of_interest = '2021-XX-XX'  # Select a date of interest to plot a vertical line
-    # date_of_interest_index = np.where(dates == date_of_interest)[0][0]
+
+    # doi = 'yyyy-mm-dd'  # Select a date of interest to plot a vertical line
+    doi_1 = '2021-05-26'  # Filename2 start being recorded
+    # df.Date[df.Filename2.first_valid_index()] should return '2021-05-27'
+    doi_2 = '2021-10-25'  # Messages from Arduino start being recorded
+    # df.Date[np.where(df.MessageFound == 0)[0][0]] should return '2021-10-25'
+    doi_3 = '2021-10-27'  # Albert board installed
+    # df.Date[df.Sound.first_valid_index()] should return '2021-10-27'
+
+    try:
+        doi_1_index = np.where(dates == doi_1)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_1}')
+
+    try:
+        doi_2_index = np.where(dates == doi_2)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_2}')
+
+    try:
+        doi_3_index = np.where(dates == doi_3)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_3}')
 
     ####################################################################################################################
 
     # Select the folder where to save the PDF or create it if it doesn't exists
     setup = df.Setup.unique()[0]  # Animal ID
-    # folder = '/home/alexis/Documentos/intersession reports/'  # + setup
-    folder = '/home/alexis/Escritorio/intersession reports test/'  # + setup
+    folder = '/home/alexis/Documentos/intersession reports/'  # + setup
     if not os.path.exists(folder):
         os.mkdir(folder)
     os.chdir(folder)
@@ -94,7 +114,7 @@ def intersession(path):
     responses_left = df[df.Side == 0].groupby('Date').Response.sum()
     responses_right = df[df.Side == 1].groupby('Date').Response.sum()
 
-    # Repetitions/Alternations
+    # Repetitions/Alternations --> CHECK!!! WHY THEY'RE DIFFERENT CODED??!!
     repetitions = df[df.RepTrial == 1].groupby('Date').RepTrial.sum().astype(int)  # Include in daily_report
     alternations = df[df.RepTrial == 0].groupby('Date').RepTrial.value_counts()  # Include in daily_report
 
@@ -130,6 +150,37 @@ def intersession(path):
     stage = df.groupby('Date').Stage.mean().round()
     substage = df.groupby('Date').Substage.mean().round()
 
+    # Psychometric parameters
+    evidences = df.groupby('Date').Evidence.apply(list)
+    choices = df.groupby('Date').Choice.apply(list)
+    psych_curves = []
+    params = []
+    sensitivity = []
+    bias = []
+    lr_left = []
+    lr_right = []
+
+    for i in range(len(dates)):
+        psych_curves.append(compute_psych_curve(evidences[dates[i]], choices[dates[i]]))
+        params.append(psych_curves[i].params)
+        sensitivity.append(params[i][0])
+        bias.append(params[i][1])
+        lr_left.append(params[i][2])
+        lr_right.append(params[i][3])
+
+    # To pandas Series
+    psych_curves = pd.Series(psych_curves, dates)
+    params = pd.Series(params, dates)
+    sensitivity = pd.Series(sensitivity, dates)
+    bias = pd.Series(bias, dates)
+    lr_left = pd.Series(lr_left, dates)
+    lr_right = pd.Series(lr_right, dates)
+
+    # Sound
+    sounds_mismatch = df['FilesMatch'].eq(0).astype(int).groupby(df['Date']).sum()
+    no_sound = df['Sound'].eq(0).astype(int).groupby(df['Date']).sum()
+    message_count = df.groupby('Date').MessageFound.sum()
+
     ####################################################################################################################
 
     with PdfPages(df.Setup.unique()[0].astype(str) + '_intersession') as pdf:
@@ -156,7 +207,7 @@ def intersession(path):
         ax = plt.subplot2grid((8, 1), (0, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
-        # ax.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+        # ax.axvline(date_of_interest_index, color='tab:red', linestyle='--')
 
         # Plot number of trials per session
         ax.plot(dates_indexes, trials, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -201,7 +252,7 @@ def intersession(path):
         ax1.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        # ax1.axvline(date_of_interest_index, color='tab:red', linestyle='-')
+        # ax1.axvline(date_of_interest_index, color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
         ax1.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -246,7 +297,7 @@ def intersession(path):
         ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        # ax2.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+        # ax2.axvline(date_of_interest_index, color='tab:red', linestyle='--')
 
         # Plot rep/alt accuracy per session
         ax2.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
@@ -290,7 +341,7 @@ def intersession(path):
         ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        # ax3.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+        # ax3.axvline(date_of_interest_index, color='tab:red', linestyle='--')
 
         # Plot misses per session
         ax3.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -335,16 +386,16 @@ def intersession(path):
         ax4.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='-')  # Chance level
+        # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='--')
 
         # Plot substage/stage mode per session
         ax4.plot(dates_indexes, substage, marker='o', ms=ms, lw=lw, color='black', label='Substage')
         ax4_twin = ax4.twinx()  # Instantiate a second axes that shares the same x-axis
         ax4_twin.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='tab:gray', label='Stage')
 
-        ax4.set_xlabel('Days')
+        # ax4.set_xlabel('Days')
         ax4.set_xlim([0, len(dates_indexes)])
-        # ax3.set_xticklabels([])
+        ax4.set_xticklabels([])
         ax4.set_ylim([-1, 11])
         ax4.set_ylabel('Substage')
         # ax4.set_yticks(list(np.arange(0, 11, 1)))
@@ -357,20 +408,12 @@ def intersession(path):
 
         # Instantiate a second axes that shares the same x-axis
         # ax4_twin = ax4.twinx()
-        # ax4_twin.set_ylim([0, 10])
-        # # ax4_twin.set_yticks(list(np.arange(0, 11, 1)))
-        # ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        # ax4_twin.spines['top'].set_visible(False)
-        # # ax4_twin.spines['bottom'].set_visible(False)
-
-        # Instantiate a second axes that shares the same x-axis
-        # ax4_twin = ax4.twinx()
         # ax4_twin.set_ylim([0, 4])
         ax4_twin.set_yticks(list(np.arange(0, 5, 1)))
         # ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax4_twin.set_ylabel('Stage')
         ax4_twin.spines['top'].set_visible(False)
-        # ax4_twin.spines['bottom'].set_visible(False)
+        ax4_twin.spines['bottom'].set_visible(False)
 
         # Make shared legend for both axis
         lines_1, labels_1 = ax4.get_legend_handles_labels()
@@ -378,7 +421,6 @@ def intersession(path):
         lines = lines_1 + lines_2
         labels = labels_1 + labels_2
         ax4.legend(lines, labels, loc='lower right', fontsize='xx-small', frameon=True)
-
 
         time_end_substages = time.time()
         runtime_substages = time_end_miss - time_start_substages
@@ -388,14 +430,93 @@ def intersession(path):
         # Under development
         ################################################################################################################
 
-        # ACCURACY PER EVIDENCE
+        # # ACCURACY PER EVIDENCE
+        #
+        # df.groupby(['Date', 'Evidence']).Hit.agg(['sum', 'count']).astype('int')  # This matches with daily report's accuracy when summing
+        # acc_evi = df.groupby(['Date', 'Evidence']).Hit.sum() / df.groupby(['Date', 'Evidence']).Hit.count()
+        #
+        #
+        # df.groupby(['Date', 'Evidence']).Hit.sum()['2021-10-19']
 
-        df.groupby(['Date', 'Evidence']).Hit.agg(['sum', 'count']).astype('int')  # This matches with daily report's accuracy when summing
-        acc_evi = df.groupby(['Date', 'Evidence']).Hit.sum() / df.groupby(['Date', 'Evidence']).Hit.count()
+        ################################################################################################################
+        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
+        # # PLOT 5: PSYCHOMETRIC PARAMETERS
+        #
+        # time_start_substages = time.time()
+        #
+        # # ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
+        # ax5 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
+        #
+        # # Plot horizontal lines
+        # ax5.axhline(3, color='tab:gray', linestyle=':')  # Chance level
+        # ax5.axhline(6, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        # ax5.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
+        #
+        # # Plot vertical line for date of interest
+        # # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+        #
+        # # Plot misses per session
+        # ax5.plot(dates_indexes, sensitivity, marker='o', ms=ms, lw=lw, color='pink', label='Total')
+        # ax5.plot(dates_indexes, bias, marker='o', ms=ms, lw=lw, color='olive', label='Total')
+        # ax5.plot(dates_indexes, lr_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Lapse Left')
+        # ax5.plot(dates_indexes, lr_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Lapse Right')
+        #
+        # sensitivity = pd.Series(sensitivity, dates)
+        # bias = pd.Series(bias, dates)
+        # lr_left = pd.Series(lr_left, dates)
+        # lr_right = pd.Series(lr_right, dates)
 
+        ################################################################################################################
 
-        df.groupby(['Date', 'Evidence']).Hit.sum()['2021-10-19']
+        # PLOT 5: SOUND CHECKS
 
+        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
+
+        time_start_sound_checks = time.time()
+
+        ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
+
+        try:
+            # Plot vertical line for date of interest
+            ax5.axvline(doi_1_index, color='tab:pink', linestyle='--')
+        except UnboundLocalError:
+            print(f'No data from this animal on {doi_1}')
+
+        try:
+            # Plot vertical line for date of interest
+            ax5.axvline(doi_2_index, color='tab:purple', linestyle='--')
+        except UnboundLocalError:
+            print(f'No data from this animal on {doi_2}')
+
+        try:
+            # Plot vertical line for date of interest
+            ax5.axvline(doi_3_index, color='tab:red', linestyle='--')
+        except UnboundLocalError:
+            print(f'No data from this animal on {doi_3}')
+
+        # # Plot sound issues per session
+        ax5.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
+        ax5.plot(dates_indexes, message_count, marker='o', ms=ms, lw=lw, color='tab:purple', label='Message count')
+        ax5.plot(dates_indexes, no_sound, marker='o', ms=ms, lw=lw, color='tab:red', label='No sound')
+
+        ax5.set_xlabel('Days')
+        ax5.set_xlim([0, len(dates_indexes)])
+        # ax5.set_xticklabels([])
+        ax5.set_ylabel('Sound checks')
+        ax5.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax5.spines['top'].set_visible(False)
+        # ax5.spines['bottom'].set_visible(False)
+        # ax5.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax5_twin = ax5.twinx()
+        ax5_twin.set_ylim([ax5.get_ylim()[0], ax5.get_ylim()[1]])  # Get ylims from ax5 and set them for ax5_twin
+        ax5_twin.spines['top'].set_visible(False)
+        # ax5_twin.spines['bottom'].set_visible(False)
+
+        time_end_sound_checks = time.time()
+        runtime_sound_checks = time_end_sound_checks - time_start_sound_checks
+        print("'Plot 5: sound checks' took", round(runtime_sound_checks, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -415,7 +536,28 @@ def intersession(path):
     runtime_total = time_end_total - time_start_total
     print('The script took', round(runtime_total, 2), 'seconds to run', '\n')
 
+
 ########################################################################################################################
+
+
+def do_intersessions():
+    time_start = time.time()
+    # print('Doing intersession reports of: ' + animal)
+    folder = '/home/alexis/PycharmProjects/glue_sessions/'
+    # animal = input('Enter animal')
+    animals = os.listdir(folder)
+    animals = [animals for animals in animals if animals.endswith('.csv') and len(animals) == 7]
+    animals.sort()
+
+    for i in range(len(animals)):
+        path = folder + animals[i]
+        intersession(path)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+################################################################################################################
 
 # Jordi's snippets with groupby:
 

@@ -8,7 +8,9 @@ import csv
 
 # To do:
 # When a session's file  is corrupted, continue but catch that session's ID. Done but save in text file instead of as
-# variable?
+# variable? DONE
+# Single corrupted session csv
+# Add training day index column to df
 
 
 # Define function
@@ -76,11 +78,12 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
 
             try:
                 df_session = parse(path)  # Parse session
+                df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
             except IndexError:
                 print(f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with next session...")
                 corrupted_sessions.append(sessions[i])
 
-            df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
+            # df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
         else:
             pass
 
@@ -91,10 +94,9 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
-    print('The corrupted sessions are:', *corrupted_sessions, sep='\n')
+    print('The corrupted sessions are:', *corrupted_sessions, '\n', sep='\n')
 
-    column_name = 'corrupted sessions'
-
+    # Save corrupted sessions in a separate csv file
     with open('/home/alexis/PycharmProjects/glue_sessions/' + animal + '_corrupted_sessions.csv', 'w', newline='') as f:
         wr = csv.writer(f)
         wr.writerow(corrupted_sessions)
@@ -116,3 +118,15 @@ def update_glued_sessions():
 
     for i in range(len(animals)):
         glue_sessions(animal=animals[i], protocol='stage_training', to_csv=True)
+
+
+# from glue_sessions.glue_sessions import glue_sessions
+#
+# glue_sessions(animal='902', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='904', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='906', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='909', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='910', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='911', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='913', protocol='stage_training', to_csv=True)
+# glue_sessions(animal='915', protocol='stage_training', to_csv=True)

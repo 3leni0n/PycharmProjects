@@ -17,7 +17,6 @@ import numpy as np
 
 # Define function
 def parse(path):
-
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
     df = pd.read_csv(path, skiprows=6, sep=';')
 
@@ -83,16 +82,14 @@ def parse(path):
 
     ####################################################################################################################
 
-    # Initialize lists
-    # reward_side is already computed
-    trial = []  # Useful for merging sessions later on
-    rep_trial = []  # Trials in which the rewarded side coincides with the previous animal’s response (not rewarded side).
+    trial = []
+    rep_trial = []
     reward = []
     punish = []
     miss = []
     wrong_lick = []
     hit = []
-    after_hit = []  # After correct
+    after_hit = []
     choice = []
     rep_choice = []
     response = []
@@ -101,16 +98,22 @@ def parse(path):
     trial_len = []
     stim_start = []
     stim_end = []
-    stim_len = []  # Adddddddd
+    stim_len = []
     resp_win_start = []
     resp_win_end = []
     resp_win_len = []
     filename = []
     filename2 = []
+    files_match = []
+    message = []
+    message_found = []
+    sound_left = []
+    sound_right = []
+    sound = []
     evidence = []
     evi_rep = []
-    coherence = []
     # coh_rep = []
+    coherence = []
     port1in = []
     port1out = []
     port2in = []
@@ -167,8 +170,7 @@ def parse(path):
         trial_len.append(float(band[band.TYPE == 'INFO']['+INFO'].iloc[0]))
 
         # Stimulus timestamps (take BPOD-FINAL-TIME as the real timestamp of the TTL = BPOD-INITIAL-TIME + TTL duration)
-        stim_start.append(float(
-            band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
+        stim_start.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
         # # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
         # # Leads to erroneous stimulus length in stage 4, but probably waas there for stage 1. Readjust if needed
@@ -201,11 +203,49 @@ def parse(path):
         # Registered values (within loop)
         filename.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME')]['+INFO'].iloc[0])  # Bpod sounds
 
+        # Sound checks (not registered from the beginning except Filename2)
+        # Filename2 (registered by Arduino)
         try:
             filename2.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME2')]['+INFO'].iloc[0])  # Arduino
             # sounds
         except IndexError:
             filename2.append(np.nan)
+
+        if filename[i] == filename2[i]:
+            files_match.append(1)
+        elif filename2[i] is np.nan:
+            files_match.append(np.nan)
+        else:
+            files_match.append(0)
+
+        # Arduino's error messages
+        try:
+            message.append(str(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'MESSAGE')]['+INFO'].iloc[0]))
+        except IndexError:
+            message.append(None)  # As when there was no message it gets filled with nan and I want to know when I
+            # started to keep track of it
+
+        if message[i] is None:
+            message_found.append(np.nan)
+        elif message[i] == 'nan':
+            message_found.append(0)
+        else:
+            message_found.append(1)
+
+        # Sound detection with Albert's board
+        # Sound from left
+        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC1High')].shape[0] > 0:
+            sound_left.append(1)
+        else:
+            sound_left.append(0)
+
+        # Sound from right
+        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC2High')].shape[0] > 0:
+            sound_right.append(1)
+        else:
+            sound_right.append(0)
+
+        sound.append(sound_left[i] + sound_right[i])
 
         evidence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'EVIDENCE')]['+INFO'].iloc[0]))
         coherence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'COHERENCE')]['+INFO'].iloc[0]))
@@ -235,7 +275,7 @@ def parse(path):
                 rep_choice.append(0)
 
             # RepTrial or RewardRepeat?
-            # Trials in which the rewarded side coincides with the previous animal’s response (not rewarded side).
+            # Trials in which the rewarded side coincides with the previous animal’s response (not rewarded side)
             if np.isnan(choice[i - 1]):
                 rep_trial.append(np.nan)
             elif reward_side[i] == choice[i - 1]:
@@ -254,24 +294,33 @@ def parse(path):
                 evi_rep.append(abs(evidence[i]))
                 # coh_rep.append(abs(coherence[i]))
 
+    # If no sound was detected in an entire session or most trials (95%), it's likely due to Albert's card wasn't
+    # installed. First sessions with it (in boxes 5-6) was on 27/10/2021
+    # if len(np.unique(sound_left)) == 1 and len(np.unique(sound_right)) == 1:  # Sensitive to noise (1 trial with BNCXHigh)
+    if len(np.where(np.array(sound_left) == 1)[0]) / len(np.where(np.array(reward_side) == 0)[0]) <= 0.05 and \
+            len(np.where(np.array(sound_right) == 1)[0]) / len(np.where(np.array(reward_side) == 1)[0]) <= 0.05:
+        sound_left = [np.nan] * n_trials
+        sound_right = [np.nan] * n_trials
+        sound = [np.nan] * n_trials
+
     ####################################################################################################################
 
     # Construct DataFrame
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
-               'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
-               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Substage',
-               'Motor', 'REC', 'Progression', 'CB', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment',
-               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart',
-               'SessionEnd']
+               'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
+               'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'Evidence', 'EviRep', 'Coherence', 'Port1In',
+               'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Substage', 'Motor',
+               'REC', 'Progression', 'CB', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board',
+               'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
-                    resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
-                    port1in, port1out, port2in, port2out, aw, switch, timeout, fixation, stage, substage, motor, rec,
-                    progression, cb, serial_port, protocol, creator, project, experiment, board, setup, net_port,
-                    subject,
-                    bpod_api_version, session, date, time_session_started, time_session_ended))
+                    resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found,
+                    sound_left, sound_right, sound, evidence, evi_rep, coherence, port1in, port1out, port2in, port2out,
+                    aw, switch, timeout, fixation, stage, substage, motor, rec, progression, cb, serial_port, protocol,
+                    creator, project, experiment, board, setup, net_port, subject, bpod_api_version, session, date,
+                    time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
 

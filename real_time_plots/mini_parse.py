@@ -50,7 +50,7 @@ def mini_parse(file):
     # switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
     # timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
     # fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
-    # stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
+    stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
     # substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
     # motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
     # rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
@@ -107,6 +107,11 @@ def mini_parse(file):
     port1out = []
     port2in = []
     port2out = []
+
+    # Test sound left/right
+    sound_detec_left = []
+    sound_detect_right = []
+    sound_detect = []
 
     ####################################################################################################################
 
@@ -199,6 +204,19 @@ def mini_parse(file):
         # Stage, motor, substage for tracking changes within session when running a single script
         # Register running window
 
+        # Sound left or right
+        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC1High')].size > 0:
+            sound_detec_left.append(1)
+        else:
+            sound_detec_left.append(0)
+
+        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC2High')].size > 0:
+            sound_detect_right.append(1)
+        else:
+            sound_detect_right.append(0)
+
+        sound_detect.append(sound_detec_left[i] + sound_detect_right[i])
+
         if i == 0:
             after_hit.append(np.nan)
             rep_choice.append(np.nan)
@@ -245,12 +263,13 @@ def mini_parse(file):
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
-               'Port1In', 'Port1Out', 'Port2In', 'Port2Out']
+               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'sound_detect_left', 'sound_detect_right', 'sound_detect',
+               'Stage']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
-                    port1in, port1out, port2in, port2out))
+                    port1in, port1out, port2in, port2out, sound_detec_left, sound_detect_right, sound_detect, stage))
 
     new_df = pd.DataFrame(data=data, columns=columns)
 

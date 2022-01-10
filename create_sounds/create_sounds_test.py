@@ -11,10 +11,10 @@ from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
 import string
-from my_fun.my_fun import evi2coh, envelope
+from my_fun.my_fun import white_noise, evi2coh, envelope
+
 
 ########################################################################################################################
-
 
 def create_sounds_test(save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
@@ -30,7 +30,6 @@ def create_sounds_test(save=False):
     time_start = time.time()
 
     # Generate white noise
-    # whiteNoise = UtilsR.whiteNoiseGen(1.0, 2000, 20000, 1, FsOut=44100, Fn=10000, randgen=None)
     whiteNoise = white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000)
     # band_fs=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
     # FsOut=44100 the most used (audio CD)
@@ -40,6 +39,9 @@ def create_sounds_test(save=False):
     # Generate evidences and coherences
     evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
                           0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
+
+    # (max_vol/min_value)^(1/n-1)
+
     # Evidences spaced 0.1 because len(np.arange(-1, 1, 0.1)) < len(list(string.ascii_lowercase)). In words, the sounds'
     # filename can be expressed only with letters (20 characters), while an spacing of 0.05 would require 40 characters
     # and use numbers too
@@ -65,7 +67,7 @@ def create_sounds_test(save=False):
                'EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
                'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9']  # Envelope Right * 10 frames
 
-    # [f'EL{n:02}' for n in range(n_frames)]
+    # [f'EL{n:02}' for n in range(n_frames)]  # To iterate
 
     # df = pd.DataFrame(data=None, index=None, columns=columns)  # Create empty data frame with column labels
 
@@ -87,10 +89,6 @@ def create_sounds_test(save=False):
             # path_mp3 = name + '.mp3'
             # path_ogg = name + '.ogg'
             print(sound_number, name)
-
-            # SL, SR, EL, ER = UtilsR.envelope(coherences[k], whiteNoise, dur=1, nframes=10, samplingR=44100,
-            #                                  variance=0.015, randomized=False, paired=False, LAmp=1.0, RAmp=1.0,
-            #                                  oldbug=False, randgen=None)
 
             SL, SR, EL, ER = envelope(whiteNoise, coherences[k], fs=44100, amp=1, dur=1, n_frames=10, var=0.015,
                                       paired=False)
