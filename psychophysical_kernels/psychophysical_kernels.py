@@ -26,7 +26,7 @@ import statsmodels.discrete.discrete_model as sm
 from matplotlib import pyplot as plt
 
 
-sounds = pd.read_csv('/home/alexis/PycharmProjects/create_sounds/sounds.csv')
+sounds = pd.read_csv('/create_sounds/sounds_1.csv')
 sounds_left = sounds.iloc[:, 1:11]  # Index left skipping 'filename'
 sounds_left.columns = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']  # DataFrames needs to have BOTH the same
 # row and column indices in order to perform an element-wise subtraction

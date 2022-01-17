@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from sympy import symbols, Eq, log, nsolve
 import slack
 import os
+import csv
 
 # For compute_psych_curve
 from scipy import stats
@@ -17,7 +18,7 @@ from collections import namedtuple
 ########################################################################################################################
 
 
-def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000):  # Adapted from UtilsR's 'whiteNoiseGen'
+def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True):  # Adapted from UtilsR's 'whiteNoiseGen'
     """Create 'white noise' (between quotes as the signal is actually being band pass filtered).
     Note: if it takes too long try reducing the sampling rate or the filter length.
     """
@@ -37,6 +38,8 @@ def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000):  # Adap
     band_noise = lfilter(band_pass, 1, noise)  # Filter data with the FIR filter
     signal = band_noise[fs:int(fs * (dur + 1))]  # Indexing from fs to fs * 2, taking the second half of band_noise
     # (plot to understand)
+    if normalize:
+        signal = signal/np.max(abs(signal))
     return signal
 
 
@@ -130,6 +133,65 @@ def envelope(noise, coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=
             return sound_L, sound_R, stairs_L, stairs_R
 
         sound_L = envelope_L * noise * mod_wave * amp
+
+        return sound_L, sound_R, stairs_L, stairs_R
+
+
+def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, dur=1, n_frames=10, sigma=1):
+    """
+    Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
+    :param noise: white noise vector
+    :param coh: coherence [0=left, 1=right]
+    :param fs: sampling frequency (needs to match the fs of white noise and sine wave)
+    :param amp: amplitude
+    :param dur: duration (in seconds)
+    :param n_frames: number of frames
+    :param var: variance of the beta distribution
+    :param paired: if True, the sum of both sides = 1
+    :return: sound left, sound right, stairs left (* n_frames), stairs_right (* n_frames)
+    """
+
+    # noise = white_noise(fs=fs, cutoff=[2000, 20000], amp=amp, dur=dur, fn=10000)
+    n_points = dur * fs  # Should be an integer
+
+    if len(noise) != n_points:
+        raise ValueError('whitenoise and n_points need to  be the same length')
+
+    x, mod_wave = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
+    # amp = 0.5 so the length of y domain is 1 (-0.5, 0.5) instead of 2 (-1, 1)
+    # phase = -np.pi/2 so the function starts at its minimum
+    # v_shift = amp = 0.5 so the function y domain starts at 0 and is positive
+
+    if dB_left < 0 or dB_left > max_vol:
+        raise ValueError(f'{dB_left} is an invalid coherence, it must be within the range [0, 1]')
+
+    elif dB_left == 0 or dB_left == max_vol:
+
+        coh_left = get_amp_from_dB(dB_left, max_vol)
+        coh_right = get_amp_from_dB(dB_right, max_vol)
+
+        # If coh == 0, stairsR = 0 and stairsL = -1; elif coh == 1, stairsR == 1 and stairsL == 0
+        envelope_L = np.repeat(coh_left, n_points)
+        envelope_R = np.repeat(coh_right, n_points)
+
+        sound_L = envelope_L * noise * mod_wave * amp  # Change svec for white_noise
+        sound_R = envelope_R * noise * mod_wave * amp
+        stairs_L = np.repeat(dB_left, n_frames)  # Change name to envelope
+        stairs_R = np.repeat(dB_right, n_frames)
+        return sound_L, sound_R, stairs_L, stairs_R
+
+    else:
+        stairs_L = np.random.normal(dB_left, sigma, size=n_frames)  # Draw samples from a Beta distribution
+        stairs_R = np.random.normal(dB_right, sigma, size=n_frames)  # Draw samples from a Beta distribution
+
+        stairs_L_amp = get_amp_from_dB(stairs_L, max_vol)
+        stairs_R_amp = get_amp_from_dB(stairs_R, max_vol)
+
+        envelope_L = np.repeat(stairs_L_amp, int(n_points / n_frames))
+        envelope_R = np.repeat(stairs_R_amp, int(n_points / n_frames))
+
+        sound_L = envelope_L * noise * mod_wave * amp
+        sound_R = envelope_R * noise * mod_wave * amp
 
         return sound_L, sound_R, stairs_L, stairs_R
 
@@ -283,7 +345,7 @@ def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
 def enterthematrix(filepath):
     """Create sounds matrix"""
     # Import sounds DataFrame but only the filenames
-    # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
+    # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds_1.csv'  # My laptop
     # filepath_setup2 = '/home/setup2/'  # setup2 pc
     # df_ild = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
     df = pd.read_csv(filepath)  # Import all columns
@@ -383,11 +445,14 @@ def find_dB_evi0(max_vol):
     dB = 20 * np.log10(10**(max_vol/20)/2)
     return dB
 
+########################################################################################################################
 
 # Set of functions with Rafa on December 14th 2021 to create sounds sampling in the dB space
+
+
 def find_constant(max_vol):
     """Find the constant that produces max_vol dB when amplitude is maximum (1). Depends on speaker, amplifier,
-    calibation..."""
+    calibation, etc"""
     constant = (1 / 10 ** (max_vol / 20))
     return constant
 
@@ -412,8 +477,8 @@ def get_amp_from_dB(dB, max_vol):
     """Transform amplitude into decibels (dB). A reduction of amplitude in half = -6dB"""
     constant = find_constant(max_vol)
     amp = constant*(10**(dB/20))
-    if amp < 0.001:
-        return 0.001
+    # if amp < 0.001:
+    #     return 0.001
     return amp
 
 
@@ -424,7 +489,7 @@ def get_complementary_amp(amp):
 
 def get_complementary_dB(dB, max_vol):
     amp = get_amp_from_dB(dB, max_vol)
-    complementary_amp = 1 - amp
+    complementary_amp = get_complementary_amp(amp)
     complementary_dB = get_dB_from_amp(complementary_amp, max_vol)
     return complementary_dB
 
@@ -444,23 +509,10 @@ def get_diff_dB(dB, max_vol):
 def get_amps_from_diff(diff):
     val1 = 0.5 - diff / 2
     val2 = 0.5 + diff / 2
-    return (val1, val2)
+    return val1, val2
 
 
 def get_dBs_from_diff(diff, max_vol):
-
-    diff_amp = get_amp_from_dB(diff, max_vol / 2)
-
-    val1 = 0.5 - diff_amp / 2
-    val2 = 0.5 + diff_amp / 2
-
-    val1_dB = get_dB_from_amp(val1, max_vol)
-    val2_dB = get_dB_from_amp(val2, max_vol)
-
-    return (val1_dB, val2_dB)
-
-
-def find_dBs_from_diff(diff, max_vol):
     """Find the parameters to input the amplitude to dB transformation function so it returns values matching reality
     (calibration value and ambient noise in dB)"""
 
@@ -482,11 +534,20 @@ def find_dBs_from_diff(diff, max_vol):
     return x, y
 
 
+def get_dBs_and_amps_from_diff(diff, max_vol):
+    x, y = get_dBs_from_diff(diff, max_vol)
+    x2 = get_amp_from_dB(x, max_vol)
+    y2 = get_amp_from_dB(y, max_vol)
+    return x, y, x2, y2
+
+
+########################################################################################################################
+
 def ild():
     """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
     The input should be a csv file to convert to DataFrame
     """
-    path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
+    path = '/create_sounds/sounds_1.csv'  # My laptop
     df = pd.read_csv(path)
     # df_ild = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
     df_dB = df  # Copy DataFrame

@@ -3,7 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from my_fun.my_fun import find_power_dB_par, ild, my_select_evidence, compute_psych_curve
 from glue_sessions.glue_sessions import glue_sessions
-from create_sounds.create_sounds import create_sounds
+from create_sounds.create_sounds_v1 import create_sounds
 
 ########################################################################################################################
 

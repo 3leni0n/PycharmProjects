@@ -2,8 +2,6 @@
 import time
 import numpy as np
 import sys
-sys.path.append('/home/alexis/toolsr')
-from toolsR import UtilsR
 import os
 import itertools
 import wavio
@@ -11,12 +9,26 @@ from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
 import string
-from my_fun.my_fun import white_noise, evi2coh, envelope
-
+from my_fun.my_fun import *
 
 ########################################################################################################################
 
-def create_sounds_test(save=False):
+max_vol = 70  # Calibration value
+ILDs_dB = np.array([-70, -10, -4, -2, 0, 2, 4, 10, 70])
+
+dBs = []
+for i in ILDs_dB:
+    value = get_dBs_from_diff(i, max_vol)
+    dBs.append(value)
+
+dBs = np.round(dBs)
+dBs_right = list(abs(np.unique(dBs.flatten())))
+dBs_left = list(np.flip(dBs_right))
+
+sigma = 1
+
+
+def create_sounds_v2(save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
     amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
     determining from what side, left or right, the sound is louder on average, the evidence represent the information
@@ -30,28 +42,13 @@ def create_sounds_test(save=False):
     time_start = time.time()
 
     # Generate white noise
-    whiteNoise = white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000)
+    noise = white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True)
     # band_fs=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
     # FsOut=44100 the most used (audio CD)
 
     ####################################################################################################################
 
-    # Generate evidences and coherences
-    evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
-                          0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])
-
-    # (max_vol/min_value)^(1/n-1)
-
-    # Evidences spaced 0.1 because len(np.arange(-1, 1, 0.1)) < len(list(string.ascii_lowercase)). In words, the sounds'
-    # filename can be expressed only with letters (20 characters), while an spacing of 0.05 would require 40 characters
-    # and use numbers too
-    # Evidences finished in .05 for the final task and psychometric curves
-    coherences = evi2coh(evidences)  # From 0 (left) to 1 (right) so 0 net evidence returns 0.5. Input argument needed
-    # to calculate beta distribution in envelope function
-
-    ####################################################################################################################
-
-    # Select the folder and create it if it doesn't exists
+    # Select the folder and create it if it doesn't exist
     # folder = '/home/alexis/Música/sounds/'
     folder = '/home/alexis/Escritorio/test/'
 
@@ -59,7 +56,7 @@ def create_sounds_test(save=False):
         os.mkdir(folder)
 
     # 21 * 21 chars = 441 possible sounds per evidence
-    chars = list(string.ascii_lowercase[:len(evidences)])  # Make a list of all the lowercase letters as long as
+    chars = list(string.ascii_lowercase)  # Make a list of all the lowercase letters as long as
     # evidences
 
     # Create DataFrame column labels
@@ -69,12 +66,13 @@ def create_sounds_test(save=False):
 
     # [f'EL{n:02}' for n in range(n_frames)]  # To iterate
 
-    # df = pd.DataFrame(data=None, index=None, columns=columns)  # Create empty data frame with column labels
-
     sound_number = 0  # Initialize counter
-    ELER = []
+    ELER = []  # Envelope left + envelope right
 
-    for k in range(len(chars)):
+    for k in range(len(ILDs_dB)):
+
+        dB_left = dBs_left[k]
+        dB_right = dBs_right[k]
 
         for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
             # Sound number (name) from 1 (aaa) to 9261 (uuu)
@@ -82,26 +80,16 @@ def create_sounds_test(save=False):
             name = folder + chars[k] + i + j
 
             filename = chars[k] + i + j  # For the csv file
-            # filename = np.array([filename])
-            # filename = np.array([filename], dtype=object)  # dtype=object so np.hstack don't convert all to string
 
             path_wav = name + '.wav'
             # path_mp3 = name + '.mp3'
             # path_ogg = name + '.ogg'
             print(sound_number, name)
 
-            SL, SR, EL, ER = envelope(whiteNoise, coherences[k], fs=44100, amp=1, dur=1, n_frames=10, var=0.015,
-                                      paired=False)
+            SL, SR, EL, ER = do_envelope_dB_normal(noise, dB_left, dB_right, max_vol,
+                                                   fs=44100, amp=1, dur=1, n_frames=10, sigma=sigma)
 
-            # ELER.append(np.hstack((filename, EL, ER)))  # As list
-            # ELER.append([filename, list(EL), list(ER)])
             ELER.append([filename] + list(EL) + list(ER))
-
-            # ELER = np.concatenate((filename, EL, ER))  # Concatenate EL and ER (envelope)
-            # # ELER = np.hstack((filename, EL, ER))  # Stack horizontally EL and ER (envelope)
-            # df2 = pd.DataFrame([ELER], columns=columns)  # Fill data frame
-            # # df = df.append(df2)  # Append last row of data to existing data frame
-            # df = df.append(df2, ignore_index=True)  # Append last row of data to existing data frame
 
             if save == True:  # Save sounds only if specified (don't wanna for simulation purposes)
                 sound = np.column_stack((filename, SL, SR))
@@ -110,14 +98,13 @@ def create_sounds_test(save=False):
                 # sound_wav.export(path_mp3, format='mp3')  # Export the wav sound to a mp3 file
                 # sound_wav.export(path_ogg, format='ogg')  # Export the wav sound to a ogg file
 
-    # df.index.name = 'filename'  # Change index name from 'Unnamed: 0' to 'filename'
+            if k == 0 or k == 8:
+                break  # Not to create more than 1 sound for maximum evidence
 
-    # Only as list
-    # ELER = np.array(ELER)
     df = pd.DataFrame(data=ELER, index=None, columns=columns)
 
     if save == True:
-        # df_ild.to_csv('sounds.csv')  # Save df_ild as csv file
+        # df_ild.to_csv('sounds_1.csv')  # Save df_ild as csv file
         df.to_csv(folder + 'test.csv')
 
     time_end = time.time()
