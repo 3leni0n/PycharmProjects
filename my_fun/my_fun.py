@@ -345,7 +345,7 @@ def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
 def enterthematrix(filepath):
     """Create sounds matrix"""
     # Import sounds DataFrame but only the filenames
-    # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds_1.csv'  # My laptop
+    # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     # filepath_setup2 = '/home/setup2/'  # setup2 pc
     # df_ild = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
     df = pd.read_csv(filepath)  # Import all columns
@@ -547,7 +547,7 @@ def ild():
     """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
     The input should be a csv file to convert to DataFrame
     """
-    path = '/create_sounds/sounds_1.csv'  # My laptop
+    path = '/create_sounds/sounds.csv'  # My laptop
     df = pd.read_csv(path)
     # df_ild = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
     df_dB = df  # Copy DataFrame

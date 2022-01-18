@@ -15,9 +15,15 @@ def mini_parse(file):
 
     if file.df is None:
         reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+        reward_side = reward_side[1:-1].split(',')  # Convert string to list, [1:-1] to get rid of the square brackets []
+        reward_side = list(map(int, reward_side))  # Convert list elements from string to integers
         file.reward_side = reward_side
     else:
         reward_side = file.reward_side
+
+    if file.box is None:
+        box = df[df.MSG == 'BOARD-NAME']['+INFO'].iloc[0]
+        file.box = box
 
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
@@ -50,7 +56,9 @@ def mini_parse(file):
     # switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
     # timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
     # fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
-    stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
+
+
+    stage = [int(df[(df.TYPE == 'VAL') & (df.MSG == 'STAGE')]['+INFO'].iloc[0])] * n_trials
     # substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
     # motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
     # rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
@@ -68,10 +76,14 @@ def mini_parse(file):
     # date = [session_started.split()[0]] * n_trials
     # time_session_started = [session_started.split()[1]] * n_trials
     # time_session_ended = [session_ended.split()[1]] * n_trials
-    reward_side = reward_side[1:-1].split(',')  # Convert string to list, [1:-1] to get rid of the square brackets []
-    reward_side = list(map(int, reward_side))  # Convert list elements from string to integers
     # reward_side = np.array(reward_side, dtype=int)  # Convert to array
-    reward_side = reward_side[:n_trials]
+
+    try:
+        print(file.df.shape[0])
+        print(file.df.shape[0] + n_trials)
+        reward_side = reward_side[file.df.shape[0]:file.df.shape[0] + n_trials]
+    except:
+        reward_side = reward_side[:n_trials]
 
     ####################################################################################################################
 
@@ -99,9 +111,12 @@ def mini_parse(file):
     resp_win_len = []
     filename = []
     filename2 = []
-    evidence = []
-    evi_rep = []
-    coherence = []
+    files_match = []
+    # evidence = []
+    ild = []
+    ild_rep = []
+    # evi_rep = []
+    # coherence = []
     # coh_rep = []
     port1in = []
     port1out = []
@@ -109,9 +124,13 @@ def mini_parse(file):
     port2out = []
 
     # Test sound left/right
-    sound_detec_left = []
-    sound_detect_right = []
-    sound_detect = []
+    sound_left = []
+    sound_right = []
+    sound = []
+
+    message = []
+
+
 
     ####################################################################################################################
 
@@ -119,6 +138,53 @@ def mini_parse(file):
 
         trial.append(i)
         band = df[index[i]:index[i + 1]]
+
+        try:
+            message_str = float(band[band['MSG'] == 'MESSAGE']['+INFO'].iloc[0])
+        except:
+            message_str = 1
+
+        message.append(message_str)
+
+
+        # Registered values (within loop)
+        filename.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME')]['+INFO'].iloc[0])  # Bpod sounds
+
+        # Not registered from the beginning
+        try:
+            filename2.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME2')]['+INFO'].iloc[0])  # Arduino
+            # sounds
+        except IndexError:
+            filename2.append(np.nan)
+
+        if filename[i] == filename2[i]:
+            files_match.append(1)
+        elif filename2[i] is np.nan:
+            files_match.append(np.nan)
+        else:
+            files_match.append(0)
+
+
+
+
+        # Sound detected with Albert's card?
+        # Sound from left
+        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC1High')].size > 0:
+            sound_left.append(1)
+        else:
+            sound_left.append(0)
+
+        # Sound from right
+        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC2High')].size > 0:
+            sound_right.append(1)
+        else:
+            sound_right.append(0)
+
+        sound.append(sound_left[i] + sound_right[i])
+
+
+
+
 
         if pd.isnull(band[(band.TYPE == 'STATE') & (band.MSG == 'Reward')]['+INFO'].iloc[0]) == False:
             reward.append(1)
@@ -189,39 +255,26 @@ def mini_parse(file):
         port2in.append(band[band['+INFO'] == 'Port2In']['BPOD-INITIAL-TIME'].tolist())
         port2out.append(band[band['+INFO'] == 'Port2Out']['BPOD-INITIAL-TIME'].tolist())
 
-        # Registered values (within loop)
-        filename.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME')]['+INFO'].iloc[0])  # Bpod sounds
+        # evidence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'EVIDENCE')]['+INFO'].iloc[0]))
+        # coherence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'COHERENCE')]['+INFO'].iloc[0]))
 
         try:
-            filename2.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME2')]['+INFO'].iloc[0])  # Arduino
-            # sounds
-        except IndexError:
-            filename2.append(np.nan)
+            ild.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'ILD')]['+INFO'].iloc[0]))
+        except:
+            ild.append(reward_side[i])
 
-        evidence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'EVIDENCE')]['+INFO'].iloc[0]))
-        coherence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'COHERENCE')]['+INFO'].iloc[0]))
+
         # Sound filename + sound2 filename + coherence/evidence + presented coherences/evidences
         # Stage, motor, substage for tracking changes within session when running a single script
         # Register running window
-
-        # Sound left or right
-        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC1High')].size > 0:
-            sound_detec_left.append(1)
-        else:
-            sound_detec_left.append(0)
-
-        if band[(band['TYPE'] == 'EVENT') & (band['+INFO'] == 'BNC2High')].size > 0:
-            sound_detect_right.append(1)
-        else:
-            sound_detect_right.append(0)
-
-        sound_detect.append(sound_detec_left[i] + sound_detect_right[i])
 
         if i == 0:
             after_hit.append(np.nan)
             rep_choice.append(np.nan)
             rep_trial.append(np.nan)
-            evi_rep.append(np.nan)
+            ild_rep.append(np.nan)
+            # evi_rep.append(np.nan)
+
             # coh_rep.append(np.nan)
 
         if i > 0:  # All the following analysis can't be done in the first trial
@@ -246,15 +299,18 @@ def mini_parse(file):
             else:
                 rep_trial.append(0)  # Alternated trials
 
-            # Evidence/coherence repeat
+            # Evidence/coherence/ild repeat
             if np.isnan(rep_trial[i]):
-                evi_rep.append(np.nan)
+                ild_rep.append(np.nan)
+                # evi_rep.append(np.nan)
                 # coh_rep.append(np.nan)
             elif rep_trial[i] == 0:  # Negative evi/coh
-                evi_rep.append(-abs(evidence[i]))
+                ild_rep.append(-abs(ild[i]))
+                # evi_rep.append(-abs(evidence[i]))
                 # coh_rep.append(-abs(coherence[i]))
             elif rep_trial[i] == 1:  # Positive evi/coh
-                evi_rep.append(abs(evidence[i]))
+                ild_rep.append(abs(ild[i]))
+                # evi_rep.append(abs(evidence[i]))
                 # coh_rep.append(abs(coherence[i]))
 
     ####################################################################################################################
@@ -262,14 +318,17 @@ def mini_parse(file):
     # Construct DataFrame
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
-               'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'Evidence', 'EviRep', 'Coherence',
-               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'sound_detect_left', 'sound_detect_right', 'sound_detect',
-               'Stage']
+               'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'ILD', 'ILDRep',
+               'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'SoundLeft', 'SoundRight', 'Sound',
+               'Stage', 'Message']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
-                    resp_win_start, resp_win_end, resp_win_len, filename, filename2, evidence, evi_rep, coherence,
-                    port1in, port1out, port2in, port2out, sound_detec_left, sound_detect_right, sound_detect, stage))
+                    resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, ild, ild_rep,
+                    port1in, port1out, port2in, port2out, sound_left, sound_right, sound, stage,
+                    message))
+
+
 
     new_df = pd.DataFrame(data=data, columns=columns)
 
@@ -278,6 +337,13 @@ def mini_parse(file):
     else:
         trials = file.df.shape[0]
         new_df.Trial = new_df.Trial + trials
+        # print("old")
+        # print(file.df.index)
+        # print("new")
+        # print(new_df.index)
         file.df = pd.concat([file.df, new_df])
+        file.df = file.df.reset_index(drop=True)
+        # print("final")
+        # print(file.df.index)
 
-    file.skip += index[-1] - 1
+    file.skip += index[-1]

@@ -9,13 +9,14 @@ import time
 # from my_fun.my_fun import *
 
 
-def real_time_plot(df, path, ax1, ax2, ax3, ax4, trials):
+def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
 
     ####################################################################################################################
 
     # Plotting style
     ms = 3  # (mpl default for plt.plot=6 and for plt.scatter=6**2)
     lw = 1.5  # mpl default
+    running_window = 20
 
     ####################################################################################################################
 
@@ -44,7 +45,14 @@ def real_time_plot(df, path, ax1, ax2, ax3, ax4, trials):
     #
     # water = 2.5 * rewards
 
-    df = df.tail(trials)
+    if df is None:
+        return
+
+    df = df.tail(trials + running_window)  # + 20 for computing rolling average (assuming rolling average window is 20 trials)
+
+    extra_trials = max(len(df) - trials, 0)
+    x_min = df.index[0] + extra_trials
+    x_max = df.index[-1]
 
     ####################################################################################################################
 
@@ -55,17 +63,51 @@ def real_time_plot(df, path, ax1, ax2, ax3, ax4, trials):
     ra_left = compute_window(df.Hit[(df.Miss == 0) & (df.Side == 0)], 20)  # Left valid trials
     ra_right = compute_window(df.Hit[(df.Miss == 0) & (df.Side == 1)], 20)  # Right valid trials
 
+
     # Plot horizontal lines
     ax1.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
     ax1.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
     ax1.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
     # Plot accuracy rolling average
-    ax1.plot(df.Hit[df.Miss == 0].index, ra_total, marker='o', ms=ms, lw=lw, color='black', label='Total')
-    ax1.plot(df.Hit[(df.Miss == 0) & (df.Side == 0)].index, ra_left, marker='o', ms=ms, lw=lw, color='tab:blue',
+    ax1.plot(df[df.Miss == 0].index, ra_total, marker='o', ms=ms, lw=lw, color='black', label='Total')
+    ax1.plot(df[(df.Miss == 0) & (df.Side == 0)].index, ra_left, marker='o', ms=ms, lw=lw, color='tab:blue',
              label='Left')
-    ax1.plot(df.Hit[(df.Miss == 0) & (df.Side == 1)].index, ra_right, marker='o', ms=ms, lw=lw, color='tab:orange',
+    ax1.plot(df[(df.Miss == 0) & (df.Side == 1)].index, ra_right, marker='o', ms=ms, lw=lw, color='tab:orange',
              label='Right')
+
+    ax1.set_xlim([x_min, x_max])
+
+    ####################################################################################################################
+
+    # PLOT 2: MESSAGE ERROR
+    # print(df.Message)
+
+    # if FilesMatch[i] == 0:
+    #     color = 'pink'
+    # elif Message[i] = 1:
+    #     color = 'purple'
+    # elif Sound == 0:
+    #     color = 'red'
+
+    scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax2, color='purple')
+    scatter = sns.scatterplot(x=df.Trial, y=df.Sound, ax=ax2, color='red')
+    scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch, ax=ax2, color='pink')
+    scatter.set_ylim([-0.1, 0.1])
+
+    text = box + ' ' + path
+
+    ax2.text(0.1, 0.1, text,
+             transform=ax2.transAxes)
+
+    ax2.set_xlim([x_min, x_max])
+
+    ####################################################################################################################
+
+    # PLOT 3:
+    ax3.set_xlim([x_min, x_max])
+
+
 
     ####################################################################################################################
 
@@ -78,7 +120,7 @@ def real_time_plot(df, path, ax1, ax2, ax3, ax4, trials):
     hue_order = ['Error', 'Hit', 'Miss']
 
     if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
-        scatter = sns.scatterplot(x=df.index, y=df.Side, hue=hue, palette=palette,
+        scatter = sns.scatterplot(x=df.Trial, y=df.Side, hue=hue, palette=palette,
                                   hue_order=hue_order,
                                   s=ms ** 2, ax=ax4)
         # ax4.set_ylim(-0.8, 1.8)
@@ -94,7 +136,7 @@ def real_time_plot(df, path, ax1, ax2, ax3, ax4, trials):
         # ax4_twin.spines['top'].set_visible(False)
 
     else:  # Plot coherences
-        scatter = sns.scatterplot(x=df.index, y=df.Evidence, hue=hue, palette=palette,
+        scatter = sns.scatterplot(x=df.Trial, y=df.Evidence, hue=hue, palette=palette,
                                   hue_order=hue_order, s=ms ** 2, ax=ax4)
     #     # Plot horizontal lines
     #     ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
@@ -119,9 +161,11 @@ def real_time_plot(df, path, ax1, ax2, ax3, ax4, trials):
     # ax4.set_xlabel('Trial')
     # # scatter.legend(bbox_to_anchor=(1, 1))
     # scatter.legend(loc='lower right', fontsize='xx-small', frameon=True)
-    # # scatter.get_legend().remove()
+    scatter.get_legend().remove()
     # ax4.spines['top'].set_visible(False)
     # # ax4.spines['right'].set_visible(False)
+
+    ax4.set_xlim([x_min, x_max])
 
     time_end_hit = time.time()
     runtime_hit = time_end_hit - time_start_hit

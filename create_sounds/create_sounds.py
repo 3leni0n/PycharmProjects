@@ -98,7 +98,7 @@ def create_sounds_v1(save=False):
     df = pd.DataFrame(data=ELER, index=None, columns=columns)
 
     if save == True:
-        # df_ild.to_csv('sounds_1.csv')  # Save df_ild as csv file
+        # df_ild.to_csv('sounds.csv')  # Save df_ild as csv file
         df.to_csv(folder + 'test.csv')
 
     time_end = time.time()

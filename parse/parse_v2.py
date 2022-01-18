@@ -1,7 +1,7 @@
 # To do:
 # Add envelopes per trial
 # Add Bpod variables per trial
-# Not to do las trial if session crashed
+# Not to do last trial if session crashed
 # Include the new VARs in upper text
 
 ########################################################################################################################
@@ -14,9 +14,10 @@ import numpy as np
 ########################################################################################################################
 
 # Define function
-def parse(path):
+def parse_v2(path):
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
     df = pd.read_csv(path, skiprows=6, sep=';')
+    sounds_2 = pd.read_csv('/home/alexis/PycharmProjects/create_sounds/sounds_2.csv')
 
     ####################################################################################################################
 
@@ -108,15 +109,17 @@ def parse(path):
     sound_left = []
     sound_right = []
     sound = []
-    evidence = []
-    evi_rep = []
+    # evidence = []
+    # evi_rep = []
     # coh_rep = []
     coherence = []
+    ild = []
+    ild_rep = []
     port1in = []
     port1out = []
     port2in = []
     port2out = []
-    substage = []
+    # substage = []
 
     ####################################################################################################################
 
@@ -168,12 +171,14 @@ def parse(path):
         trial_len.append(float(band[band.TYPE == 'INFO']['+INFO'].iloc[0]))
 
         # Stimulus timestamps (take BPOD-FINAL-TIME as the real timestamp of the TTL = BPOD-INITIAL-TIME + TTL duration)
-        stim_start.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
+        stim_start.append(
+            float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
         # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
         if stage[i] <= 3:
             if miss[i] == 1:
-                stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
             elif punish[i] == 1:
                 stim_end.append(
                     float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
@@ -181,7 +186,8 @@ def parse(path):
                 stim_end.append(
                     float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
         else:  # Leads to erroneous stimulus length in stage 4, but probably was there for stage 1. Readjust if needed
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+            stim_end.append(
+                float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
         stim_len.append(stim_end[i] - stim_start[i])
 
@@ -245,18 +251,23 @@ def parse(path):
 
         sound.append(sound_left[i] + sound_right[i])
 
-        evidence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'EVIDENCE')]['+INFO'].iloc[0]))
-        coherence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'COHERENCE')]['+INFO'].iloc[0]))
+        # evidence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'EVIDENCE')]['+INFO'].iloc[0]))
+        # coherence.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'COHERENCE')]['+INFO'].iloc[0]))
+        try:  # In case sound parameters are lost in the void, they can always be rescued from their csv
+            ild.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'ILD')]['+INFO'].iloc[0]))
+        except IndexError:
+            ild.append(sounds_2.loc[sounds_2.filename == filename[i]].ILD.values[0])
         # Sound filename + sound2 filename + coherence/evidence + presented coherences/evidences
         # Stage, motor, substage for tracking changes within session when running a single script
         # Register running window
-        substage.append(int(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'SUBSTAGE')]['+INFO'].iloc[0]))
+        # substage.append(int(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'SUBSTAGE')]['+INFO'].iloc[0]))
 
         if i == 0:
             after_hit.append(np.nan)
             rep_choice.append(np.nan)
             rep_trial.append(np.nan)
-            evi_rep.append(np.nan)
+            ild_rep.append(np.nan)
+            # evi_rep.append(np.nan)
             # coh_rep.append(np.nan)
 
         if i > 0:  # All the following analysis can't be done in the first trial
@@ -281,15 +292,18 @@ def parse(path):
             else:
                 rep_trial.append(0)  # Alternated trials
 
-            # Evidence/coherence repeat
+            # Evidence/coherence/ild repeat
             if np.isnan(rep_trial[i]):
-                evi_rep.append(np.nan)
+                ild_rep.append(np.nan)
+                # evi_rep.append(np.nan)
                 # coh_rep.append(np.nan)
             elif rep_trial[i] == 0:  # Negative evi/coh
-                evi_rep.append(-abs(evidence[i]))
+                ild_rep.append(-abs(ild[i]))
+                # evi_rep.append(-abs(evidence[i]))
                 # coh_rep.append(-abs(coherence[i]))
             elif rep_trial[i] == 1:  # Positive evi/coh
-                evi_rep.append(abs(evidence[i]))
+                ild_rep.append(abs(ild[i]))
+                # evi_rep.append(abs(evidence[i]))
                 # coh_rep.append(abs(coherence[i]))
 
     # If no sound was detected in an entire session or most trials (95%), it's likely due to Albert's card wasn't
@@ -307,16 +321,17 @@ def parse(path):
     columns = ['Trial', 'Side', 'RepTrial', 'Reward', 'Punish', 'Miss', 'WrongLick', 'Hit', 'AfterHit', 'Choice',
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
-               'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'Evidence', 'EviRep', 'Coherence', 'Port1In',
-               'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Substage', 'Motor',
+               'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'Port1In',
+               'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor',
                'REC', 'Progression', 'CB', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board',
                'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
-                    resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found,
-                    sound_left, sound_right, sound, evidence, evi_rep, coherence, port1in, port1out, port2in, port2out,
-                    aw, switch, timeout, fixation, stage, substage, motor, rec, progression, cb, serial_port, protocol,
+                    resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, message,
+                    message_found,
+                    sound_left, sound_right, sound, ild, port1in, port1out, port2in, port2out,
+                    aw, switch, timeout, fixation, stage, motor, rec, progression, cb, serial_port, protocol,
                     creator, project, experiment, board, setup, net_port, subject, bpod_api_version, session, date,
                     time_session_started, time_session_ended))
 

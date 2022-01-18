@@ -45,7 +45,7 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
     else:
         df = pd.DataFrame()  # Create empty DataFrame if there's no csv yet for that animal
 
-    folder = folder + animal + '/sessions'  # Update folder with selected animal
+    folder = folder + animal + '/sessions/'  # Update folder with selected animal
     sessions = os.listdir(folder)  # List sessions
     sessions.sort()  # Sort them by date
 
@@ -73,7 +73,7 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
 
         # Loop only over sessions with the selected protocol that aren't glued yet
         if protocol in sessions[i] and sessions[i] not in glued_sessions:
-            path = folder + '/' + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse.py
+            path = folder + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse.py
             print('Parsing session ' + "'" + sessions[i] + "'" + '...', sep='')
 
             try:

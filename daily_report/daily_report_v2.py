@@ -49,20 +49,20 @@ import os
 import slack
 
 from my_fun.my_fun import *  # Or from daily_report.daily_report import daily_report
-from parse.parse import *  # Or from parse.parse import parse
+from parse.parse_v2 import *  # Or from parse.parse_v2 import parse_v2
 
 
 ########################################################################################################################
 
 # Define function
-def daily_report(path, send_slack=False):
+def daily_report_v2(path, send_slack=False):
     # Register time
     time_start_total = time.time()
 
     ####################################################################################################################
 
     # Import session to be parsed
-    df = parse(path)
+    df = parse_v2(path)
 
     ####################################################################################################################
 
@@ -171,8 +171,8 @@ def daily_report(path, send_slack=False):
               '\n')
 
         s2 = ('Stage: ' + str(df.Stage.unique()[0]) + ', ' +
-              'Substage(s): ' + str(df.Substage.sort_values().unique()[0]) + '-' +
-              str(df.Substage.sort_values().unique()[-1]) + ', ' +
+              # 'Substage(s): ' + str(df.Substage.sort_values().unique()[0]) + '-' +
+              # str(df.Substage.sort_values().unique()[-1]) + ', ' +
               'Fixation: ' + str(df.Fixation.unique()[0]) + ', ' +
               'Timeout: ' + str(df.Timeout.unique()[0]) + ', ' +
               'Switch: ' + str(df.Switch.unique()[0]) + ', ' +
@@ -197,8 +197,7 @@ def daily_report(path, send_slack=False):
 
         s5 = ('Miss left: ' + str(misses_left) + ' (' + str(int(round(miss_rate_left * 100))) + '%)' + ', ' +
               'Miss right: ' + str(misses_right) + ' (' + str(int(round(miss_rate_right * 100))) + '%)' + ', ' +
-              'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(
-                    round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
+              'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
               'No sound: ' + str(no_sound) + ' (' + str(round((no_sound / trials) * 100, 1)) + '%)' +
               '\n')
 
@@ -214,8 +213,8 @@ def daily_report(path, send_slack=False):
 
         # fig = plt.figure()
 
-        change_substage = df.Substage.diff()  # Find trials in which substage changes
-        change_substage = change_substage[change_substage != 0].dropna()  # Omit 0s and drop first nan
+        # change_substage = df.Substage.diff()  # Find trials in which substage changes
+        # change_substage = change_substage[change_substage != 0].dropna()  # Omit 0s and drop first nan
 
         # PLOT 1: ACCURACY PER SIDE
 
@@ -509,119 +508,119 @@ def daily_report(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOTS 8-9: PSYCOMETRIC CURVES
-
-        # Only draw PC if evidences are introduced (stage 4)
-        if len(df.Evidence.unique()) > 2 and df.Stage.unique()[0] == 4:
-            # fig = plt.figure()
-
-            # Psychometric curve of the whole session (all trials)
-            ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
-
-            # Compute psychometric curves
-            psych_curve = compute_psych_curve(df.Evidence, df.Choice)  # No need to filter out the misses
-            psych_curve_rep = compute_psych_curve(df.EviRep, df.RepChoice)
-
-            # Plot horizontal and vertical lines
-            ax11.axhline(0.5, color='tab:gray', ls='--')
-            ax11.axvline(0., color='tab:gray', ls='--')
-
-            # Plot left-right psychometric curve and errorbars
-            ax11.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
-            ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
-                          markerfacecolor='none')
-
-            # # Plot alt-rep psychometric curve and errorbars
-            # ax11.plot(np.linspace(-1, 1, 30), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
-            # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
-            #               color='tab:brown', fmt='o', markerfacecolor='none')
-
-            ax11.set_xlabel('Evi.')
-            ax11.set_xlim([-1.05, 1.05])
-            ax11.set_ylabel('Prob. right')
-            ax11.set_ylim([-0.025, 1.025])
-            # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
-            ax11.legend(loc="lower right", frameon=False)
-
-            # ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
-            # # ax11_right_yaxis.set_ylabel('Prob. right')
-            # ax11.set_yticklabels([])  # Remove left yticklabels
-            # ax11.set_yticks([])  # Remove left yticks
-
-            ax11.spines['top'].set_visible(False)
-            ax11.spines['right'].set_visible(False)
-            # ax11_right_yaxis.spines['top'].set_visible(False)
-            # ax11_right_yaxis.spines['left'].set_visible(False)
-
-            ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
-                          xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
-            ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
-                          xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:red')
-
-            sensitivity, bias, lr_left, lr_right = psych_curve.params
-
-            ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-                          "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                          "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                          "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
-                          fontsize='xx-small')
-
-            if df.Progression.unique()[0] == 1:
-
-                # Psychometric curves per substage
-                ax_list = [plt.subplot2grid((16, 6), (10, 3), rowspan=2, colspan=1),  # Substage 1
-                           plt.subplot2grid((16, 6), (10, 4), rowspan=2, colspan=1),  # Substage 2
-                           plt.subplot2grid((16, 6), (10, 5), rowspan=2, colspan=1),  # Substage 3
-                           plt.subplot2grid((16, 6), (12, 3), rowspan=2, colspan=1),  # Substage 4
-                           plt.subplot2grid((16, 6), (12, 4), rowspan=2, colspan=1),  # Substage 5
-                           plt.subplot2grid((16, 6), (12, 5), rowspan=2, colspan=1),  # Substage 6
-                           plt.subplot2grid((16, 6), (14, 3), rowspan=2, colspan=1),  # Substage 7
-                           plt.subplot2grid((16, 6), (14, 4), rowspan=2, colspan=1),  # Substage 8
-                           plt.subplot2grid((16, 6), (14, 5), rowspan=2, colspan=1)]  # Substage 9
-
-                substages_session = df.Substage.unique()
-                df_substages = {}  # Create empty dictionary
-
-                for i in range(len(ax_list)):
-                    if i + 1 not in substages_session:  # +1 because ax_list is from 0 to 8 and substages can go from 1 to 9
-                        ax_list[i].set_visible(False)  # Make axes invisible
-                        continue
-                    else:
-                        df_substages[i + 1] = df[df.Substage == i + 1]
-
-                    # Compute psychometric curves
-                    psych_curve = compute_psych_curve(
-                        df_substages[i + 1].Evidence[df_substages[i + 1].Miss == 0],
-                        df_substages[i + 1].Choice[df_substages[i + 1].Miss == 0])
-
-                    ax = ax_list[i]
-
-                    # Plot horizontal and vertical lines
-                    ax.axhline(0.5, color='tab:gray', ls='--')
-                    ax.axvline(0., color='tab:gray', ls='--')
-
-                    # Plot left-right psychometric curve and errorbars
-                    ax.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
-                    ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
-                                fmt='o', markerfacecolor='none')
-
-                    ax.set_title(f'Sub.{i + 1}, n={len(df_substages[i + 1])}')
-                    ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
-                    ax.set_xticks([], [])
-                    ax.set_ylim([-0.1, 1.1])
-                    ax.set_yticks([], [])
-                    # plt.axis('equal')
-
-                    # x0, x1 = plt.gca().get_xlim()
-                    # y0, y1 = plt.gca().get_ylim()
-                    # plt.gca().set_aspect((x1 - x0) / (y1 - y0))  # Height is float times the width
-
-                # plt.tight_layout()
-
-                # This won't work unless updating matplotlib
-                # plt.suptitle('Substage')
-                # fig.supxlabel('Prob. right')
-                # fig.supylabel('Evidence')
+        # # PLOTS 8-9: PSYCOMETRIC CURVES
+        #
+        # # Only draw PC if evidences are introduced (stage 4)
+        # if len(df.Evidence.unique()) > 2 and df.Stage.unique()[0] == 4:
+        #     # fig = plt.figure()
+        #
+        #     # Psychometric curve of the whole session (all trials)
+        #     ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
+        #
+        #     # Compute psychometric curves
+        #     psych_curve = compute_psych_curve(df.Evidence, df.Choice)  # No need to filter out the misses
+        #     psych_curve_rep = compute_psych_curve(df.EviRep, df.RepChoice)
+        #
+        #     # Plot horizontal and vertical lines
+        #     ax11.axhline(0.5, color='tab:gray', ls='--')
+        #     ax11.axvline(0., color='tab:gray', ls='--')
+        #
+        #     # Plot left-right psychometric curve and errorbars
+        #     ax11.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
+        #     ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
+        #                   markerfacecolor='none')
+        #
+        #     # # Plot alt-rep psychometric curve and errorbars
+        #     # ax11.plot(np.linspace(-1, 1, 30), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
+        #     # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
+        #     #               color='tab:brown', fmt='o', markerfacecolor='none')
+        #
+        #     ax11.set_xlabel('Evi.')
+        #     ax11.set_xlim([-1.05, 1.05])
+        #     ax11.set_ylabel('Prob. right')
+        #     ax11.set_ylim([-0.025, 1.025])
+        #     # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
+        #     ax11.legend(loc="lower right", frameon=False)
+        #
+        #     # ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
+        #     # # ax11_right_yaxis.set_ylabel('Prob. right')
+        #     # ax11.set_yticklabels([])  # Remove left yticklabels
+        #     # ax11.set_yticks([])  # Remove left yticks
+        #
+        #     ax11.spines['top'].set_visible(False)
+        #     ax11.spines['right'].set_visible(False)
+        #     # ax11_right_yaxis.spines['top'].set_visible(False)
+        #     # ax11_right_yaxis.spines['left'].set_visible(False)
+        #
+        #     ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
+        #                   xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
+        #     ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
+        #                   xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:red')
+        #
+        #     sensitivity, bias, lr_left, lr_right = psych_curve.params
+        #
+        #     ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
+        #                   "B=" + str(round(bias, 2)) + "\n" +  # Bias
+        #                   "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
+        #                   "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
+        #                   fontsize='xx-small')
+        #
+        #     if df.Progression.unique()[0] == 1:
+        #
+        #         # Psychometric curves per substage
+        #         ax_list = [plt.subplot2grid((16, 6), (10, 3), rowspan=2, colspan=1),  # Substage 1
+        #                    plt.subplot2grid((16, 6), (10, 4), rowspan=2, colspan=1),  # Substage 2
+        #                    plt.subplot2grid((16, 6), (10, 5), rowspan=2, colspan=1),  # Substage 3
+        #                    plt.subplot2grid((16, 6), (12, 3), rowspan=2, colspan=1),  # Substage 4
+        #                    plt.subplot2grid((16, 6), (12, 4), rowspan=2, colspan=1),  # Substage 5
+        #                    plt.subplot2grid((16, 6), (12, 5), rowspan=2, colspan=1),  # Substage 6
+        #                    plt.subplot2grid((16, 6), (14, 3), rowspan=2, colspan=1),  # Substage 7
+        #                    plt.subplot2grid((16, 6), (14, 4), rowspan=2, colspan=1),  # Substage 8
+        #                    plt.subplot2grid((16, 6), (14, 5), rowspan=2, colspan=1)]  # Substage 9
+        #
+        #         substages_session = df.Substage.unique()
+        #         df_substages = {}  # Create empty dictionary
+        #
+        #         for i in range(len(ax_list)):
+        #             if i + 1 not in substages_session:  # +1 because ax_list is from 0 to 8 and substages can go from 1 to 9
+        #                 ax_list[i].set_visible(False)  # Make axes invisible
+        #                 continue
+        #             else:
+        #                 df_substages[i + 1] = df[df.Substage == i + 1]
+        #
+        #             # Compute psychometric curves
+        #             psych_curve = compute_psych_curve(
+        #                 df_substages[i + 1].Evidence[df_substages[i + 1].Miss == 0],
+        #                 df_substages[i + 1].Choice[df_substages[i + 1].Miss == 0])
+        #
+        #             ax = ax_list[i]
+        #
+        #             # Plot horizontal and vertical lines
+        #             ax.axhline(0.5, color='tab:gray', ls='--')
+        #             ax.axvline(0., color='tab:gray', ls='--')
+        #
+        #             # Plot left-right psychometric curve and errorbars
+        #             ax.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
+        #             ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
+        #                         fmt='o', markerfacecolor='none')
+        #
+        #             ax.set_title(f'Sub.{i + 1}, n={len(df_substages[i + 1])}')
+        #             ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
+        #             ax.set_xticks([], [])
+        #             ax.set_ylim([-0.1, 1.1])
+        #             ax.set_yticks([], [])
+        #             # plt.axis('equal')
+        #
+        #             # x0, x1 = plt.gca().get_xlim()
+        #             # y0, y1 = plt.gca().get_ylim()
+        #             # plt.gca().set_aspect((x1 - x0) / (y1 - y0))  # Height is float times the width
+        #
+        #         # plt.tight_layout()
+        #
+        #         # This won't work unless updating matplotlib
+        #         # plt.suptitle('Substage')
+        #         # fig.supxlabel('Prob. right')
+        #         # fig.supylabel('Evidence')
 
         ################################################################################################################
 
@@ -1018,21 +1017,40 @@ def do_daily_reports(send_slack=False):
         if len(split_sessions) > 1:
             for j in range(len(split_sessions)):
                 path = folder2 + split_sessions[j] + '/' + split_sessions[
-                    j] + '.csv'  # Get csv file path to input parse.py
+                    j] + '.csv'  # Get csv file path to input parse_v2.py
                 print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found in the same date(s)'"", sep='')
                 # print(path)
-                daily_report(path, send_slack=send_slack)
+                daily_report_v2(path, send_slack=send_slack)
         else:
-            path = folder2 + sessionID + '/' + sessionID + '.csv'  # Get csv file path to input parse.py
+            path = folder2 + sessionID + '/' + sessionID + '.csv'  # Get csv file path to input parse_v2.py
             print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
                   ' sessions found in the same date(s)'"", sep='')
             # print(path)
-            daily_report(path, send_slack=send_slack)
+            daily_report_v2(path, send_slack=send_slack)
 
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
+
+
+def do_all_daily(experiment, animal):
+
+    time_start = time.time()
+
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/' + animal + '/sessions/'
+    sessions = os.listdir(folder)
+    sessions.sort()  # Sort them by date
+    sessions = [x for x in sessions if 'stage_training' in x]  # Get rid of non training sessions
+
+    for i in range(len(sessions)):
+        path = folder + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse_v2.py
+        daily_report_v2(path)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
 
 # if __name__ == "__main__":
 #     daily_report()
