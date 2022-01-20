@@ -73,7 +73,7 @@ def animate(i, parameters, trials):
     print('')
     print('iteration', i)
 
-    if i % 10 == 0:  # How many iterations to wait to look for new files
+    if i % 1 == 0:  # How many iterations to wait to look for new files
         get_paths(parameters)
         print('checking for files')
     for file in parameters.files:
@@ -90,7 +90,7 @@ def main():
 
     data_path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_2/setups'
     # data_path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups'
-    minutes_ago = 5  # How much time back look for sessions
+    minutes_ago = 1  # How much time back look for sessions
     max_sessions = 4  # Max number of boxes at the same time
     interval = 5000  # in ms, the larger the name the less demanding
     trials = 100  # How many trials to show

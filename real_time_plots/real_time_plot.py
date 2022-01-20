@@ -44,7 +44,7 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     if df is None:
         return
 
-    df = df.tail(trials + running_window)  # + 20 for computing rolling average (assuming rolling average window is 20 trials)
+    df = df.tail(trials + running_window)  # + For computing rolling average
 
     extra_trials = max(len(df) - trials, 0)
     x_min = df.index[0] + extra_trials
@@ -73,7 +73,10 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
              label='Right')
 
     ax1.set_xlim([x_min, x_max])
+    ax1.set_ylim([0, 1])
 
+    text = box + ': ' + path
+    ax1.text(0, 1.1, text, transform=ax1.transAxes)
     ####################################################################################################################
 
     # PLOT 2: SOUND ERRORS
@@ -83,22 +86,14 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch, ax=ax2, color='pink')
     scatter.set_ylim([-0.1, 0.1])
 
-    text = box + ' ' + path
-    ax2.text(0.1, 0.1, text, transform=ax2.transAxes)
     ax2.set_xlim([x_min, x_max])
-
     ####################################################################################################################
 
     # PLOT 3: MISSES
     ax3.set_xlim([x_min, x_max])
-
-
-
     ####################################################################################################################
 
     # PLOT 4: HIT SCATTER PLOT
-
-    time_start_hit = time.time()
 
     palette = ['tab:red', 'tab:green', 'grey']
     hue = ['Error' if i == 0 else 'Hit' if i == 1 else 'Miss' for i in df.Hit]
@@ -108,6 +103,8 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         scatter = sns.scatterplot(x=df.Trial, y=df.Side, hue=hue, palette=palette,
                                   hue_order=hue_order,
                                   s=ms ** 2, ax=ax4)
+        ax4.set_yticks([0, 1])
+        ax4.set_yticklabels(['L', 'R'])
 
     else:  # Plot coherences
         scatter = sns.scatterplot(x=df.Trial, y=df.Evidence, hue=hue, palette=palette,
@@ -116,6 +113,4 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     scatter.get_legend().remove()
     ax4.set_xlim([x_min, x_max])
 
-    time_end_hit = time.time()
-    runtime_hit = time_end_hit - time_start_hit
-    print("'Plot 4: misses' took", round(runtime_hit, 2), 'seconds to run')
+
