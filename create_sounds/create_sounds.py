@@ -13,7 +13,8 @@ from my_fun.my_fun import *
 
 ########################################################################################################################
 
-def create_sounds_v1(save=False):
+
+def create_sounds(save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
     amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
     determining from what side, left or right, the sound is louder on average, the evidence represent the information

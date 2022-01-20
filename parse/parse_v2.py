@@ -218,7 +218,7 @@ def parse_v2(path):
         if filename[i] == filename2[i]:
             files_match.append(1)
         elif filename2[i] is np.nan:
-            files_match.append(np.nan)
+            files_match.append(0)
         else:
             files_match.append(0)
 

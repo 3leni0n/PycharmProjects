@@ -1,7 +1,3 @@
-import matplotlib.pyplot as plt
-from matplotlib.patches import Patch  # For custom legend
-from matplotlib.lines import Line2D  # For custom legend
-from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -80,15 +76,7 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
 
     ####################################################################################################################
 
-    # PLOT 2: MESSAGE ERROR
-    # print(df.Message)
-
-    # if FilesMatch[i] == 0:
-    #     color = 'pink'
-    # elif Message[i] = 1:
-    #     color = 'purple'
-    # elif Sound == 0:
-    #     color = 'red'
+    # PLOT 2: SOUND ERRORS
 
     scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax2, color='purple')
     scatter = sns.scatterplot(x=df.Trial, y=df.Sound, ax=ax2, color='red')
@@ -96,15 +84,12 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     scatter.set_ylim([-0.1, 0.1])
 
     text = box + ' ' + path
-
-    ax2.text(0.1, 0.1, text,
-             transform=ax2.transAxes)
-
+    ax2.text(0.1, 0.1, text, transform=ax2.transAxes)
     ax2.set_xlim([x_min, x_max])
 
     ####################################################################################################################
 
-    # PLOT 3:
+    # PLOT 3: MISSES
     ax3.set_xlim([x_min, x_max])
 
 
@@ -123,75 +108,14 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         scatter = sns.scatterplot(x=df.Trial, y=df.Side, hue=hue, palette=palette,
                                   hue_order=hue_order,
                                   s=ms ** 2, ax=ax4)
-        # ax4.set_ylim(-0.8, 1.8)
-        # ax4.set_yticks([0, 1])
-        # ax4.set_yticklabels(['L', 'R'])
-        # ax4.set_ylabel('Sides')
-        #
-        # # Instantiate a second axes that shares the same x-axis
-        # ax4_twin = ax4.twinx()
-        # ax4_twin.set_ylim(-0.8, 1.8)  # Evidences
-        # ax4_twin.set_yticks([0, 1])
-        # ax4_twin.set_yticklabels(['L', 'R'])
-        # ax4_twin.spines['top'].set_visible(False)
 
     else:  # Plot coherences
         scatter = sns.scatterplot(x=df.Trial, y=df.Evidence, hue=hue, palette=palette,
                                   hue_order=hue_order, s=ms ** 2, ax=ax4)
-    #     # Plot horizontal lines
-    #     ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
-    #     ax4.axhline(-0.5, color='tab:gray', linestyle=':')  # Evidence -0.5
-    #     ax4.axhline(0.5, color='tab:gray', linestyle=':')  # Evidence 0.5
-    #     ax4.set_ylim(-1.1, 1.1)  # Evidences
-    #     # ax.set_ylim(0, 1)  # Coherences
-    #     ax4.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-    #     ax4.set_yticklabels(['L', '', '', '', '0', '', '', '', 'R'])  # Evidences
-    #     # ax.set_yticklabels(['Left', '', '', '', '0.5', '', '',  '', 'Right'])  # Coherences
-    #     ax4.set_ylabel('Evi.')
-    #     # ax.set_ylabel('Coherence')
-    #
-    #     # Instantiate a second axes that shares the same x-axis
-    #     ax4_twin = ax4.twinx()
-    #     ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
-    #     ax4_twin.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-    #     ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
-    #     ax4_twin.spines['top'].set_visible(False)
-    #
-    # ax4.set_xlim([1, len(df)])  # 1 to not plot trial 0
-    # ax4.set_xlabel('Trial')
-    # # scatter.legend(bbox_to_anchor=(1, 1))
-    # scatter.legend(loc='lower right', fontsize='xx-small', frameon=True)
-    scatter.get_legend().remove()
-    # ax4.spines['top'].set_visible(False)
-    # # ax4.spines['right'].set_visible(False)
 
+    scatter.get_legend().remove()
     ax4.set_xlim([x_min, x_max])
 
     time_end_hit = time.time()
     runtime_hit = time_end_hit - time_start_hit
     print("'Plot 4: misses' took", round(runtime_hit, 2), 'seconds to run')
-
-    ####################################################################################################################
-
-    # text1 = ('Task: ' + path + '\n')
-    # text2 = ('Accuracy: ' + str(accuracy) + '  Accuracy left: ' + str(accuracy_left) + '  Accuracy right: ' + str(accuracy_right) + '\n')
-    # text3 = ('Water: ' +  str(water))
-
-
-    # palette = {0: "black",
-    #            1: "green",
-    #            0.5: "gray"}
-
-
-    # df = df.fillna(0.5)
-
-    # ax2.text(0, 0, text1 + text2 + text3)
-    #
-    #
-    # sns.scatterplot(x=df_session.Trial, y=df_session.Choice, hue=df_session.Hit, palette = palette, s=100, ax=ax1)
-
-    # ax2.set_axis_off()
-    #
-    # ax1.legend([], [], frameon=False)
-    #
-    # sns.despine()
