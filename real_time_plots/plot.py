@@ -23,7 +23,7 @@ class File:
 class Parameters:
     def __init__(self, axis, minutes_ago, max_sessions, data_path):
         self.files = []
-        self.paths = []
+        self.paths = {}
         self.axis = axis
         self.minutes_ago = minutes_ago
         self.max_sessions = max_sessions
@@ -47,19 +47,36 @@ def get_paths(parameters):
     paths = path_generator(parameters.data_path, parameters.minutes_ago, parameters.max_sessions)
     if set(paths) != parameters.paths:
         files = []
+        boxes = []
         for path in paths:
             file = File(path)
             mini_parse(file)  # parse the data and creates file.reward_side and file.box
-            files.append(file)
+            if file.box not in boxes:
+                files.append(file)
+                boxes.append(file.box)
 
         try:
             files = sorted(files, key=lambda x: x.box)
 
             for index, file in enumerate(files):
-                file.axis1 = parameters.axis[index * 4]
-                file.axis2 = parameters.axis[index * 4 + 1]
-                file.axis3 = parameters.axis[index * 4 + 2]
-                file.axis4 = parameters.axis[index * 4 + 3]
+
+                print(file.box)
+                if file.box == "Bpod5":
+                    j = 0
+                elif file.box == "Bpod6":
+                    j = 1
+                elif file.box == "Bpod7":
+                    j = 2
+                elif file.box == "Bpod8":
+                    j = 3
+                else:
+                    j = -1
+
+                if j >= 0:
+                    file.axis1 = parameters.axis[j * 4]
+                    file.axis2 = parameters.axis[j * 4 + 1]
+                    file.axis3 = parameters.axis[j * 4 + 2]
+                    file.axis4 = parameters.axis[j * 4 + 3]
 
             parameters.files = files
             parameters.paths = {file.path for file in files}
