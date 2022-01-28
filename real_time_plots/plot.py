@@ -73,8 +73,11 @@ def get_paths(parameters):
                     j = -1
 
                 if j >= 0:
+<<<<<<< HEAD
                     print("a ver", j)
                     # print(parameters.axis)
+=======
+>>>>>>> efe2d551c06ea84eaf3090c23ba8ab300b4f4d57
                     file.axis1 = parameters.axis[j * 4]
                     file.axis2 = parameters.axis[j * 4 + 1]
                     file.axis3 = parameters.axis[j * 4 + 2]

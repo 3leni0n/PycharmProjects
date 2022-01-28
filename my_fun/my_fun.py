@@ -682,7 +682,8 @@ def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapte
         'jaime': 'U7UTKNN0P',
         'carles': 'UPZPM32UC',
         'jordi': 'U8J8YA66S',
-        'my_channel': '#pv_nmdar_eranet'
+        'my_channel': '#pv_nmdar_eranet',
+        'reports': '#pv_nmdar_eranet_reports'
     }
 
     if (userid[0] != 'U') and (userid[0] != '#'):  # Assumes it is a first name

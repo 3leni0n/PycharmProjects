@@ -964,7 +964,7 @@ def daily_report_v2(path, send_slack=False):
 
         os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
         filepath = folder + '/' + df.Session.unique()[0]
-        slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet')  # Alexis: 'U01DDHH7LLX'
+        slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
 
 ########################################################################################################################
@@ -979,24 +979,21 @@ def daily_report_v2(path, send_slack=False):
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
 
 
-def do_daily_reports(send_slack=False):
+def do_daily_reports_v2(send_slack=False):
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/'
     # animal = input('Enter animal')
     animals = os.listdir(folder)
     animals.sort()
 
     try:
         animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
+        animals.remove('Test2')
         animals.remove('.idea')  # Pycharm's archive
 
         # Remove animals not training
-        animals.remove('902')
-        animals.remove('904')
-        animals.remove('909')
-        animals.remove('911')
-        # animals.remove('915')
+        animals.remove('XXX')
     except ValueError:
         pass
 
