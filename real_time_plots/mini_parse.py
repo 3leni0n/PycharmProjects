@@ -13,12 +13,12 @@ def mini_parse(file):
     if len(index) < 2:
         return
 
-    if file.df is None:
+    try:
         reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
         reward_side = reward_side[1:-1].split(',')  # Convert string to list, [1:-1] to get rid of the square brackets []
         reward_side = list(map(int, reward_side))  # Convert list elements from string to integers
         file.reward_side = reward_side
-    else:
+    except:
         reward_side = file.reward_side
 
     if file.box is None:
@@ -79,8 +79,8 @@ def mini_parse(file):
     # reward_side = np.array(reward_side, dtype=int)  # Convert to array
 
     try:
-        print(file.df.shape[0])
-        print(file.df.shape[0] + n_trials)
+        # print(file.df.shape[0])
+        # print(file.df.shape[0] + n_trials)
         reward_side = reward_side[file.df.shape[0]:file.df.shape[0] + n_trials]
     except:
         reward_side = reward_side[:n_trials]
