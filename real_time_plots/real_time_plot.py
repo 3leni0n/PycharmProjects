@@ -28,6 +28,7 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
                 performance.append(round(np.mean(data[i - runningwindow:i]), 2))
         return performance
 
+    print(ax1)
     ax1.clear()
     ax2.clear()
     ax3.clear()
@@ -42,7 +43,11 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     if df is None:
         return
 
+<<<<<<< HEAD
+    df = df.tail(trials + running_window)  # + For computing rolling average 
+=======
     df = df.tail(trials + running_window)  # + For computing rolling average
+>>>>>>> efe2d551c06ea84eaf3090c23ba8ab300b4f4d57
 
     extra_trials = max(len(df) - trials, 0)
     x_min = df.index[0] + extra_trials
