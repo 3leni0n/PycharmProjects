@@ -8,16 +8,25 @@ H2O: add to 20 ul (7.5 ul)
 2X Phire Tissue Direct PCR Master Mix: 10 ul
 Primer A: 0.5 ul
 Primer B: 0.5 ul
-(DNA: 1.5 ul)"""
+(DNA: 1.5 ul)
+"""
 
 
-def pcr_grin1(n_samples, volume=20):
+def pcr_grin1(n_samples, volume=20, control=True):
 
     blank = 1  # For checking contamination
     extra = 1  # For pipetting loss
-    n_samples = n_samples + blank + extra  # +2: 1 blanck + 1 for pipetting loss
-    print(n_samples)
-    print(f'Alicuota for {n_samples - blank - extra} sample(s) + {blank} blank + {extra} extra (for pipetting loss) \n')
+
+    if control == True:
+        control_negative = 1
+        control_positive = 1
+        control_hemi = 1
+        n_samples = n_samples + blank + extra + control_negative + control_positive + control_hemi
+    else:
+        n_samples = n_samples + blank + extra
+
+    print(f'Alicuota for {n_samples - blank - extra - control_negative - control_positive - control_hemi} sample(s) + '
+          f'{blank} blank + {extra} extra + {control_negative + control_positive + control_hemi} controls \n')
 
     print('Add to the mix:')
     water = 7.5 * n_samples  # Nuclease free, add till complete 20 ul (7.5 ul)
@@ -37,14 +46,21 @@ def pcr_grin1(n_samples, volume=20):
     assert(((water + phire_tissue_direct_pcr_master_mix_2x + primer_in + primer_out) / n_samples) + dna) == volume
 
 
-def pcr_pvcre(n_samples, volume=20):
+def pcr_pvcre(n_samples, volume=20, control=True):
 
     blank = 1  # For checking contamination
     extra = 1  # For pipetting loss
-    n_samples = n_samples + blank + extra  # +2: 1 blanck + 1 for pipetting loss
 
-    print(n_samples)
-    print(f'Alicuota for {n_samples - blank - extra} sample(s) + {blank} blank + {extra} extra (for pipetting loss) \n')
+    if control == True:
+        control_negative = 1
+        control_positive = 1
+        control_hemi = 1
+        n_samples = n_samples + blank + extra + control_negative + control_positive + control_hemi
+    else:
+        n_samples = n_samples + blank + extra
+
+    print(f'Alicuota for {n_samples - blank - extra - control_negative - control_positive - control_hemi} sample(s) + '
+          f'{blank} blank + {extra} extra + {control_negative + control_positive + control_hemi} controls \n')
 
     print('Add to the mix:')
     water = 5 * n_samples  # Nuclease free, add till complete 20 ul (7.5 ul)

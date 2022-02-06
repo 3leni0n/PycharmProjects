@@ -3,6 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 from parse.parse import parse
+from parse.parse_v2 import parse_v2
 import csv
 
 
@@ -14,15 +15,31 @@ import csv
 
 
 # Define function
-def glue_sessions(animal=None, protocol=None, to_csv=False):
+def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
 
     time_start = time.time()
 
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'  # Where the data for all animals is
+    if experiment is None:
 
-    if animal == None:
+        folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
 
-        animals = os.listdir(folder)  # List animals
+        try:
+            experiments.remove('.idea')  # Pycharm's archive
+            experiments.remove('Daily check')
+            experiments.remove('WaterCalibration')
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+
+    if animal is None:
+
+        animals = os.listdir(folder_in)  # List animals
         animals.sort()  # Sort them by name
 
         try:
@@ -36,20 +53,27 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
 
     # # Check if csv from that animal already exist, and if so, import it
     glued_sessions = []  # Initialize empty list so if it's the first time glue all sessions
-    glued_animals = os.listdir('/home/alexis/PycharmProjects/glue_sessions')
+
+    # Select the output folder_in and create it if it doesn't exist
+    folder_out = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
+    if not os.path.exists(folder_out):
+        os.mkdir(folder_out)
+
+    glued_animals = os.listdir(folder_out)
+    glued_animals.sort()
     glued_animals = [x for x in glued_animals if x.endswith('.csv')]  # Get rid of non csv files
 
     if animal + '.csv' in glued_animals:
-        df = pd.read_csv('/home/alexis/PycharmProjects/glue_sessions/' + animal + '.csv')
+        df = pd.read_csv('/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '.csv')
         glued_sessions = df.Session.unique().tolist()
     else:
         df = pd.DataFrame()  # Create empty DataFrame if there's no csv yet for that animal
 
-    folder = folder + animal + '/sessions/'  # Update folder with selected animal
-    sessions = os.listdir(folder)  # List sessions
+    folder_in = folder_in + animal + '/sessions/'  # Update folder_in with selected animal
+    sessions = os.listdir(folder_in)  # List sessions
     sessions.sort()  # Sort them by date
 
-    if protocol == None:
+    if protocol is None:
 
         protocols = []  # Initiate list
         for i, session in enumerate(sessions):
@@ -73,40 +97,64 @@ def glue_sessions(animal=None, protocol=None, to_csv=False):
 
         # Loop only over sessions with the selected protocol that aren't glued yet
         if protocol in sessions[i] and sessions[i] not in glued_sessions:
-            path = folder + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse.py
+            path = folder_in + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse.py
             print('Parsing session ' + "'" + sessions[i] + "'" + '...', sep='')
 
             try:
-                df_session = parse(path)  # Parse session
+                if protocol == 'stage_training':
+                    df_session = parse(path)  # Parse session
+                elif protocol == 'stage_training_v2':
+                    df_session = parse_v2(path)  # Parse session
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
             except IndexError:
-                print(f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with next session...")
+                print(
+                    f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with next session...")
                 corrupted_sessions.append(sessions[i])
 
-            # df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
         else:
             pass
 
-    if to_csv == True:
-        df.to_csv('/home/alexis/PycharmProjects/glue_sessions/' + animal + '.csv', index=False)
-        # index=False to avoid the 'Unmmaed: 0' column
+    if to_csv:
+        df.to_csv(folder_out + animal + '.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+
+    print('The corrupted sessions are:', *corrupted_sessions, '\n', sep='\n')
+
+    if corrupted_sessions:  # If corrupted sessions isn't empty, save them in a .csv file
+        # Save corrupted sessions in a separate csv file
+        with open('/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '_corrupted_sessions.csv',
+                  'w', newline='') as f:
+            wr = csv.writer(f)
+            wr.writerow(corrupted_sessions)
 
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
-    print('The corrupted sessions are:', *corrupted_sessions, '\n', sep='\n')
-
-    # Save corrupted sessions in a separate csv file
-    with open('/home/alexis/PycharmProjects/glue_sessions/' + animal + '_corrupted_sessions.csv', 'w', newline='') as f:
-        wr = csv.writer(f)
-        wr.writerow(corrupted_sessions)
 
     return df, corrupted_sessions
 
 
-def update_glued_sessions():
+def update_glued_sessions(experiment=None):
+    """Update the glued_sessions .csv files for all animals with the non yet included sessions."""
 
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'  # Where the data for all animals is
+    time_start = time.time()
+
+    if experiment is None:
+
+        folder = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        experiments = os.listdir(folder)  # List experiments
+        experiments.sort()  # Sort them by name
+
+        try:
+            experiments.remove('.idea')  # Pycharm's archive
+            experiments.remove('Daily check')
+            experiments.remove('WaterCalibration')
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    folder = folder + experiment + '/setups/'  # Where the data for all animals is
     animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
 
@@ -117,16 +165,9 @@ def update_glued_sessions():
         pass
 
     for i in range(len(animals)):
-        glue_sessions(animal=animals[i], protocol='stage_training', to_csv=True)
+        print(f'Updating sessions of animal {animals[i]}...')
+        glue_sessions(animal=animals[i], protocol='stage_training_v2', experiment=experiment, to_csv=True)
 
-
-# from glue_sessions.glue_sessions import glue_sessions
-#
-# glue_sessions(animal='902', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='904', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='906', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='909', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='910', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='911', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='913', protocol='stage_training', to_csv=True)
-# glue_sessions(animal='915', protocol='stage_training', to_csv=True)
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')

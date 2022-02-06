@@ -9,6 +9,7 @@ from sympy import symbols, Eq, log, nsolve
 import slack
 import os
 import csv
+import random
 
 # For compute_psych_curve
 from scipy import stats
@@ -340,6 +341,39 @@ def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
             selected_evidence = np.random.choice(available, p=prob_vec)
 
     return selected_evidence  # UtilsR one returns coherence
+
+########################################################################################################################
+
+"""
+df = pd.read_csv('/home/setup2/pybpod/sounds_2.csv')
+ilds = df.ILD.unique()
+
+def select_evidences_3(p, side):
+    r = random.random()  # Generate random float between 0 and 1
+    if r > p:
+        if side == 0:
+            return ilds.min()
+        else:
+            return ilds.max()
+    else:
+        if side == 0:
+            options = ilds[ilds <= 0]
+            options = np.repeat(options, 2)
+            options = options[:-1]
+            return random.choice(options)
+        else:
+            options = ilds[ilds >= 0]
+            options = np.repeat(options, 2)
+            options = options[1:]
+            return random.choice(options)
+
+evidences = []
+
+for i in range(n_trials):
+    evidences.append(select_evidences_3(1, trial_list[i]))
+
+plt.hist(evidences, bins=100)
+"""
 
 
 def enterthematrix(filepath):
