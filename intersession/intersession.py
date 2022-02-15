@@ -153,6 +153,7 @@ def intersession(path, to_csv=False, send_slack=False):
     # Stage / Substage
     stage = df.groupby('Date').Stage.mean().round()
     # substage = df.groupby('Date').Substage.mean().round()  # Need to add it again to the parse, even if its nan
+    motor = df.groupby('Date').Motor.mean().round()
 
     # Psychometric parameters
     # evidences = df.groupby('Date').Evidence.apply(list)  # # Need to add it again to the parse, even if its nan
@@ -384,57 +385,59 @@ def intersession(path, to_csv=False, send_slack=False):
 
         ################################################################################################################
 
-        # # PLOT 4: STAGES/SUBSTAGES
-        #
-        # time_start_substages = time.time()
-        #
-        # ax4 = plt.subplot2grid((8, 1), (4, 0), rowspan=1, colspan=1)
-        #
-        # # Plot horizontal lines
+        # PLOT 4: STAGES/SUBSTAGES
+
+        time_start_substages = time.time()
+
+        ax4 = plt.subplot2grid((8, 1), (4, 0), rowspan=1, colspan=1)
+        # ax4 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
+
+        # Plot horizontal lines
         # ax4.axhline(3, color='tab:gray', linestyle=':')  # Chance level
         # ax4.axhline(6, color='tab:gray', linestyle=':')  # Accuracy 0.25
         # ax4.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
-        #
-        # # Plot vertical line for date of interest
-        # # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        #
-        # # Plot substage/stage mode per session
+
+        # Plot vertical line for date of interest
+        # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+
+        # Plot stage/substage/motor per session
+        ax4.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
         # ax4.plot(dates_indexes, substage, marker='o', ms=ms, lw=lw, color='black', label='Substage')
-        # ax4_twin = ax4.twinx()  # Instantiate a second axes that shares the same x-axis
-        # ax4_twin.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='tab:gray', label='Stage')
-        #
-        # # ax4.set_xlabel('Days')
-        # ax4.set_xlim([0, len(dates_indexes)])
-        # ax4.set_xticklabels([])
-        # ax4.set_ylim([-1, 11])
-        # ax4.set_ylabel('Substage')
-        # # ax4.set_yticks(list(np.arange(0, 11, 1)))
-        # # ax4.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # # ax4.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        # ax4.legend(loc='lower right', fontsize='xx-small', frameon=True)
-        # ax4.spines['top'].set_visible(False)
-        # ax4.spines['bottom'].set_visible(False)
-        # # ax4.spines['right'].set_visible(False)
-        #
-        # # Instantiate a second axes that shares the same x-axis
-        # # ax4_twin = ax4.twinx()
-        # # ax4_twin.set_ylim([0, 4])
-        # ax4_twin.set_yticks(list(np.arange(0, 5, 1)))
-        # # ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        # ax4_twin.set_ylabel('Stage')
-        # ax4_twin.spines['top'].set_visible(False)
-        # ax4_twin.spines['bottom'].set_visible(False)
-        #
-        # # Make shared legend for both axis
-        # lines_1, labels_1 = ax4.get_legend_handles_labels()
-        # lines_2, labels_2 = ax4_twin.get_legend_handles_labels()
-        # lines = lines_1 + lines_2
-        # labels = labels_1 + labels_2
-        # ax4.legend(lines, labels, loc='lower right', fontsize='xx-small', frameon=True)
-        #
-        # time_end_substages = time.time()
-        # runtime_substages = time_end_miss - time_start_substages
-        # print("'Plot 3: misses' took", round(runtime_substages, 2), 'seconds to run')
+        ax4_twin = ax4.twinx()  # Instantiate a second axes that shares the same x-axis
+        ax4_twin.plot(dates_indexes, motor, marker='o', ms=ms, lw=lw, color='tab:gray', label='Motor')
+
+        # ax4.set_xlabel('Days')
+        ax4.set_xlim([0, len(dates_indexes)])
+        ax4.set_xticklabels([])
+        ax4.set_ylim()
+        ax4.set_ylabel('Stage')
+        ax4.set_yticks(stage.unique())
+        # ax4.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        # ax4.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax4.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax4.spines['top'].set_visible(False)
+        ax4.spines['bottom'].set_visible(False)
+        # ax4.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        # ax4_twin = ax4.twinx()
+        # ax4_twin.set_ylim([0, 4])
+        ax4_twin.set_yticks(motor.unique())
+        # ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax4_twin.set_ylabel('Motor')
+        ax4_twin.spines['top'].set_visible(False)
+        ax4_twin.spines['bottom'].set_visible(False)
+
+        # Make shared legend for both axis
+        lines_1, labels_1 = ax4.get_legend_handles_labels()
+        lines_2, labels_2 = ax4_twin.get_legend_handles_labels()
+        lines = lines_1 + lines_2
+        labels = labels_1 + labels_2
+        ax4.legend(lines, labels, loc='lower right', fontsize='xx-small', frameon=True)
+
+        time_end_substages = time.time()
+        runtime_substages = time_end_miss - time_start_substages
+        print("'Plot 3: misses' took", round(runtime_substages, 2), 'seconds to run')
 
         ################################################################################################################
         # Under development
@@ -491,18 +494,24 @@ def intersession(path, to_csv=False, send_slack=False):
             ax5.axvline(doi_1_index, color='tab:pink', linestyle='--')
         except UnboundLocalError:
             print(f'No data from this animal on {doi_1}')
+        except NameError:
+            print(f'No data from this animal on {doi_1}')
 
         try:
             # Plot vertical line for date of interest
             ax5.axvline(doi_2_index, color='tab:purple', linestyle='--')
         except UnboundLocalError:
             print(f'No data from this animal on {doi_2}')
+        except NameError:
+            print(f'No data from this animal on {doi_1}')
 
         try:
             # Plot vertical line for date of interest
             ax5.axvline(doi_3_index, color='tab:red', linestyle='--')
         except UnboundLocalError:
             print(f'No data from this animal on {doi_3}')
+        except NameError:
+            print(f'No data from this animal on {doi_1}')
 
         # # Plot sound issues per session
         ax5.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')

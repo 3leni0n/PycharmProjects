@@ -10,16 +10,19 @@ import slack
 import os
 import csv
 import random
+from matplotlib import pyplot as plt
 
 # For compute_psych_curve
 from scipy import stats
 from scipy.optimize import minimize
 from collections import namedtuple
 
+
 ########################################################################################################################
 
 
-def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True):  # Adapted from UtilsR's 'whiteNoiseGen'
+def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000,
+                normalize=True):  # Adapted from UtilsR's 'whiteNoiseGen'
     """Create 'white noise' (between quotes as the signal is actually being band pass filtered).
     Note: if it takes too long try reducing the sampling rate or the filter length.
     """
@@ -40,7 +43,7 @@ def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normaliz
     signal = band_noise[fs:int(fs * (dur + 1))]  # Indexing from fs to fs * 2, taking the second half of band_noise
     # (plot to understand)
     if normalize:
-        signal = signal/np.max(abs(signal))
+        signal = signal / np.max(abs(signal))
     return signal
 
 
@@ -57,7 +60,7 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
     # v_shift = 0  # Vertical shift
     y = amp * np.sin(ang_freq * x + phase) + v_shift  # Sine wave function
 
-    if plot == True:
+    if plot:
         plt.plot(x, y)
         plt.title('Sine wave')
         plt.xlabel('$\it{t}$ (s)')
@@ -126,7 +129,7 @@ def envelope(noise, coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=
         envelope_L = envelope_R - 1
         sound_R = envelope_R * noise * mod_wave * amp
 
-        if paired == False:
+        if not paired:
             stairs_L = np.random.beta(a, b, size=n_frames) - 1
             envelope_L = np.repeat(stairs_L, int(n_points / n_frames))  # When 'paired=False' it draws it from
             # the beta distro
@@ -142,12 +145,14 @@ def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, du
     """
     Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
     :param noise: white noise vector
-    :param coh: coherence [0=left, 1=right]
+    :param dB_left: np array with left dB
+    :param dB_right: np array with right dB
+    :param max_vol: maximum volume (i.e. calibration value)
     :param fs: sampling frequency (needs to match the fs of white noise and sine wave)
     :param amp: amplitude
     :param dur: duration (in seconds)
     :param n_frames: number of frames
-    :param var: variance of the beta distribution
+    :param sigma: standard deviation of the normal distribution
     :param paired: if True, the sum of both sides = 1
     :return: sound left, sound right, stairs left (* n_frames), stairs_right (* n_frames)
     """
@@ -212,7 +217,7 @@ def get_alpha_beta(mean, var, plot=False):
     elif b <= 0:
         raise ValueError(f'beta = {b} <=0')
     else:
-        if plot == True:  # Plot the beta distribution with parameters a, b
+        if plot:  # Plot the beta distribution with parameters a, b
             mean, var, skew, kurt = beta.stats(a, b, moments='mvsk')
             x = np.linspace(beta.ppf(0.01, a, b), beta.ppf(0.99, a, b), 100)
             plt.plot(x, beta.pdf(x, a, b), 'r-', lw=5, alpha=0.6, label='beta pdf')
@@ -286,8 +291,8 @@ def getWaterCalib(board, ports):  # From UtilsR
 #     return selected_evidence  # UtilsR one returns coherence
 
 
-def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
-# def my_select_evidence(trial_type, evidences, shape='uniform'):  # Adapted from UtilsR
+def my_select_evidence_new(trial_type, evidences, p=None):  # Adapted from UtilsR
+    # def my_select_evidence(trial_type, evidences, shape='uniform'):  # Adapted from UtilsR
     """
     Reduce the prob of 0 evidence to 1/2 as it is part of both left and right trials. This function would be equivalent
     to repeat each evidence in the array except for 0
@@ -304,18 +309,18 @@ def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
         if p is not None:
             p = p
         # if shape == 'u-shape':
-            # p = [((1 / 3) + (1 / 3 / 3)), (1 / 3), ((1 / 3) - (1 / 3 / 3))]
+        # p = [((1 / 3) + (1 / 3 / 3)), (1 / 3), ((1 / 3) - (1 / 3 / 3))]
         # elif shape == 'uniform':
-            # p = list(np.repeat(1 / len(available), len(available)))
+        # p = list(np.repeat(1 / len(available), len(available)))
     elif trial_type == 1:
         available = evidences[evidences >= 0]  # Evidences corresponding to the right
         if p is not None:
             # p.reverse()
             p = p[::-1]
-         # if shape == 'u-shape':
-            # p = [((1 / 3) - (1 / 3 / 3)), (1 / 3), ((1 / 3) + (1 / 3 / 3))]
+        # if shape == 'u-shape':
+        # p = [((1 / 3) - (1 / 3 / 3)), (1 / 3), ((1 / 3) + (1 / 3 / 3))]
         # elif shape == 'uniform':
-            # p = list(np.repeat(1 / len(available), len(available)))
+        # p = list(np.repeat(1 / len(available), len(available)))
 
     if 0 not in evidences:  # just pick one randomly
         # selected_evidence = np.random.choice(available)
@@ -334,7 +339,8 @@ def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
             rest = 1 - sum(p_corr)  # Get the remainder half of p0
             non_zero_loc = np.where(available != 0)[0]  # Find the indexes of non zero evidences in available vector
             for i in range(len(non_zero_loc)):
-                p_corr[non_zero_loc[i]] = p_corr[non_zero_loc[i]] + rest / len(non_zero_loc)  # Sum the other half of p0 to the p of the non zero
+                p_corr[non_zero_loc[i]] = p_corr[non_zero_loc[i]] + rest / len(
+                    non_zero_loc)  # Sum the other half of p0 to the p of the non zero
                 # evidences (so the whole sums 1)
             selected_evidence = np.random.choice(available, p=p_corr)
         else:
@@ -342,37 +348,44 @@ def my_select_evidence(trial_type, evidences, p=None):  # Adapted from UtilsR
 
     return selected_evidence  # UtilsR one returns coherence
 
-########################################################################################################################
 
 """
 df = pd.read_csv('/home/setup2/pybpod/sounds_2.csv')
 ilds = df.ILD.unique()
+n_trials = 10000
+trial_types = [0, 1]
+trial_list = np.random.choice(trial_types, n_trials).tolist()
+"""
 
-def select_evidences_3(p, side):
-    r = random.random()  # Generate random float between 0 and 1
+
+def select_ilds(ilds, p, side):
+    # r = random.random()  # Generate random float between 0 and 1. PyBpod missing random library
+    r = np.random.random(1)[0]  # Generate random float between 0 and 1
     if r > p:
-        if side == 0:
-            return ilds.min()
-        else:
-            return ilds.max()
+        if side == 0:  # Left
+            return ilds.min()  # Sound left only
+        else:  # Right
+            return ilds.max()  # Sound right only
     else:
-        if side == 0:
-            options = ilds[ilds <= 0]
-            options = np.repeat(options, 2)
-            options = options[:-1]
-            return random.choice(options)
-        else:
-            options = ilds[ilds >= 0]
-            options = np.repeat(options, 2)
-            options = options[1:]
-            return random.choice(options)
+        if side == 0:  # Left
+            options = ilds[ilds <= 0]  # Left ILDs
+            options = np.repeat(options, 2)  # Repeat each element of the vector
+            options = options[:-1]  # Exclude one of the 0s from the vector, so it has 1/2 p than the rest
+        else:  # Right
+            options = ilds[ilds >= 0]  # Right ILDs
+            options = np.repeat(options, 2)  # Repeat each element of the vector
+            options = options[1:]  # Exclude one of the 0s from the vector, so it has 1/2 p than the rest
+    # selected_ild = random.choice(options)
+    selected_ild = np.random.choice(options)
+    return selected_ild
 
+
+"""
 evidences = []
-
 for i in range(n_trials):
-    evidences.append(select_evidences_3(1, trial_list[i]))
-
+    evidences.append(select_ilds(ilds, 1, trial_list[i]))
 plt.hist(evidences, bins=100)
+plt.title('p=1')
 """
 
 
@@ -408,12 +421,12 @@ def enterthematrix(filepath):
     return df
 
 
-def sounds_dict(start, stop, num, decimals):
+def sounds_dict(start, stop, num, n_decimals):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")
     chars = list(ascii_lowercase[:num])  # Make a list of all the lowercase letters as long as num
-    pulses = np.around(np.linspace(start, stop, num), decimals)  # Make evenly spaced TTL pulses rounded to round2
+    pulses = np.around(np.linspace(start, stop, num), n_decimals)  # Make evenly spaced TTL pulses rounded to round2
     return dict(zip(chars, pulses))
 
 
@@ -476,8 +489,9 @@ def power_dB(amp):
 def find_dB_evi0(max_vol):
     """Find dB for evidence 0 (how much volume when evidence is 0?)"""
     amp_ref = 0.00002  # The commonly used reference sound pressure in air is 20 µPa
-    dB = 20 * np.log10(10**(max_vol/20)/2)
+    dB = 20 * np.log10(10 ** (max_vol / 20) / 2)
     return dB
+
 
 ########################################################################################################################
 
@@ -510,7 +524,7 @@ def get_dB_from_amp(amp, max_vol):
 def get_amp_from_dB(dB, max_vol):
     """Transform amplitude into decibels (dB). A reduction of amplitude in half = -6dB"""
     constant = find_constant(max_vol)
-    amp = constant*(10**(dB/20))
+    amp = constant * (10 ** (dB / 20))
     # if amp < 0.001:
     #     return 0.001
     return amp
@@ -556,7 +570,7 @@ def get_dBs_from_diff(diff, max_vol):
     constant = find_constant(max_vol)
 
     # Define system of nonlinear equations
-    eq1 = Eq(constant*10**(x/20) + constant*10**(y/20) - 1, 0)
+    eq1 = Eq(constant * 10 ** (x / 20) + constant * 10 ** (y / 20) - 1, 0)
     eq2 = Eq(x - y - diff, 0)
 
     # Solve equations numerically
@@ -652,7 +666,7 @@ def compute_window(data, runningwindow):
     return performance
 
 
-def compute_psych_curve(x, y):
+def compute_psych_curve(x, y, n_points=100):
     """Computes a psychometric function."""
 
     def sigmoid_mme(fit_params: tuple):
@@ -681,8 +695,8 @@ def compute_psych_curve(x, y):
     # Fit parameters:
     k, x0, b, p = [np.around(param, 2) for param in ll['x']]
 
-    # Compute the fit with 30 points:
-    fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(-1, 1, 30) - x0)))
+    # Compute the fit with n_points number of points:
+    fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(np.min(x), np.max(x), n_points) - x0)))
     fit = [np.around(elem, 3) for elem in fit]
 
     psych_curve = namedtuple('psych_curve',
@@ -695,7 +709,7 @@ def compute_psych_curve(x, y):
     if len(ydata) == 0:
         return psych_curve(xdata=[np.nan],
                            ydata=[np.nan],
-                           fit=[np.nan] * 30,
+                           fit=[np.nan] * n_points,
                            params=[np.nan] * 4,
                            fit_error=[np.nan])
     else:

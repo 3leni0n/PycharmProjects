@@ -178,7 +178,8 @@ def daily_report_v2(path, send_slack=False):
               'Switch: ' + str(df.Switch.unique()[0]) + ', ' +
               'Motor: ' + str(df.Motor.unique()[0]) + ', ' +
               'CB: ' + str(df.CB.unique()[0]) + ', ' +
-              'Progression: ' + str(df.Progression.unique()[0]) +
+              'Progression: ' + str(df.Progression.unique()[0]) + ', ' +
+              'P: ' + str(df.P.unique()[0]) +
               '\n')
 
         s3 = ('Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
@@ -232,7 +233,7 @@ def daily_report_v2(path, send_slack=False):
         # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
@@ -255,22 +256,22 @@ def daily_report_v2(path, send_slack=False):
                  color='tab:orange',
                  label='Right')
 
-        if df.Progression.unique()[0] == 1:
-            for i in range(len(change_substage.index)):
-                if change_substage[change_substage.index[i]] == 1:
-                    # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-                    #              arrowprops=dict(arrowstyle='->', color='green'))
-                    ax1.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax1.annotate(s=str(df.Substage[change_substage.index[i]]),
-                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-                                 color='tab:green', ha='center')
-                elif change_substage[change_substage.index[i]] == -1:
-                    # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-                    #              arrowprops=dict(arrowstyle='<-', color='red'))
-                    ax1.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax1.annotate(s=str(df.Substage[change_substage.index[i]]),
-                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-                                 color='tab:red', ha='center')
+        # if df.Progression.unique()[0] == 1:
+        #     for i in range(len(change_substage.index)):
+        #         if change_substage[change_substage.index[i]] == 1:
+        #             # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+        #             #              arrowprops=dict(arrowstyle='->', color='green'))
+        #             ax1.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+        #             ax1.annotate(s=str(df.Substage[change_substage.index[i]]),
+        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+        #                          color='tab:green', ha='center')
+        #         elif change_substage[change_substage.index[i]] == -1:
+        #             # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+        #             #              arrowprops=dict(arrowstyle='<-', color='red'))
+        #             ax1.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+        #             ax1.annotate(s=str(df.Substage[change_substage.index[i]]),
+        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+        #                          color='tab:red', ha='center')
 
         ax1.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax1.set_xticklabels([])
@@ -310,7 +311,7 @@ def daily_report_v2(path, send_slack=False):
         ra_alt = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)], 20)
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
             ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
@@ -327,22 +328,22 @@ def daily_report_v2(path, send_slack=False):
         ax2.plot(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)].index, ra_alt, marker='o', ms=ms,
                  lw=lw, color='tab:purple', label='Alt')
 
-        if df.Progression.unique()[0] == 1:
-            for i in range(len(change_substage.index)):
-                if change_substage[change_substage.index[i]] == 1:
-                    # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-                    #              arrowprops=dict(arrowstyle='->', color='green'))
-                    ax2.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax2.annotate(s=str(df.Substage[change_substage.index[i]]),
-                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-                                 color='tab:green', ha='center')
-                elif change_substage[change_substage.index[i]] == -1:
-                    # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-                    #              arrowprops=dict(arrowstyle='<-', color='red'))
-                    ax2.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax2.annotate(s=str(df.Substage[change_substage.index[i]]),
-                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-                                 color='tab:red', ha='center')
+        # if df.Progression.unique()[0] == 1:
+        #     for i in range(len(change_substage.index)):
+        #         if change_substage[change_substage.index[i]] == 1:
+        #             # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+        #             #              arrowprops=dict(arrowstyle='->', color='green'))
+        #             ax2.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+        #             ax2.annotate(s=str(df.Substage[change_substage.index[i]]),
+        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+        #                          color='tab:green', ha='center')
+        #         elif change_substage[change_substage.index[i]] == -1:
+        #             # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+        #             #              arrowprops=dict(arrowstyle='<-', color='red'))
+        #             ax2.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+        #             ax2.annotate(s=str(df.Substage[change_substage.index[i]]),
+        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+        #                          color='tab:red', ha='center')
 
         ax2.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax2.set_xticklabels([])
@@ -380,7 +381,7 @@ def daily_report_v2(path, send_slack=False):
         ra_right_miss = compute_window(df.Miss[df.Side == 1], 20)  # Right valid trials
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
             ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
@@ -398,22 +399,22 @@ def daily_report_v2(path, send_slack=False):
         ax3.plot(df[df.Side == 1].index, ra_right_miss, marker='o', ms=ms, lw=lw, color='tab:orange',
                  label='Right')
 
-        if df.Progression.unique()[0] == 1:
-            for i in range(len(change_substage.index)):
-                if change_substage[change_substage.index[i]] == 1:
-                    # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-                    #              arrowprops=dict(arrowstyle='->', color='green'))
-                    ax3.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax3.annotate(s=str(df.Substage[change_substage.index[i]]),
-                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-                                 color='tab:green', ha='center')
-                elif change_substage[change_substage.index[i]] == -1:
-                    # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-                    #              arrowprops=dict(arrowstyle='<-', color='red'))
-                    ax3.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax3.annotate(s=str(df.Substage[change_substage.index[i]]),
-                                 xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-                                 color='tab:red', ha='center')
+        # if df.Progression.unique()[0] == 1:
+        #     for i in range(len(change_substage.index)):
+        #         if change_substage[change_substage.index[i]] == 1:
+        #             # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+        #             #              arrowprops=dict(arrowstyle='->', color='green'))
+        #             ax3.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+        #             ax3.annotate(s=str(df.Substage[change_substage.index[i]]),
+        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+        #                          color='tab:green', ha='center')
+        #         elif change_substage[change_substage.index[i]] == -1:
+        #             # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
+        #             #              arrowprops=dict(arrowstyle='<-', color='red'))
+        #             ax3.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+        #             ax3.annotate(s=str(df.Substage[change_substage.index[i]]),
+        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
+        #                          color='tab:red', ha='center')
 
         ax3.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax3.set_xticklabels([])
@@ -446,7 +447,7 @@ def daily_report_v2(path, send_slack=False):
         time_start_hit = time.time()
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
@@ -463,7 +464,7 @@ def daily_report_v2(path, send_slack=False):
             ax4.set_ylim(-0.8, 1.8)
             ax4.set_yticks([0, 1])
             ax4.set_yticklabels(['L', 'R'])
-            ax4.set_ylabel('Sides')
+            ax4.set_ylabel('Side')
 
             # Instantiate a second axes that shares the same x-axis
             ax4_twin = ax4.twinx()
@@ -473,25 +474,25 @@ def daily_report_v2(path, send_slack=False):
             ax4_twin.spines['top'].set_visible(False)
 
         else:  # Plot coherences
-            scatter = sns.scatterplot(x=df.index, y=df.Evidence, hue=hue, palette=palette,
+            scatter = sns.scatterplot(x=df.index, y=df.ILD, hue=hue, palette=palette,
                                       hue_order=hue_order, s=ms ** 2)
             # Plot horizontal lines
             ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
             ax4.axhline(-0.5, color='tab:gray', linestyle=':')  # Evidence -0.5
             ax4.axhline(0.5, color='tab:gray', linestyle=':')  # Evidence 0.5
-            ax4.set_ylim(-1.1, 1.1)  # Evidences
+            # ax4.set_ylim(-1.1, 1.1)  # Evidences
             # ax.set_ylim(0, 1)  # Coherences
-            ax4.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-            ax4.set_yticklabels(['L', '', '', '', '0', '', '', '', 'R'])  # Evidences
+            ax4.set_yticks(np.sort(df.ILD.unique()))
+            ax4.set_yticklabels(['-70', '-8', '-4', '-2', '0', '2', '4', '8', '70'])  # ILDs
             # ax.set_yticklabels(['Left', '', '', '', '0.5', '', '',  '', 'Right'])  # Coherences
-            ax4.set_ylabel('Evi.')
+            ax4.set_ylabel('ILD')
             # ax.set_ylabel('Coherence')
 
             # Instantiate a second axes that shares the same x-axis
             ax4_twin = ax4.twinx()
-            ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
-            ax4_twin.set_yticks([-1, -0.75, -0.5, -0.25, 0, 0.25, 0.5, 0.75, 1])
-            ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
+            # ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
+            ax4.set_yticks(np.sort(df.ILD.unique()))
+            ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])  # ILDs
             ax4_twin.spines['top'].set_visible(False)
 
         ax4.set_xlim([1, len(df)])  # 1 to not plot trial 0
@@ -508,119 +509,173 @@ def daily_report_v2(path, send_slack=False):
 
         ################################################################################################################
 
-        # # PLOTS 8-9: PSYCOMETRIC CURVES
-        #
-        # # Only draw PC if evidences are introduced (stage 4)
-        # if len(df.Evidence.unique()) > 2 and df.Stage.unique()[0] == 4:
-        #     # fig = plt.figure()
-        #
-        #     # Psychometric curve of the whole session (all trials)
-        #     ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
-        #
-        #     # Compute psychometric curves
-        #     psych_curve = compute_psych_curve(df.Evidence, df.Choice)  # No need to filter out the misses
-        #     psych_curve_rep = compute_psych_curve(df.EviRep, df.RepChoice)
-        #
-        #     # Plot horizontal and vertical lines
-        #     ax11.axhline(0.5, color='tab:gray', ls='--')
-        #     ax11.axvline(0., color='tab:gray', ls='--')
-        #
-        #     # Plot left-right psychometric curve and errorbars
-        #     ax11.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
-        #     ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
-        #                   markerfacecolor='none')
-        #
-        #     # # Plot alt-rep psychometric curve and errorbars
-        #     # ax11.plot(np.linspace(-1, 1, 30), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
-        #     # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
-        #     #               color='tab:brown', fmt='o', markerfacecolor='none')
-        #
-        #     ax11.set_xlabel('Evi.')
-        #     ax11.set_xlim([-1.05, 1.05])
-        #     ax11.set_ylabel('Prob. right')
-        #     ax11.set_ylim([-0.025, 1.025])
-        #     # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
-        #     ax11.legend(loc="lower right", frameon=False)
-        #
-        #     # ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
-        #     # # ax11_right_yaxis.set_ylabel('Prob. right')
-        #     # ax11.set_yticklabels([])  # Remove left yticklabels
-        #     # ax11.set_yticks([])  # Remove left yticks
-        #
-        #     ax11.spines['top'].set_visible(False)
-        #     ax11.spines['right'].set_visible(False)
-        #     # ax11_right_yaxis.spines['top'].set_visible(False)
-        #     # ax11_right_yaxis.spines['left'].set_visible(False)
-        #
-        #     ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
-        #                   xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:red')
-        #     ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
-        #                   xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:red')
-        #
-        #     sensitivity, bias, lr_left, lr_right = psych_curve.params
-        #
-        #     ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-        #                   "B=" + str(round(bias, 2)) + "\n" +  # Bias
-        #                   "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-        #                   "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
-        #                   fontsize='xx-small')
-        #
-        #     if df.Progression.unique()[0] == 1:
-        #
-        #         # Psychometric curves per substage
-        #         ax_list = [plt.subplot2grid((16, 6), (10, 3), rowspan=2, colspan=1),  # Substage 1
-        #                    plt.subplot2grid((16, 6), (10, 4), rowspan=2, colspan=1),  # Substage 2
-        #                    plt.subplot2grid((16, 6), (10, 5), rowspan=2, colspan=1),  # Substage 3
-        #                    plt.subplot2grid((16, 6), (12, 3), rowspan=2, colspan=1),  # Substage 4
-        #                    plt.subplot2grid((16, 6), (12, 4), rowspan=2, colspan=1),  # Substage 5
-        #                    plt.subplot2grid((16, 6), (12, 5), rowspan=2, colspan=1),  # Substage 6
-        #                    plt.subplot2grid((16, 6), (14, 3), rowspan=2, colspan=1),  # Substage 7
-        #                    plt.subplot2grid((16, 6), (14, 4), rowspan=2, colspan=1),  # Substage 8
-        #                    plt.subplot2grid((16, 6), (14, 5), rowspan=2, colspan=1)]  # Substage 9
-        #
-        #         substages_session = df.Substage.unique()
-        #         df_substages = {}  # Create empty dictionary
-        #
-        #         for i in range(len(ax_list)):
-        #             if i + 1 not in substages_session:  # +1 because ax_list is from 0 to 8 and substages can go from 1 to 9
-        #                 ax_list[i].set_visible(False)  # Make axes invisible
-        #                 continue
-        #             else:
-        #                 df_substages[i + 1] = df[df.Substage == i + 1]
-        #
-        #             # Compute psychometric curves
-        #             psych_curve = compute_psych_curve(
-        #                 df_substages[i + 1].Evidence[df_substages[i + 1].Miss == 0],
-        #                 df_substages[i + 1].Choice[df_substages[i + 1].Miss == 0])
-        #
-        #             ax = ax_list[i]
-        #
-        #             # Plot horizontal and vertical lines
-        #             ax.axhline(0.5, color='tab:gray', ls='--')
-        #             ax.axvline(0., color='tab:gray', ls='--')
-        #
-        #             # Plot left-right psychometric curve and errorbars
-        #             ax.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
-        #             ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
-        #                         fmt='o', markerfacecolor='none')
-        #
-        #             ax.set_title(f'Sub.{i + 1}, n={len(df_substages[i + 1])}')
-        #             ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
-        #             ax.set_xticks([], [])
-        #             ax.set_ylim([-0.1, 1.1])
-        #             ax.set_yticks([], [])
-        #             # plt.axis('equal')
-        #
-        #             # x0, x1 = plt.gca().get_xlim()
-        #             # y0, y1 = plt.gca().get_ylim()
-        #             # plt.gca().set_aspect((x1 - x0) / (y1 - y0))  # Height is float times the width
-        #
-        #         # plt.tight_layout()
-        #
-        #         # This won't work unless updating matplotlib
-        #         # plt.suptitle('Substage')
-        #         # fig.supxlabel('Prob. right')
-        #         # fig.supylabel('Evidence')
+        # PLOTS 8: PSYCOMETRIC CURVE
+
+        # To do:
+        # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
+
+        # Only draw PC if evidences are introduced (stage 4)
+        if len(df.ILD.unique()) > 2 and df.Stage.unique()[0] == 4:
+            # fig = plt.figure()
+
+            # Psychometric curve of the whole session (all trials)
+            ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
+
+            # Compute psychometric curves
+            psych_curve = compute_psych_curve(df.ILD, df.Choice)  # No need to filter out the misses
+            psych_curve_rep = compute_psych_curve(df.ILDRep, df.RepChoice)
+
+            # Plot horizontal and vertical lines
+            ax11.axhline(0.5, color='tab:gray', ls='--')
+            ax11.axvline(0., color='tab:gray', ls='--')
+
+            # Plot left-right psychometric curve and errorbars
+            ax11.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve.fit, color='tab:orange', label='L-R')
+            ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
+                          markerfacecolor='none')
+
+            # Plot alt-rep psychometric curve and errorbars
+            # ax11.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
+            # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
+            #               color='tab:brown', fmt='o', markerfacecolor='none')
+
+            ax11.set_xlabel('ILD')
+            # ax11.set_xlim([-1.05, 1.05])
+            # ax11.set_xlim([min(np.sort(df.ILD.unique())), max(np.sort(df.ILD.unique()))])  # Include min and max ILDs
+            ax11.set_xlim(np.sort(df.ILD.unique())[1] - 1, np.sort(df.ILD.unique())[-2] + 1)  # Exclude min and max ILDs
+            # ax11.set_xticks(np.sort(df.ILD.unique()))  # Include min and max ILDs
+            ax11.set_xticks(np.sort(df.ILD.unique())[1:-1])  # Exclude min and max ILDs
+            ax11.set_ylabel('Prob. right')
+            # ax11.set_ylim([-0.025, 1.025])
+            # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
+            # ax11.legend(loc="lower right", frameon=False)
+
+            # ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
+            # # ax11_right_yaxis.set_ylabel('Prob. right')
+            # ax11.set_yticklabels([])  # Remove left yticklabels
+            # ax11.set_yticks([])  # Remove left yticks
+
+            ax11.spines['top'].set_visible(False)
+            ax11.spines['right'].set_visible(False)
+            # ax11_right_yaxis.spines['top'].set_visible(False)
+            # ax11_right_yaxis.spines['left'].set_visible(False)
+
+            # Annotate min and max
+            ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
+                          xytext=(psych_curve.xdata[0], psych_curve.ydata[0]),  color='k', va='bottom', ha='left', fontsize='medium')
+            ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
+                          xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='k', va='top', ha='right', fontsize='medium')
+
+            # Annotate 2nd min and 2nd max
+            ax11.annotate(str(round(psych_curve.ydata[1], 2)), xy=(psych_curve.xdata[1], psych_curve.ydata[1]),
+                          # 2nd min
+                          xytext=(psych_curve.xdata[1], psych_curve.ydata[1]), color='k', va='bottom', ha='left',
+                          fontsize='medium')
+
+            ax11.annotate(str(round(psych_curve.ydata[-2], 2)), xy=(psych_curve.xdata[-2], psych_curve.ydata[-2]),
+                          # 2nd max
+                          xytext=(psych_curve.xdata[-2], psych_curve.ydata[-2]), color='k', va='top', ha='right',
+                          fontsize='medium')
+
+            sensitivity, bias, lr_left, lr_right = psych_curve.params  # Extract psychometric curve parameters
+
+            # # Annotate parameters
+            # ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
+            #               "B=" + str(round(bias, 2)) + "\n" +  # Bias
+            #               "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
+            #               "LR_R=" + str(round(lr_right, 2)),
+            #               xy=(np.min(df.ILD), ax11.get_ylim()[1]), xytext=(np.min(df.ILD), ax11.get_ylim()[1]),
+            #               color='k', va='top', ha='left', fontsize='medium')
+
+            # Annotate parameters for 2nd min and 2nd max
+            ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
+                          "B=" + str(round(bias, 2)) + "\n" +  # Bias
+                          "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
+                          "LR_R=" + str(round(lr_right, 2)),
+                          xy=(np.sort(df.ILD.unique())[1], 1), xytext=(np.sort(df.ILD.unique())[1], 1), color='k',
+                          va='top', ha='left', fontsize='medium')
+
+            # if df.Progression.unique()[0] == 1:
+            #
+            #     # Psychometric curves per substage
+            #     ax_list = [plt.subplot2grid((16, 6), (10, 3), rowspan=2, colspan=1),  # Substage 1
+            #                plt.subplot2grid((16, 6), (10, 4), rowspan=2, colspan=1),  # Substage 2
+            #                plt.subplot2grid((16, 6), (10, 5), rowspan=2, colspan=1),  # Substage 3
+            #                plt.subplot2grid((16, 6), (12, 3), rowspan=2, colspan=1),  # Substage 4
+            #                plt.subplot2grid((16, 6), (12, 4), rowspan=2, colspan=1),  # Substage 5
+            #                plt.subplot2grid((16, 6), (12, 5), rowspan=2, colspan=1),  # Substage 6
+            #                plt.subplot2grid((16, 6), (14, 3), rowspan=2, colspan=1),  # Substage 7
+            #                plt.subplot2grid((16, 6), (14, 4), rowspan=2, colspan=1),  # Substage 8
+            #                plt.subplot2grid((16, 6), (14, 5), rowspan=2, colspan=1)]  # Substage 9
+            #
+            #     substages_session = df.Substage.unique()
+            #     df_substages = {}  # Create empty dictionary
+            #
+            #     for i in range(len(ax_list)):
+            #         if i + 1 not in substages_session:  # +1 because ax_list is from 0 to 8 and substages can go from 1 to 9
+            #             ax_list[i].set_visible(False)  # Make axes invisible
+            #             continue
+            #         else:
+            #             df_substages[i + 1] = df[df.Substage == i + 1]
+            #
+            #         # Compute psychometric curves
+            #         psych_curve = compute_psych_curve(
+            #             df_substages[i + 1].Evidence[df_substages[i + 1].Miss == 0],
+            #             df_substages[i + 1].Choice[df_substages[i + 1].Miss == 0])
+            #
+            #         ax = ax_list[i]
+            #
+            #         # Plot horizontal and vertical lines
+            #         ax.axhline(0.5, color='tab:gray', ls='--')
+            #         ax.axvline(0., color='tab:gray', ls='--')
+            #
+            #         # Plot left-right psychometric curve and errorbars
+            #         ax.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
+            #         ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
+            #                     fmt='o', markerfacecolor='none')
+            #
+            #         ax.set_title(f'Sub.{i + 1}, n={len(df_substages[i + 1])}')
+            #         ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
+            #         ax.set_xticks([], [])
+            #         ax.set_ylim([-0.1, 1.1])
+            #         ax.set_yticks([], [])
+            #         # plt.axis('equal')
+            #
+            #         # x0, x1 = plt.gca().get_xlim()
+            #         # y0, y1 = plt.gca().get_ylim()
+            #         # plt.gca().set_aspect((x1 - x0) / (y1 - y0))  # Height is float times the width
+            #
+            #     # plt.tight_layout()
+            #
+            #     # This won't work unless updating matplotlib
+            #     # plt.suptitle('Substage')
+            #     # fig.supxlabel('Prob. right')
+            #     # fig.supylabel('Evidence')
+
+        ################################################################################################################
+
+        # PLOT 8: ILDS DISTRIBUTION
+
+        # Only draw ILDs distribution if evidences are introduced (stage 4)
+        if len(df.ILD.unique()) > 2 and df.Stage.unique()[0] == 4:
+            # fig = plt.figure()
+
+            # ILDs distribution of the whole session (all trials)
+            ax12 = plt.subplot2grid((16, 4), (10, 2), rowspan=6, colspan=2)
+
+            ax12.hist(df.ILD, bins=50, color='k')
+            ax12.set_xticks(np.sort(df.ILD.unique()))
+
+            ax12.set_yticklabels([])
+            ax12.spines['top'].set_visible(False)
+
+            # Instantiate a second axes that shares the same x-axis
+            ax12_twin = ax12.twinx()
+            ax12_twin.set_yticks(ax12.get_yticks())
+            ax12_twin.spines['top'].set_visible(False)
+            ax12_twin.spines['bottom'].set_visible(False)
+
+            ax12.text(0, ax12.get_ylim()[1], 'p=' + str(df.P.unique()[0]), color='k', va='top', ha='center', fontsize='medium')
 
         ################################################################################################################
 
@@ -994,6 +1049,8 @@ def do_daily_reports_v2(send_slack=False):
 
         # Remove animals not training
         animals.remove('XXX')
+        animals.remove('328')
+        animals.remove('331')
     except ValueError:
         pass
 

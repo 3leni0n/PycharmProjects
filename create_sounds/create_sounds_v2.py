@@ -29,7 +29,7 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
     time_start = time.time()
 
-    ILDs_dB = np.array([-70, -10, -4, -2, 0, 2, 4, 10, 70])
+    ILDs_dB = np.array([-70, -8, -4, -2, 0, 2, 4, 8, 70])
 
     dBs = []
     for i in ILDs_dB:
@@ -50,8 +50,8 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     ####################################################################################################################
 
     # Select the folder and create it if it doesn't exist
-    # folder = '/home/alexis/Música/sounds_2/'
-    folder = '/home/alexis/Escritorio/test/'
+    folder = '/home/alexis/Música/sounds_2/'
+    # folder = '/home/alexis/Música/test/'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -93,8 +93,9 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
             data.append([filename] + [ILDs_dB[k]] + list(EL) + list(ER) + [max_vol] + [fs] + [cutoff] + [amp] + [dur] +
                         [fn] + [normalize] + [n_frames] + [sigma] + [save])
 
-            if save == True:  # Save sounds only if specified (don't wanna for simulation purposes)
-                sound = np.column_stack((filename, SL, SR))
+            if save:  # Save sounds only if specified (don't wanna for simulation purposes)
+                # sound = np.column_stack((filename, SL, SR))
+                sound = np.column_stack((SL, SR))
                 wavio.write(path_wav, sound, fs, sampwidth=1)  # Write the array sound to a wav file
                 # sound_wav = AudioSegment.from_wav(path_wav)  # Read the wav file to a wav sound
                 # sound_wav.export(path_mp3, format='mp3')  # Export the wav sound to a mp3 file
@@ -105,10 +106,8 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
     df = pd.DataFrame(data=data, index=None, columns=columns)
 
-    if save == True:
-        # df_ild.to_csv('sounds.csv')  # Save df_ild as csv file
-        df.to_csv(folder + 'test.csv')
-        # df.to_csv(folder + 'test.csv', index=False)  # To avoid writing the 'Unnamed:' column for repeating the index
+    if save:
+        df.to_csv(folder + 'sounds_2.csv', index=False)  # index=False to avoid writing the 'Unnamed:' column
 
     time_end = time.time()
     runtime = time_end - time_start

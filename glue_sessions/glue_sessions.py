@@ -154,7 +154,7 @@ def update_glued_sessions(experiment=None):
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder = folder + experiment + '/setups/'  # Where the data for all animals is
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
     animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
 

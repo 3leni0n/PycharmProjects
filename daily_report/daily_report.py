@@ -233,7 +233,7 @@ def daily_report(path, send_slack=False):
         # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
@@ -311,7 +311,7 @@ def daily_report(path, send_slack=False):
         ra_alt = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)], 20)
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
             ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
@@ -381,7 +381,7 @@ def daily_report(path, send_slack=False):
         ra_right_miss = compute_window(df.Miss[df.Side == 1], 20)  # Right valid trials
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
             ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
@@ -447,7 +447,7 @@ def daily_report(path, send_slack=False):
         time_start_hit = time.time()
 
         # Prepares the grid for the plots
-        if df.Stage.unique()[0] == 4 and df.Substage.unique().min() > 0:
+        if df.Stage.unique()[0] == 4:
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)

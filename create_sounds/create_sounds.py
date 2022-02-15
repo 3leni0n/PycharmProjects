@@ -11,6 +11,7 @@ from matplotlib import pyplot as plt
 import string
 from my_fun.my_fun import *
 
+
 ########################################################################################################################
 
 
@@ -51,7 +52,7 @@ def create_sounds(save=False):
 
     # Select the folder and create it if it doesn't exist
     # folder = '/home/alexis/Música/sounds/'
-    folder = '/home/alexis/Escritorio/test/'
+    folder = '/home/alexis/Música/test/'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -89,8 +90,9 @@ def create_sounds(save=False):
 
             ELER.append([filename] + list(EL) + list(ER))
 
-            if save == True:  # Save sounds only if specified (don't wanna for simulation purposes)
-                sound = np.column_stack((filename, SL, SR))
+            if save:  # Save sounds only if specified (don't wanna for simulation purposes)
+                # sound = np.column_stack((filename, SL, SR))
+                sound = np.column_stack((SL, SR))
                 wavio.write(path_wav, sound, 44100, sampwidth=1)  # Write the array sound to a wav file
                 # sound_wav = AudioSegment.from_wav(path_wav)  # Read the wav file to a wav sound
                 # sound_wav.export(path_mp3, format='mp3')  # Export the wav sound to a mp3 file
@@ -98,9 +100,8 @@ def create_sounds(save=False):
 
     df = pd.DataFrame(data=ELER, index=None, columns=columns)
 
-    if save == True:
-        # df_ild.to_csv('sounds.csv')  # Save df_ild as csv file
-        df.to_csv(folder + 'test.csv')
+    if save:
+        df.to_csv(folder + 'test.csv', index=False)  # index=False to avoid writing the 'Unnamed:' column
 
     time_end = time.time()
     runtime = time_end - time_start
