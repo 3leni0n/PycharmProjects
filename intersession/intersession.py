@@ -521,6 +521,7 @@ def intersession(path, to_csv=False, send_slack=False):
         ax5.set_xlabel('Days')
         ax5.set_xlim([0, len(dates_indexes)])
         # ax5.set_xticklabels([])
+        # ax5.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax5.set_ylabel('Sound checks')
         ax5.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax5.spines['top'].set_visible(False)

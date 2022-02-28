@@ -591,7 +591,7 @@ def daily_report_v2(path, send_slack=False):
             ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
                           "B=" + str(round(bias, 2)) + "\n" +  # Bias
                           "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                          "LR_R=" + str(round(lr_right, 2)),
+                          "LR_R=" + str(round(lr_right, 2)),  # Right lapse rate
                           xy=(np.sort(df.ILD.unique())[1], 1), xytext=(np.sort(df.ILD.unique())[1], 1), color='k',
                           va='top', ha='left', fontsize='medium')
 
@@ -1032,78 +1032,6 @@ def daily_report_v2(path, send_slack=False):
 # Line of bash code to sync the cluster data with the local machine:
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
-
-
-def do_daily_reports_v2(send_slack=False):
-    time_start = time.time()
-    # print('Doing daily reports of: ' + animal)
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/'
-    # animal = input('Enter animal')
-    animals = os.listdir(folder)
-    animals.sort()
-
-    try:
-        animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
-        animals.remove('Test2')
-        animals.remove('.idea')  # Pycharm's archive
-
-        # Remove animals not training
-        animals.remove('XXX')
-        animals.remove('328')
-        animals.remove('331')
-    except ValueError:
-        pass
-
-    for i in range(len(animals)):
-
-        folder2 = folder + animals[i] + '/sessions/'  # Replace 0 with i in for loop with n = len(animals)
-        sessions = os.listdir(folder2)
-        sessions.sort()  # Sort them by date
-        index = -1  # last session
-
-        sessionID = sessions[index]  # Add scenario in which there are several sessions per day
-        date_sessionID = sessionID[
-                         -15:-7]  # Indexing from the end because length of date + time won't change, opposite to
-        # mice and protocol names
-        split_sessions = [s for s in sessions if date_sessionID in s]
-
-        # This block looks if there are more than one session with the same date and do the reports for each if so
-        if len(split_sessions) > 1:
-            for j in range(len(split_sessions)):
-                path = folder2 + split_sessions[j] + '/' + split_sessions[
-                    j] + '.csv'  # Get csv file path to input parse_v2.py
-                print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
-                      ' sessions found in the same date(s)'"", sep='')
-                # print(path)
-                daily_report_v2(path, send_slack=send_slack)
-        else:
-            path = folder2 + sessionID + '/' + sessionID + '.csv'  # Get csv file path to input parse_v2.py
-            print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
-                  ' sessions found in the same date(s)'"", sep='')
-            # print(path)
-            daily_report_v2(path, send_slack=send_slack)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
-
-
-def do_all_daily(experiment, animal):
-
-    time_start = time.time()
-
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/' + animal + '/sessions/'
-    sessions = os.listdir(folder)
-    sessions.sort()  # Sort them by date
-    sessions = [x for x in sessions if 'stage_training' in x]  # Get rid of non training sessions
-
-    for i in range(len(sessions)):
-        path = folder + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse_v2.py
-        daily_report_v2(path)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
 
 # if __name__ == "__main__":

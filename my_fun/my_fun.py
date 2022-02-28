@@ -668,9 +668,14 @@ def compute_window(data, runningwindow):
 
 def compute_psych_curve(x, y, n_points=100):
     """Computes a psychometric function."""
+    # https://psychology.stackexchange.com/questions/13347/how-can-i-fit-a-psychometric-function-such-that-the-minimum-is-50-chance-level
 
     def sigmoid_mme(fit_params: tuple):
         k, x0, b, p = fit_params
+
+        # k = weight (pendiente)
+        # x0 = bias
+        # b, p = lapses
 
         # Function to fit:
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
