@@ -171,3 +171,41 @@ def update_glued_sessions(experiment=None):
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
+
+
+def glue_all(experiment=None, to_csv=False):
+
+    time_start = time.time()
+
+    if experiment is None:
+
+        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
+        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's archive
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+
+    animals = os.listdir(folder_in)  # List animals
+    animals.sort()  # Sort them by name
+
+    df = pd.DataFrame()  # Create empty dataframe
+
+    for i in range(len(animals)):
+        df_animal = pd.read_csv(folder_in + animals[i])
+        df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
+
+    folder_out = folder_in
+
+    if to_csv:
+        df.to_csv(folder_out + 'all' + '.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+
+    return df

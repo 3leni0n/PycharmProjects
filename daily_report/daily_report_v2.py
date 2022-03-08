@@ -590,8 +590,8 @@ def daily_report_v2(path, send_slack=False):
             # Annotate parameters for 2nd min and 2nd max
             ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
                           "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                          "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                          "LR_R=" + str(round(lr_right, 2)),  # Right lapse rate
+                          "LR_R=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
+                          "LR_L=" + str(round(lr_right, 2)),  # Right lapse rate
                           xy=(np.sort(df.ILD.unique())[1], 1), xytext=(np.sort(df.ILD.unique())[1], 1), color='k',
                           va='top', ha='left', fontsize='medium')
 

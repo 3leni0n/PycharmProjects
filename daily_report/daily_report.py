@@ -562,8 +562,8 @@ def daily_report(path, send_slack=False):
 
             ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
                           "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                          "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                          "LR_R=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
+                          "LR_R=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
+                          "LR_L=" + str(round(lr_right, 2)), xy=(0, 0), xytext=(-1, 0.5),  # Right lapse rate
                           fontsize='xx-small')
 
             if df.Progression.unique()[0] == 1:

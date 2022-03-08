@@ -126,7 +126,7 @@ def kernel(library='sm'):
             #              va='top', ha='center', fontsize='medium')
             # plt.annotate(text, xy=(i, yticks[1]), xytext=(i, yticks[1]), color='k', va='center', ha='center', fontsize='medium')
 
-        plt.savefig(folder + str(df.Setup.unique()[0]) + '_PK_all_ILDs.png')
+        plt.savefig(folder + str(df.Setup.unique()[0]) + '_PK.png')
 
 
 
