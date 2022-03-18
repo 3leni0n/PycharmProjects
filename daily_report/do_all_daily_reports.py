@@ -4,6 +4,12 @@ from daily_report import *
 
 
 def do_all_daily(experiment, animal):
+    """
+    Do all the daily reports of an animal
+    :param experiment:
+    :param animal:
+    :return:
+    """
 
     time_start = time.time()
 

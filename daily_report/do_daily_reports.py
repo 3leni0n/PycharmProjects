@@ -31,6 +31,10 @@ def do_daily_reports_v2(send_slack=False):
         animals.remove('331')
     except ValueError:
         pass
+    try:
+        animals.remove('333')
+    except ValueError:
+        pass
 
     for i in range(len(animals)):
 

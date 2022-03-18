@@ -15,9 +15,14 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 (https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html).
 - x will be a matrix with my stimulus strengths (1 row per stimulus, one column for each frame, so 1*10)
 - y will be the subjects' choices
+
+To do:
+
+- Fit a line to the kernel
 """
 
 
+import time
 import os
 import pandas as pd
 import numpy as np
@@ -26,12 +31,38 @@ import statsmodels.api as sm
 from matplotlib import pyplot as plt
 
 
-def kernel(library='sm'):
+def kernel(experiment='2AFC_2', animal=None, library='sm', save=False):
 
-    folder = '/home/alexis/Documentos/kernels/'
-    if not os.path.exists(folder):
-        os.mkdir(folder)
-    os.chdir(folder)
+    time_start = time.time()
+
+    if experiment is None:
+
+        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
+        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's archive
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+
+    if animal is None:
+
+        animals = os.listdir(folder_in)  # List animals
+        animals.sort()  # Sort them by name
+        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
+
+        print('Animals: ' + str(animals))  # Remove square brackets
+        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
+
+    folder_in = folder_in + animal + '.csv'
+    df = pd.read_csv(folder_in)  # Read behavioral data
 
     # Load sounds
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
@@ -61,13 +92,13 @@ def kernel(library='sm'):
     frames_mean.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
     frames_mean_array = np.mean([frames_left_array, frames_right_array], axis=0)  # Get the column wise mean between right and left frames
 
-    # Behavioral data
-    subject_path = '/home/alexis/PycharmProjects/glue_sessions/2AFC_2/335.csv'
+    # Load behavioral data
+    subject_path = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '.csv'
     df = pd.read_csv(subject_path)
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
-    # target_ilds = [-2, 0, 2]
-    # df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
+    target_ilds = [-2, 0, 2]
+    df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
     filenames = df.Filename.tolist()
     stim_strength = frames_ild.loc[[np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(columns=['filename'])
     # stim_strength = sounds.loc[sounds['filename'].isin(filenames)].drop(columns=['filename'])  # Doesn't keep duplicates
@@ -126,23 +157,27 @@ def kernel(library='sm'):
             #              va='top', ha='center', fontsize='medium')
             # plt.annotate(text, xy=(i, yticks[1]), xytext=(i, yticks[1]), color='k', va='center', ha='center', fontsize='medium')
 
-        plt.savefig(folder + str(df.Setup.unique()[0]) + '_PK.png')
-
-
+        if save:
+            folder_out = '/home/alexis/Documentos/kernels/'
+            if not os.path.exists(folder_out):
+                os.mkdir(folder_out)
+            os.chdir(folder_out)
+            plt.savefig(folder_out + str(df.Setup.unique()[0]) + '_PK.png')
+            plt.close()
 
 ########################################################################################################################
 
-# Legacy
-stim_strength2 = stim_strength.iloc[:, 5:6]
-stim_strength2 = sm.add_constant(stim_strength2)  # Add constant (bias)
-model2 = sm.GLM(choices, stim_strength2, family=sm.families.Binomial())  # Binomial as there's 2 choices. No lapses because is between 0 and 1
-results2 = model2.fit()
-print(results2.summary())
-
-
-first_frames = []
-last_frames = []
-
-for i in range(len(sounds)):
-    first_frames.append(frames_ild.iloc[i, 1:6].mean())
-    last_frames.append(frames_ild.iloc[i, 6:11].mean())
+# # Legacy
+# stim_strength2 = stim_strength.iloc[:, 5:6]
+# stim_strength2 = sm.add_constant(stim_strength2)  # Add constant (bias)
+# model2 = sm.GLM(choices, stim_strength2, family=sm.families.Binomial())  # Binomial as there's 2 choices. No lapses because is between 0 and 1
+# results2 = model2.fit()
+# print(results2.summary())
+#
+#
+# first_frames = []
+# last_frames = []
+#
+# for i in range(len(sounds)):
+#     first_frames.append(frames_ild.iloc[i, 1:6].mean())
+#     last_frames.append(frames_ild.iloc[i, 6:11].mean())

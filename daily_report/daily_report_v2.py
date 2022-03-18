@@ -179,7 +179,7 @@ def daily_report_v2(path, send_slack=False):
               'Motor: ' + str(df.Motor.unique()[0]) + ', ' +
               'CB: ' + str(df.CB.unique()[0]) + ', ' +
               'Progression: ' + str(df.Progression.unique()[0]) + ', ' +
-              'P: ' + str(df.P.unique()[0]) +
+              'P: ' + str(round(df.P.iloc[1], 2)) +
               '\n')
 
         s3 = ('Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
@@ -205,7 +205,7 @@ def daily_report_v2(path, send_slack=False):
         s6 = ('Water: ' + str(water) + ' μL' + ', ' +
               'Water left: ' + str(water_left) + ' μL' + ', ' +
               'Water right: ' + str(water_right) + ' μL' + ', ' +
-              'AW: ' + str(df.AW.unique()[0]) + ' μL' +
+              'AW: ' + str(df.AW.unique()[0]) + ' trials' +
               '\n')
 
         # plt.text(0.1, 0.90, s1 + s2 + s3 + s4 + s5 + s6, fontsize=8, transform=plt.gcf().transFigure)
@@ -214,8 +214,8 @@ def daily_report_v2(path, send_slack=False):
 
         # fig = plt.figure()
 
-        # change_substage = df.Substage.diff()  # Find trials in which substage changes
-        # change_substage = change_substage[change_substage != 0].dropna()  # Omit 0s and drop first nan
+        change_p = df.P.diff()  # Find trials in which substage changes
+        change_p = change_p[change_p != 0].dropna()  # Omit 0s and drop first nan
 
         # PLOT 1: ACCURACY PER SIDE
 
@@ -256,22 +256,22 @@ def daily_report_v2(path, send_slack=False):
                  color='tab:orange',
                  label='Right')
 
-        # if df.Progression.unique()[0] == 1:
-        #     for i in range(len(change_substage.index)):
-        #         if change_substage[change_substage.index[i]] == 1:
-        #             # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-        #             #              arrowprops=dict(arrowstyle='->', color='green'))
-        #             ax1.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-        #             ax1.annotate(s=str(df.Substage[change_substage.index[i]]),
-        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-        #                          color='tab:green', ha='center')
-        #         elif change_substage[change_substage.index[i]] == -1:
-        #             # ax1.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-        #             #              arrowprops=dict(arrowstyle='<-', color='red'))
-        #             ax1.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-        #             ax1.annotate(s=str(df.Substage[change_substage.index[i]]),
-        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-        #                          color='tab:red', ha='center')
+        if df.Progression.unique()[0] == 1:
+            for i in range(len(change_p.index)):
+                if change_p[change_p.index[i]] > 0:
+                    # ax1.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='->', color='green'))
+                    ax1.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                                 xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
+                                 color='tab:green', ha='center')
+                elif change_p[change_p.index[i]] < 0:
+                    # ax1.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='<-', color='red'))
+                    ax1.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                                 xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
+                                 color='tab:red', ha='center')
 
         ax1.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax1.set_xticklabels([])
@@ -328,22 +328,22 @@ def daily_report_v2(path, send_slack=False):
         ax2.plot(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)].index, ra_alt, marker='o', ms=ms,
                  lw=lw, color='tab:purple', label='Alt')
 
-        # if df.Progression.unique()[0] == 1:
-        #     for i in range(len(change_substage.index)):
-        #         if change_substage[change_substage.index[i]] == 1:
-        #             # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-        #             #              arrowprops=dict(arrowstyle='->', color='green'))
-        #             ax2.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-        #             ax2.annotate(s=str(df.Substage[change_substage.index[i]]),
-        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-        #                          color='tab:green', ha='center')
-        #         elif change_substage[change_substage.index[i]] == -1:
-        #             # ax2.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-        #             #              arrowprops=dict(arrowstyle='<-', color='red'))
-        #             ax2.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-        #             ax2.annotate(s=str(df.Substage[change_substage.index[i]]),
-        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-        #                          color='tab:red', ha='center')
+        if df.Progression.unique()[0] == 1:
+            for i in range(len(change_p.index)):
+                if change_p[change_p.index[i]] > 0:
+                    # ax2.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='->', color='green'))
+                    ax2.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                                 xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
+                                 color='tab:green', ha='center')
+                elif change_p[change_p.index[i]] < 0:
+                    # ax2.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='<-', color='red'))
+                    ax2.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                                 xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
+                                 color='tab:red', ha='center')
 
         ax2.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax2.set_xticklabels([])
@@ -399,22 +399,22 @@ def daily_report_v2(path, send_slack=False):
         ax3.plot(df[df.Side == 1].index, ra_right_miss, marker='o', ms=ms, lw=lw, color='tab:orange',
                  label='Right')
 
-        # if df.Progression.unique()[0] == 1:
-        #     for i in range(len(change_substage.index)):
-        #         if change_substage[change_substage.index[i]] == 1:
-        #             # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-        #             #              arrowprops=dict(arrowstyle='->', color='green'))
-        #             ax3.plot(change_substage.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-        #             ax3.annotate(s=str(df.Substage[change_substage.index[i]]),
-        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-        #                          color='tab:green', ha='center')
-        #         elif change_substage[change_substage.index[i]] == -1:
-        #             # ax3.annotate(s='', xy=(change_substage.index[i], 1), xytext=(change_substage.index[i], 0),
-        #             #              arrowprops=dict(arrowstyle='<-', color='red'))
-        #             ax3.plot(change_substage.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-        #             ax3.annotate(s=str(df.Substage[change_substage.index[i]]),
-        #                          xy=(change_substage.index[i], 0.1), xytext=(change_substage.index[i], 0.2),
-        #                          color='tab:red', ha='center')
+        if df.Progression.unique()[0] == 1:
+            for i in range(len(change_p.index)):
+                if change_p[change_p.index[i]] > 0:
+                    # ax3.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='->', color='green'))
+                    ax3.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
+                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                                 xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
+                                 color='tab:green', ha='center')
+                elif change_p[change_p.index[i]] < 0:
+                    # ax3.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
+                    #              arrowprops=dict(arrowstyle='<-', color='red'))
+                    ax3.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
+                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                                 xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
+                                 color='tab:red', ha='center')
 
         ax3.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax3.set_xticklabels([])
@@ -423,7 +423,7 @@ def daily_report_v2(path, send_slack=False):
         ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax3.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax3.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax3.spines['top'].set_visible(False)
         ax3.spines['bottom'].set_visible(False)
         # ax3.spines['right'].set_visible(False)
@@ -675,7 +675,8 @@ def daily_report_v2(path, send_slack=False):
             ax12_twin.spines['top'].set_visible(False)
             ax12_twin.spines['bottom'].set_visible(False)
 
-            ax12.text(0, ax12.get_ylim()[1], 'p=' + str(df.P.unique()[0]), color='k', va='top', ha='center', fontsize='medium')
+            ax12.text(0, ax12.get_ylim()[1], '$\it{p_{mean}}$=' + str(round(df.P.mean(), 2)), color='k', va='top',
+                      ha='center', fontsize='medium')
 
         ################################################################################################################
 

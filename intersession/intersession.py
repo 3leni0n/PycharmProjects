@@ -1,9 +1,10 @@
 import time
-import os
 import pandas as pd
-from matplotlib.backends.backend_pdf import PdfPages
+import datetime
+import os
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 
 from my_fun.my_fun import compute_psych_curve, slack_spam
 from parse.parse import parse
@@ -40,11 +41,15 @@ def intersession(path, to_csv=False, send_slack=False):
     # path = '/home/alexis/PycharmProjects/glue_sessions/' + str(animal) + '.csv'  # Where the data for all animals is
     df = pd.read_csv(path)
     experiment = df.Experiment.unique()[0]
+    setup = str(df.Setup.unique()[0])  # Animal ID
+    print(f'Doing the intersession of animal {setup} from experiment {experiment}...')
     # df.reset_index(drop=True, inplace=True)  # Don't create index column and modify it on the go
     # df_grouped = df.groupby('Date')  # Group by date instead of session
     dates_indexes = df.groupby('Date').ngroup().unique()  # Array with number of dates: x axis
     n_dates = dates_indexes.max()
     dates = df.Date.unique()
+    dow = [datetime.datetime.strptime(dates[i], "%Y-%m-%d").date().weekday() for i in range(len(dates))]  # Date of the
+    # week, Monday is 0 and Sunday is 6
 
     # doi = 'yyyy-mm-dd'  # Select a date of interest to plot a vertical line
     doi_1 = '2021-05-26'  # Filename2 start being recorded
@@ -55,37 +60,54 @@ def intersession(path, to_csv=False, send_slack=False):
     # df.Date[df.Sound.first_valid_index()] should return '2021-10-27'
     doi_4 = '2022-02-21'  # First training day after the retreat (February 17-19)
     doi_5 = '2022-02-25'  # Pep visited the animals in sala C to examine 326 and 329
+    doi_6 = '2022-03-03'  # First day without bringing down Tiffany's animals
+    doi_7 = '2022-03-09'  # Mice moved from sala C to sala B
 
     try:
         doi_1_index = np.where(dates == doi_1)[0][0]
     except IndexError:
         print(f'No data from this animal on {doi_1}')
+        doi_1_index = np.nan
 
     try:
         doi_2_index = np.where(dates == doi_2)[0][0]
     except IndexError:
         print(f'No data from this animal on {doi_2}')
+        doi_2_index = np.nan
 
     try:
         doi_3_index = np.where(dates == doi_3)[0][0]
     except IndexError:
         print(f'No data from this animal on {doi_3}')
+        doi_3_index = np.nan
 
     try:
         doi_4_index = np.where(dates == doi_4)[0][0]
     except IndexError:
         print(f'No data from this animal on {doi_4}')
+        doi_4_index = np.nan
 
     try:
         doi_5_index = np.where(dates == doi_5)[0][0]
     except IndexError:
         print(f'No data from this animal on {doi_5}')
+        doi_5_index = np.nan
+
+    try:
+        doi_6_index = np.where(dates == doi_6)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_6}')
+        doi_6_index = np.nan
+
+    try:
+        doi_7_index = np.where(dates == doi_7)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_7}')
+        doi_7_index = np.nan
 
     ####################################################################################################################
 
     # Select the folder where to save the PDF or create it if it doesn't exists
-    setup = str(df.Setup.unique()[0])  # Animal ID
-    experiment = df.Experiment.unique()[0]
     folder = '/home/alexis/Documentos/intersession reports/' + experiment  # + setup
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -198,10 +220,13 @@ def intersession(path, to_csv=False, send_slack=False):
     no_sound = df['Sound'].eq(0).astype(int).groupby(df['Date']).sum()
     message_count = df.groupby('Date').MessageFound.sum()
 
+    # Probabilities of difficult trials (non-maximum evidence)
+    p = df.groupby('Date').P.mean()
+    p = p.fillna(0)
+
+    # Construct DataFrame
     columns = []
-
     data = list(zip())
-
     df_intersession = pd.DataFrame(data=data, columns=columns)
 
     ####################################################################################################################
@@ -233,6 +258,8 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax.axvline(date_of_interest_index, color='tab:red', linestyle='--')
         ax.axvline(doi_4_index, color='tab:red', linestyle='--')
         ax.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax.axvline(doi_7_index, color='tab:red', linestyle='--')
 
         # Plot number of trials per session
         ax.plot(dates_indexes, trials, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -280,6 +307,8 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax1.axvline(date_of_interest_index, color='tab:red', linestyle='--')
         ax1.axvline(doi_4_index, color='tab:red', linestyle='--')
         ax1.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax1.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax1.axvline(doi_7_index, color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
         ax1.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -327,6 +356,8 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax2.axvline(date_of_interest_index, color='tab:red', linestyle='--')
         ax2.axvline(doi_4_index, color='tab:red', linestyle='--')
         ax2.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax2.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax2.axvline(doi_7_index, color='tab:red', linestyle='--')
 
         # Plot rep/alt accuracy per session
         ax2.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
@@ -373,6 +404,8 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax3.axvline(date_of_interest_index, color='tab:red', linestyle='--')
         ax3.axvline(doi_4_index, color='tab:red', linestyle='--')
         ax3.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax3.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax3.axvline(doi_7_index, color='tab:red', linestyle='--')
 
         # Plot misses per session
         ax3.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -421,6 +454,8 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='--')
         ax4.axvline(doi_4_index, color='tab:red', linestyle='--')
         ax4.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax4.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax4.axvline(doi_7_index, color='tab:red', linestyle='--')
 
         # Plot stage/substage/motor per session
         ax4.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
@@ -511,52 +546,19 @@ def intersession(path, to_csv=False, send_slack=False):
 
         ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
 
-        try:
-            # Plot vertical line for date of interest
-            ax5.axvline(doi_1_index, color='tab:pink', linestyle='--')
-        except UnboundLocalError:
-            print(f'No data from this animal on {doi_1}')
-        except NameError:
-            print(f'No data from this animal on {doi_1}')
-
-        try:
-            # Plot vertical line for date of interest
-            ax5.axvline(doi_2_index, color='tab:purple', linestyle='--')
-        except UnboundLocalError:
-            print(f'No data from this animal on {doi_2}')
-        except NameError:
-            print(f'No data from this animal on {doi_2}')
-
-        try:
-            # Plot vertical line for date of interest
-            ax5.axvline(doi_3_index, color='tab:red', linestyle='--')
-        except UnboundLocalError:
-            print(f'No data from this animal on {doi_3}')
-        except NameError:
-            print(f'No data from this animal on {doi_3}')
-
-        try:
-            # Plot vertical line for date of interest
-            ax5.axvline(doi_4_index, color='tab:red', linestyle='--')
-        except UnboundLocalError:
-            print(f'No data from this animal on {doi_4}')
-        except NameError:
-            print(f'No data from this animal on {doi_4}')
-
-        try:
-            # Plot vertical line for date of interest
-            ax5.axvline(doi_5_index, color='tab:red', linestyle='--')
-        except UnboundLocalError:
-            print(f'No data from this animal on {doi_5}')
-        except NameError:
-            print(f'No data from this animal on {doi_5}')
+        # Plot vertical line for date of interest
+        # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+        ax5.axvline(doi_4_index, color='tab:red', linestyle='--')
+        ax5.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax5.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax5.axvline(doi_7_index, color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
         ax5.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
         ax5.plot(dates_indexes, message_count, marker='o', ms=ms, lw=lw, color='tab:purple', label='Message count')
         ax5.plot(dates_indexes, no_sound, marker='o', ms=ms, lw=lw, color='tab:red', label='No sound')
 
-        ax5.set_xlabel('Days')
+        # ax5.set_xlabel('Days')
         ax5.set_xlim([0, len(dates_indexes)])
         # ax5.set_xticklabels([])
         # ax5.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
@@ -578,6 +580,40 @@ def intersession(path, to_csv=False, send_slack=False):
 
         ################################################################################################################
 
+        # PLOT 6: Probabilities of difficult trials (non-maximum evidence)
+
+        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
+
+        time_start_sound_checks = time.time()
+
+        ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
+
+        # Plot vertical line for date of interest
+        # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+        ax6.axvline(doi_4_index, color='tab:red', linestyle='--')
+        ax6.axvline(doi_5_index, color='tab:red', linestyle='--')
+        ax6.axvline(doi_6_index, color='tab:red', linestyle='--')
+        ax6.axvline(doi_7_index, color='tab:red', linestyle='--')
+
+        # # Plot sound issues per session
+        ax6.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k', label='P')
+
+        ax6.set_xlabel('Days')
+        ax6.set_xlim([0, len(dates_indexes)])
+        # ax6.set_xticklabels([])
+        # ax6.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
+        ax6.set_ylabel('P')
+        ax6.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax6.spines['top'].set_visible(False)
+        # ax6.spines['bottom'].set_visible(False)
+        # ax6.spines['right'].set_visible(False)
+
+        time_end_sound_checks = time.time()
+        runtime_sound_checks = time_end_sound_checks - time_start_sound_checks
+        print("'Plot 5: sound checks' took", round(runtime_sound_checks, 2), 'seconds to run')
+
+        ################################################################################################################
+
         time_start_savepag1 = time.time()
         pdf.savefig()  # saves the current figure into a pdf page
         time_end_savepag1 = time.time()
@@ -590,14 +626,14 @@ def intersession(path, to_csv=False, send_slack=False):
         ################################################################################################################
 
         # Construct DataFrame
-        columns = ['Dates', 'Trials', 'TrialsLeft', 'TrialsRight', 'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt',
+        columns = ['Dates', 'DoW', 'Trials', 'TrialsLeft', 'TrialsRight', 'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt',
                    'Errors', 'ErrorsLeft', 'ErrorsRight', 'Performance', 'PerformanceLeft', 'PerformanceRight',
                    'Responses', 'ResponsesLeft', 'ResponsesRight', 'Repetitions', 'Alternations', 'Accuracy',
                    'AccuracyLeft', 'AccuracyRight', 'AccuracyRep', 'AccuracyAlt', 'Misses', 'MissesLeft', 'MissesRight',
                    'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards', 'RewardsLeft', 'RewardsRight', 'Water',
                    'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch', 'NoSound', 'MessageCount']
 
-        data = list(zip(dates, trials, trials_left, trials_right, hits, hits_left, hits_right, hits_rep, hits_alt, errors,
+        data = list(zip(dates, dow, trials, trials_left, trials_right, hits, hits_left, hits_right, hits_rep, hits_alt, errors,
                         errors_left, errors_right, performance, performance_left, performance_right, responses,
                         responses_left, responses_right, repetitions, alternations, accuracy, accuracy_left,
                         accuracy_right, accuracy_rep, accuracy_alt, misses, misses_left, misses_right, miss_rate,
@@ -605,6 +641,8 @@ def intersession(path, to_csv=False, send_slack=False):
                         water_right, stage, sounds_mismatch, no_sound, message_count))
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
+
+    print(os.getcwd())
 
     if to_csv:
         df_intersession.to_csv(folder + '/' + setup + '_intersession.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
@@ -629,7 +667,7 @@ def intersession(path, to_csv=False, send_slack=False):
 
 ########################################################################################################################
 
-def do_intersessions(experiment=None, to_csv=False, send_slack=False):
+def do_intersessions(experiment=None, to_csv=True, send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     time_start = time.time()

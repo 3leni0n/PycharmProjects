@@ -65,6 +65,11 @@ def parse_v2(path):
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+
+    # # under testing: objective is to plot the cb trials in daily report
+    # reward_side_cb = df[df.MSG == 'REWARD_SIDE']['+INFO']
+    # print(reward_side_cb)
+
     valve_1 = [float(df[df.MSG == 'VALVE_1']['+INFO'].iloc[0])] * n_trials
     valve_2 = [float(df[df.MSG == 'VALVE_2']['+INFO'].iloc[0])] * n_trials
 
