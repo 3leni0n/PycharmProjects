@@ -5,6 +5,16 @@ from mini_parse import mini_parse
 from real_time_plot import real_time_plot
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from multiprocessing import Process, Queue
+
+
+def collectData(communicator, data_path, minutes_ago, max_sessions, paths, files):
+
+    while True:
+        files = get_paths(data_path, minutes_ago, max_sessions, paths, files)
+        communicator.put(files)
+        time.sleep(5)
+
 
 
 class File:
@@ -14,20 +24,7 @@ class File:
         self.df = None
         self.reward_side = None
         self.box = None
-        self.axis1 = None
-        self.axis2 = None
-        self.axis3 = None
-        self.axis4 = None
 
-
-class Parameters:
-    def __init__(self, axis, minutes_ago, max_sessions, data_path):
-        self.files = []
-        self.paths = {}
-        self.axis = axis
-        self.minutes_ago = minutes_ago
-        self.max_sessions = max_sessions
-        self.data_path = data_path
 
 
 def path_generator(path, minutes_ago, max_sessions):
@@ -43,12 +40,13 @@ def path_generator(path, minutes_ago, max_sessions):
     return [x[0] for x in paths]
 
 
-def get_paths(parameters):
-    paths = path_generator(parameters.data_path, parameters.minutes_ago, parameters.max_sessions)
-    if set(paths) != parameters.paths:
+
+def get_paths(data_path, minutes_ago, max_sessions, paths, files):
+    new_paths = path_generator(data_path, minutes_ago, max_sessions)
+    if set(new_paths) != paths:
         files = []
         boxes = []
-        for path in paths:
+        for path in new_paths:
             file = File(path)
             mini_parse(file)  # parse the data and creates file.reward_side and file.box
             if file.box not in boxes:
@@ -57,48 +55,41 @@ def get_paths(parameters):
 
         try:
             files = sorted(files, key=lambda x: x.box)
-
-            for index, file in enumerate(files):
-
-                print(file.box)
-                if file.box == "Bpod5":
-                    j = 0
-                elif file.box == "Bpod6":
-                    j = 1
-                elif file.box == "Bpod7":
-                    j = 2
-                elif file.box == "Bpod8":
-                    j = 3
-                else:
-                    j = -1
-
-                if j >= 0:
-                    file.axis1 = parameters.axis[j * 4]
-                    file.axis2 = parameters.axis[j * 4 + 1]
-                    file.axis3 = parameters.axis[j * 4 + 2]
-                    file.axis4 = parameters.axis[j * 4 + 3]
-
-            parameters.files = files
-            parameters.paths = {file.path for file in files}
         except:
             pass
+    else:
+        for file in files:
+            mini_parse(file)
+    return files
 
 
-def animate(i, parameters, trials):
+
+
+def animate(i, trials, axis, communicator):
 
     start = time.time()
     print('')
     print('iteration', i)
 
-    if i % 1 == 0:  # How many iterations to wait to look for new files
-        get_paths(parameters)
-        print('checking for files')
-    for file in parameters.files:
+    files = communicator.get()
+
+    print("a")
+    print(files)
+    print("a")
+    for file in files:
         filename = os.path.basename(file.path)
         print('parsing file:', filename)
-        mini_parse(file)
+        print(file.box)
         try:
-            real_time_plot(file.df, file.box, filename, file.axis1, file.axis2, file.axis3, file.axis4, trials)
+            if file.box == "Bpod5":
+                real_time_plot(file.df, file.box, filename, axis[0], axis[1], axis[2], axis[3], trials)
+                print(axis[0])
+            elif file.box == "Bpod6":
+                real_time_plot(file.df, file.box, filename, axis[4], axis[5], axis[6], axis[7], trials)
+            elif file.box == "Bpod7":
+                real_time_plot(file.df, file.box, filename, axis[8], axis[9], axis[10], axis[11], trials)
+            elif file.box == "Bpod8":
+                real_time_plot(file.df, file.box, filename, axis[12], axis[13], axis[14], axis[15], trials)
             print('OK file:', filename)
         except:
             pass
@@ -111,7 +102,7 @@ def main():
     # data_path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups'
     minutes_ago = 1  # How much time back look for sessions
     max_sessions = 4  # Max number of boxes at the same time
-    interval = 5000  # in ms, the larger the name the less demanding
+    interval = 1000  # in ms, the larger the name the less demanding
     trials = 100  # How many trials to show
 
     try:
@@ -125,17 +116,22 @@ def main():
 
     fig = plt.figure()
     axis = []
+    paths = []
+    files = []
 
     for i in range(sessions_number * 4):
         axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
 
-    parameters = Parameters(axis, minutes_ago, sessions_number, data_path)
+    communicator = Queue()
+    duta = Process(target=collectData, args=(communicator, data_path, minutes_ago, max_sessions, paths, files,))
+    duta.start()
 
-    ani = FuncAnimation(fig, animate, fargs=(parameters, trials, ), interval=interval)
+    ani = FuncAnimation(fig, animate, fargs=(trials, axis, communicator), interval=interval)
 
-    plt.subplots_adjust(bottom=0.05, top=0.95, hspace=.9)
-    # plt.tight_layout()  # Doesn't work, make plots very thin and long
+    plt.subplots_adjust(hspace=.9)
     plt.show()
+
+    duta.join()
 
 
 if __name__ == '__main__':

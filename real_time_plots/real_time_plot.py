@@ -34,20 +34,17 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     ax3.clear()
     ax4.clear()
 
-    # accuracy = round(df.Hit.mean(), 2)
-    # accuracy_left = round(df.loc[df.Choice == 0].Hit.mean(), 2)
-    # accuracy_right = round(df.loc[df.Choice == 1].Hit.mean(), 2)
-    # reward = df.loc[df.Hit == 1].shape[0]
-    # water = 2.5 * reward
+    accuracy = round(df.Hit.mean(), 2)
+    accuracy_left = round(df.loc[df.Side == 0].Hit.mean(), 2)
+    accuracy_right = round(df.loc[df.Side == 1].Hit.mean(), 2)
+    reward = df.loc[df.Hit == 1].shape[0]
+    water = 2.5 * reward
+    p = round(df.P.iloc[-1], 2)
 
     if df is None:
         return
 
-<<<<<<< HEAD
-    df = df.tail(trials + running_window)  # + For computing rolling average 
-=======
     df = df.tail(trials + running_window)  # + For computing rolling average
->>>>>>> efe2d551c06ea84eaf3090c23ba8ab300b4f4d57
 
     extra_trials = max(len(df) - trials, 0)
     x_min = df.index[0] + extra_trials
@@ -82,8 +79,7 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
 
     text = box + ': ' + path
     ax1.text(0, 1.1, text, transform=ax1.transAxes)
-    # text2 = 'Acc: ' + str(accuracy)
-    # ax1.text(0, 0, text2, transform=ax2.transAxes)
+
     ####################################################################################################################
 
     # PLOT 2: SOUND ERRORS
@@ -95,6 +91,15 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     ax2.set_xlim([x_min, x_max])
     ax2.set_ylabel('Sound errors')
     scatter.set_ylim([-0.1, 0.1])
+
+    ax2.text(1, 1,
+             "Acc=" + str(accuracy) + "\n" +  # Accuracy
+             "Acc. left=" + str(accuracy_left) + "\n" +  # Accuracy left
+             "Acc. right=" + str(accuracy_right) + "\n" +  # Accuracy right
+             "Water=" + str(water) + "\n" +  # Water
+             "P=" + str(p),  # Probabilities difficult trials
+             transform=ax2.transAxes, color='k', va='top', ha='left', fontsize='small')
+
     ####################################################################################################################
 
     # PLOT 3: MISSES
@@ -136,8 +141,10 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         ax4.set_yticklabels(['L', 'R'])
 
     else:  # Plot coherences
-        scatter = sns.scatterplot(x=df.Trial, y=df.Evidence, hue=hue, palette=palette,
+        scatter = sns.scatterplot(x=df.Trial, y=df.ILD, hue=hue, palette=palette,
                                   hue_order=hue_order, s=ms ** 2, ax=ax4)
+        ax4.set_yticks(df.ILD.unique())
+        # ax4.set_yscale('log')
 
     scatter.get_legend().remove()
     ax4.set_xlim([x_min, x_max])

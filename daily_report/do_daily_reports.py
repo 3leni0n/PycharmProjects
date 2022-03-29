@@ -24,7 +24,23 @@ def do_daily_reports_v2(send_slack=False):
 
     # Remove animals not training
     try:
+        animals.remove('325')
+    except ValueError:
+        pass
+    try:
+        animals.remove('326')
+    except ValueError:
+        pass
+    try:
+        animals.remove('327')
+    except ValueError:
+        pass
+    try:
         animals.remove('328')
+    except ValueError:
+        pass
+    try:
+        animals.remove('330')
     except ValueError:
         pass
     try:
@@ -33,6 +49,10 @@ def do_daily_reports_v2(send_slack=False):
         pass
     try:
         animals.remove('333')
+    except ValueError:
+        pass
+    try:
+        animals.remove('334')
     except ValueError:
         pass
 

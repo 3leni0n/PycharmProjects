@@ -97,11 +97,11 @@ def animate(i, parameters, trials):
         filename = os.path.basename(file.path)
         print('parsing file:', filename)
         mini_parse(file)
-        try:
-            real_time_plot(file.df, file.box, filename, file.axis1, file.axis2, file.axis3, file.axis4, trials)
-            print('OK file:', filename)
-        except:
-            pass
+        # try:
+        real_time_plot(file.df, file.box, filename, file.axis1, file.axis2, file.axis3, file.axis4, trials)
+        print('OK file:', filename)
+        # except:
+        #     pass
     print('time:', time.time() - start)
 
 
@@ -112,7 +112,7 @@ def main():
     minutes_ago = 1  # How much time back look for sessions
     max_sessions = 4  # Max number of boxes at the same time
     interval = 5000  # in ms, the larger the name the less demanding
-    trials = 100  # How many trials to show
+    trials = 5  # How many trials to show
 
     try:
         sessions_number = int(sys.argv[1])
@@ -126,8 +126,25 @@ def main():
     fig = plt.figure()
     axis = []
 
-    for i in range(sessions_number * 4):
-        axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
+    # for i in range(sessions_number * 4):
+    #     axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
+
+    axis.append(plt.subplot2grid((12, 2), (0, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (1, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (2, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (0, 1), rowspan=3, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (3, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (4, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (5, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (3, 1), rowspan=3, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (6, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (7, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (8, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (6, 1), rowspan=3, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (9, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (10, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (11, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (9, 1), rowspan=3, colspan=1))
 
     parameters = Parameters(axis, minutes_ago, sessions_number, data_path)
 

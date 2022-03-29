@@ -164,31 +164,6 @@ def plot_pc(experiment=None, animal=None, kind='both', save=False):
 
 ########################################################################################################################
 
-lapses_rep_after_hit = []
-lapses_alt_after_hit = []
-lapses_rep_after_error = []
-lapses_alt_after_error = []
-
-params_after_hit, params_after_error = plot_pc('2AFC_2', '335', 'prob_rep_after')
-
-lapses_rep_after_hit.append(params_after_hit[2])
-lapses_alt_after_hit.append(params_after_hit[3])
-lapses_rep_after_error.append(params_after_error[2])
-lapses_alt_after_error.append(params_after_error[3])
-
-# Paired-samples t-test
-t_test = stats.ttest_rel(lapses_rep, lapses_alt)  # Two-sided
-# t_test = stats.ttest_rel(lapses_rep, lapses_alt, alternative='greater')  # One-sided (you have a priori hypothesis of
-# why one mean would be larger than the other one)
-
-t_test = stats.ttest_rel(lapses_rep_after_hit, lapses_alt_after_hit)  # Two-sided
-print(np.round(np.mean(lapses_rep_after_hit), 2), ' ± ', np.round(stats.sem(lapses_rep_after_hit), 2), ', ', 'p = ', np.round(t_test.pvalue, 2), sep='')
-
-t_test = stats.ttest_rel(lapses_rep_after_error, lapses_alt_after_error)  # Two-sided
-
-########################################################################################################################
-
-
 def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335']):
 
     time_start = time.time()
@@ -217,12 +192,23 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     ydata = []
     trials = 0
 
+    n_points = 100
+    # ilds = np.sort(df.ILD.unique())
+    color = 'tab:orange'
+    label = 'Prob. right'
+    # color = 'tab:brown'
+    # label = 'Prob. rep'
+
     for i in range(len(animals)):
         print(folder_in + animals[i] + '.csv')
         df = pd.read_csv(folder_in + animals[i] + '.csv')
         df = df[df.P > 0]
+        ilds = np.sort(df.ILD.unique())
         psych_curve = compute_psych_curve(df.ILD, df.Choice, 100)
         # psych_curve = compute_psych_curve(df.ILDRep, df.RepChoice, 100)
+        plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color='tab:grey', alpha=0.25)
+        plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:grey', fmt='o',
+                     markerfacecolor='none', alpha=0.25)
         fit.append(psych_curve.fit)
         fit_error.append(psych_curve.fit_error)
         params.append(psych_curve.params)
@@ -243,22 +229,24 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     # label = 'Prob. rep'
 
     plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, label=label)
-    plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', markerfacecolor='none')
+    plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o',
+                 markerfacecolor='none')
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
     plt.title(f'Psychometric curve, {len(animals)} animals, {trials} trials')
     # plt.title(f'Psychometric curve, {len(df.Setup.unique())} animals, {len(df)} trials')
-    plt.axhline(0.5, color='tab:gray', ls='--')
-    plt.axvline(0., color='tab:gray', ls='--')
     plt.xlim([ilds[0] - 7, ilds[-1] + 7])
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
     plt.ylim([-0.025, 1.025])
     plt.legend(loc='lower center')
-    plt.xlabel('Repeating ILD')
-    plt.ylabel('Prob. rep')
-    filename = ' PC_prob_rep_all_animals.png'
+    plt.xlabel('ILD')
+    # plt.xlabel('Repeating ILD')
+    plt.ylabel('Prob. right')
+    # plt.ylabel('Prob. rep')
+    filename = ' PC_prob_right_all_animals.png'
+    # filename = ' PC_prob_rep_all_animals.png'
     folder_out = '/home/alexis/Documentos/psychometric curves/'
 
     sensitivity, bias, lr_left, lr_right = psych_curve.params
@@ -270,3 +258,30 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
                  va=va, ha=ha, fontsize=fontsize)
 
     plt.savefig(folder_out + filename)
+
+    return np.array(params)
+
+########################################################################################################################
+
+# lapses_rep_after_hit = []
+# lapses_alt_after_hit = []
+# lapses_rep_after_error = []
+# lapses_alt_after_error = []
+#
+# params_after_hit, params_after_error = plot_pc('2AFC_2', '335', 'prob_rep_after')
+#
+# lapses_rep_after_hit.append(params_after_hit[2])
+# lapses_alt_after_hit.append(params_after_hit[3])
+# lapses_rep_after_error.append(params_after_error[2])
+# lapses_alt_after_error.append(params_after_error[3])
+#
+# # Paired-samples t-test
+# t_test = stats.ttest_rel(lapses_rep, lapses_alt)  # Two-sided
+# # t_test = stats.ttest_rel(lapses_rep, lapses_alt, alternative='greater')  # One-sided (you have a priori hypothesis of
+# # why one mean would be larger than the other one)
+#
+#
+# t_test = stats.ttest_rel(lapses_rep_after_hit, lapses_alt_after_hit)  # Two-sided
+# print(np.round(np.mean(lapses_rep_after_hit), 2), ' ± ', np.round(stats.sem(lapses_rep_after_hit), 2), ', ', 'p = ', np.round(t_test.pvalue, 2), sep='')
+#
+# t_test = stats.ttest_rel(lapses_rep_after_error, lapses_alt_after_error)  # Two-sided

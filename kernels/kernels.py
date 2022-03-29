@@ -29,9 +29,10 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 import statsmodels.api as sm
 from matplotlib import pyplot as plt
+from scipy import stats
 
 
-def kernel(experiment='2AFC_2', animal=None, library='sm', save=False):
+def plot_kernel(experiment='2AFC_2', animal=None, library='sm', save=False):
 
     time_start = time.time()
 
@@ -105,7 +106,6 @@ def kernel(experiment='2AFC_2', animal=None, library='sm', save=False):
     stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
     choices = df.Choice.reset_index(drop=True)  # Indices must match for modeling
 
-
     # Plots
     plt.figure()
 
@@ -135,7 +135,7 @@ def kernel(experiment='2AFC_2', animal=None, library='sm', save=False):
         # plt.plot(np.arange(len(params)), params, marker='o', mfc='None', label='')  # Without constant
         # plt.errorbar(np.arange(len(params)), params, yerr=beta_std_err, color='tab:blue', fmt='o',
         #              markerfacecolor='none')  # Without constant
-        plt.plot(np.arange(len(params)-1), params.iloc[1:11], color='k', marker='o', mfc='None', label='')  # With constant
+        plt.plot(np.arange(len(params)-1), params.iloc[1:11], color='k', marker='o', mfc='None')  # With constant
         plt.errorbar(np.arange(len(params)-1), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color='k', fmt='o',
                      markerfacecolor='none')  # With constant
         plt.axhline(0, color='tab:gray', ls='--')
@@ -164,6 +164,52 @@ def kernel(experiment='2AFC_2', animal=None, library='sm', save=False):
             os.chdir(folder_out)
             plt.savefig(folder_out + str(df.Setup.unique()[0]) + '_PK.png')
             plt.close()
+
+    return params
+
+
+def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335']):
+
+    time_start = time.time()
+
+    if experiment is None:
+
+        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
+        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's archive
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+
+    params = []
+
+    for i in range(len(animals)):
+        print(folder_in + animals[i] + '.csv')
+        params.append(plot_kernel(experiment=experiment, animal=animals[i], library='sm', save=True))
+
+    params = np.array(params)
+    params_mean = np.mean(params[:, 1:11], 0)
+    params_sem = stats.sem(params[:, 1:11], 0)
+
+    plt.plot(np.arange(params.shape[1] - 1), params_mean, color='k')
+    plt.errorbar(np.arange(params.shape[1] - 1), params_mean, yerr=params_sem, color='k', fmt='o',
+                 markerfacecolor='none')
+
+    filename = 'test.png'
+    folder_out = '/home/alexis/Documentos/kernels/'
+
+    plt.savefig(folder_out + filename)
+
+    return params
+
 
 ########################################################################################################################
 

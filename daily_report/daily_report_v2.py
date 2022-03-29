@@ -663,7 +663,7 @@ def daily_report_v2(path, send_slack=False):
             # ILDs distribution of the whole session (all trials)
             ax12 = plt.subplot2grid((16, 4), (10, 2), rowspan=6, colspan=2)
 
-            ax12.hist(df.ILD, bins=50, color='k')
+            ax12.hist(df.ILD, bins=100, color='k')
             ax12.set_xticks(np.sort(df.ILD.unique()))
 
             ax12.set_yticklabels([])
