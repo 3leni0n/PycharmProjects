@@ -75,3 +75,25 @@ def sounds_dict(start, stop, num, n_decimals):
     chars = list(ascii_lowercase[:num])  # Make a list of all the lowercase letters as long as num
     pulses = np.around(np.linspace(start, stop, num), n_decimals)  # Make evenly spaced TTL pulses rounded to round2
     return dict(zip(chars, pulses))
+
+
+def select_ilds(ilds, p, side):
+    # r = random.random()  # Generate random float between 0 and 1. PyBpod missing random library
+    r = np.random.random(1)[0]  # Generate random float between 0 and 1
+    if r > p:
+        if side == 0:  # Left
+            return ilds.min()  # Sound left only
+        else:  # Right
+            return ilds.max()  # Sound right only
+    else:
+        if side == 0:  # Left
+            options = ilds[ilds <= 0]  # Left ILDs
+            options = np.repeat(options, 2)  # Repeat each element of the vector
+            options = options[:-1]  # Exclude one of the 0s from the vector, so it has 1/2 p than the rest
+        else:  # Right
+            options = ilds[ilds >= 0]  # Right ILDs
+            options = np.repeat(options, 2)  # Repeat each element of the vector
+            options = options[1:]  # Exclude one of the 0s from the vector, so it has 1/2 p than the rest
+    # selected_ild = random.choice(options)
+    selected_ild = np.random.choice(options)
+    return selected_ild
