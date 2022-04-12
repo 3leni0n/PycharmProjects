@@ -7,14 +7,9 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 from my_fun.my_fun import compute_psych_curve, slack_spam
-from parse.parse import parse
-from glue_sessions.glue_sessions import glue_sessions
 
 
 ########################################################################################################################
-
-# Outcome:
-# - Single PDF per animal, that updates after each session
 
 # Objectives:
 # - Track errors (general first, then per side)
@@ -62,6 +57,8 @@ def intersession(path, to_csv=False, send_slack=False):
     doi_5 = '2022-02-25'  # Pep visited the animals in sala C to examine 326 and 329
     doi_6 = '2022-03-03'  # First day without bringing down Tiffany's animals
     doi_7 = '2022-03-09'  # Mice moved from sala C to sala B
+    doi_8 = '2022-03-21'  # Ad lib CA 2% water
+    doi_9 = '2022-04-07'  # First day without bringing down Balma's animals
 
     try:
         doi_1_index = np.where(dates == doi_1)[0][0]
@@ -105,9 +102,21 @@ def intersession(path, to_csv=False, send_slack=False):
         print(f'No data from this animal on {doi_7}')
         doi_7_index = np.nan
 
+    try:
+        doi_8_index = np.where(dates == doi_8)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_8}')
+        doi_8_index = np.nan
+
+    try:
+        doi_9_index = np.where(dates == doi_9)[0][0]
+    except IndexError:
+        print(f'No data from this animal on {doi_9}')
+        doi_9_index = np.nan
+
     ####################################################################################################################
 
-    # Select the folder where to save the PDF or create it if it doesn't exists
+    # Select the folder where to save the PDF or create it if it doesn't exist
     folder = '/home/alexis/Documentos/intersession reports/' + experiment  # + setup
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -122,6 +131,9 @@ def intersession(path, to_csv=False, send_slack=False):
     ####################################################################################################################
 
     # SUMMARY VARIABLES
+
+    subject = df.groupby('Date').Subject.unique().astype('int')
+    board = df.groupby('Date').Board.unique()
 
     # Trials
     trials = df.groupby('Date').Trial.size()
@@ -250,29 +262,30 @@ def intersession(path, to_csv=False, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 0: TRIALS PER SESSION
+        # PLOT 0: RESPONSES
+
+        time_start = time.time()
 
         ax = plt.subplot2grid((8, 1), (0, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
         # ax.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax.axvline(doi_7_index, color='tab:red', linestyle='--')
+        # ax.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot number of trials per session
-        ax.plot(dates_indexes, trials, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax.plot(dates_indexes, trials_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax.plot(dates_indexes, trials_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        ax.plot(dates_indexes, responses, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax.plot(dates_indexes, responses_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax.plot(dates_indexes, responses_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
         ax.set_xlim([0, len(dates_indexes)])
         ax.set_xticklabels([])
-        ax.set_ylabel('Trials')
-        ax.set_ylim([0, trials.max() + 100])
-        ax.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
-        # ax.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # ax.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax.set_ylabel('Responses')
+        ax.set_ylim([0, responses.max() + 100])
+        ax.set_yticks(list(np.arange(0, responses.max() + 100, 100)[0::2]))
         ax.legend(loc='lower right', fontsize='xx-small', frameon=True)
         ax.spines['top'].set_visible(False)
         ax.spines['bottom'].set_visible(False)
@@ -287,14 +300,18 @@ def intersession(path, to_csv=False, send_slack=False):
         ax_twin.spines['bottom'].set_visible(False)
 
         # Plot text
-        # ax1.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
+        # ax.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
         ax.text(0, ax.get_ylim()[1], s1)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 0: responses' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 1: ACCURACY PER SIDE
+        # PLOT 1: WATER
 
-        time_start_acc_side = time.time()
+        time_start = time.time()
 
         ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
 
@@ -305,23 +322,22 @@ def intersession(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax1.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax1.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax1.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax1.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax1.axvline(doi_7_index, color='tab:red', linestyle='--')
+        # ax1.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax1.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax1.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax1.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax1.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
-        ax1.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax1.plot(dates_indexes, accuracy_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax1.plot(dates_indexes, accuracy_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        ax1.plot(dates_indexes, water, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax1.plot(dates_indexes, water_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax1.plot(dates_indexes, water_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
         ax1.set_xlim([0, len(dates_indexes)])
         ax1.set_xticklabels([])
-        ax1.set_ylabel('Acc.\n(%)')
-        ax1.set_ylim([0, 1.1])
-        ax1.set_yticks(list(np.arange(0, 1.1, 0.1)))
-        ax1.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # ax1.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax1.set_ylabel('Water')
+        ax1.set_ylim([0, water.max() + 100])
+        ax1.set_yticks(list(np.arange(0, water.max() + 100, 100)[0::5]))
         ax1.legend(loc='lower right', fontsize='xx-small', frameon=True)
         ax1.spines['top'].set_visible(False)
         ax1.spines['bottom'].set_visible(False)
@@ -329,21 +345,21 @@ def intersession(path, to_csv=False, send_slack=False):
 
         # Instantiate a second axes that shares the same x-axis
         ax1_twin = ax1.twinx()
-        ax1_twin.set_ylim([0, 1.1])
-        ax1_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
-        ax1_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax1_twin.set_ylim([0, water.max() + 100])
+        ax1_twin.set_yticks(list(np.arange(0, water.max() + 100, 100)[0::5]))
+        ax1_twin.set_yticklabels([])
         ax1_twin.spines['top'].set_visible(False)
         ax1_twin.spines['bottom'].set_visible(False)
 
-        time_end_acc_side = time.time()
-        runtime_acc_side = time_end_acc_side - time_start_acc_side
-        print("'Plot 1: accuracy per side' took", round(runtime_acc_side, 2), 'seconds to run')
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 1: water' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 2: REPEATING VS ALTERNATING ACCURACY
+        # PLOT 2: ACCURACY PER SIDE
 
-        time_start_acc_repalt = time.time()
+        time_start = time.time()
 
         ax2 = plt.subplot2grid((8, 1), (2, 0), rowspan=1, colspan=1)
 
@@ -354,14 +370,16 @@ def intersession(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax2.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax2.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax2.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax2.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax2.axvline(doi_7_index, color='tab:red', linestyle='--')
+        # ax2.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax2.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax2.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax2.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax2.axvline(doi_8_index, color='tab:red', linestyle='--')
 
-        # Plot rep/alt accuracy per session
-        ax2.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
-        ax2.plot(dates_indexes, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
+        # Plot sides accuracy per session
+        ax2.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax2.plot(dates_indexes, accuracy_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax2.plot(dates_indexes, accuracy_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
         ax2.set_xlim([0, len(dates_indexes)])
         ax2.set_xticklabels([])
@@ -383,15 +401,15 @@ def intersession(path, to_csv=False, send_slack=False):
         ax2_twin.spines['top'].set_visible(False)
         ax2_twin.spines['bottom'].set_visible(False)
 
-        time_end_acc_repalt = time.time()
-        runtime_acc_repalt = time_end_acc_repalt - time_start_acc_repalt
-        print("'Plot 2: accuracy repeating vs alternating' took", round(runtime_acc_repalt, 2), 'seconds to run')
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 2: accuracy per sides' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 3: MISSES
+        # PLOT 3: REPEATING VS ALTERNATING ACCURACY
 
-        time_start_miss = time.time()
+        time_start = time.time()
 
         ax3 = plt.subplot2grid((8, 1), (3, 0), rowspan=1, colspan=1)
 
@@ -402,20 +420,20 @@ def intersession(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax3.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax3.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax3.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax3.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax3.axvline(doi_7_index, color='tab:red', linestyle='--')
+        # ax3.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax3.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax3.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax3.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax3.axvline(doi_8_index, color='tab:red', linestyle='--')
 
-        # Plot misses per session
-        ax3.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax3.plot(dates_indexes, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax3.plot(dates_indexes, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        # Plot rep/alt accuracy per session
+        ax3.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
+        ax3.plot(dates_indexes, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
 
         ax3.set_xlim([0, len(dates_indexes)])
         ax3.set_xticklabels([])
+        ax3.set_ylabel('Acc.\n(%)')
         ax3.set_ylim([0, 1.1])
-        ax3.set_ylabel('Miss\n(%)')
         ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
@@ -432,44 +450,42 @@ def intersession(path, to_csv=False, send_slack=False):
         ax3_twin.spines['top'].set_visible(False)
         ax3_twin.spines['bottom'].set_visible(False)
 
-        time_end_miss = time.time()
-        runtime_miss = time_end_miss - time_start_miss
-        print("'Plot 3: misses' took", round(runtime_miss, 2), 'seconds to run')
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 3: accuracy repeating vs alternating' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 4: STAGES/SUBSTAGES
+        # PLOT 4: MISSES
 
-        time_start_substages = time.time()
+        time_start = time.time()
 
         ax4 = plt.subplot2grid((8, 1), (4, 0), rowspan=1, colspan=1)
-        # ax4 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
-        # ax4.axhline(3, color='tab:gray', linestyle=':')  # Chance level
-        # ax4.axhline(6, color='tab:gray', linestyle=':')  # Accuracy 0.25
-        # ax4.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
+        ax4.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+        ax4.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        ax4.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
         # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax4.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax4.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax4.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax4.axvline(doi_7_index, color='tab:red', linestyle='--')
+        # ax4.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax4.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax4.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax4.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax4.axvline(doi_8_index, color='tab:red', linestyle='--')
 
-        # Plot stage/substage/motor per session
-        ax4.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
-        # ax4.plot(dates_indexes, substage, marker='o', ms=ms, lw=lw, color='black', label='Substage')
-        ax4_twin = ax4.twinx()  # Instantiate a second axes that shares the same x-axis
-        ax4_twin.plot(dates_indexes, motor, marker='o', ms=ms, lw=lw, color='tab:gray', label='Motor')
+        # Plot misses per session
+        ax4.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax4.plot(dates_indexes, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax4.plot(dates_indexes, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
-        # ax4.set_xlabel('Days')
         ax4.set_xlim([0, len(dates_indexes)])
         ax4.set_xticklabels([])
-        ax4.set_ylim()
-        ax4.set_ylabel('Stage')
-        ax4.set_yticks(stage.unique())
-        # ax4.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        ax4.set_ylim([0, 1.1])
+        ax4.set_ylabel('Miss\n(%)')
+        ax4.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax4.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax4.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax4.legend(loc='lower right', fontsize='xx-small', frameon=True)
         ax4.spines['top'].set_visible(False)
@@ -477,24 +493,77 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax4.spines['right'].set_visible(False)
 
         # Instantiate a second axes that shares the same x-axis
-        # ax4_twin = ax4.twinx()
-        # ax4_twin.set_ylim([0, 4])
-        ax4_twin.set_yticks(motor.unique())
-        # ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax4_twin.set_ylabel('Motor')
+        ax4_twin = ax4.twinx()
+        ax4_twin.set_ylim([0, 1.1])
+        ax4_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax4_twin.spines['top'].set_visible(False)
         ax4_twin.spines['bottom'].set_visible(False)
 
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 4: misses' took", round(runtime, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 5: STAGES/SUBSTAGES/MOTOR
+
+        time_start = time.time()
+
+        ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
+        # ax5 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
+
+        # Plot horizontal lines
+        # ax5.axhline(3, color='tab:gray', linestyle=':')  # Chance level
+        # ax5.axhline(6, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        # ax5.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+        # Plot vertical line for date of interest
+        # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+        # ax5.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax5.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax5.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax5.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax5.axvline(doi_8_index, color='tab:red', linestyle='--')
+
+        # Plot stage/substage/motor per session
+        ax5.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
+        # ax5.plot(dates_indexes, substage, marker='o', ms=ms, lw=lw, color='black', label='Substage')
+        ax5_twin = ax5.twinx()  # Instantiate a second axes that shares the same x-axis
+        ax5_twin.plot(dates_indexes, motor, marker='o', ms=ms, lw=lw, color='tab:gray', label='Motor')
+
+        # ax5.set_xlabel('Days')
+        ax5.set_xlim([0, len(dates_indexes)])
+        ax5.set_xticklabels([])
+        ax5.set_ylim()
+        ax5.set_ylabel('Stage')
+        ax5.set_yticks(stage.unique())
+        # ax5.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        # ax5.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax5.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax5.spines['top'].set_visible(False)
+        ax5.spines['bottom'].set_visible(False)
+        # ax5.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        # ax5_twin = ax5.twinx()
+        # ax5_twin.set_ylim([0, 4])
+        ax5_twin.set_yticks(motor.unique())
+        # ax5_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax5_twin.set_ylabel('Motor')
+        ax5_twin.spines['top'].set_visible(False)
+        ax5_twin.spines['bottom'].set_visible(False)
+
         # Make shared legend for both axis
-        lines_1, labels_1 = ax4.get_legend_handles_labels()
-        lines_2, labels_2 = ax4_twin.get_legend_handles_labels()
+        lines_1, labels_1 = ax5.get_legend_handles_labels()
+        lines_2, labels_2 = ax5_twin.get_legend_handles_labels()
         lines = lines_1 + lines_2
         labels = labels_1 + labels_2
-        ax4.legend(lines, labels, loc='lower right', fontsize='xx-small', frameon=True)
+        ax5.legend(lines, labels, loc='lower right', fontsize='xx-small', frameon=True)
 
-        time_end_substages = time.time()
-        runtime_substages = time_end_miss - time_start_substages
-        print("'Plot 3: misses' took", round(runtime_substages, 2), 'seconds to run')
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 5: stages/motor' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
         # Under development
@@ -538,79 +607,88 @@ def intersession(path, to_csv=False, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 5: SOUND CHECKS
+        # PLOT 6: SOUND CHECKS
 
         # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
 
-        time_start_sound_checks = time.time()
-
-        ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
-
-        # Plot vertical line for date of interest
-        # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax5.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax5.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax5.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax5.axvline(doi_7_index, color='tab:red', linestyle='--')
-
-        # # Plot sound issues per session
-        ax5.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
-        ax5.plot(dates_indexes, message_count, marker='o', ms=ms, lw=lw, color='tab:purple', label='Message count')
-        ax5.plot(dates_indexes, no_sound, marker='o', ms=ms, lw=lw, color='tab:red', label='No sound')
-
-        # ax5.set_xlabel('Days')
-        ax5.set_xlim([0, len(dates_indexes)])
-        # ax5.set_xticklabels([])
-        # ax5.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
-        ax5.set_ylabel('Sound checks')
-        ax5.legend(loc='upper right', fontsize='xx-small', frameon=True)
-        ax5.spines['top'].set_visible(False)
-        # ax5.spines['bottom'].set_visible(False)
-        # ax5.spines['right'].set_visible(False)
-
-        # Instantiate a second axes that shares the same x-axis
-        ax5_twin = ax5.twinx()
-        ax5_twin.set_ylim([ax5.get_ylim()[0], ax5.get_ylim()[1]])  # Get ylims from ax5 and set them for ax5_twin
-        ax5_twin.spines['top'].set_visible(False)
-        # ax5_twin.spines['bottom'].set_visible(False)
-
-        time_end_sound_checks = time.time()
-        runtime_sound_checks = time_end_sound_checks - time_start_sound_checks
-        print("'Plot 5: sound checks' took", round(runtime_sound_checks, 2), 'seconds to run')
-
-        ################################################################################################################
-
-        # PLOT 6: Probabilities of difficult trials (non-maximum evidence)
-
-        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
-
-        time_start_sound_checks = time.time()
+        time_start = time.time()
 
         ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
-        # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        ax6.axvline(doi_4_index, color='tab:red', linestyle='--')
-        ax6.axvline(doi_5_index, color='tab:red', linestyle='--')
-        ax6.axvline(doi_6_index, color='tab:red', linestyle='--')
-        ax6.axvline(doi_7_index, color='tab:red', linestyle='--')
+        # ax6.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+        # ax6.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax6.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax6.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax6.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax6.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
-        ax6.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k', label='P')
+        ax6.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
+        ax6.plot(dates_indexes, message_count, marker='o', ms=ms, lw=lw, color='tab:purple', label='Message count')
+        ax6.plot(dates_indexes, no_sound, marker='o', ms=ms, lw=lw, color='tab:red', label='No sound')
 
-        ax6.set_xlabel('Days')
+        # ax6.set_xlabel('Days')
         ax6.set_xlim([0, len(dates_indexes)])
-        # ax6.set_xticklabels([])
+        ax6.set_xticklabels([])
         # ax6.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
-        ax6.set_ylabel('P')
+        ax6.set_ylabel('Sound checks')
         ax6.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax6.spines['top'].set_visible(False)
-        # ax6.spines['bottom'].set_visible(False)
+        ax6.spines['bottom'].set_visible(False)
         # ax6.spines['right'].set_visible(False)
 
-        time_end_sound_checks = time.time()
-        runtime_sound_checks = time_end_sound_checks - time_start_sound_checks
-        print("'Plot 5: sound checks' took", round(runtime_sound_checks, 2), 'seconds to run')
+        # Instantiate a second axes that shares the same x-axis
+        ax6_twin = ax6.twinx()
+        ax6_twin.set_ylim([ax6.get_ylim()[0], ax6.get_ylim()[1]])  # Get ylims from ax6 and set them for ax6_twin
+        ax6_twin.set_yticklabels([])
+        ax6_twin.spines['top'].set_visible(False)
+        ax6_twin.spines['bottom'].set_visible(False)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 6: sound checks' took", round(runtime, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 7: PROBABILITIES DIFFICULT TRIALS
+
+        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
+
+        time_start = time.time()
+
+        ax7 = plt.subplot2grid((8, 1), (7, 0), rowspan=1, colspan=1)
+
+        # Plot vertical line for date of interest
+        # ax7.axvline(date_of_interest_index, color='tab:red', linestyle='--')
+        # ax7.axvline(doi_4_index, color='tab:red', linestyle='--')
+        # ax7.axvline(doi_5_index, color='tab:red', linestyle='--')
+        # ax7.axvline(doi_6_index, color='tab:red', linestyle='--')
+        # ax7.axvline(doi_7_index, color='tab:red', linestyle='--')
+        ax7.axvline(doi_8_index, color='tab:red', linestyle='--')
+
+        # # Plot sound issues per session
+        ax7.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k', label='P')
+
+        ax7.set_xlabel('Days')
+        ax7.set_xlim([0, len(dates_indexes)])
+        # ax7.set_xticklabels([])
+        # ax7.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
+        ax7.set_ylabel('P')
+        ax7.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax7.spines['top'].set_visible(False)
+        # ax7.spines['bottom'].set_visible(False)
+        # ax7.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax7_twin = ax7.twinx()
+        ax7_twin.set_yticklabels([])
+        ax7_twin.spines['top'].set_visible(False)
+        ax7_twin.spines['bottom'].set_visible(False)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 7: sound checks' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -626,14 +704,14 @@ def intersession(path, to_csv=False, send_slack=False):
         ################################################################################################################
 
         # Construct DataFrame
-        columns = ['Dates', 'DoW', 'Trials', 'TrialsLeft', 'TrialsRight', 'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt',
+        columns = ['Dates', 'DoW', 'Subject', 'Board', 'Trials', 'TrialsLeft', 'TrialsRight', 'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt',
                    'Errors', 'ErrorsLeft', 'ErrorsRight', 'Performance', 'PerformanceLeft', 'PerformanceRight',
                    'Responses', 'ResponsesLeft', 'ResponsesRight', 'Repetitions', 'Alternations', 'Accuracy',
                    'AccuracyLeft', 'AccuracyRight', 'AccuracyRep', 'AccuracyAlt', 'Misses', 'MissesLeft', 'MissesRight',
                    'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards', 'RewardsLeft', 'RewardsRight', 'Water',
                    'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch', 'NoSound', 'MessageCount']
 
-        data = list(zip(dates, dow, trials, trials_left, trials_right, hits, hits_left, hits_right, hits_rep, hits_alt, errors,
+        data = list(zip(dates, dow, subject, board, trials, trials_left, trials_right, hits, hits_left, hits_right, hits_rep, hits_alt, errors,
                         errors_left, errors_right, performance, performance_left, performance_right, responses,
                         responses_left, responses_right, repetitions, alternations, accuracy, accuracy_left,
                         accuracy_right, accuracy_rep, accuracy_alt, misses, misses_left, misses_right, miss_rate,
@@ -642,10 +720,11 @@ def intersession(path, to_csv=False, send_slack=False):
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
-    print(os.getcwd())
+    # if to_csv:
+    #     df_intersession.to_csv(folder + '/' + setup + '_intersession.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
 
     if to_csv:
-        df_intersession.to_csv(folder + '/' + setup + '_intersession.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+        df_intersession.to_csv('/home/alexis/PycharmProjects/intersession/' + setup + '_intersession.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
 
     # Register time again and compute the total run time of the script
     time_end_total = time.time()

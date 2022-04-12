@@ -1,7 +1,5 @@
 # To do:
-# Add envelopes per trial
-# Add Bpod variables per trial
-# Not to do last trial if session crashed
+
 # Include the new VARs in upper text
 
 ########################################################################################################################
@@ -13,8 +11,8 @@ import numpy as np
 
 ########################################################################################################################
 
-# Define function
 def parse_v2(path):
+
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
     df = pd.read_csv(path, skiprows=6, sep=';')
     sounds_2 = pd.read_csv('/home/alexis/PycharmProjects/create_sounds/sounds_2.csv')
@@ -25,9 +23,7 @@ def parse_v2(path):
     # one index = df_ild[df_ild['TYPE'] == 'END-TRIAL'].index
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
-    # METADATA (multiply by n_trials)
-
-    # INFO
+    # INFO (METADATA)
     serial_port = [df[df.MSG == 'SERIAL-PORT']['+INFO'].iloc[0]] * n_trials
     protocol = [df[df.MSG == 'PROTOCOL-NAME']['+INFO'].iloc[0]] * n_trials  # Task
     creator = df[df.MSG == 'CREATOR-NAME']['+INFO'].iloc[0]
@@ -62,6 +58,14 @@ def parse_v2(path):
     rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
     progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
     cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
+    resp_win = [int(df[df.MSG == 'VAR_RESP_WIN']['+INFO'].iloc[0])] * n_trials
+    iti = [int(df[df.MSG == 'VAR_ITI']['+INFO'].iloc[0])] * n_trials
+    warm_up = [int(df[df.MSG == 'VAR_WARM_UP']['+INFO'].iloc[0])] * n_trials
+    recovery_mode = [int(df[df.MSG == 'VAR_RECOVERY_MODE']['+INFO'].iloc[0])] * n_trials
+    try:
+        p_right = [float(df[df.MSG == 'VAR_P_RIGHT']['+INFO'].iloc[0])] * n_trials  # Added 06-04-2022
+    except IndexError:
+        p_right = np.nan
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
@@ -213,7 +217,7 @@ def parse_v2(path):
         # Registered values (within loop)
         filename.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME')]['+INFO'].iloc[0])  # Bpod sounds
 
-        # Sound checks (not registered from the beginning except Filename2)
+        # SOUND CHECKS (not registered from the beginning except Filename)
         # Filename2 (registered by Arduino)
         try:
             filename2.append(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'FILENAME2')]['+INFO'].iloc[0])  # Arduino
@@ -267,7 +271,11 @@ def parse_v2(path):
         # Stage, motor, substage for tracking changes within session when running a single script
         # Register running window
         # substage.append(int(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'SUBSTAGE')]['+INFO'].iloc[0]))
-        p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
+
+        try:
+            p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
+        except IndexError:
+            p.append(np.nan)
 
         if i == 0:
             after_hit.append(np.nan)
@@ -330,7 +338,7 @@ def parse_v2(path):
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In',
                'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor',
-               'REC', 'Progression', 'CB', 'P', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board',
+               'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board',
                'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
@@ -338,13 +346,13 @@ def parse_v2(path):
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, message,
                     message_found,
                     sound_left, sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out,
-                    aw, switch, timeout, fixation, stage, motor, rec, progression, cb, p, serial_port, protocol,
+                    aw, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up, recovery_mode, p, serial_port, protocol,
                     creator, project, experiment, board, setup, net_port, subject, bpod_api_version, session, date,
                     time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
 
-    # df.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_ild as csv file
+    # df_session.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_session as csv file
 
     return df_session
 
