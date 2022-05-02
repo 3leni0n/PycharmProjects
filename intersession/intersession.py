@@ -117,7 +117,7 @@ def intersession(path, to_csv=False, send_slack=False):
     ####################################################################################################################
 
     # Select the folder where to save the PDF or create it if it doesn't exist
-    folder = '/home/alexis/Documentos/intersession reports/' + experiment  # + setup
+    folder = '/home/alexis/Documentos/intersession reports/' + experiment
     if not os.path.exists(folder):
         os.mkdir(folder)
     os.chdir(folder)
@@ -139,6 +139,7 @@ def intersession(path, to_csv=False, send_slack=False):
     trials = df.groupby('Date').Trial.size()
     trials_left = df[df.Side == 0].groupby('Date').Trial.size()
     trials_right = df[df.Side == 1].groupby('Date').Trial.size()
+    trials_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Trial.size()
 
     # Hits
     hits = df.groupby('Date').Hit.sum().astype('int')
@@ -146,6 +147,7 @@ def intersession(path, to_csv=False, send_slack=False):
     hits_right = df[df.Side == 1].groupby('Date').Hit.sum().astype('int')
     hits_rep = df[df.RepTrial == 1].groupby('Date').Hit.sum().astype('int')  # Include in daily_report
     hits_alt = df[df.RepTrial == 0].groupby('Date').Hit.sum().astype('int')  # Include in daily_report
+    hits_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Hit.sum().astype('int')
 
     # Errors
     errors = df.groupby('Date').WrongLick.sum().astype(int) + df.groupby('Date').Punish.sum().astype(int)
@@ -163,6 +165,7 @@ def intersession(path, to_csv=False, send_slack=False):
     responses = df.groupby('Date').Response.sum()
     responses_left = df[df.Side == 0].groupby('Date').Response.sum()
     responses_right = df[df.Side == 1].groupby('Date').Response.sum()
+    responses_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Response.sum()
 
     # Repetitions/Alternations --> CHECK!!! WHY THEY'RE DIFFERENT CODED??!!
     repetitions = df[df.RepTrial == 1].groupby('Date').RepTrial.sum().astype(int)  # Include in daily_report
@@ -172,8 +175,11 @@ def intersession(path, to_csv=False, send_slack=False):
     accuracy = hits / responses
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
+    accuracy_max_evi = hits_max_evi / responses_max_evi
+    lateral_bias = accuracy_right - accuracy_left
     accuracy_rep = hits_rep / repetitions  # Include in daily_report
     accuracy_alt = hits_alt / alternations  # Include in daily_report
+    rep_bias = accuracy_rep - accuracy_alt
 
     # Misses (invalid trials)
     misses = df.groupby('Date').Miss.sum()
@@ -274,9 +280,9 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax.axvline(doi_8_index, color='tab:red', linestyle='--')
 
-        # Plot number of trials per session
+        # Plot number of responses per session
         ax.plot(dates_indexes, responses, marker='o', ms=ms, lw=lw, color='black', label='Total')
         ax.plot(dates_indexes, responses_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
         ax.plot(dates_indexes, responses_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
@@ -326,7 +332,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax1.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax1.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax1.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax1.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax1.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
         ax1.plot(dates_indexes, water, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -374,7 +380,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax2.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax2.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax2.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax2.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax2.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
         ax2.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -424,7 +430,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax3.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax3.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax3.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax3.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax3.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot rep/alt accuracy per session
         ax3.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
@@ -473,7 +479,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax4.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax4.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax4.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax4.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax4.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot misses per session
         ax4.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -511,7 +517,6 @@ def intersession(path, to_csv=False, send_slack=False):
         time_start = time.time()
 
         ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
-        # ax5 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         # ax5.axhline(3, color='tab:gray', linestyle=':')  # Chance level
@@ -524,7 +529,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax5.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax5.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax5.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax5.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax5.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # Plot stage/substage/motor per session
         ax5.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
@@ -609,8 +614,6 @@ def intersession(path, to_csv=False, send_slack=False):
 
         # PLOT 6: SOUND CHECKS
 
-        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
-
         time_start = time.time()
 
         ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
@@ -621,7 +624,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax6.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax6.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax6.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax6.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax6.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
         ax6.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
@@ -653,8 +656,6 @@ def intersession(path, to_csv=False, send_slack=False):
 
         # PLOT 7: PROBABILITIES DIFFICULT TRIALS
 
-        # fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
-
         time_start = time.time()
 
         ax7 = plt.subplot2grid((8, 1), (7, 0), rowspan=1, colspan=1)
@@ -665,7 +666,7 @@ def intersession(path, to_csv=False, send_slack=False):
         # ax7.axvline(doi_5_index, color='tab:red', linestyle='--')
         # ax7.axvline(doi_6_index, color='tab:red', linestyle='--')
         # ax7.axvline(doi_7_index, color='tab:red', linestyle='--')
-        ax7.axvline(doi_8_index, color='tab:red', linestyle='--')
+        # ax7.axvline(doi_8_index, color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
         ax7.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k', label='P')
@@ -707,14 +708,14 @@ def intersession(path, to_csv=False, send_slack=False):
         columns = ['Dates', 'DoW', 'Subject', 'Board', 'Trials', 'TrialsLeft', 'TrialsRight', 'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt',
                    'Errors', 'ErrorsLeft', 'ErrorsRight', 'Performance', 'PerformanceLeft', 'PerformanceRight',
                    'Responses', 'ResponsesLeft', 'ResponsesRight', 'Repetitions', 'Alternations', 'Accuracy',
-                   'AccuracyLeft', 'AccuracyRight', 'AccuracyRep', 'AccuracyAlt', 'Misses', 'MissesLeft', 'MissesRight',
+                   'AccuracyLeft', 'AccuracyRight', 'AccMaxEvi', 'LateralBias', 'AccuracyRep', 'AccuracyAlt', 'RepBias', 'Misses', 'MissesLeft', 'MissesRight',
                    'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards', 'RewardsLeft', 'RewardsRight', 'Water',
                    'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch', 'NoSound', 'MessageCount']
 
         data = list(zip(dates, dow, subject, board, trials, trials_left, trials_right, hits, hits_left, hits_right, hits_rep, hits_alt, errors,
                         errors_left, errors_right, performance, performance_left, performance_right, responses,
                         responses_left, responses_right, repetitions, alternations, accuracy, accuracy_left,
-                        accuracy_right, accuracy_rep, accuracy_alt, misses, misses_left, misses_right, miss_rate,
+                        accuracy_right, accuracy_max_evi, lateral_bias, accuracy_rep, accuracy_alt, rep_bias, misses, misses_left, misses_right, miss_rate,
                         miss_rate_left, miss_rate_right, rewards, rewards_left, rewards_right, water, water_left,
                         water_right, stage, sounds_mismatch, no_sound, message_count))
 

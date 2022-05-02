@@ -766,3 +766,29 @@ def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapte
                 print(f"filepath '{filepath}' doesn't exist")
         except Exception as e:
             print(e)  # Perhaps prints are caught by pybpod
+
+
+def check_date_exist(date, dates):
+    """
+    Check if a string date exist in a list or Series of string dates
+    :param date: date as string
+    :param dates: dates as list or pd.Series of strings
+    :return:
+    """
+    date = str(date)  # Ensure date is in string format
+    if type(dates) is list:  # Check if iterable of dates is a list
+        # print('Is list')
+        if date in dates:
+            print(f'Date {date} exists')
+            return True
+        else:
+            print(f'Date {date} doesnt exist')
+            return False
+    elif type(dates) is pd.core.series.Series:  # Check if iterable of dates is a pandas Series
+        # print('Is pandas Series')
+        if dates.str.contains(date).any():
+            print(f'Date {date} exists')
+            return True
+        else:
+            print(f'Date {date} doesnt exist')
+            return False
