@@ -28,6 +28,13 @@ def all_intersessions(experiment='2AFC_2'):
     animals = os.listdir(folder_in)
     animals = [animals for animals in animals if animals.endswith('.csv')]
     animals.sort()
+    animals.remove('328_intersession.csv')
+    animals.remove('326_intersession.csv')
+    animals.remove('331_intersession.csv')
+    animals.remove('334_intersession.csv')
+
+
+
 
     ####################################################################################################################
 
@@ -59,13 +66,13 @@ def all_intersessions(experiment='2AFC_2'):
         ################################################################################################################
 
         # Create subplot's axes. Need to be outside for loop otherwise it overwrites the plots
-        ax = plt.subplot2grid((8, 1), (0, 0), rowspan=1, colspan=1)
-        ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
-        ax2 = plt.subplot2grid((8, 1), (2, 0), rowspan=1, colspan=1)
-        ax3 = plt.subplot2grid((8, 1), (3, 0), rowspan=1, colspan=1)
-        ax4 = plt.subplot2grid((8, 1), (4, 0), rowspan=1, colspan=1)
-        ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
-        ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
+        ax = plt.subplot2grid((6, 1), (0, 0), rowspan=1, colspan=1)
+        # ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
+        ax2 = plt.subplot2grid((6, 1), (1, 0), rowspan=2, colspan=1)
+        ax3 = plt.subplot2grid((6, 1), (3, 0), rowspan=1, colspan=1)
+        ax4 = plt.subplot2grid((6, 1), (4, 0), rowspan=1, colspan=1)
+        ax5 = plt.subplot2grid((6, 1), (5, 0), rowspan=1, colspan=1)
+        # ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
         # ax7 = plt.subplot2grid((8, 1), (7, 0), rowspan=1, colspan=1)
         # axX = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)  # Regular plot (1 row x 1 column grid)
 
@@ -103,30 +110,30 @@ def all_intersessions(experiment='2AFC_2'):
 
             ################################################################################################################
 
-            # PLOT 1: WATER
-
-            time_start = time.time()
-
-            # ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
-            # ax1 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
-
-            ax1.plot(df_dt, df.Water, marker='o', ms=ms, lw=lw)
-
-            if i == len(animals) - 1:
-
-                # ax1.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
-                ax1.set_xticklabels([])
-                ax1.set_ylabel('Water')
-                ax1.spines['top'].set_visible(False)
-                ax1.spines['bottom'].set_visible(False)
-
-                # Instantiate a second axes that shares the same x-axis
-                ax1_twin = ax1.twinx()
-                ax1_twin.set_ylim(ax1.get_ylim())
-                # ax1_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
-                ax1_twin.set_yticklabels([])
-                ax1_twin.spines['top'].set_visible(False)
-                ax1_twin.spines['bottom'].set_visible(False)
+            # # PLOT 1: WATER
+            #
+            # time_start = time.time()
+            #
+            # # ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
+            # # ax1 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
+            #
+            # ax1.plot(df_dt, df.Water, marker='o', ms=ms, lw=lw)
+            #
+            # if i == len(animals) - 1:
+            #
+            #     # ax1.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
+            #     ax1.set_xticklabels([])
+            #     ax1.set_ylabel('Water')
+            #     ax1.spines['top'].set_visible(False)
+            #     ax1.spines['bottom'].set_visible(False)
+            #
+            #     # Instantiate a second axes that shares the same x-axis
+            #     ax1_twin = ax1.twinx()
+            #     ax1_twin.set_ylim(ax1.get_ylim())
+            #     # ax1_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
+            #     ax1_twin.set_yticklabels([])
+            #     ax1_twin.spines['top'].set_visible(False)
+            #     ax1_twin.spines['bottom'].set_visible(False)
 
             ################################################################################################################
 
@@ -139,10 +146,16 @@ def all_intersessions(experiment='2AFC_2'):
 
             ax2.plot(df_dt, df.AccMaxEvi, marker='o', ms=ms, lw=lw)
 
+            # Plot horizontal lines
+            ax2.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+            ax2.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+            ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
             if i == len(animals) - 1:
 
                 # ax2.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
                 ax2.set_xticklabels([])
+                ax2.set_yticks([0, 0.25, 0.5, 0.75, 1])
                 ax2.set_ylabel('Acc. Max. Evi.\n(%)')
                 ax2.spines['top'].set_visible(False)
                 ax2.spines['bottom'].set_visible(False)
@@ -193,9 +206,15 @@ def all_intersessions(experiment='2AFC_2'):
 
             ax4.plot(df_dt, df.MissRate, marker='o', ms=ms, lw=lw)
 
+            # Plot horizontal lines
+            ax4.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+            ax4.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+            ax4.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
             if i == len(animals) - 1:
                 # ax4.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
                 ax4.set_xticklabels([])
+                ax4.set_yticks([0, 0.25, 0.5, 0.75, 1])
                 ax4.set_ylabel('Misses\n(%)')
                 ax4.spines['top'].set_visible(False)
                 ax4.spines['bottom'].set_visible(False)
@@ -221,7 +240,7 @@ def all_intersessions(experiment='2AFC_2'):
 
             if i == len(animals) - 1:
                 # ax5.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
-                ax5.set_xticklabels([])
+                # ax5.set_xticklabels([])
                 ax5.set_ylabel('Stage')
                 ax5.spines['top'].set_visible(False)
                 ax5.spines['bottom'].set_visible(False)
@@ -232,33 +251,33 @@ def all_intersessions(experiment='2AFC_2'):
                 # ax5_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
                 ax5_twin.set_yticklabels([])
                 ax5_twin.spines['top'].set_visible(False)
-                ax5_twin.spines['bottom'].set_visible(False)
+                # ax5_twin.spines['bottom'].set_visible(False)
 
             ################################################################################################################
 
-            # PLOT 6: SOUND CHECKS
-
-            time_start = time.time()
-
-            # ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
-            # ax6 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
-
-            ax6.plot(df_dt, df.NoSound, marker='o', ms=ms, lw=lw)
-
-            if i == len(animals) - 1:
-                # ax6.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
-                # ax6.set_xticklabels([])
-                ax6.set_ylabel('NoSound')
-                ax6.spines['top'].set_visible(False)
-                # ax6.spines['bottom'].set_visible(False)
-
-                # Instantiate a second axes that shares the same x-axis
-                ax6_twin = ax6.twinx()
-                ax6_twin.set_ylim(ax6.get_ylim())
-                # ax6_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
-                ax6_twin.set_yticklabels([])
-                ax6_twin.spines['top'].set_visible(False)
-                # ax6_twin.spines['bottom'].set_visible(False)
+            # # PLOT 6: SOUND CHECKS
+            #
+            # time_start = time.time()
+            #
+            # # ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
+            # # ax6 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
+            #
+            # ax6.plot(df_dt, df.NoSound, marker='o', ms=ms, lw=lw)
+            #
+            # if i == len(animals) - 1:
+            #     # ax6.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='center')
+            #     # ax6.set_xticklabels([])
+            #     ax6.set_ylabel('NoSound')
+            #     ax6.spines['top'].set_visible(False)
+            #     # ax6.spines['bottom'].set_visible(False)
+            #
+            #     # Instantiate a second axes that shares the same x-axis
+            #     ax6_twin = ax6.twinx()
+            #     ax6_twin.set_ylim(ax6.get_ylim())
+            #     # ax6_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
+            #     ax6_twin.set_yticklabels([])
+            #     ax6_twin.spines['top'].set_visible(False)
+            #     # ax6_twin.spines['bottom'].set_visible(False)
 
             ################################################################################################################
 
@@ -290,8 +309,8 @@ def all_intersessions(experiment='2AFC_2'):
         plt.draw()  # The tick label strings are not populated until a draw method has been called
         # (https://matplotlib.org/3.5.0/api/_as_gen/matplotlib.axes.Axes.get_xticklabels.html)
         fig.canvas.draw()  # Alternative
-        ax6.set_xticklabels(ax6.get_xticklabels(), rotation=45, ha='center')
-        ax6.set_xlabel('Date')
+        ax5.set_xticklabels(ax5.get_xticklabels(), rotation=45, ha='right')
+        ax5.set_xlabel('Date')
 
         ################################################################################################################
 
