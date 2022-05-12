@@ -59,6 +59,7 @@ def intersession(path, to_csv=False, send_slack=False):
     doi_7 = '2022-03-09'  # Mice moved from sala C to sala B
     doi_8 = '2022-03-21'  # Ad lib CA 2% water
     doi_9 = '2022-04-07'  # First day without bringing down Balma's animals
+    # Add elastic p (March 11)
 
     try:
         doi_1_index = np.where(dates == doi_1)[0][0]
@@ -747,7 +748,7 @@ def intersession(path, to_csv=False, send_slack=False):
 
 ########################################################################################################################
 
-def do_intersessions(experiment=None, to_csv=True, send_slack=False):
+def do_intersessions(experiment='2AFC_2', to_csv=True, send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     time_start = time.time()

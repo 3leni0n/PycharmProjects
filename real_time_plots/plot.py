@@ -134,7 +134,7 @@ def main():
     ani = FuncAnimation(fig, animate, fargs=(parameters, trials, ), interval=interval)
 
     plt.subplots_adjust(bottom=0.05, top=0.95, hspace=.9)
-    # plt.tight_layout()  # Doesn't work, make plots very thin and long
+    # plt.tight_layout()  # Doesn't work, make psychometric_curves very thin and long
     plt.show()
 
 

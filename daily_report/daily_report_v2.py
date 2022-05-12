@@ -16,11 +16,11 @@
 """
 # Tiffany's comments:
 
-1. Markers are too big in the trend plots (miss, accuracy, repeat).DONE
+1. Markers are too big in the trend psychometric_curves (miss, accuracy, repeat).DONE
 2. You need to have better resolution of the Accuracy plot than of the Miss plot, so they shouldn't have the same size.
    Same for Repeat/Alternate, especially in this early stages. DONE
 3. I see that you are plotting the psycometric already. I would have removed it and only display it when necessary,
-   specially in order to increase the size of other more important plots. You wanna have all the information needed at a
+   specially in order to increase the size of other more important psychometric_curves. You wanna have all the information needed at a
    glance. DONE
 4. Raster plot.
     a. Why are you plotting the stimulus? You already segregated by stimulus in two rasters, left and right. This is
@@ -230,11 +230,11 @@ def daily_report_v2(path, send_slack=False):
         ra_right = compute_window(df.Hit[(df.Miss == 0) & (df.Side == 1)],
                                   20)  # Right valid trials
 
-        # # Prepares the grid for the plots
+        # # Prepares the grid for the psychometric_curves
         # ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
         # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
@@ -312,7 +312,7 @@ def daily_report_v2(path, send_slack=False):
         ra_rep = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 1)], 20)
         ra_alt = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)], 20)
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
@@ -382,7 +382,7 @@ def daily_report_v2(path, send_slack=False):
         ra_left_miss = compute_window(df.Miss[df.Side == 0], 20)  # Left valid trials
         ra_right_miss = compute_window(df.Miss[df.Side == 1], 20)  # Right valid trials
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
@@ -448,12 +448,17 @@ def daily_report_v2(path, send_slack=False):
 
         time_start_hit = time.time()
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
         # ax4 = plt.subplot2grid((4, 1), (3, 0))
+
+        # Plot horizontal lines
+        ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
+        # ax4.axhline(-0.5, color='tab:gray', linestyle=':')  # Evidence -0.5
+        # ax4.axhline(0.5, color='tab:gray', linestyle=':')  # Evidence 0.5
 
         palette = ['tab:red', 'tab:green', 'grey']
         hue = ['Error' if i == 0 else 'Hit' if i == 1 else 'Miss' for i in df.Hit]
@@ -461,8 +466,7 @@ def daily_report_v2(path, send_slack=False):
 
         if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
             scatter = sns.scatterplot(x=df.index, y=df.Side, hue=hue, palette=palette,
-                                      hue_order=hue_order,
-                                      s=ms ** 2)
+                                      hue_order=hue_order, s=ms ** 3, zorder=2.5)  # zorder=2.5 to plot the dots over the line
             ax4.set_ylim(-0.8, 1.8)
             ax4.set_yticks([0, 1])
             ax4.set_yticklabels(['L', 'R'])
@@ -477,13 +481,9 @@ def daily_report_v2(path, send_slack=False):
 
         else:  # Plot coherences
             scatter = sns.scatterplot(x=df.index, y=df.ILD, hue=hue, palette=palette,
-                                      hue_order=hue_order, s=ms ** 2)
-            # Plot horizontal lines
-            ax4.axhline(0, color='tab:gray', linestyle='--')  # Evidence 0
-            # ax4.axhline(-0.5, color='tab:gray', linestyle=':')  # Evidence -0.5
-            # ax4.axhline(0.5, color='tab:gray', linestyle=':')  # Evidence 0.5
+                                      hue_order=hue_order, s=ms ** 3, zorder=2.5)  # zorder=2.5 to plot the dots over the line
 
-            ax4.set_yscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+            ax4.set_yscale('symlog', linthresh=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax4.set_ylim(-100, 100)
             ax4.minorticks_off()  # Remove minor ticks
             ilds = np.sort(df.ILD.unique().astype('int'))
@@ -500,7 +500,7 @@ def daily_report_v2(path, send_slack=False):
 
             # Instantiate a second axes that shares the same x-axis
             ax4_twin = ax4.twinx()
-            ax4_twin.set_yscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+            ax4_twin.set_yscale('symlog', linthresh=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax4_twin.minorticks_off()  # Remove minor ticks
             # ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
             ax4_twin.set_ylim(ax4.get_ylim())
@@ -964,7 +964,7 @@ def daily_report_v2(path, send_slack=False):
                         # markersize=200 / len(df.Side == 1))
                         # markersize = ax.containers[1][0].get_height()
 
-            xlim[k] = [ax.get_xlim()]  # Store xlim from left and right plots
+            xlim[k] = [ax.get_xlim()]  # Store xlim from left and right psychometric_curves
             ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
 
         # Custom legend

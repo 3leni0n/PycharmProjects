@@ -65,7 +65,7 @@ def all_intersessions(experiment='2AFC_2'):
 
         ################################################################################################################
 
-        # Create subplot's axes. Need to be outside for loop otherwise it overwrites the plots
+        # Create subplot's axes. Need to be outside for loop otherwise it overwrites the psychometric_curves
         ax = plt.subplot2grid((6, 1), (0, 0), rowspan=1, colspan=1)
         # ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
         ax2 = plt.subplot2grid((6, 1), (1, 0), rowspan=2, colspan=1)

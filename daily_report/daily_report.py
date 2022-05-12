@@ -16,11 +16,11 @@
 """
 # Tiffany's comments:
 
-1. Markers are too big in the trend plots (miss, accuracy, repeat).DONE
+1. Markers are too big in the trend psychometric_curves (miss, accuracy, repeat).DONE
 2. You need to have better resolution of the Accuracy plot than of the Miss plot, so they shouldn't have the same size.
    Same for Repeat/Alternate, especially in this early stages. DONE
 3. I see that you are plotting the psycometric already. I would have removed it and only display it when necessary,
-   specially in order to increase the size of other more important plots. You wanna have all the information needed at a
+   specially in order to increase the size of other more important psychometric_curves. You wanna have all the information needed at a
    glance. DONE
 4. Raster plot.
     a. Why are you plotting the stimulus? You already segregated by stimulus in two rasters, left and right. This is
@@ -228,11 +228,11 @@ def daily_report(path, send_slack=False):
         ra_right = compute_window(df.Hit[(df.Miss == 0) & (df.Side == 1)],
                                   20)  # Right valid trials
 
-        # # Prepares the grid for the plots
+        # # Prepares the grid for the psychometric_curves
         # ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
         # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
@@ -310,7 +310,7 @@ def daily_report(path, send_slack=False):
         ra_rep = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 1)], 20)
         ra_alt = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)], 20)
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
@@ -380,7 +380,7 @@ def daily_report(path, send_slack=False):
         ra_left_miss = compute_window(df.Miss[df.Side == 0], 20)  # Left valid trials
         ra_right_miss = compute_window(df.Miss[df.Side == 1], 20)  # Right valid trials
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
@@ -446,7 +446,7 @@ def daily_report(path, send_slack=False):
 
         time_start_hit = time.time()
 
-        # Prepares the grid for the plots
+        # Prepares the grid for the psychometric_curves
         if df.Stage.unique()[0] == 4:
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
@@ -755,7 +755,7 @@ def daily_report(path, send_slack=False):
                         # markersize=200 / len(df.Side == 1))
                         # markersize = ax.containers[1][0].get_height()
 
-            xlim[k] = [ax.get_xlim()]  # Store xlim from left and right plots
+            xlim[k] = [ax.get_xlim()]  # Store xlim from left and right psychometric_curves
             ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
 
         # Custom legend
