@@ -396,7 +396,7 @@ def enterthematrix(filepath):
     # Import sounds DataFrame but only the filenames
     # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     # filepath_setup2 = '/home/setup2/'  # setup2 pc
-    # df_ild = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
+    # filenames = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
     df = pd.read_csv(filepath)  # Import all columns
     # Create relevant arrays to build DataFrame columns
     evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
@@ -412,14 +412,14 @@ def enterthematrix(filepath):
               np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
     df.insert(2, 'coherence', np.repeat(coherences, len(coherences) ** 2))
     df.insert(3, 'difficulty', np.repeat(difficulties, len(difficulties) ** 2))
-    # df_ild.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
+    # filenames.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
     df.insert(4, 'substage', np.repeat(substages, len(substages) ** 2))
 
-    # df_ild['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
-    # df_ild['coherence'] = np.repeat(coherences, len(coherences) ** 2)
-    # df_ild['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
-    # # df_ild['stage'] = np.repeat(stages, len(stages) ** 2)
-    # df_ild['substage'] = np.repeat(substages, len(substages) ** 2)
+    # filenames['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
+    # filenames['coherence'] = np.repeat(coherences, len(coherences) ** 2)
+    # filenames['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
+    # # filenames['stage'] = np.repeat(stages, len(stages) ** 2)
+    # filenames['substage'] = np.repeat(substages, len(substages) ** 2)
     return df
 
 
@@ -599,7 +599,7 @@ def ild():
     """
     path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     df = pd.read_csv(path)
-    # df_ild = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
+    # filenames = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
     df_dB = df  # Copy DataFrame
     df_dB.iloc[:, 1:21] = power_dB(abs(df.iloc[:, 1:21]))  # Apply the function to entire DataFrame except 'filename'
     # column. abs because can't do log10 of negative number. To retrieve the negative sign for left the ILD will be
@@ -619,7 +619,7 @@ def ild():
                           0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])  # Define evidences
     df_ild.insert(1, 'Evidence',
                   np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
-    # df_ild_summary = df_ild.groupby('Evidence', as_index=False).mean()  # SQL-style index
+    # df_ild_summary = filenames.groupby('Evidence', as_index=False).mean()  # SQL-style index
     df_ild_summary = df_ild.groupby('Evidence').mean()  # Group labels asn index
     return df_ild
 

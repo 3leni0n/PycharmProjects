@@ -20,7 +20,7 @@ def parse_v2(path):
     ####################################################################################################################
 
     index = df[df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous
-    # one index = df_ild[df_ild['TYPE'] == 'END-TRIAL'].index
+    # one index = filenames[filenames['TYPE'] == 'END-TRIAL'].index
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
     # INFO (METADATA)
@@ -40,7 +40,7 @@ def parse_v2(path):
     try:
         session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
     except IndexError:
-        # session_ended = df_ild['PC-TIME'].iloc[-1]
+        # session_ended = filenames['PC-TIME'].iloc[-1]
         session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
         # print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
         print(f"The session '{np.unique(session)[0]}' ended abruptly, probably due to Bpod crashed. Using last PC_TIME "

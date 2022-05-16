@@ -48,6 +48,8 @@ from scipy import stats
 def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None,
                 save=False):
     """
+    Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
+    options for control are available
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
     :param animal: Mouse ID number
     :param library: library used to compute the kernel
@@ -147,9 +149,6 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     # choices_left = choices[choices_mean_left_indexes]  # Get choices of trials where evidence to choose left
     # choices_right = choices[choices_mean_right_indexes]  # Get choices of trials where evidence to choose right
 
-
-
-
     # Default plotting parameters
     color = 'k'
     label = ''
@@ -213,7 +212,6 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
                     choices = choices.loc[np.rint(len(choices) / 2):]  # 2nd half
                     label = '2nd half'
                     filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half.png'
-
                 elif control == 'half1_vs_half2_random':
                     stim_strength = stim_strength.loc[random_half2_indexes, :]  # 2nd half (random)
                     choices = choices.loc[random_half2_indexes]  # 2nd half (random)
@@ -302,7 +300,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     return params
 
-
+#
 def do_kernels(control='left_vs_right', experiment='2AFC_2',
                animals=['325', '327', '329', '330', '332', '333', '335', '337'],
                target_ilds=[-2, 0, 2], save=False):

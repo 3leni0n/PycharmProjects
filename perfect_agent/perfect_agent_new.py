@@ -9,6 +9,14 @@ from create_sounds.create_sounds_v2 import create_sounds_v2
 
 
 def perfect_agent(n_trials=1000, sim_stim=False, sigma=1, plot=False):
+    """
+    Simulates a perfect agent that perform an 2AFC ILD discrimination task
+    :param n_trials: Number of trials
+    :param sim_stim: Simulates stimuli. If False uses real stimuli used for training mice
+    :param sigma: std of the envelope fluctuations. Only used when sim_stim=True
+    :param plot: If plot the results or not
+    :return: DataFrame with the number of unfair trials, errors, hits and accuracy
+    """
 
     time_start = time.time()
 
