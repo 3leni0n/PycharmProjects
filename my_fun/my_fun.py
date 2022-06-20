@@ -682,6 +682,8 @@ def compute_psych_curve(x, y, n_points=100):
         # Function to fit:
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
 
+        # If take x0 out of parenthesis
+
         # Calculate negative log likelihood:
         ll = - np.sum(stats.norm.logpdf(ydata, loc=y_pred))
 
@@ -725,6 +727,49 @@ def compute_psych_curve(x, y, n_points=100):
                            fit=fit,
                            params=[k, x0, b, p],
                            fit_error=fit_error)
+
+
+def pc_lapses0(x, k, x0):
+    """
+    Psychometric function when lapses = 0
+    :param x: value to predict
+    :param k: slope
+    :param x0: bias
+    :return: value of y for the input value of x
+    """
+    return 1 / (1 + np.exp(-k * (x - x0)))
+
+
+def pc_lapses0_x0(k, x0):
+    """
+    Psychometric function when lapses = 0 and x = 0 (special case of the above)
+    :param k: slope
+    :param x0: bias
+    :return: value of y for x = 0
+    """
+    return 1 / (1 + np.exp(k * x0))
+
+
+def pc_bias0(x, b, p, k):
+    """
+    Psychometric function when bias = 0
+    :param x: value to predict
+    :param b: lower lapse
+    :param p: upper lapse
+    :param k: slope
+    :return: value of y for the input value of x
+    """
+    return b + (1 - b - p) / (1 + np.exp(-k * x))
+
+
+def pc_bias0_x0(b, p):
+    """
+    Psychometric function when bias = 0 and x = 0 (special case of the above)
+    :param b: lower lapse
+    :param p: upper lapse
+    :return: value of y for x = 0
+    """
+    return b + (1 - b - p) / 2
 
 
 def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapted from UtilsR (Jordi's)

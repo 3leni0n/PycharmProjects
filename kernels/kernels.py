@@ -43,13 +43,20 @@ from sklearn.linear_model import LogisticRegression
 import statsmodels.api as sm
 from matplotlib import pyplot as plt
 from scipy import stats
+import seaborn as sns
+
+# Mel's code snippet for poster
+sns.set_theme()
+sns.set_style("white")
+sns.set_context("poster")
 
 
 def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None,
-                save=False):
+                n_mean_frames=None, save=False, format='svg', transparent=False):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
+    :param n_mean_frames: Number of mean frames (end/final frames)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
     :param animal: Mouse ID number
     :param library: library used to compute the kernel
@@ -57,6 +64,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     :param zscore: if True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
     :param control: What control analysis to run
     :param save: If True, saves the plot
+    :param format: output format of the saved figure
+    :param transparent: set background transparent
     :return: GLM model parameters
     """
 
@@ -106,6 +115,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     # Frames ILD (elementwise)
     frames_ild = pd.DataFrame(
         sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
+
     if zscore:
         frames_ild = pd.DataFrame(stats.zscore(frames_ild, axis=None))  # Z-score the ILDs (along axis 0 or None
     # returns same result, but not axis 1)
@@ -121,38 +131,13 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     df = pd.read_csv(folder_in)  # Load behavioral data
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
-    # target_ilds = [-2, 0, 2]
-    # target_ilds = [0]
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
     filenames = df.Filename.tolist()
-
-    ####################################################################################################################
-    # # Average frames
-    # n_mean_frames = 5  # Number of mean frames
-    # stim_strength_mean = []
-    # for i in range(n_mean_frames):
-    #     stim_strength_mean.append(stim_strength.iloc[:, i * 2:2 + i * 2].mean(axis=1))
-    #
-    # stim_strength = pd.DataFrame(data=stim_strength_mean)
-    # stim_strength = stim_strength.T
-    ####################################################################################################################
-
-    # # What did the animal chose when the evidence was to choose left/right?
-    # stim_strength_mean = stim_strength.mean(axis=1)  # Get mean stimulus strength
-    # choices_mean = [0 if x < 0 else 1 for x in stim_strength_mean]  # Get the choices according to mean stimulus
-    # # strength (perfect agent)
-    # choices_mean = np.array(choices_mean)  # To np array to use np.where
-    # choices_mean_left_indexes = np.where(choices_mean == 0)[0]  # Get indexes of trials where evidence to choose left
-    # choices_mean_right_indexes = np.where(choices_mean == 1)[0]  # Get indexes of trials where evidence to choose right
-    # stim_strength_left = stim_strength.iloc[choices_mean_left_indexes, :]  # Get stimuli of trials where evidence to choose left
-    # stim_strength_right = stim_strength.iloc[choices_mean_right_indexes, :]  # Get stimuli of trials where evidence to choose right
-    # choices_left = choices[choices_mean_left_indexes]  # Get choices of trials where evidence to choose left
-    # choices_right = choices[choices_mean_right_indexes]  # Get choices of trials where evidence to choose right
 
     # Default plotting parameters
     color = 'k'
     label = ''
-    filename = f'_PK_ILDs: {target_ilds}.png'
+    filename = f'_PK_ILDs: {target_ilds}'
 
     # Control
     if control is not None:
@@ -170,6 +155,22 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
             [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
             columns=['filename'])
         stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+
+        # Average frames (to have more trials per regressor)
+        if n_mean_frames is not None:
+            # n_mean_frames = 2  # Number of mean frames (end/final frames)
+            n_frames_per_mean_frame = int(
+                n_frames / n_mean_frames)  # Number of frames to compute the mean of (must be an integer
+            # for slicing)
+            assert n_frames % n_mean_frames == 0  # Need to be exact division
+            stim_strength_mean = []
+            for i in range(n_mean_frames):
+                stim_strength_mean.append(stim_strength.iloc[:,
+                                          i * n_frames_per_mean_frame:n_frames_per_mean_frame + i * n_frames_per_mean_frame].mean(
+                    axis=1))  # Get the mean per trial of every 'n_frames_per_mean_frame' frames
+            stim_strength = pd.DataFrame(data=stim_strength_mean)
+            stim_strength = stim_strength.T
+            filename = f'_PK_ILDs: {target_ilds}, {n_mean_frames} averaged frames'
 
         # Random 50% vs 50% of trials without replacement
         trials_indexes = choices.index.values
@@ -190,12 +191,12 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
                     stim_strength = stim_strength.loc[:np.rint(len(stim_strength) / 2), :]  # 1st half
                     choices = choices.loc[:np.rint(len(choices) / 2)]  # 1st half
                     label = '1st half'
-                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half.png'
+                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half'
                 elif control == 'half1_vs_half2_random':
                     stim_strength = stim_strength.loc[random_half1_indexes, :]  # 1st half (random)
                     choices = choices.loc[random_half1_indexes]  # 1st half (random)
                     label = '1st random half'
-                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half_random.png'
+                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half_random'
                 elif control == 'left_vs_right':
                     choices_mean_indexes = np.where(choices_mean == 0)[0]
                     # Get indexes of trials where evidence was to choose left
@@ -203,7 +204,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
                     # Get stimuli of trials where evidence was to choose left
                     choices = choices[choices_mean_indexes]  # Get choices of trials where evidence was to choose left
                     label = 'left'
-                    filename = f'_PK_ILDs: {target_ilds}_left_vs_right.png'
+                    filename = f'_PK_ILDs: {target_ilds}_left_vs_right'
                 color = 'tab:blue'
 
             else:  # # 2nd half / 2nd half random / right
@@ -211,12 +212,12 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
                     stim_strength = stim_strength.loc[np.rint(len(stim_strength) / 2):, :]  # 2nd half
                     choices = choices.loc[np.rint(len(choices) / 2):]  # 2nd half
                     label = '2nd half'
-                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half.png'
+                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half'
                 elif control == 'half1_vs_half2_random':
                     stim_strength = stim_strength.loc[random_half2_indexes, :]  # 2nd half (random)
                     choices = choices.loc[random_half2_indexes]  # 2nd half (random)
                     label = '2nd random half'
-                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half_random.png'
+                    filename = f'_PK_ILDs: {target_ilds}_1st_vs_2nd_half_random'
                 elif control == 'left_vs_right':
                     choices_mean_indexes = np.where(choices_mean == 1)[0]
                     # Get indexes of trials where evidence was to choose right
@@ -224,7 +225,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
                     # Get stimuli of trials where evidence was to choose right
                     choices = choices[choices_mean_indexes]  # Get choices of trials where evidence was to choose right
                     label = 'right'
-                    filename = f'_PK_ILDs: {target_ilds}_left_vs_right.png'
+                    filename = f'_PK_ILDs: {target_ilds}_left_vs_right'
                 color = 'tab:orange'
 
         if library == 'sklearn':  # Scikit-learn library
@@ -265,19 +266,24 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # plt.errorbar(np.arange(len(params)), params, yerr=beta_std_err, color='tab:blue', fmt='o',
         #              markerfacecolor='none')  # With constant (bias)
 
-        plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker='o', mfc='None', label=label)
+        plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker=None, mfc='none', mec='none', mew=0,
+                 ms=0, label=label)
         # Without constant (bias)
-        plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color, fmt='o',
-                     markerfacecolor='none')  # Without constant (bias)
+        plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
+                     marker=None, mfc='none', mec='none', mew=0, ms=0)  # Without constant (bias)
 
         plt.axhline(0, color='tab:gray', ls='--')
-        plt.title(f'Psychophysical kernel, animal {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')
+        # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')  # With ILDs
+        plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
         plt.xlabel('Stimulus frame')
         plt.ylabel('GLM weight (z-scored)')
-        plt.legend()
+        # plt.legend()
         yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
         # Annotate significance
+        if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
+            n_frames = n_mean_frames
+
         for i in range(n_frames):
             if p_values[i] <= 0.05:  # +i to skip constant
                 text = '*'
@@ -295,15 +301,18 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
-        plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename)
+        plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename, foramt=format, transparent=transparent)
         plt.close()
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
 
     return params
 
-#
-def do_kernels(control='left_vs_right', experiment='2AFC_2',
-               animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-               target_ilds=[-2, 0, 2], save=False):
+
+def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
+               target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None, save=False):
     """Do the kernels for all animals of a given batch (experiment)"""
 
     time_start = time.time()
@@ -328,14 +337,17 @@ def do_kernels(control='left_vs_right', experiment='2AFC_2',
     for i in range(len(animals)):
         path = folder + animals[i]
         print(path)
-        plot_kernel(experiment=experiment, animal=animals[i], target_ilds=target_ilds, control=control, save=save)
+        plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, zscore=zscore,
+                    control=control, n_mean_frames=n_mean_frames, save=save)
 
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337']):
+def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
+                                save=False, format='svg', transparent=False):
+
     time_start = time.time()
 
     if experiment is None:
@@ -355,23 +367,46 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 
     folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
 
+    n_frames = 10
     params = []
+    n_trials = []
 
     for i in range(len(animals)):
         print(folder_in + animals[i] + '.csv')
-        params.append(plot_kernel(experiment=experiment, animal=animals[i], library='sm', save=True))
+        n_trials.append(len(pd.read_csv(folder_in + animals[i] + '.csv')))
+        params.append(plot_kernel(experiment=experiment, animal=animals[i], library='sm', save=False))
 
     params = np.array(params)
     params_mean = np.mean(params[:, 1:11], 0)
     params_sem = stats.sem(params[:, 1:11], 0)
 
-    plt.plot(np.arange(params.shape[1] - 1), params_mean, color='k')
-    plt.errorbar(np.arange(params.shape[1] - 1), params_mean, yerr=params_sem, color='k', fmt='o',
-                 markerfacecolor='none')
+    plt.figure()
 
-    filename = 'mean_PK_across_animals.png'
-    folder_out = '/home/alexis/Documentos/kernels/'
+    plt.plot(np.arange(params.shape[1] - 1), params_mean, color='k', marker=None, mfc='none', mec='none', mew=0, ms=0)
+    plt.errorbar(np.arange(params.shape[1] - 1), params_mean, yerr=params_sem, color='k', marker=None, mfc='none',
+                 mec='none', mew=0, ms=0)
 
-    plt.savefig(folder_out + filename)
+    plt.axhline(0, color='tab:gray', ls='--')
+    # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')  # With ILDs
+    plt.title(f'N={len(params)}, {sum(n_trials)} trials')
+    plt.xlabel('Stimulus frame')
+    plt.ylabel('GLM weight (z-scored)')
+    # plt.legend()
+    yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+    if save:
+        folder_out = '/home/alexis/Documentos/kernels/'
+        filename = 'mean_PK_across_animals'
+        if not os.path.exists(folder_out):
+            os.mkdir(folder_out)
+        os.chdir(folder_out)
+        plt.savefig(folder_out + filename, format=format, transparent=transparent)
+        plt.close()
+
+    plt.close('all')
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
 
     return params

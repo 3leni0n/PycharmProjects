@@ -5,9 +5,15 @@ from my_fun.my_fun import *
 from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
+import seaborn as sns
+
+# Mel's code snippet for poster
+sns.set_theme()
+sns.set_style("white")
+sns.set_context("poster")
 
 
-def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False):
+def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, format='svg', transparent=False):
     """Plot psychometric curve"""
 
     time_start = time.time()
@@ -38,7 +44,6 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False):
         print('Animals: ' + str(animals))  # Remove square brackets
         animal = input('Enter animal')  # Ask user to input animal to glue sessions from
 
-
     folder_in = folder_in + animal + '.csv'
     df = pd.read_csv(folder_in)  # Read behavioral data
     df = df[df.P > 0]  # Only those sessions with ilds
@@ -62,17 +67,21 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False):
         # Plot params
         color = 'tab:orange'
         label = 'Prob. right'
-        plt.xlabel('ILD')
-        plt.ylabel('Prob. right')
+        plt.xlabel('Stimulus ILD (dB)')
+        plt.ylabel('Prob. choose right')
 
         # Annotation params
-        xy = (ilds[0], 1)
-        xytext = (ilds[0], 1)
+        lower_lapse = "LR_R="
+        upper_lapse = "LR_L="
+        # xy = (ilds[0], 1)
+        # xytext = (ilds[0], 1)
+        xy = (-20, 1)
+        xytext = (-20, 1)
         va = 'top'
         ha = 'left'
         fontsize = 'medium'
 
-        filename = '_PC_prob_right.png'
+        filename = '_PC_prob_right'
 
     elif kind == 'prob_rep':
 
@@ -83,18 +92,22 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False):
         # Plot params
         color = 'tab:brown'
         label = 'Prob. repeat'
-        plt.xlabel('Repeating ILD')
-        plt.ylabel('Prob. repeat')
+        plt.xlabel('Repeating stimulus ILD (dB)')
+        plt.ylabel('Prob. choose repeat')
 
         # Annotate params
-        xy = (ilds[-1], 0)
-        xytext = (ilds[-1], 0)
+        lower_lapse = "LR_Rep="
+        upper_lapse = "LR_Alt="
+        # xy = (ilds[-1], 0)
+        # xytext = (ilds[-1], 0)
+        xy = (20, 0)
+        xytext = (20, 0)
         color = 'tab:brown'
         va = 'bottom'
         ha = 'right'
         fontsize = 'medium'
 
-        filename = '_PC_prob_rep.png'
+        filename = '_PC_prob_rep'
 
     # elif kind == 'prob_rep_after':
     #
@@ -129,44 +142,64 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False):
     #     plt.ylabel('Prob. repeat')
     #     filename = ' PC_prob_after.png'
 
-
     # Plot psychometric curve and errorbars
-    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, label=label)
-    plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color,
-                 fmt='o', markerfacecolor='none')
+    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
+             label='')
 
-    sensitivity, bias, lr_left, lr_right = psych_curve.params
+    # Move extreme datapoints closer to the center to zoom in
+    psych_curve.xdata[0] = -20
+    psych_curve.xdata[-1] = 20
+
+    plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color,
+                 fmt='o', mfc=color)
+
+    sensitivity, bias, lr_lower, lr_upper = psych_curve.params
     plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
                  "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                 "LR_Rep=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                 "LR_Alt=" + str(round(lr_right, 2)),  # Left lapse rate
+                 lower_lapse + str(round(lr_lower, 2)) + "\n" +  # Upper lapse rate
+                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                  xy=xy, xytext=xytext, color=color,
                  va=va, ha=ha, fontsize=fontsize)
 
-    plt.xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
-    plt.minorticks_off()  # Remove minor ticks
-    plt.title(f'Psychometric curve, animal {df.Setup.unique()[0]}, {len(df)} trials')
-    # plt.title(f'Psychometric curve, {len(df.Setup.unique())} animals, {len(df)} trials')
+    # plt.xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+    # plt.minorticks_off()  # Remove minor ticks
+    plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
+    # plt.title(f'Mouse {len(df.Setup.unique())}, {len(df)} trials')
     plt.axhline(0.5, color='tab:gray', ls='--')
+
+    if kind == 'prob_rep':  # Plot only for 'prob_rep'
+        pc0_bias0 = lr_lower + (1 - lr_lower - lr_upper) / 2  # Value of the PC for x = 0 when bias = 0
+        plt.axhline(pc0_bias0, color='tab:blue', ls=':', label='y(x=0)|B=0')
+        pc0_lapses0 = 1 / (1 + np.exp(sensitivity * bias))  # Value of the PC for x = 0 when lapses = 0
+        plt.axhline(pc0_lapses0, color='tab:orange', ls=':', label='y(x=0)|LR=0')
+        plt.legend(loc='upper left', fontsize='xx-small', frameon=False)
+
     plt.axvline(0., color='tab:gray', ls='--')
-    plt.xlim([ilds[0]-7, ilds[-1]+7])
+    # plt.xlim([ilds[0]-7, ilds[-1]+7]
+    plt.xlim([-21, 21])  # To chop the extreme values
+    ilds[0] = -20
+    ilds[-1] = 20
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
     plt.ylim([-0.025, 1.025])
+    plt.yticks([0, 0.5, 1])
     # plt.legend(loc='lower center')
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
 
     if save:
         folder_out = '/home/alexis/Documentos/psychometric curves/'
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
-        plt.savefig(folder_out + animal + filename)
+        plt.savefig(folder_out + animal + filename, format=format, transparent=transparent)
         plt.close()
 
     return psych_curve
 
 
-def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_right'):
+def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_right',
+           save=False, format='svg', transparent=False):
     """Do the kernels for all animals of a given batch (experiment)"""
 
     time_start = time.time()
@@ -191,7 +224,7 @@ def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333
     for i in range(len(animals)):
         path = folder + animals[i]
         print(path)
-        plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=True)
+        plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -199,7 +232,7 @@ def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333
 
 
 def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                           kind='prob_right'):
+                           save=False, kind='prob_right', format='svg', transparent=False):
 
     time_start = time.time()
 
@@ -240,9 +273,11 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         elif kind == 'prob_rep':
             psych_curve = compute_psych_curve(df.ILDRep, df.RepChoice, n_points)
 
-        plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color='tab:grey', alpha=0.25)
-        plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:grey', fmt='o',
-                     markerfacecolor='none', alpha=0.25)
+        plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color='tab:grey', marker=None,
+                 mfc='none', mec='none', mew=0, ms=0, alpha=0.25)
+        # mec='none, mew=0 and ms=0 to not plot markers in individual animals
+        # plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:grey', fmt='o',
+        #              mfc='none', alpha=0.25)  # Don't plot the errorbars in individual animals
 
         fit.append(psych_curve.fit)
         fit_error.append(psych_curve.fit_error)
@@ -260,101 +295,130 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         # Plot params
         color = 'tab:orange'
         label = 'Prob. right'
-        xlabel = 'ILD'
-        ylabel = 'Prob. right'
+        xlabel = 'Stimulus ILD (dB)'
+        ylabel = 'Prob. choose right'
 
         # Annotation params
-        xy = (ilds[0], 1)
-        xytext = (ilds[0], 1)
+        lower_lapse = "LR_L="
+        upper_lapse = "LR_R="
+        # xy = (ilds[0], 1)
+        # xytext = (ilds[0], 1)
+        xy = (-20, 1)
+        xytext = (-20, 1)
         va = 'top'
         ha = 'left'
         fontsize = 'medium'
 
-        filename = ' PC_prob_right_all_animals.png'
+        filename = ' PC_prob_right_all_animals'
 
     elif kind == 'prob_rep':
 
         # Plot params
         color = 'tab:brown'
         label = 'Prob. repeat'
-        xlabel = 'Repeating ILD'
-        ylabel = 'Prob. repeat'
+        xlabel = 'Repeating stimulus ILD (dB)'
+        ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        xy = (ilds[-1], 0)
-        xytext = (ilds[-1], 0)
+        lower_lapse = "LR_Alt="
+        upper_lapse = "LR_Rep="
+        # xy = (ilds[-1], 0)
+        # xytext = (ilds[-1], 0)
+        xy = (20, 0)
+        xytext = (20, 0)
         color = 'tab:brown'
         va = 'bottom'
         ha = 'right'
         fontsize = 'medium'
 
-        filename = ' PC_prob_rep_all_animals.png'
+        filename = ' PC_prob_rep_all_animals'
 
-    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, label=label)
+    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
+             label=label)
+
+    # Move extreme datapoints closer to the center to zoom in
+    psych_curve.xdata[0] = -20
+    psych_curve.xdata[-1] = 20
+
     plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o',
-                 markerfacecolor='none')
+                 mfc=color)
 
+    # plt.xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+    # plt.minorticks_off()  # Remove minor ticks
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
-    plt.title(f'Psychometric curve, {len(animals)} animals, {trials} trials')
-    # plt.title(f'Psychometric curve, {len(df.Setup.unique())} animals, {len(df)} trials')
-    plt.xlim([ilds[0] - 7, ilds[-1] + 7])
+    plt.title(f'N={len(animals)}, {trials} trials')
+    # plt.title(f'N={len(df.Setup.unique())}, {len(df)} trials')
+    # plt.xlim([ilds[0] - 7, ilds[-1] + 7])
+    plt.xlim([-21, 21])  # To chop the extreme values
+    ilds[0] = -20
+    ilds[-1] = 20
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
     plt.ylim([-0.025, 1.025])
-    plt.legend(loc='lower center')
+    plt.yticks([0, 0.5, 1])
+    # plt.legend(loc='lower center')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    folder_out = '/home/alexis/Documentos/psychometric curves/'
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
 
     sensitivity, bias, lr_left, lr_right = psych_curve.params
     plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
                  "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                 "LR_Rep=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-                 "LR_Alt=" + str(round(lr_right, 2)),  # Left lapse rate
+                 upper_lapse + str(round(lr_left, 2)) + "\n" +  # Upper lapse rate
+                 lower_lapse + str(round(lr_right, 2)),  # Lower lapse rate
                  xy=xy, xytext=xytext, color=color,
                  va=va, ha=ha, fontsize=fontsize)
 
-    plt.savefig(folder_out + filename)
+    if save:
+        folder_out = '/home/alexis/Documentos/psychometric curves/'
+        if not os.path.exists(folder_out):
+            os.mkdir(folder_out)
+        os.chdir(folder_out)
+        plt.savefig(folder_out + filename, format=format, transparent=transparent)
+        plt.close()
 
     return np.array(params)
 
 
 def test_lapses(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_rep',
-                save=True):
-    params = plot_pc_across_animals(experiment=experiment, animals=animals, kind='prob_rep')
-    rep_lapses = params[:, 2]
-    alt_lapses = params[:, 3]
+                save=True, format=format, transparent=False):
+
+    params = plot_pc_across_animals(experiment=experiment, animals=animals, kind=kind)
+    lower_lapses = params[:, 2]
+    upper_lapses = params[:, 3]
     plt.figure()
-    plt.scatter(alt_lapses, rep_lapses, color='k')
+    plt.scatter(upper_lapses, lower_lapses, color='k')
     x = np.linspace(0, 0.5)
     y = x
     plt.plot(x, y, 'r')
     plt.axis('square')
-    plt.title('Repeating vs alteranting lapses')
-    plt.xlim(0, 0.5)
+    plt.title('Rep. vs Alt. lapses')
+    # plt.xlim(0, 0.5)
+    plt.xlim(0, np.round(np.max(lower_lapses), 1))
     plt.xlabel('Alternating lapses')
-    plt.ylim(0, 0.5)
+    plt.xticks(np.linspace(0, np.round(np.max(lower_lapses), 1), 3))
+    # plt.ylim(0, 0.5)
+    plt.ylim(0, np.round(np.max(lower_lapses), 1))
     plt.ylabel('Repeating lapses')
+    plt.yticks(np.linspace(0, np.round(np.max(lower_lapses), 1), 3))
 
     # Paired-samples t-test
-    t_test = stats.ttest_rel(rep_lapses, alt_lapses)  # Two-sided
-    # t_test = stats.ttest_rel(rep_lapses, alt_lapses, alternative='greater')  # One-sided (you have a priori hypothesis of
+    t_test = stats.ttest_rel(lower_lapses, upper_lapses)  # Two-sided
+    # t_test = stats.ttest_rel(lower_lapses, upper_lapses, alternative='greater')  # One-sided (you have a priori hypothesis of
     # why one mean would be larger than the other one)
 
-    print('Rep. lapse = ' + str(np.round(np.mean(rep_lapses), 2)) + ' ± ' +
-                 str(np.round(stats.sem(rep_lapses), 2)) + ', ' + 'p = ' + str(np.round(t_test.pvalue, 2)), sep='')
-    print('Alt. lapse = ' + str(np.round(np.mean(alt_lapses), 2)) + ' ± ' +
-                 str(np.round(stats.sem(alt_lapses), 2)) + ', ' + 'p = ' + str(np.round(t_test.pvalue, 2)), sep='')
-
-    plt.annotate('Rep. lapse = ' + str(np.round(np.mean(rep_lapses), 2)) + ' ± ' +
-                 str(np.round(stats.sem(rep_lapses), 2)) + ', ' + 'p = ' + str(np.round(t_test.pvalue, 2)),
-                 xy=(0.25, 0.45), color='k', va='bottom', ha='center', fontsize='medium')
-    plt.annotate('Alt. lapse = ' + str(np.round(np.mean(alt_lapses), 2)) + ' ± ' +
-                 str(np.round(stats.sem(alt_lapses), 2)) + ', ' + 'p = ' + str(np.round(t_test.pvalue, 2)),
-                 xy=(0.25, 0.43), color='k', va='bottom', ha='center', fontsize='medium')
+    plt.annotate('Rep. lapse = ' + str(np.round(np.mean(lower_lapses), 2)) + ' ± ' +
+                 str(np.round(stats.sem(lower_lapses), 2)), xy=(0.15, 0.04), color='k', va='bottom', ha='center',
+                 fontsize='xx-small')
+    plt.annotate('Alt. lapse = ' + str(np.round(np.mean(upper_lapses), 2)) + ' ± ' +
+                 str(np.round(stats.sem(upper_lapses), 2)),
+                 xy=(0.15, 0.02), color='k', va='bottom', ha='center', fontsize='xx-small')
+    plt.annotate('p = ' + str(np.round(t_test.pvalue, 4)), xy=(0.15, 0), color='k', va='bottom', ha='center',
+                 fontsize='xx-small')
 
     if save:
-        filename = 'Rep_Alt_lapses.png'
+        filename = 'Rep_Alt_lapses'
         folder_out = '/home/alexis/Documentos/psychometric curves/'
-        plt.savefig(folder_out + filename)
+        plt.savefig(folder_out + filename, format=format, transparent=transparent)
