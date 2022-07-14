@@ -81,14 +81,14 @@ def post(t, n):
     rt(t)
 
 def beam(t, n, height):
-    """Makes a horizontal line at the given height and return."""
+    """Makes a horizontal line at the given y2 and return."""
     hollow(t, n*height)
     fdbk(t, n)
     hollow(t, -n*height)
 
 def hangman(t, n, height):
-    """Makes a vertical line to the given height and a horizontal line
-    at the given height and then return.
+    """Makes a vertical line to the given y2 and a horizontal line
+    at the given y2 and then return.
     This is efficient to implement, and turns out to be useful, but
     it's not so semantically clean."""
     stump(t, n * height)
@@ -111,7 +111,7 @@ def vshape(t, n, height):
     diagonal(t, n/2, height*n)
 
 def bump(t, n, height):
-    """Makes a bump with radius n at height*n
+    """Makes a bump with radius n at y2*n
     """
     stump(t, n*height)
     arc(t, n/2.0, 180)

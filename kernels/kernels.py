@@ -23,17 +23,24 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 # ILDs = [-2, 0, 2] vs ILDs = [0]               Done
 # 1st half vs 2nd half                          Done
 # Random 50% vs 50%                             Done
-# Left vs right kernels                         To do
+# Left vs right kernels                         Done
+# Permutation CI                                To do
+# Bootstrap errorbars                           To do
 
 
 # Comments from Jaime:
 # - Are you using any type of regularisation when computing the kernels?
-# - Another nice control would be to generate synthetic data with an agent that e.g. only uses 1 frame (1st or n-th). Generate responses using that frame plus noise and compute kernels at different coherences.
+# - Another nice control would be to generate synthetic data with an agent that e.g. only uses 1 frame (1st or n-th).
+# Generate responses using that frame plus noise and compute kernels at different coherences.
 # - Can you also try to compute kernels using the AUC method that Genis describes in his paper (Prat-Ortega et al 2020)'
 
-# 1. For each animal and each stim evidence level, compute the mean and std. dev. of the stimuli used. Check that the means and std dev obtained numerically coincide with the nominal values.
-# 2. Compute, as explained in Kiani’s paper, the mean of all the stimuli conditioned on the choice (ie mean of all stimuli of evidence X yielding a Right choice and the mean of those yielding a Left choice).
-# 3. As we talked Today, compute for each stim evidence and each animal, histograms of the number of times each of the stimulus were used.
+# 1. For each animal and each stim evidence level, compute the mean and std. dev. of the stimuli used. Check that the
+# means and std dev obtained numerically coincide with the nominal values.
+# 2. Compute, as explained in Kiani’s paper, the mean of all the stimuli conditioned on the choice (ie mean of all
+# stimuli of evidence X yielding a Right choice and the mean of those yielding a Left choice).
+# 3. As we talked Today, compute for each stim evidence and each animal, histograms of the number of times each of the
+# stimulus were used.
+
 
 import time
 import os
@@ -47,12 +54,14 @@ import seaborn as sns
 
 # Mel's code snippet for poster
 sns.set_theme()
-sns.set_style("white")
-sns.set_context("poster")
+sns.set_style('white')
+sns.set_style('ticks')
+sns.set_context('poster')
+# sns.despine()
 
 
 def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None,
-                n_mean_frames=None, save=False, format='svg', transparent=False):
+                n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
@@ -132,6 +141,19 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
+
+    ####################################################################################################################
+    'UNDER CONSTRUCTION'
+    ####################################################################################################################
+
+    # Index drug sessions
+    df_intersession = pd.read_csv('/home/alexis/PycharmProjects/intersession/' + animal + '_intersession.csv')
+    # df = df[(df.AccLeft >= 0.75) & (df.AccRight >= 0.75)]  # Select only trials with accuracy above threshold
+    drug_session_dates = df_intersession[df_intersession.Drug == 'MK801'].Dates
+    df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+
+    ####################################################################################################################
+
     filenames = df.Filename.tolist()
 
     # Default plotting parameters
@@ -145,7 +167,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     else:
         n_iterations = 1  # If not running control, 1 plot
 
-    plt.figure()
+    plt.figure(constrained_layout=True)
 
     for j in range(n_iterations):
 
@@ -266,13 +288,17 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # plt.errorbar(np.arange(len(params)), params, yerr=beta_std_err, color='tab:blue', fmt='o',
         #              markerfacecolor='none')  # With constant (bias)
 
-        plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker=None, mfc='none', mec='none', mew=0,
-                 ms=0, label=label)
+        # plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker=None, mfc='none', mec='none', mew=0,
+        #          ms=0, label=label)
+        plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker='o', label=label)
         # Without constant (bias)
+        # Without constant (bias)
+        # plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
+        #              marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10)  # Without constant (bias)
         plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
-                     marker=None, mfc='none', mec='none', mew=0, ms=0)  # Without constant (bias)
+                     marker='o', fmt='none', mec='none', ms=0)  # Without constant (bias)
 
-        plt.axhline(0, color='tab:gray', ls='--')
+        # plt.axhline(0, color='tab:gray', ls='--')
         # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')  # With ILDs
         plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
         plt.xlabel('Stimulus frame')
@@ -296,12 +322,41 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
             plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1, yticks[1]), color=color, va='center', ha='center',
                          fontsize='medium')  # i+1 to skip constant
 
+
+    # Bootstrapping / permutation test (shuffles)
+    shuffles = []
+    for _ in range(iterations):
+        # choices = choices.sample(frac=1).reset_index(drop=True)
+        stim_strength = stim_strength.sample(frac=1).reset_index(drop=True)
+        # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
+        model = sm.GLM(choices, stim_strength,
+                       family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+        results = model.fit()
+        params = results.params
+        shuffles.append(params)
+
+    percentiles = np.percentile(shuffles, 95, axis=0)[1:11]  # Get upper 5 percentile of the shuffles
+    percentiles_mean = np.mean(percentiles)  # Get the mean
+    percentiles = np.insert(percentiles, 0, percentiles_mean)  # Add the mean to the beginning
+    percentiles = np.append(percentiles, percentiles_mean)  # Add the mean to the end
+    shuffles_mean = np.mean(shuffles, axis=0)[1:11]
+    shuffles_mean_mean = np.mean(shuffles_mean)
+    shuffles_mean = np.insert(shuffles_mean, 0, shuffles_mean_mean)
+    shuffles_mean = np.append(shuffles_mean, shuffles_mean_mean)
+    # plt.plot(np.arange(1, len(params)), shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    # plt.plot(np.arange(1, len(params)), percentiles, color='tab:red', ls=':', zorder=1.9)
+    plt.plot(shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(percentiles, color='tab:red', ls=':', zorder=1.9)
+    plt.xlim(0, n_frames + 1)
+    # plt.xticks([2, 4, 6, 8, 10])
+    plt.xticks(np.arange(0, n_frames, 2))
+
     if save:
         folder_out = '/home/alexis/Documentos/kernels/'
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
-        plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename, foramt=format, transparent=transparent)
+        plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format, transparent=transparent)
         plt.close()
 
     time_end = time.time()
@@ -312,7 +367,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
 
 def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
-               target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None, save=False):
+               target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
+               format='svg', transparent=False):
     """Do the kernels for all animals of a given batch (experiment)"""
 
     time_start = time.time()
@@ -338,7 +394,7 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
         path = folder + animals[i]
         print(path)
         plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, zscore=zscore,
-                    control=control, n_mean_frames=n_mean_frames, save=save)
+                    control=control, n_mean_frames=n_mean_frames, iterations=iterations, save=save, format=format, transparent=transparent)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -346,7 +402,8 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
 
 
 def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                                save=False, format='svg', transparent=False):
+                                library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None,
+                                iterations=1000, save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
@@ -374,13 +431,14 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     for i in range(len(animals)):
         print(folder_in + animals[i] + '.csv')
         n_trials.append(len(pd.read_csv(folder_in + animals[i] + '.csv')))
-        params.append(plot_kernel(experiment=experiment, animal=animals[i], library='sm', save=False))
+        params.append(plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds,
+                                  control=None, n_mean_frames=None, iterations=1000, zscore=zscore, save=False))
 
     params = np.array(params)
     params_mean = np.mean(params[:, 1:11], 0)
     params_sem = stats.sem(params[:, 1:11], 0)
 
-    plt.figure()
+    plt.figure(constrained_layout=True)
 
     plt.plot(np.arange(params.shape[1] - 1), params_mean, color='k', marker=None, mfc='none', mec='none', mew=0, ms=0)
     plt.errorbar(np.arange(params.shape[1] - 1), params_mean, yerr=params_sem, color='k', marker=None, mfc='none',

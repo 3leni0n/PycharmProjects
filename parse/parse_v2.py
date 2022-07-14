@@ -338,17 +338,17 @@ def parse_v2(path):
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In',
                'Port1Out', 'Port2In', 'Port2Out', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor',
-               'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board',
-               'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
+               'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'SerialPort', 'Protocol',
+               'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session',
+               'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, message,
-                    message_found,
-                    sound_left, sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out,
-                    aw, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up, recovery_mode, p, serial_port, protocol,
-                    creator, project, experiment, board, setup, net_port, subject, bpod_api_version, session, date,
-                    time_session_started, time_session_ended))
+                    message_found, sound_left, sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out,
+                    aw, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up,
+                    recovery_mode, p, serial_port, protocol, creator, project, experiment, board, setup, net_port,
+                    subject, bpod_api_version, session, date, time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
 

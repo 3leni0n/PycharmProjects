@@ -33,18 +33,175 @@ https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html
 http://pillowlab.princeton.edu/teaching/mathtools16/slides/lec21_Bootstrap.pdf
 """
 
+import time
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 from scipy.stats import bootstrap
+
+# Mel's code snippet for poster
+sns.set_theme()
+sns.set_style('white')
+sns.set_style('ticks')
+sns.set_context('poster')
+# sns.despine()
 
 indexes = df.reset_index().index.values
 
-bootstrap_samples = []
-for _ in range(10000):
-    x = np.random.choice(indexes, size=len(indexes), replace=True)
-    bootstrap_samples.append(x.mean())
+bootstrap_samples_1000 = []
+time_start = time.time()
 
-test = df.sample(replace=False)
+for _ in range(1000):
+
+    # 1x = 0.84s
+    # 10x = 13s
+    # 100x = 2 min
+    # 1000x = 23 min
+
+    # bs = np.random.choice(indexes, size=len(indexes), replace=True)
+    df_bs = df.sample(frac=1, replace=True)  # Bootstrapped df
+
+    # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
+    choices = df_bs.Choice.reset_index(drop=True)  # Indices must match for modeling
+    filenames = df_bs.Filename.tolist()
+    stim_strength = frames_ild.loc[
+        [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        columns=['filename'])
+    stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+    stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
+
+    # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
+    model = sm.GLM(choices, stim_strength,
+                   family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+    results = model.fit()
+    params = results.params
+
+    bootstrap_samples_1000.append(params)
+
+time_end = time.time()
+runtime = time_end - time_start
+print('The script took', round(runtime, 2), 'seconds to run')
+
+plt.figure(constrained_layout=True)
+bs_100_errorbar = np.std(bootstrap_samples_100, axis=0)[1:]
+bs_1000_errorbar = np.std(bootstrap_samples_1000, axis=0)[1:]
+
+plt.figure(constrained_layout=True)
+plt.plot(np.arange(1, len(params)), params.iloc[1:11], color='k', marker=None, mfc='none', mec='none', mew=0,
+         ms=0)
+# Without constant (bias)
+plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color='tab:gray',
+             marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10, alpha=0.5, label='bse')  # Without constant (bias)
+plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=bs_100_errorbar, color='tab:blue',
+             marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10, alpha=0.5, label='bs_100')  # Without constant (bias)
+plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=bs_1000_errorbar, color='tab:orange',
+             marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10, alpha=0.5, label='bs_1000')  # Without constant (bias)
+plt.legend(loc='best', frameon=False, fontsize='xx-small')
+
+########################################################################################################################
+########################################################################################################################
+
+# Permutation test
+shuffles = []
+
+for _ in range(20):
+
+    # 1x = 0.84s
+    # 10x = 13s
+    # 100x = 2 min
+    # 1000x = 23 min
+
+    # bs = np.random.choice(indexes, size=len(indexes), replace=True)
+    # df_bs = df.sample(frac=1, replace=True)  # Bootstrapped df
+
+    # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
+    choices = df.Choice.reset_index(drop=True)  # Indices must match for modeling
+    filenames = df.Filename.tolist()
+    stim_strength = frames_ild.loc[
+        [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        columns=['filename'])
+    stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+    stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
+
+    # choices = choices.sample(frac=1).reset_index(drop=True)
+    stim_strength = stim_strength.sample(frac=1).reset_index(drop=True)
+    # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
+    model = sm.GLM(choices, stim_strength,
+                   family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+    results = model.fit()
+    params = results.params
+
+    shuffles.append(params)
+    plt.plot(np.arange(1, len(params)), params.iloc[1:11], color='tab:gray', marker=None, mfc='none', mec='none', mew=0,
+             ms=0, label=label, alpha=0.5)
+
+time_end = time.time()
+runtime = time_end - time_start
+print('The script took', round(runtime, 2), 'seconds to run')
+
+percentiles = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffles
+shuffles = np.array(shuffles)
 
 
-import statsmodels.stats.api as sms
-sms.DescrStatsW(bootstrap_samples).tconfint_mean()
+
+plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker='o', label=label)
+plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
+             marker='o', fmt='none', mec='none', ms=0)  # Without constant (bias)
+mean_shuffles = np.mean(shuffles, axis=0)[1:11]
+plt.plot(np.arange(1, len(params)), mean_shuffles, color='tab:gray', ls='--', zorder=1.8)
+plt.plot(np.arange(1, len(params)), percentiles[1:11], color='tab:red', ls=':', zorder=1.9)
+
+
+
+
+
+
+
+plt.figure(constrained_layout=True)
+
+# Plot all shuffles
+for i in range(len(shuffles)):
+    plt.plot(np.arange(1, len(params)), shuffles[i][1:], color='tab:gray', marker=None, mfc='none', mec='none', mew=0,
+             ms=0, label=label, alpha=0.1)
+
+# Get the shuffles that are above the 5 percentile
+upper_shuffles = [shuffles[np.where(shuffles[:, i] > percentiles[i])][:,i] for i in range(len(shuffles[0]))]
+upper_shuffles = np.array(upper_shuffles)
+upper_shuffles = upper_shuffles.T
+
+# Plot upper 5% shuffles
+for i in range(len(upper_shuffles) - 1):
+    plt.plot(np.arange(1, len(params)), upper_shuffles[i][1:], color='tab:gray', marker=None, mfc='none', mec='none', mew=0,
+             ms=0, label=label, alpha=0.5)
+
+# Plot kernel
+plt.plot(np.arange(1, len(params)), params_test.iloc[1:11], color='k', marker=None, mfc='none', mec='none', mew=0,
+         ms=0, label=label)
+
+plt.errorbar(np.arange(1, len(params)), params_test.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
+             marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10, zorder=3)  # Without constant (bias)
+
+mean_upper_shuffles = np.mean(upper_shuffles, axis=0)
+std_upper_shuffles = np.std(upper_shuffles, axis=0)
+
+plt.plot(np.arange(1, len(params)), mean_upper_shuffles[1:], color='tab:pink')
+plt.errorbar(np.arange(1, len(params)), mean_upper_shuffles[1:11], yerr=std_upper_shuffles[1:11], color='tab:pink',
+             marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10, zorder=3)  # Without constant (bias)
+
+plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
+plt.xlabel('Stimulus frame')
+plt.ylabel('GLM weight (z-scored)')
+# plt.legend()
+yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+
+
+# From Mel 2:
+# save:
+with open('bootstrap_samples_100.pickle', 'wb') as handle:
+    pickle.dump(bootstrap_samples_100, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+# load:
+with open('../Data/new/df_corrected.pickle', 'rb') as handle:
+    df_dat = pickle.load(handle)

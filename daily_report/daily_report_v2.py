@@ -783,7 +783,7 @@ def daily_report_v2(path, send_slack=False):
 
             # ILDs distribution of the whole session (all trials)
             # ax12 = plt.subplot2grid((16, 4), (10, 2), rowspan=6, colspan=2)
-            # axins2 = inset_axes(ax13, width="50%", height="50%", loc=4)
+            # axins2 = inset_axes(ax13, width="50%", y2="50%", loc=4)
             ax12 = inset_axes(ax13, width="25%", height="25%", loc=4, borderpad=2)
 
             ax12.bar(0, len(df[df.ILD == -70]), color='k')
