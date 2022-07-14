@@ -65,13 +65,14 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
-    :param n_mean_frames: Number of mean frames (end/final frames)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
     :param animal: Mouse ID number
     :param library: library used to compute the kernel
     :param target_ilds: ILDs to use (ideally just 0)
     :param zscore: if True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
     :param control: What control analysis to run
+    :param n_mean_frames: Number of mean frames (end/final frames)
+    :param iterations:
     :param save: If True, saves the plot
     :param format: output format of the saved figure
     :param transparent: set background transparent
@@ -128,6 +129,10 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     if zscore:
         frames_ild = pd.DataFrame(stats.zscore(frames_ild, axis=None))  # Z-score the ILDs (along axis 0 or None
     # returns same result, but not axis 1)
+        ylabel = 'GLM weight (z-scored)'
+    else:
+        ylabel = 'GLM weight'
+
     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
     # # Frames mean (elementwise) - not needed not used
@@ -163,13 +168,13 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     # Control
     if control is not None:
-        n_iterations = 2  # If running control, 2 plots (half vs half, 50% vs 50% random, left vs right, etc)
+        n_plots = 2  # If running control, 2 plots (half vs half, 50% vs 50% random, left vs right, etc)
     else:
-        n_iterations = 1  # If not running control, 1 plot
+        n_plots = 1  # If not running control, 1 plot
 
     plt.figure(constrained_layout=True)
 
-    for j in range(n_iterations):
+    for j in range(n_plots):
 
         # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
         choices = df.Choice.reset_index(drop=True)  # Indices must match for modeling
@@ -229,7 +234,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
                     filename = f'_PK_ILDs: {target_ilds}_left_vs_right'
                 color = 'tab:blue'
 
-            else:  # # 2nd half / 2nd half random / right
+            else:  # 2nd half / 2nd half random / right
                 if control == 'half1_vs_half2':
                     stim_strength = stim_strength.loc[np.rint(len(stim_strength) / 2):, :]  # 2nd half
                     choices = choices.loc[np.rint(len(choices) / 2):]  # 2nd half
@@ -302,7 +307,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')  # With ILDs
         plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
         plt.xlabel('Stimulus frame')
-        plt.ylabel('GLM weight (z-scored)')
+        plt.ylabel(ylabel)
         # plt.legend()
         yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
@@ -322,20 +327,22 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
             plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1, yticks[1]), color=color, va='center', ha='center',
                          fontsize='medium')  # i+1 to skip constant
 
-
-    # Bootstrapping / permutation test (shuffles)
+    # Permutation test (shuffled_var)
     shuffles = []
     for _ in range(iterations):
         # choices = choices.sample(frac=1).reset_index(drop=True)
-        stim_strength = stim_strength.sample(frac=1).reset_index(drop=True)
+        stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
         # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-        model = sm.GLM(choices, stim_strength,
+        model = sm.GLM(choices, stim_strength_shuffled,
                        family=sm.families.Binomial())  # GLM with Binomial family and Logit link
         results = model.fit()
         params = results.params
         shuffles.append(params)
 
-    percentiles = np.percentile(shuffles, 95, axis=0)[1:11]  # Get upper 5 percentile of the shuffles
+    # Maybe use instead 'sns.despine(offset=10, trim=True)' to shift the x axis to the right and see all datapoints
+    # without adding the mean to the beginning and end
+    # (http://seaborn.pydata.org/tutorial/aesthetics.html)
+    percentiles = np.percentile(shuffles, 95, axis=0)[1:11]  # Get upper 5 percentile of the shuffled_var
     percentiles_mean = np.mean(percentiles)  # Get the mean
     percentiles = np.insert(percentiles, 0, percentiles_mean)  # Add the mean to the beginning
     percentiles = np.append(percentiles, percentiles_mean)  # Add the mean to the end
