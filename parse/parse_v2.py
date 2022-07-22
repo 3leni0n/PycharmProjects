@@ -17,7 +17,7 @@ import numpy as np
 def parse_v2(path):
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
     df = pd.read_csv(path, skiprows=6, sep=';')
-    sounds_2 = pd.read_csv('/home/alexis/PycharmProjects/create_sounds/sounds_2.csv')
+    sounds_2 = pd.read_csv('/home/setup2/PycharmProjects/create_sounds/sounds_2.csv')
 
     ####################################################################################################################
 

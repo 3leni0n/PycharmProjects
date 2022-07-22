@@ -2,11 +2,12 @@ import seaborn as sns
 import numpy as np
 import pandas as pd
 import time
+
+
 # from my_fun.my_fun import *
 
 
 def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
-
     ####################################################################################################################
 
     # Plotting style
@@ -41,7 +42,7 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     print('\n')
 
     extra_trials = max(len(df) - trials, 0)
-    print(extra_trials)
+    print('Extra trials: ', extra_trials)
 
     x_min = df.index[0] + extra_trials
     x_max = df.index[-1]
@@ -57,7 +58,6 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     ra_total = compute_window(df.Hit[df.Miss == 0], 20)  # All valid trials
     ra_left = compute_window(df.Hit[(df.Miss == 0) & (df.Side == 0)], 20)  # Left valid trials
     ra_right = compute_window(df.Hit[(df.Miss == 0) & (df.Side == 1)], 20)  # Right valid trials
-
 
     # Plot horizontal lines
     ax1.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -149,18 +149,16 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
 
     # PLOT 4: PERISTIMULUS LICK RASTER
 
-    last = df.Trial.iloc[-1]
-
-    if last > trials:
-        first = last - trials
-    else:
-        first = 0
-
-    for j in first:last:
+    # last = df.Trial.iloc[-1]
+    #
+    # if last > trials:
+    #     first = last - trials
+    # else:
+    #     first = 0
+    #
+    # for j in range(first, last):
 
     for j in range(len(df)):  # n trials
-
-        k = j + len(df) - trials
 
         if df.Side.iloc[j] == 0:
             stim_color = 'tab:blue'
@@ -173,27 +171,27 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         # Need to specify zorder otherwise response window is plotted under stimulus length and can't be seen
 
         # Define response window color according to trial outcome
-        if df.WrongLick[j] == 1.0:
+        if df.WrongLick.iloc[j] == 1.0:
             resp_win_color = 'tab:pink'
-        elif df.Hit[j] == 0.0:
+        elif df.Hit.iloc[j] == 0.0:
             resp_win_color = 'tab:red'
-        elif df.Hit[j] == 1.0:
+        elif df.Hit.iloc[j] == 1.0:
             resp_win_color = 'tab:green'
-        elif np.isnan(df.Hit[j]):
+        elif np.isnan(df.Hit.iloc[j]):
             resp_win_color = 'tab:gray'
 
         # Plot response window length
-        ax4.barh(df.index.values[j], df.RespWinLen[j], left=df.RespWinStart[j] - df.StimStart[j], color=resp_win_color,
-                 zorder=2)
+        ax4.barh(df.index.values[j], df.RespWinLen.iloc[j], left=df.RespWinStart.iloc[j] - df.StimStart.iloc[j],
+                 color=resp_win_color, zorder=2)
 
         # Left licks
-        for i in range(len(df.Port1In[j])):  # n licks
+        for i in range(len(df.Port1In.iloc[j])):  # n licks
 
             # If licks are after stimulus onset, draw markeredgecolor so it can be seen over stimulus length barh
-            if df.Port1In[j][i] - \
-                    df.StimStart[j] > \
-                    df.StimStart[j] - \
-                    df.StimStart[j]:
+            if df.Port1In.iloc[j][i] - \
+                    df.StimStart.iloc[j] > \
+                    df.StimStart.iloc[j] - \
+                    df.StimStart.iloc[j]:
                 ms = 2
                 mec = 'k'
                 mew = 0.1
@@ -202,24 +200,22 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
                 mec = 'tab:blue'
                 mew = None
 
-            if not df.Port1In[j]:
+            if not df.Port1In.iloc[j]:
                 pass
             else:
-                ax4.plot(df.Port1In[j][i] -
-                        df.StimStart[j],
-                        df.index[j], marker='o', ms=200 / len(df.Side == 0),
+                ax4.plot(df.Port1In.iloc[j][i] - df.StimStart.iloc[j], df.index[j], marker='o', ms=200 / len(df.Side == 0),
                         mec=mec, mew=mew, color='tab:blue', zorder=3)
                 # markersize=200 / len(df.Side == 0))
                 # markersize = ax.containers[1][0].get_height()
 
         # Right licks
-        for i in range(len(df.Port2In[j])):  # n licks
+        for i in range(len(df.Port2In.iloc[j])):  # n licks
 
             # If licks are after stimulus onset, draw markeredgecolor so it can be seen over stimulus length barh
-            if df.Port2In[j][i] - \
-                    df.StimStart[j] > \
-                    df.StimStart[j] - \
-                    df.StimStart[j]:
+            if df.Port2In.iloc[j][i] - \
+                    df.StimStart.iloc[j] > \
+                    df.StimStart.iloc[j] - \
+                    df.StimStart.iloc[j]:
                 ms = 2
                 mec = 'k'
                 mew = 0.1
@@ -228,20 +224,115 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
                 mec = 'tab:orange'
                 mew = None
 
-            if not df.Port2In[j]:
+            if not df.Port2In.iloc[j]:
                 pass
             else:
-                ax4.plot(df.Port2In[j][i] -
-                        df.StimStart[j],
-                        df.Port2In.index[j], marker='o', ms=200 / len(df.Side == 0),
+                ax4.plot(df.Port2In.iloc[j][i] - df.StimStart.iloc[j], df.Port2In.index[j], marker='o', ms=200 / len(df.Side == 0),
                         mec=mec, mew=mew, color='tab:orange', zorder=3)
                 # markersize=200 / len(df.Side == 1))
                 # markersize = ax.containers[1][0].get_height()
 
     ax4.set_xlabel('Time (s) from stim. onset')
+    ax4.set_xlim([0, 5])
     ax4.set_ylabel('Trial')
+    ax4.set_ylim([y_min, y_max])
     # ax4.set_ylim([max(len(df) - trials, 0), len(df)])
     # print(y_min, y_max)
+
+    ####################################################################################################################
+
+    # PLOT 4: PERISTIMULUS LICK RASTER
+
+    # last = df.Trial.iloc[-1]
+    #
+    # if last > trials:
+    #     first = last - trials
+    # else:
+    #     first = 0
+    #
+    # for j in range(first, last):
+
+    # if df.Side.iloc[-1] == 0:
+    #     stim_color = 'tab:blue'
+    # elif df.Side.iloc[-1] == 1:
+    #     stim_color = 'tab:orange'
+    #
+    # # Plot stimulus length
+    # ax4.barh(df.index.values[-1], df.StimLen.iloc[-1], left=df.StimStart.iloc[-1] - df.StimStart.iloc[-1],
+    #          color=stim_color, alpha=1, label='Stim', zorder=1)
+    # # Need to specify zorder otherwise response window is plotted under stimulus length and can't be seen
+    #
+    # # Define response window color according to trial outcome
+    # if df.WrongLick.iloc[-1] == 1.0:
+    #     resp_win_color = 'tab:pink'
+    # elif df.Hit.iloc[-1] == 0.0:
+    #     resp_win_color = 'tab:red'
+    # elif df.Hit.iloc[-1] == 1.0:
+    #     resp_win_color = 'tab:green'
+    # elif np.isnan(df.Hit.iloc[-1]):
+    #     resp_win_color = 'tab:gray'
+    #
+    # # Plot response window length
+    # ax4.barh(df.index.values[-1], df.RespWinLen.iloc[-1], left=df.RespWinStart.iloc[-1] - df.StimStart.iloc[-1],
+    #          color=resp_win_color, zorder=2)
+    #
+    # # Left licks
+    # for i in range(len(df.Port1In.iloc[-1])):  # n licks
+    #
+    #     # If licks are after stimulus onset, draw markeredgecolor so it can be seen over stimulus length barh
+    #     if df.Port1In.iloc[-1][i] - \
+    #             df.StimStart.iloc[-1] > \
+    #             df.StimStart.iloc[-1] - \
+    #             df.StimStart.iloc[-1]:
+    #         ms = 2
+    #         mec = 'k'
+    #         mew = 0.1
+    #     else:
+    #         ms = 1
+    #         mec = 'tab:blue'
+    #         mew = None
+    #
+    #     if not df.Port1In.iloc[-1]:
+    #         pass
+    #     else:
+    #         ax4.plot(df.Port1In.iloc[-1][i] - df.StimStart.iloc[-1], df.index[-1], marker='o',
+    #                  ms=200 / len(df.Side == 0),
+    #                  mec=mec, mew=mew, color='tab:blue', zorder=3)
+    #         # markersize=200 / len(df.Side == 0))
+    #         # markersize = ax.containers[1][0].get_height()
+    #
+    # # Right licks
+    # for i in range(len(df.Port2In.iloc[-1])):  # n licks
+    #
+    #     # If licks are after stimulus onset, draw markeredgecolor so it can be seen over stimulus length barh
+    #     if df.Port2In.iloc[-1][i] - \
+    #             df.StimStart.iloc[-1] > \
+    #             df.StimStart.iloc[-1] - \
+    #             df.StimStart.iloc[-1]:
+    #         ms = 2
+    #         mec = 'k'
+    #         mew = 0.1
+    #     else:
+    #         ms = 1
+    #         mec = 'tab:orange'
+    #         mew = None
+    #
+    #     if not df.Port2In.iloc[-1]:
+    #         pass
+    #     else:
+    #         ax4.plot(df.Port2In.iloc[-1][i] - df.StimStart.iloc[-1], df.Port2In.index[-1], marker='o',
+    #                  ms=200 / len(df.Side == 0),
+    #                  mec=mec, mew=mew, color='tab:orange', zorder=3)
+    #         # markersize=200 / len(df.Side == 1))
+    #         # markersize = ax.containers[1][0].get_height()
+    #
+    # ax4.set_xlabel('Time (s) from stim. onset')
+    # ax4.set_ylabel('Trial')
+    # ax4.set_ylim([y_min, y_max])
+    # # ax4.set_ylim([max(len(df) - trials, 0), len(df)])
+    # # print(y_min, y_max)
+
+    ####################################################################################################################
 
     # Plot text
     accuracy = round(df.Hit.mean(), 2)
