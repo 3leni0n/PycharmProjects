@@ -266,29 +266,29 @@ def getWaterCalib(board, ports):  # From UtilsR
             return [float(results[i - 1]) for i in ports]
 
 
-# def my_select_evidence_old(trial_type, evidences):  # Adapted from UtilsR
-#     """
-#     Reduce the prob of 0 evidence to 1/2 as it is part of both left and right trials. This function would be equivalent
-#     to repeat each evidence in the array except for 0
-#     trial_type: int, 0=left, 1=right
-#     evidences: np.array with all possible evidences
-#     returns: a randomly selected evidence from the available ones according to trial_type and withdrawn with equal prob
-#     """
-#     evidences = np.array(evidences)
-#     if trial_type == 0:
-#         available = evidences[evidences <= 0]  # evidences corresponding to the left
-#     else:
-#         available = evidences[evidences >= 0]  # evidences corresponding to the right
-#     if 0 not in evidences:  # just pick one randomly
-#         selected_evidence = np.random.choice(available)
-#     else:  # find it and set its prob of being taken by np.random.choice by 1/2 of the rest
-#         zero_loc = np.where(available == 0)[0][0]  # index of 0 in our vector available
-#         prob = 1 / len(evidences)  # prob of any particular evidence
-#         prob_vec = np.repeat(prob * 2, len(available))  # Make them all double
-#         prob_vec[zero_loc] = prob  # Set prob for evidence 0 to 1/2 of the rest so it appears with the same prob to
-#         # other evidences if added both reward sides
-#         selected_evidence = np.random.choice(available, p=prob_vec)
-#     return selected_evidence  # UtilsR one returns coherence
+def my_select_evidence_old(trial_type, evidences):  # Adapted from UtilsR
+    """
+    Reduce the prob of 0 evidence to 1/2 as it is part of both left and right trials. This function would be equivalent
+    to repeat each evidence in the array except for 0
+    trial_type: int, 0=left, 1=right
+    evidences: np.array with all possible evidences
+    returns: a randomly selected evidence from the available ones according to trial_type and withdrawn with equal prob
+    """
+    evidences = np.array(evidences)
+    if trial_type == 0:
+        available = evidences[evidences <= 0]  # evidences corresponding to the left
+    else:
+        available = evidences[evidences >= 0]  # evidences corresponding to the right
+    if 0 not in evidences:  # just pick one randomly
+        selected_evidence = np.random.choice(available)
+    else:  # find it and set its prob of being taken by np.random.choice by 1/2 of the rest
+        zero_loc = np.where(available == 0)[0][0]  # index of 0 in our vector available
+        prob = 1 / len(evidences)  # prob of any particular evidence
+        prob_vec = np.repeat(prob * 2, len(available))  # Make them all double
+        prob_vec[zero_loc] = prob  # Set prob for evidence 0 to 1/2 of the rest so it appears with the same prob to
+        # other evidences if added both reward sides
+        selected_evidence = np.random.choice(available, p=prob_vec)
+    return selected_evidence  # UtilsR one returns coherence
 
 
 def my_select_evidence_new(trial_type, evidences, p=None):  # Adapted from UtilsR
@@ -349,24 +349,21 @@ def my_select_evidence_new(trial_type, evidences, p=None):  # Adapted from Utils
     return selected_evidence  # UtilsR one returns coherence
 
 
-"""
-df = pd.read_csv('/home/setup2/pybpod/sounds_2.csv')
-ilds = df.ILD.unique()
-n_trials = 10000
-trial_types = [0, 1]
-trial_list = np.random.choice(trial_types, n_trials).tolist()
-"""
-
-
 def select_ilds(ilds, p, side):
+    """
+    :param ilds: array with the ilds to select from
+    :param p: probability of difficult ilds (non-maximum evidence). Between 0 and 1
+    :param side: Side from where to select the ilds from. 0=left, 1=right
+    :return: randomly selected ild from ilds for a given side
+    """
     # r = random.random()  # Generate random float between 0 and 1. PyBpod missing random library
-    r = np.random.random(1)[0]  # Generate random float between 0 and 1
-    if r > p:
+    r = np.random.random(1)[0]  # Return random floats in the half-open interval [0.0, 1.0)
+    if r > p:  # Easiest ilds (maximum evidence)
         if side == 0:  # Left
             return ilds.min()  # Sound left only
         else:  # Right
             return ilds.max()  # Sound right only
-    else:
+    else:  # Rest of the ilds (non maximum evidence)
         if side == 0:  # Left
             options = ilds[ilds <= 0]  # Left ILDs
             options = np.repeat(options, 2)  # Repeat each element of the vector
@@ -375,17 +372,22 @@ def select_ilds(ilds, p, side):
             options = ilds[ilds >= 0]  # Right ILDs
             options = np.repeat(options, 2)  # Repeat each element of the vector
             options = options[1:]  # Exclude one of the 0s from the vector, so it has 1/2 p than the rest
-    # selected_ild = random.choice(options)
-    selected_ild = np.random.choice(options)
+        selected_ild = np.random.choice(options)  # Generates a random sample from a given 1-D array
     return selected_ild
 
 
 """
-evidences = []
+n_trials = 10000
+trial_types = [0, 1]  # 0 (rewarded left) or 1 (rewarded right)
+# trial_list = np.random.choice(trial_types, n_trials).tolist()  # Generate random trial vector of length n_trials
+trial_list = np.random.choice(trial_types, n_trials).tolist() 
+ilds = np.array([-70, -8, -4, -2, 0, 2, 4, 8, 70])
+p = 0.5
+ild = []
 for i in range(n_trials):
-    evidences.append(select_ilds(ilds, 1, trial_list[i]))
-plt.hist(evidences, bins=100)
-plt.title('p=1')
+    ild.append(select_ilds(ilds, p, trial_list[i]))
+plt.hist(ild, bins=100)
+plt.title(f'p={p}')
 """
 
 
@@ -394,7 +396,7 @@ def enterthematrix(filepath):
     # Import sounds DataFrame but only the filenames
     # filepath = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     # filepath_setup2 = '/home/setup2/'  # setup2 pc
-    # df_ild = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
+    # filenames = pd.read_csv(filepath, usecols=['filename'])  # Alternatively usecols=[0], to import only 'filename' column
     df = pd.read_csv(filepath)  # Import all columns
     # Create relevant arrays to build DataFrame columns
     evidences = np.array([-1, -0.9, -0.8, -0.75, -0.6, -0.5, -0.4, -0.3, -0.25, -0.1,
@@ -410,14 +412,14 @@ def enterthematrix(filepath):
               np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
     df.insert(2, 'coherence', np.repeat(coherences, len(coherences) ** 2))
     df.insert(3, 'difficulty', np.repeat(difficulties, len(difficulties) ** 2))
-    # df_ild.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
+    # filenames.insert(4, 'stage', np.repeat(stages, len(stages) ** 2))
     df.insert(4, 'substage', np.repeat(substages, len(substages) ** 2))
 
-    # df_ild['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
-    # df_ild['coherence'] = np.repeat(coherences, len(coherences) ** 2)
-    # df_ild['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
-    # # df_ild['stage'] = np.repeat(stages, len(stages) ** 2)
-    # df_ild['substage'] = np.repeat(substages, len(substages) ** 2)
+    # filenames['evidence'] = np.repeat(evidences, len(evidences) ** 2)  # Repeat each evidence per n sounds with that evidence
+    # filenames['coherence'] = np.repeat(coherences, len(coherences) ** 2)
+    # filenames['difficulty'] = np.repeat(difficulties, len(difficulties) ** 2)
+    # # filenames['stage'] = np.repeat(stages, len(stages) ** 2)
+    # filenames['substage'] = np.repeat(substages, len(substages) ** 2)
     return df
 
 
@@ -597,7 +599,7 @@ def ild():
     """
     path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     df = pd.read_csv(path)
-    # df_ild = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
+    # filenames = pd.read_csv(path).drop('filename', 1)  # Import csv as DataFrame dropping the column 'filename'
     df_dB = df  # Copy DataFrame
     df_dB.iloc[:, 1:21] = power_dB(abs(df.iloc[:, 1:21]))  # Apply the function to entire DataFrame except 'filename'
     # column. abs because can't do log10 of negative number. To retrieve the negative sign for left the ILD will be
@@ -617,7 +619,7 @@ def ild():
                           0, 0.1, 0.25, 0.3, 0.4, 0.5, 0.6, 0.75, 0.8, 0.9, 1])  # Define evidences
     df_ild.insert(1, 'Evidence',
                   np.repeat(evidences, len(evidences) ** 2))  # Repeat each evidence per n sounds with that evidence
-    # df_ild_summary = df_ild.groupby('Evidence', as_index=False).mean()  # SQL-style index
+    # df_ild_summary = filenames.groupby('Evidence', as_index=False).mean()  # SQL-style index
     df_ild_summary = df_ild.groupby('Evidence').mean()  # Group labels asn index
     return df_ild
 
@@ -680,6 +682,8 @@ def compute_psych_curve(x, y, n_points=100):
         # Function to fit:
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
 
+        # If take x0 out of parenthesis
+
         # Calculate negative log likelihood:
         ll = - np.sum(stats.norm.logpdf(ydata, loc=y_pred))
 
@@ -725,6 +729,49 @@ def compute_psych_curve(x, y, n_points=100):
                            fit_error=fit_error)
 
 
+def pc_lapses0(x, k, x0):
+    """
+    Psychometric function when lapses = 0
+    :param x: value to predict
+    :param k: slope
+    :param x0: bias
+    :return: value of y for the input value of x
+    """
+    return 1 / (1 + np.exp(-k * (x - x0)))
+
+
+def pc_lapses0_x0(k, x0):
+    """
+    Psychometric function when lapses = 0 and x = 0 (special case of the above)
+    :param k: slope
+    :param x0: bias
+    :return: value of y for x = 0
+    """
+    return 1 / (1 + np.exp(k * x0))
+
+
+def pc_bias0(x, b, p, k):
+    """
+    Psychometric function when bias = 0
+    :param x: value to predict
+    :param b: lower lapse
+    :param p: upper lapse
+    :param k: slope
+    :return: value of y for the input value of x
+    """
+    return b + (1 - b - p) / (1 + np.exp(-k * x))
+
+
+def pc_bias0_x0(b, p):
+    """
+    Psychometric function when bias = 0 and x = 0 (special case of the above)
+    :param b: lower lapse
+    :param p: upper lapse
+    :return: value of y for x = 0
+    """
+    return b + (1 - b - p) / 2
+
+
 def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapted from UtilsR (Jordi's)
     """This sends msgs through the bot. Avoid spamming too much else it will get banned or timed-out. Atm not possible
     to update several files at the same time (https://github.com/slackapi/python-slack-sdk/issues/442)
@@ -766,3 +813,29 @@ def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapte
                 print(f"filepath '{filepath}' doesn't exist")
         except Exception as e:
             print(e)  # Perhaps prints are caught by pybpod
+
+
+def check_date_exist(date, dates):
+    """
+    Check if a string date exist in a list or Series of string dates
+    :param date: date as string
+    :param dates: dates as list or pd.Series of strings
+    :return:
+    """
+    date = str(date)  # Ensure date is in string format
+    if type(dates) is list:  # Check if iterable of dates is a list
+        # print('Is list')
+        if date in dates:
+            print(f'Date {date} exists')
+            return True
+        else:
+            print(f'Date {date} doesnt exist')
+            return False
+    elif type(dates) is pd.core.series.Series:  # Check if iterable of dates is a pandas Series
+        # print('Is pandas Series')
+        if dates.str.contains(date).any():
+            print(f'Date {date} exists')
+            return True
+        else:
+            print(f'Date {date} doesnt exist')
+            return False

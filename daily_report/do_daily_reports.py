@@ -40,6 +40,10 @@ def do_daily_reports_v2(send_slack=False):
     except ValueError:
         pass
     try:
+        animals.remove('329')
+    except ValueError:
+        pass
+    try:
         animals.remove('330')
     except ValueError:
         pass
@@ -48,11 +52,11 @@ def do_daily_reports_v2(send_slack=False):
     except ValueError:
         pass
     try:
-        animals.remove('333')
+        animals.remove('334')
     except ValueError:
         pass
     try:
-        animals.remove('334')
+        animals.remove('335')
     except ValueError:
         pass
 

@@ -64,13 +64,13 @@ def pcr_grin1_takara(n_samples, volume=25, control=True, extra=1):
     primer_in = 0.5 * n_samples  # 100 uM concentration
     print(f'Add {primer_in} ul of primer in (100 uM)')
     primer_out = 0.5 * n_samples  # 100 uM concentration
-    print(f'Add {primer_out} ul of primer out (100 uM)\n')
+    print(f'Add {primer_out} ul of primer out (100 uM)')
     taq = 0.2 * n_samples  # 50 uM concentration
     print(f'Add {taq} ul of Taq Polimerase\n')
     dna = 2
 
     print('Add to each PCR tube:')
-    print(f'Add {7.5 + 10 + 0.5 + 0.5} ul of mix')
+    print(f'Add {16.3 + 3 + 2.5 + 0.5 + 0.5 + 0.2} ul of mix')
     print(f'Add {dna} ul of DNA')
 
     assert(((water + dNTP + buffer_10x + primer_in + primer_out + taq) / n_samples) + dna) == volume
@@ -155,7 +155,7 @@ def pcr_pvcre_takara(n_samples, volume=25, control=True, extra=1):
     dna = 1.5
 
     print('Add to each PCR tube:')
-    print(f'Add {5 + 10 + 1 + 1 + 1 + 1} ul of mix')
+    print(f'Add {13.8 + 3 + 2.5 + 1 + 1 + 1 + 1 + 0.2} ul of mix')
     print(f'Add {dna} ul of DNA')
 
     assert(((water + dNTP + buffer_10x + primer_A + primer_B + primer_C + primer_D + taq) / n_samples) + dna) == volume
