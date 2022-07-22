@@ -716,7 +716,6 @@ def plot_bias_vs_lapses(kind='prob_rep', save=False, format='svg', transparent=F
 
 
 # Psych curves for drug data
-
 def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337'],
                            save=False, kind='prob_rep', format='svg', transparent=False):
 

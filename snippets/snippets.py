@@ -20,3 +20,9 @@ with open('bootstrap_samples_100.pickle', 'wb') as handle:
 # load:
 with open('../Data/new/df_corrected.pickle', 'rb') as handle:
     df_dat = pickle.load(handle)
+
+# How to 'listen' specific sounds with the DAC mic in the setup:
+# 1. Change the calibration of 'on_play_Sound1' from '001.wav' to the desired sound ('xxx.wav')
+# 2. Open the console, go to the directory 'cd pluginsr-for-pybpod/sound\ test'
+# 3. Run 'python sount_test.py "/devttyACMX" "left/right/both"
+# 4. Modify in sount_test the2nd sleep (line 57) to adjust the window in which dB are calculated

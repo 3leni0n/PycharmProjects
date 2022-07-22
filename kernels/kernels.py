@@ -148,14 +148,25 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
 
     ####################################################################################################################
-    'UNDER CONSTRUCTION'
+    'UNDER CONSTRUCTION >>> DRUG DATA'
     ####################################################################################################################
 
     # Index drug sessions
     df_intersession = pd.read_csv('/home/alexis/PycharmProjects/intersession/' + animal + '_intersession.csv')
     # df = df[(df.AccLeft >= 0.75) & (df.AccRight >= 0.75)]  # Select only trials with accuracy above threshold
     drug_session_dates = df_intersession[df_intersession.Drug == 'MK801'].Dates
-    df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+    # df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+
+    df.drop(index=df[(df.Date == '2022-05-25') & (df.Setup == 337)].index, inplace=True)
+    df.drop(index=df[(df.Date == '2022-05-24') & (df.Setup == 337)].index, inplace=True)
+    df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)
+    df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)
+    df.drop(index=df[(df.Date == '2022-05-31') & (df.Setup == 333)].index, inplace=True)
+
+    # df = df[df.Drug == 'saline']
+    df = df[df.Drug == 'MK801']
+    # df = df[df.Drug == 'rest']
+    n_trials = len(df)
 
     ####################################################################################################################
 
@@ -185,18 +196,15 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
         # Average frames (to have more trials per regressor)
         if n_mean_frames is not None:
-            # n_mean_frames = 2  # Number of mean frames (end/final frames)
-            n_frames_per_mean_frame = int(
-                n_frames / n_mean_frames)  # Number of frames to compute the mean of (must be an integer
-            # for slicing)
+            n_frames_per_mean_frame = int(n_frames / n_mean_frames)  # Number of frames to compute the mean of (must be
+            # an integer for slicing)
             assert n_frames % n_mean_frames == 0  # Need to be exact division
             stim_strength_mean = []
             for i in range(n_mean_frames):
                 stim_strength_mean.append(stim_strength.iloc[:,
                                           i * n_frames_per_mean_frame:n_frames_per_mean_frame + i * n_frames_per_mean_frame].mean(
                     axis=1))  # Get the mean per trial of every 'n_frames_per_mean_frame' frames
-            stim_strength = pd.DataFrame(data=stim_strength_mean)
-            stim_strength = stim_strength.T
+            stim_strength = pd.DataFrame(data=stim_strength_mean).T
             filename = f'_PK_ILDs: {target_ilds}, {n_mean_frames} averaged frames'
 
         # Random 50% vs 50% of trials without replacement
@@ -289,23 +297,10 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # stderr = result.stderr
 
         # Plot kernel
-        # plt.plot(np.arange(len(params)), params, marker='o', mfc='None', label=label)  # With constant (bias)
-        # plt.errorbar(np.arange(len(params)), params, yerr=beta_std_err, color='tab:blue', fmt='o',
-        #              markerfacecolor='none')  # With constant (bias)
-
-        # plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker=None, mfc='none', mec='none', mew=0,
-        #          ms=0, label=label)
         plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker='o', label=label)
-        # Without constant (bias)
-        # Without constant (bias)
-        # plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
-        #              marker=None, fmt='none', mfc='none', mec='none', ms=0, capsize=10)  # Without constant (bias)
         plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
                      marker='o', fmt='none', mec='none', ms=0)  # Without constant (bias)
-
-        # plt.axhline(0, color='tab:gray', ls='--')
-        # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')  # With ILDs
-        plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
+        plt.title(f'Mouse {df.Setup.unique()[0]}, {n_trials} trials')
         plt.xlabel('Stimulus frame')
         plt.ylabel(ylabel)
         # plt.legend()
@@ -333,30 +328,24 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # choices = choices.sample(frac=1).reset_index(drop=True)
         stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
         # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-        model = sm.GLM(choices, stim_strength_shuffled,
+        model_shuffled = sm.GLM(choices, stim_strength_shuffled,
                        family=sm.families.Binomial())  # GLM with Binomial family and Logit link
-        results = model.fit()
-        params = results.params
-        shuffles.append(params)
+        results_shuffled = model_shuffled.fit()
+        params_shuffled = results_shuffled.params
+        shuffles.append(params_shuffled)
+        # plt.plot(np.arange(1, len(params_shuffled)), params_shuffled.iloc[1:11], color='tab:gray', marker=None,
+        #          mfc='none', mec='none', mew=0, ms=0, label=label, alpha=0.1, zorder=1.7)  # Plot all shuffles
 
-    # Maybe use instead 'sns.despine(offset=10, trim=True)' to shift the x axis to the right and see all datapoints
-    # without adding the mean to the beginning and end
-    # (http://seaborn.pydata.org/tutorial/aesthetics.html)
-    percentiles = np.percentile(shuffles, 95, axis=0)[1:11]  # Get upper 5 percentile of the shuffled_var
-    percentiles_mean = np.mean(percentiles)  # Get the mean
-    percentiles = np.insert(percentiles, 0, percentiles_mean)  # Add the mean to the beginning
-    percentiles = np.append(percentiles, percentiles_mean)  # Add the mean to the end
-    shuffles_mean = np.mean(shuffles, axis=0)[1:11]
-    shuffles_mean_mean = np.mean(shuffles_mean)
-    shuffles_mean = np.insert(shuffles_mean, 0, shuffles_mean_mean)
-    shuffles_mean = np.append(shuffles_mean, shuffles_mean_mean)
-    # plt.plot(np.arange(1, len(params)), shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    # plt.plot(np.arange(1, len(params)), percentiles, color='tab:red', ls=':', zorder=1.9)
-    plt.plot(shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(percentiles, color='tab:red', ls=':', zorder=1.9)
-    plt.xlim(0, n_frames + 1)
-    # plt.xticks([2, 4, 6, 8, 10])
-    plt.xticks(np.arange(0, n_frames, 2))
+    shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
+    percentiles = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    plt.plot(np.arange(1, len(params)), shuffles_mean[1:11], color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(np.arange(1, len(params)), percentiles[1:11], color='tab:red', ls=':', zorder=1.9)
+    plt.xticks(np.arange(1, n_frames + 1, 1))  # Put one xtick for observation for triming later
+    sns.despine(offset=10, trim=True)  # Despine axes triming the 0
+    plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
+
+    if n_mean_frames == 2:
+        plt.xticks([1, 2])  # Readjust xticks
 
     if save:
         folder_out = '/home/alexis/Documentos/kernels/'
@@ -366,11 +355,13 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format, transparent=transparent)
         plt.close()
 
+    plt.close()
+
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
-    return params
+    return params, shuffles_mean, percentiles, n_trials
 
 
 def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
@@ -432,46 +423,84 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
 
     n_frames = 10
-    params = []
-    n_trials = []
+    params_across_animals = []
+    shuffles_means_across_animals = []
+    percentiles_across_animals = []
+    n_trials_across_animals = []
 
     for i in range(len(animals)):
-        print(folder_in + animals[i] + '.csv')
-        n_trials.append(len(pd.read_csv(folder_in + animals[i] + '.csv')))
-        params.append(plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds,
-                                  control=None, n_mean_frames=None, iterations=1000, zscore=zscore, save=False))
+        params, shuffles_mean, percentiles, n_trials = plot_kernel(experiment=experiment, animal=animals[i], library=library,
+                                                         target_ilds=target_ilds, control=control,
+                                                         n_mean_frames=n_mean_frames, iterations=iterations,
+                                                         zscore=zscore, save=save)
+        params_across_animals.append(params)
+        shuffles_means_across_animals.append(shuffles_mean)
+        percentiles_across_animals.append(percentiles)
+        n_trials_across_animals.append(n_trials)
+        # n_trials.append(len(pd.read_csv(folder_in + animals[i] + '.csv')))
 
-    params = np.array(params)
-    params_mean = np.mean(params[:, 1:11], 0)
-    params_sem = stats.sem(params[:, 1:11], 0)
+    # plt.close('all')
+
+    params_across_animals = np.array(params_across_animals)
+    params_mean_across_animals = np.mean(params_across_animals, 0)
+    params_sem_across_animals = stats.sem(params_across_animals, 0)
+    shuffles_means_across_animals = np.array(shuffles_means_across_animals)
+    shuffles_means_mean_across_animals = np.mean(shuffles_means_across_animals, 0)
+    percentiles_across_animals = np.array(percentiles_across_animals)
+    percentiles_mean_across_animals = np.mean(percentiles_across_animals, 0)
 
     plt.figure(constrained_layout=True)
 
-    plt.plot(np.arange(params.shape[1] - 1), params_mean, color='k', marker=None, mfc='none', mec='none', mew=0, ms=0)
-    plt.errorbar(np.arange(params.shape[1] - 1), params_mean, yerr=params_sem, color='k', marker=None, mfc='none',
-                 mec='none', mew=0, ms=0)
+    # color = 'k'
+    color = 'tab:pink'
+    # color = 'tab:gray'
 
-    plt.axhline(0, color='tab:gray', ls='--')
+    # Plot kernel
+    plt.plot(np.arange(1, len(params_mean_across_animals)), params_mean_across_animals[1:11], color=color, marker='o')
+    plt.errorbar(np.arange(1, len(params_mean_across_animals)), params_mean_across_animals[1:11],
+                 yerr=params_sem_across_animals[1:11], color=color, marker='o', fmt='none', mec='none')
+    plt.plot(np.arange(1, len(shuffles_means_mean_across_animals)), shuffles_means_mean_across_animals[1:11],
+             color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(np.arange(1, len(percentiles_mean_across_animals)), percentiles_mean_across_animals[1:11], color='tab:red',
+             ls=':', zorder=1.9)
+
+    n_frames = n_mean_frames
+    plt.xticks(np.arange(1, n_frames + 1, 1))  # Put one xtick for observation for triming later
+    sns.despine(offset=10, trim=True)  # Despine axes triming the 0
+    plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
+
+    if n_mean_frames == 2:
+        plt.xticks([1, 2])  # Readjust xticks
+
+    # plt.axhline(0, color='tab:gray', ls='--')
     # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials, ILDs: {target_ilds}')  # With ILDs
-    plt.title(f'N={len(params)}, {sum(n_trials)} trials')
+    plt.title(f'N={len(params_across_animals)}, {sum(n_trials_across_animals)} trials')
     plt.xlabel('Stimulus frame')
-    plt.ylabel('GLM weight (z-scored)')
+
+    if zscore:
+        plt.ylabel('GLM weight (z-scored)')
+    else:
+        plt.ylabel('GLM weight')
+
     # plt.legend()
     yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
     if save:
         folder_out = '/home/alexis/Documentos/kernels/'
-        filename = 'mean_PK_across_animals'
+        filename = f'mean_PK_across_animals: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
         plt.savefig(folder_out + filename, format=format, transparent=transparent)
-        plt.close()
-
-    plt.close('all')
+        # plt.close()
 
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
-    return params
+    return params_across_animals, shuffles_means_across_animals, percentiles_across_animals
+
+
+# plt.savefig('/home/alexis/Escritorio/PK_saline_332+333+337_ILDs:[+-8, +-4, +-2, 0].png')
+# plt.savefig('/home/alexis/Escritorio/PK_MK801_332+333+337_ILDs:[+-8, +-4, +-2, 0].png')
+# plt.savefig('/home/alexis/Escritorio/PK_rest_332+333+337_ILDs:[+-8, +-4, +-2, 0].png')
