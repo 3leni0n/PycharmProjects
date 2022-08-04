@@ -2,9 +2,10 @@ import time
 import os
 from daily_report.daily_report import *
 from daily_report.daily_report_v2 import *
+from daily_report.daily_report_v3 import *
 
 
-def do_daily_reports_v2(send_slack=False):
+def do_daily_reports(version=3, send_slack=False):
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
     # folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'
@@ -46,15 +47,28 @@ def do_daily_reports_v2(send_slack=False):
                 print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found in the same date(s)'"", sep='')
                 # print(path)
-                # daily_report(path, send_slack=send_slack)
-                daily_report_v2(path, send_slack=send_slack)
+                if version == 1:
+                    # daily_report(path, send_slack=send_slack)
+                    pass
+                elif version == 2:
+                    # daily_report_v2(path, send_slack=send_slack)
+                    pass
+                elif version == 3:
+                    daily_report_v3(path, send_slack=send_slack)
         else:
             path = folder2 + sessionID + '/' + sessionID + '.csv'  # Get csv file path to input parse/parse_v2.py
             print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
                   ' sessions found in the same date(s)'"", sep='')
             # print(path)
-            # daily_report(path, send_slack=send_slack)
-            daily_report_v2(path, send_slack=send_slack)
+
+            if version == 1:
+                # daily_report(path, send_slack=send_slack)
+                pass
+            elif version == 2:
+                # daily_report_v2(path, send_slack=send_slack)
+                pass
+            elif version == 3:
+                daily_report_v3(path, send_slack=send_slack)
 
     time_end = time.time()
     runtime = time_end - time_start
