@@ -112,7 +112,7 @@ def main():
     minutes_ago = 1  # How much time back look for sessions
     max_sessions = 4  # Max number of boxes at the same time
     interval = 5000  # in ms, the larger the name the less demanding
-    trials = 5  # How many trials to show
+    trials = 100  # How many trials to show
 
     try:
         sessions_number = int(sys.argv[1])
