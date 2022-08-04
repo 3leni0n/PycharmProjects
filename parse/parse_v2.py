@@ -199,7 +199,10 @@ def parse_v2(path):
             stim_end.append(
                 float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
-        stim_len.append(stim_end[i] - stim_start[i])
+        if stim_end[i] - stim_start[i] > 1:  # 1 Because all sounds in batches 1-2 (sounds.csv/sounds_2.csv) are 1 s
+            stim_len.append(1)
+        else:
+            stim_len.append(stim_end[i] - stim_start[i])
 
         # Response window
         resp_win_start.append(

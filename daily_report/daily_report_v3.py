@@ -11,6 +11,20 @@
 # np.where(df.Filename != df.Filename2)
 # Fix the len os stim bar in error and misses trials
 
+"""
+# Tiffany's comments:
+
+4. Raster plot.
+    a. Why are you plotting the stimulus? You already segregated by stimulus in two rasters, left and right. This is
+    only obscuring the view and adding confusion. If you wanna mark the sound duration, much lighter neutral color. DONE
+    b. Something still looks funny in the licks for me. Too much aligned to the left. Also, why do licks suddenly stop
+    on the right? DONE
+    c. Also, the display from -3 to 2 is not helpful. You wanna know what they do after reward as well, this -3 is not
+    useful and it will become even less useful in the future. Put something more like from -1 until end of trial (6?)
+    d. Also, but this is a more personal opinion, I wouldn't use bars to mark reward, punish and miss but rather an icon.
+    It's a single event, reward doesn't last the duration of the bar, for instance. Also it happens after a lick, not before.
+"""
+
 ########################################################################################################################
 
 import matplotlib.pyplot as plt
@@ -32,7 +46,7 @@ from parse.parse_v2 import *  # Or from parse.parse_v2 import parse_v2
 ########################################################################################################################
 
 # Define function
-def daily_report_v2(path, send_slack=False):
+def daily_report_v3(path, send_slack=False):
     # Register time
     time_start_total = time.time()
 
@@ -86,15 +100,15 @@ def daily_report_v2(path, send_slack=False):
     errors_right = df.WrongLick[df.Side == 1].sum().astype(int) + df.Punish[
         df.Side == 1].sum().astype(int)
 
-    # Performance
-    performance = hits / trials
-    performance_left = hits_left / trials_left
-    performance_right = hits_right / trials_right
-
     # Responses (valid trials)
     responses = df.Response.sum()
     responses_left = df.Response[df.Side == 0].sum()
     responses_right = df.Response[df.Side == 1].sum()
+
+    # Performance
+    performance = responses / trials
+    performance_left = responses_left / trials_left
+    performance_right = responses_right / trials_right
 
     # Accuracy (hit rate)
     accuracy = hits / responses
@@ -258,7 +272,7 @@ def daily_report_v2(path, send_slack=False):
         ax1.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax1.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax1.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax1.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax1.legend(loc='lower right', fontsize='xx-small', frameon=False)
         ax1.spines['top'].set_visible(False)
         ax1.spines['bottom'].set_visible(False)
         # ax1.spines['right'].set_visible(False)
@@ -330,7 +344,7 @@ def daily_report_v2(path, send_slack=False):
         ax2.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax2.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax2.legend(loc='lower right', fontsize='xx-small', frameon=False)
         ax2.spines['top'].set_visible(False)
         ax2.spines['bottom'].set_visible(False)
         # ax2.spines['right'].set_visible(False)
@@ -401,7 +415,7 @@ def daily_report_v2(path, send_slack=False):
         ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax3.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax3.legend(loc='upper right', fontsize='xx-small', frameon=False)
         ax3.spines['top'].set_visible(False)
         ax3.spines['bottom'].set_visible(False)
         # ax3.spines['right'].set_visible(False)
@@ -489,7 +503,7 @@ def daily_report_v2(path, send_slack=False):
         ax4.set_xlim([1, len(df)])  # 1 to not plot trial 0
         ax4.set_xlabel('Trial')
         # scatter.legend(bbox_to_anchor=(1, 1))
-        scatter.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        scatter.legend(loc='lower right', fontsize='xx-small', frameon=False)
         # scatter.get_legend().remove()
         ax4.spines['top'].set_visible(False)
         # ax4.spines['right'].set_visible(False)
@@ -866,7 +880,7 @@ def daily_report_v2(path, send_slack=False):
                         df_side.StimLen[j],
                         left=df_side.StimStart[j] -
                              df_side.StimStart[j],
-                        color=stim_color, alpha=1, label='Stim', zorder=1)  # Need to specify zorder otherwise
+                        color=stim_color, alpha=0.5, label='Stim', zorder=1)  # Need to specify zorder otherwise
                 # response window is plotted under stimulus length and can't be seen
 
                 # Define response window color according to trial outcome
@@ -953,7 +967,7 @@ def daily_report_v2(path, send_slack=False):
                            Line2D([0], [0], marker='o', color='w', label='Left licks', markerfacecolor='tab:blue'),
                            Line2D([0], [0], marker='o', color='w', label='Right licks', markerfacecolor='tab:orange')]
 
-        ax.legend(handles=legend_elements, loc='upper right', fontsize='xx-small', frameon=True)
+        ax.legend(handles=legend_elements, loc='upper right', fontsize='xx-small', frameon=False)
 
         time_end_raster = time.time()
         runtime_raster = time_end_raster - time_start_raster
@@ -1019,18 +1033,18 @@ def daily_report_v2(path, send_slack=False):
             # ax.hist(histcounts_L, density=True, histtype='step', color='tab:blue', label='Left licks')
             # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
 
-            ax.hist(histcounts_L, histtype='step', color='tab:blue', label='Left licks',
+            ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
                     bins=np.linspace(-2, xlim[k][0][1]),
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
                                       len(histcounts_L)))
-            ax.hist(histcounts_R, histtype='step', color='tab:orange', label='Right licks',
+            ax.hist(histcounts_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
                     bins=np.linspace(-2, xlim[k][0][1]),
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1)])) / bin_size,
                                       len(histcounts_R)))
 
             ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
 
-        ax.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax.legend(loc='upper right', fontsize='xx-small', frameon=False)
 
         time_end_psth_all = time.time()
         runtime_psth_all = time_end_psth_all - time_start_psth_all
@@ -1112,10 +1126,10 @@ def daily_report_v2(path, send_slack=False):
             # ax.hist(first_lick_L, density=True, histtype='step', color='tab:blue', label='Left')
             # ax.hist(first_lick_R, density=True, histtype='step', color='tab:orange', label='Right')
 
-            ax.hist(first_lick_L, histtype='step', color='tab:blue', label='Left licks', bins=np.linspace(0, 2),
+            ax.hist(first_lick_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks', bins=np.linspace(0, 2),
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
                                       len(first_lick_L)))
-            ax.hist(first_lick_R, histtype='step', color='tab:orange', label='Right licks',
+            ax.hist(first_lick_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
                     bins=np.linspace(0, 2),
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1)])) / bin_size,
                                       len(first_lick_R)))

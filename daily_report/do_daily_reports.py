@@ -8,7 +8,8 @@ def do_daily_reports_v2(send_slack=False):
     time_start = time.time()
     # print('Doing daily reports of: ' + animal)
     # folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC/setups/'
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/'
+    # folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/'
+    folder = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_3/setups/'
     # animal = input('Enter animal')
     animals = os.listdir(folder)
     animals.sort()
@@ -23,42 +24,6 @@ def do_daily_reports_v2(send_slack=False):
         pass
 
     # Remove animals not training
-    try:
-        animals.remove('325')
-    except ValueError:
-        pass
-    try:
-        animals.remove('326')
-    except ValueError:
-        pass
-    try:
-        animals.remove('327')
-    except ValueError:
-        pass
-    try:
-        animals.remove('328')
-    except ValueError:
-        pass
-    try:
-        animals.remove('329')
-    except ValueError:
-        pass
-    try:
-        animals.remove('330')
-    except ValueError:
-        pass
-    try:
-        animals.remove('331')
-    except ValueError:
-        pass
-    try:
-        animals.remove('334')
-    except ValueError:
-        pass
-    try:
-        animals.remove('335')
-    except ValueError:
-        pass
 
     for i in range(len(animals)):
 
