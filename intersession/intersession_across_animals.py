@@ -3,11 +3,13 @@ import pandas as pd
 import os
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from my_fun.my_fun import slack_spam
+
 
 ########################################################################################################################
 
 
-def intersession_across_animals(experiment='2AFC_2'):
+def intersession_across_animals(experiment='2AFC_3', send_slack=False):
 
     # Register time
     time_start_total = time.time()
@@ -15,7 +17,7 @@ def intersession_across_animals(experiment='2AFC_2'):
     ####################################################################################################################
 
     # Select folder where input data is
-    folder_in = '/home/alexis/PycharmProjects/intersession/'
+    folder_in = '/home/alexis/PycharmProjects/intersession/' + experiment + '/'
 
     # Select the folder where to save the PDF or create it if it doesn't exist
     folder_out = '/home/alexis/Documentos/intersession reports/' + experiment
@@ -28,10 +30,11 @@ def intersession_across_animals(experiment='2AFC_2'):
     animals = os.listdir(folder_in)
     animals = [animals for animals in animals if animals.endswith('.csv')]
     animals.sort()
-    animals.remove('328_intersession.csv')
-    animals.remove('326_intersession.csv')
-    animals.remove('331_intersession.csv')
-    animals.remove('334_intersession.csv')
+    # Remove animals from 2AFC_2 (batch 2) that never learnt the task to get a cleaner plot
+    # animals.remove('328_intersession.csv')
+    # animals.remove('326_intersession.csv')
+    # animals.remove('331_intersession.csv')
+    # animals.remove('334_intersession.csv')
 
     ####################################################################################################################
 
@@ -321,3 +324,17 @@ def intersession_across_animals(experiment='2AFC_2'):
         plt.close()
 
         ################################################################################################################
+
+        print(time.time())
+        time.sleep(60)
+        print(time.time())
+
+        # This block needs to be the last otherwise it sends the file too soon and corrupted
+        if send_slack:
+            with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token
+                slack_bot_token = f.read().replace('\n', '')
+
+            os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
+            # filepath = folder_pdf_out + '/' + df.Session.unique()[0]
+            filepath = folder_out + '/' + 'all_intersessions'
+            slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'

@@ -46,6 +46,8 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     # week, Monday is 0 and Sunday is 6
 
     # doi = 'yyyy-mm-dd'  # Select a date of interest to plot a vertical line
+
+    # For 2AFC_2 (batch 2)
     doi_1 = '2021-05-26'  # Filename2 start being recorded
     # df.Date[df.Filename2.first_valid_index()] should return '2021-05-27'
     doi_2 = '2021-10-25'  # Messages from Arduino start being recorded
@@ -117,10 +119,10 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     ####################################################################################################################
 
     # Select the folder where to save the PDF or create it if it doesn't exist
-    folder = '/home/alexis/Documentos/intersession reports/' + experiment
-    if not os.path.exists(folder):
-        os.mkdir(folder)
-    os.chdir(folder)
+    folder_pdf_out = '/home/alexis/Documentos/intersession reports/' + experiment
+    if not os.path.exists(folder_pdf_out):
+        os.mkdir(folder_pdf_out)
+    os.chdir(folder_pdf_out)
 
     ####################################################################################################################
 
@@ -811,11 +813,14 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
-    # if to_csv:
-    #     df_intersession.to_csv(folder + '/' + setup + '_intersession.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+    # Select the output folder for the .csv file and create it if it doesn't exist
+    folder_csv_out = '/home/alexis/PycharmProjects/intersession/' + experiment + '/'
+    if not os.path.exists(folder_csv_out):
+        os.mkdir(folder_csv_out)
 
     if to_csv:
-        df_intersession.to_csv('/home/alexis/PycharmProjects/intersession/' + setup + '_intersession.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+        df_intersession.to_csv(folder_csv_out + setup + '_intersession.csv', index=False)  # index=False to avoid the
+        # 'Unmmaed: 0' column
 
     # Register time again and compute the total run time of the script
     time_end_total = time.time()
@@ -828,8 +833,8 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
             slack_bot_token = f.read().replace('\n', '')
 
         os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
-        # filepath = folder + '/' + df.Session.unique()[0]
-        filepath = folder + '/' + setup + '_intersession'
+        # filepath = folder_pdf_out + '/' + df.Session.unique()[0]
+        filepath = folder_pdf_out + '/' + setup + '_intersession'
         slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
     return df_intersession
@@ -837,7 +842,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
 ########################################################################################################################
 
-def do_intersessions(experiment='2AFC_2', to_csv=True, send_slack=False):
+def do_intersessions(experiment='2AFC_3', to_csv=True, send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     time_start = time.time()
@@ -933,108 +938,86 @@ def learning_trajectories(experiment=None):
 
 ########################################################################################################################
 
+# NOTE: The next 2 functions could be merged in a single one that could take as an argument if adding to drug data to the
+# glued sessions or the intersessions (most code is copied/pasted)
 
-def add_drug_data_to_intersession(path_intersession, path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-                                  save=False):
+def add_drug_data_to_intersession(path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
+                                  to_csv=False):
     """
-    Takes an intersession' .csv and a drug' .csv paths as inputs and adds the drug data to a new 'Drug' column to the
-    intersession .csv to the corresponding dates (otherwise it adds nans) and saves the updated intersession .csv file
-    :param path_intersession: path of the intersession .csv
+    Takes all intersession' .csv files from an experiment (batch) and a drug' .csv paths as inputs and adds the drug data
+    to a new 'Drug' column to the intersession .csv to the corresponding dates (otherwise it adds nans) and saves the
+    updated intersession .csv file
     :param path_drug: path of the drug data .csv. First column is 'Date' in format 'YYYY-MM-DD', subsequent columns are
     mouse number and the injection they received ('saline', 'drug' or 'rest')
     :return: intersession DataFrame with a 'Drug' column added to the end
     """
 
-    df_intersession = pd.read_csv(path_intersession)
-    df_drug = pd.read_csv(path_drug)
-    animal = df_intersession.Subject.unique()[0].astype('str')
-    drug = []
+    folder_intersessions = '/home/alexis/PycharmProjects/intersession/2AFC_2/'  # Where the data for all animals is
+    intersessions = os.listdir(folder_intersessions)  # List experiments
+    intersessions.sort()  # Sort them by name
 
-    for i in range(len(df_intersession.Dates)):
-        if len(df_drug.Date.str.contains(df_intersession.Dates[i]).unique()) == 2:
-            drug.append(df_drug[df_drug.Date == df_intersession.Dates[i]][animal].values[0])
-        else:
-            drug.append(np.nan)
+    for j in intersessions:
 
-    drug = pd.Series(drug)
-    df_intersession['Drug'] = drug
-    if save:
-        df_intersession.to_csv('/home/alexis/PycharmProjects/intersession/' + animal + '_intersession.csv', index=False)
+        path_intersession = folder_intersessions + j
+        print(path_intersession)
+        df_intersession = pd.read_csv(path_intersession)
+        df_drug = pd.read_csv(path_drug)
+        animal = df_intersession.Subject.unique()[0].astype('str')
+        drug = []
+
+        for i in range(len(df_intersession.Dates)):
+            if len(df_drug.Date.str.contains(df_intersession.Dates[i]).unique()) == 2:
+                drug.append(df_drug[df_drug.Date == df_intersession.Dates[i]][animal].values[0])
+            else:
+                drug.append(np.nan)
+
+        drug = pd.Series(drug)
+        df_intersession['Drug'] = drug
+
+        if to_csv:
+            df_intersession.to_csv('/home/alexis/PycharmProjects/intersession/2AFC_2/' + animal + '_intersession.csv',
+                                   index=False)
 
     return df_intersession
 
 
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/325_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/326_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/327_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/328_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/329_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/330_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/331_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/332_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/333_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/334_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/335_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-# add_drug_data_to_intersession(path_intersession='/home/alexis/PycharmProjects/intersession/337_intersession.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv')
-########################################################################################################################
-
-
-def add_drug_data_to_glued_sessions(path_sessions, path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-                                    save=False):
+def add_drug_data_to_glued_sessions(path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
+                                    to_csv=False):
     """
-    Takes an intersession' .csv and a drug' .csv paths as inputs and adds the drug data to a new 'Drug' column to the
-    intersession .csv to the corresponding dates (otherwise it adds nans) and saves the updated intersession .csv file
-    :param path_sessions: path of the intersession .csv
+    Takes all intersession' .csv files from an experiment (batch) and a drug' .csv paths as inputs and adds the drug data
+    to a new 'Drug' column to the intersession .csv to the corresponding dates (otherwise it adds nans) and saves the
+    updated intersession .csv file
     :param path_drug: path of the drug data .csv. First column is 'Date' in format 'YYYY-MM-DD', subsequent columns are
     mouse number and the injection they received ('saline', 'drug' or 'rest')
     :return: intersession DataFrame with a 'Drug' column added to the end
     """
 
-    df_sessions = pd.read_csv(path_sessions)
-    animal = str(df_sessions.Setup.unique()[0])
-    df_drug = pd.read_csv(path_drug)
-    animal = df_sessions.Subject.unique()[0].astype('str')
-    drug = []
+    folder_glued_sessions = '/home/alexis/PycharmProjects/glue_sessions/2AFC_2/'  # Where the data for all animals is
+    glued_sessions = os.listdir(folder_glued_sessions)  # List experiments
+    glued_sessions.sort()  # Sort them by name
 
-    for i in range(len(df_sessions.Date)):
-        if len(df_drug.Date.str.contains(df_sessions.Date[i]).unique()) == 2:
-            drug.append(df_drug[df_drug.Date == df_sessions.Date[i]][animal].values[0])
-        else:
-            drug.append(np.nan)
+    for j in glued_sessions:
 
-    drug = pd.Series(drug)
-    df_sessions['Drug'] = drug
-    if save:
-        df_sessions.to_csv('/home/alexis/PycharmProjects/glue_sessions/2AFC_2/' + animal + '.csv', index=False)
+        path_glued_sessions = folder_glued_sessions + j
+        print(path_glued_sessions)
+        df_sessions = pd.read_csv(path_glued_sessions)
+        df_drug = pd.read_csv(path_drug)
+        animal = df_sessions.Subject.unique()[0].astype('str')
+        drug = []
+
+        for i in range(len(df_sessions.Date)):
+            if len(df_drug.Date.str.contains(df_sessions.Date[i]).unique()) == 2:
+                drug.append(df_drug[df_drug.Date == df_sessions.Date[i]][animal].values[0])
+            else:
+                drug.append(np.nan)
+
+        drug = pd.Series(drug)
+        df_sessions['Drug'] = drug
+
+        if to_csv:
+            df_sessions.to_csv('/home/alexis/PycharmProjects/glue_sessions/2AFC_2/' + animal + '.csv', index=False)
 
     return df_sessions
-
-
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/325.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/326.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/327.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/328.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/329.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/330.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/331.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/332.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/333.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/334.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/335.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-# add_drug_data_to_glued_sessions(path_sessions='/home/alexis/PycharmProjects/glue_sessions/2AFC_2/337.csv', path_drug='/home/alexis/Descargas/Mouse injections MK801.csv',
-#                                     save=True)
-
 
 
 # Jordi's snippets with groupby:

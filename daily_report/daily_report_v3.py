@@ -160,45 +160,46 @@ def daily_report_v3(path, send_slack=False):
               # [0:-7] to get rid of the floating numbers in the seconds
               'Subject: ' + df.Subject.unique()[0] + ', ' +
               'Box: ' + df.Board.unique()[0][4] + ', ' +
-              '\n')
-
-        s2 = ('Stage: ' + str(df.Stage.unique()[0]) + ', ' +
-              # 'Substage(s): ' + str(df.Substage.sort_values().unique()[0]) + '-' +
-              # str(df.Substage.sort_values().unique()[-1]) + ', ' +
+              'Stage: ' + str(df.Stage.unique()[0]) + ', ' +
               'Fixation: ' + str(df.Fixation.unique()[0]) + ', ' +
-              'Timeout: ' + str(df.Timeout.unique()[0]) + ', ' +
-              'Switch: ' + str(df.Switch.unique()[0]) + ', ' +
-              'Motor: ' + str(df.Motor.unique()[0]) + ', ' +
-              'CB: ' + str(df.CB.unique()[0]) + ', ' +
-              'Progression: ' + str(df.Progression.unique()[0]) + ', ' +
-              'P: ' + str(round(df.P.iloc[1], 2)) +
               '\n')
 
-        s3 = ('Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
+        s2 = ('Switch: ' + str(df.Switch.unique()[0]) + ', ' +
+              'Timeout: ' + str(df.Timeout.unique()[0]) + ', ' +
+              'Motor: ' + str(df.Motor.unique()[0]) + ', ' +
+              'REC : ' + str(df.REC.unique()[0]) + ', ' +
+              'CB: ' + str(df.CB.unique()[0]) + ', ' +
+              'Warm up: ' + str(df.WarmUp.unique()[0]) + ', ' +
+              'Progression: ' + str(df.Progression.unique()[0]) + ', ' +
+              'P: ' + str(round(df.P.iloc[1], 2)) + ', ' +
+              'P right: '
+              '\n')
+
+        s3 = (str(round(df.PRight.iloc[1], 2)) + ', ' +
+              'Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
               'Performance: ' + str(int(round(performance * 100))) + '% (' + str(int(round(performance_left * 100))) +
               '% L, ' + str(int(round(performance_right * 100))) + '% R)' + ', ' +
               'Accuracy: ' + str(int(round(accuracy * 100))) + '% (' + str(int(round(accuracy_left * 100))) + '% L, ' +
-              str(int(round(accuracy_right * 100))) + '% R)' +
+              str(int(round(accuracy_right * 100))) + '% R)' + ', ' +
               '\n')
 
-        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
-            responses_right) + ' R)' + ', ' +
+        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(responses_right) + ' R)' + ', ' +
               'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
               'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' + ', ' +
-              'Misses: ' + str(misses) + ' (' + str(int(round(miss_rate * 100, 1))) + '%)' +
+              'Misses: ' + str(misses) + ' (' + str(misses_left) + ' L, ' +
               '\n')
 
-        s5 = ('Miss left: ' + str(misses_left) + ' (' + str(int(round(miss_rate_left * 100))) + '%)' + ', ' +
-              'Miss right: ' + str(misses_right) + ' (' + str(int(round(miss_rate_right * 100))) + '%)' + ', ' +
+        s5 = (str(misses_right) + ' R)' + ', ' +
+              'Miss rate: ' + str(int(round(miss_rate * 100))) + '% (' + str(int(round(miss_rate_left * 100))) + '% L, ' +
+              str(int(round(miss_rate_right * 100))) + '% R)' + ', ' +
               'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
-              'No sound: ' + str(no_sound) + ' (' + str(round((no_sound / trials) * 100, 1)) + '%)' +
+              'No sound: ' + str(no_sound) + ' (' + str(round((no_sound / trials) * 100, 1)) + '%)' + ', ' +
               '\n')
 
-        s6 = ('Water: ' + str(water) + ' μL' + ', ' +
-              'Water left: ' + str(water_left) + ' μL' + ', ' +
-              'Water right: ' + str(water_right) + ' μL' + ', ' +
+        s6 = ('Messages: ' + str(message_count) + ' (' + str(round((message_count / trials) * 100, 1)) + '%)' + ', ' +
+              'Water: ' + str(water) + ' μL' + ' (' + str(water_left) + ' μL L' + ', ' + str(water_right) + ' μL R' + ')' + ', ' +
               'AW: ' + str(df.AW.unique()[0]) + ' trials' +
-              '\n')
+              '\n' + '\n')
 
         # plt.text(0.1, 0.90, s1 + s2 + s3 + s4 + s5 + s6, fontsize=8, transform=plt.gcf().transFigure)
 

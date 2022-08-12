@@ -54,7 +54,7 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
     # # Check if csv from that animal already exist, and if so, import it
     glued_sessions = []  # Initialize empty list so if it's the first time glue all sessions
 
-    # Select the output folder_in and create it if it doesn't exist
+    # Select the output folder and create it if it doesn't exist
     folder_out = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
     if not os.path.exists(folder_out):
         os.mkdir(folder_out)
@@ -103,7 +103,7 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
             try:
                 if protocol == 'stage_training':
                     df_session = parse(path)  # Parse session
-                elif protocol == 'stage_training_v2':
+                elif protocol == 'stage_training_v2' or 'stage_training_v3':
                     df_session = parse_v2(path)  # Parse session
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
             except IndexError:
@@ -133,7 +133,7 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
     return df, corrupted_sessions
 
 
-def update_glued_sessions(experiment=None):
+def update_glued_sessions(protocol='stage_training_v3', experiment=None):
     """Update the glued_sessions .csv files for all animals with the non yet included sessions."""
 
     time_start = time.time()
@@ -166,7 +166,7 @@ def update_glued_sessions(experiment=None):
 
     for i in range(len(animals)):
         print(f'Updating sessions of animal {animals[i]}...')
-        glue_sessions(animal=animals[i], protocol='stage_training_v2', experiment=experiment, to_csv=True)
+        glue_sessions(animal=animals[i], protocol=protocol, experiment=experiment, to_csv=True)
 
     time_end = time.time()
     runtime = time_end - time_start
