@@ -24,7 +24,81 @@ def do_daily_reports(version=3, send_slack=False):
     except ValueError:
         pass
 
-    # Remove animals not training
+    # # Remove animals not training
+    try:
+        animals.remove('387')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('395')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('398')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('419')
+    except ValueError:
+        pass
+    #
+    # try:
+    #     animals.remove('420')
+    # except ValueError:
+    #     pass
+    #
+    # try:
+    #     animals.remove('422')
+    # except ValueError:
+    #     pass
+    #
+    try:
+        animals.remove('501')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('614')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('615')
+    except ValueError:
+        pass
+    #
+    # try:
+    #     animals.remove('616')
+    # except ValueError:
+    #     pass
+
+    # try:
+    #     animals.remove('617')
+    # except ValueError:
+    #     pass
+
+    try:
+        animals.remove('618')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('620')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('625')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('627')
+    except ValueError:
+        pass
 
     for i in range(len(animals)):
 

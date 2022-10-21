@@ -8,13 +8,11 @@ import csv
 
 
 # To do:
-# When a session's file  is corrupted, continue but catch that session's ID. Done but save in text file instead of as
-# variable? DONE
 # Single corrupted session csv
 # Add training day index column to df
 
 
-# Define function
+# Define functions
 def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
 
     time_start = time.time()
@@ -26,7 +24,7 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
         experiments.sort()  # Sort them by name
 
         try:
-            experiments.remove('.idea')  # Pycharm's archive
+            experiments.remove('.idea')  # Pycharm's file
             experiments.remove('Daily check')
             experiments.remove('WaterCalibration')
         except ValueError:
@@ -106,9 +104,10 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
                 elif protocol == 'stage_training_v2' or 'stage_training_v3':
                     df_session = parse_v2(path)  # Parse session
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
-            except IndexError:
+            except (IndexError, ValueError):  # When passing 2 exceptions it must be in this syntax
                 print(
-                    f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with next session...")
+                    f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continueing with "
+                    f"next session...")
                 corrupted_sessions.append(sessions[i])
 
         else:
@@ -173,7 +172,7 @@ def update_glued_sessions(protocol='stage_training_v3', experiment=None):
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def glue_all(experiment=None, to_csv=False):
+def glue_all(protocol='stage_training_v3', experiment=None, to_csv=False):
 
     time_start = time.time()
 
@@ -194,6 +193,8 @@ def glue_all(experiment=None, to_csv=False):
 
     folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
 
+    update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
+
     animals = os.listdir(folder_in)  # List animals
     animals.sort()  # Sort them by name
 
@@ -206,6 +207,6 @@ def glue_all(experiment=None, to_csv=False):
     folder_out = folder_in
 
     if to_csv:
-        df.to_csv(folder_out + 'all' + '.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+        df.to_csv(folder_out + 'all' + '.csv', index=False)  # index=False to avoid the 'Unnamed: 0' column
 
     return df

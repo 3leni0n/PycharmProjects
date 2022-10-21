@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from my_fun.my_fun import slack_spam
 
-
 ########################################################################################################################
 
 
@@ -163,6 +162,8 @@ def intersession_across_animals(experiment='2AFC_3', send_slack=False):
                 # Instantiate a second axes that shares the same x-axis
                 ax2_twin = ax2.twinx()
                 ax2_twin.set_ylim(ax2.get_ylim())
+                ax2_twin.set_xticklabels([])
+                ax2_twin.set_yticks([0, 0.25, 0.5, 0.75, 1])
                 # ax2_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
                 ax2_twin.set_yticklabels([])
                 ax2_twin.spines['top'].set_visible(False)
@@ -178,6 +179,11 @@ def intersession_across_animals(experiment='2AFC_3', send_slack=False):
             # ax3 = plt.subplot2grid((1, 1), (0, 0), rowspan=1, colspan=1)
 
             ax3.plot(df_dt, df.RepBias, marker='o', ms=ms, lw=lw)
+
+            # Plot horizontal lines
+            ax3.axhline(-0.5, color='tab:gray', linestyle=':')  # Bias
+            ax3.axhline(0, color='tab:gray', linestyle='--')  # No bias
+            ax3.axhline(0.5, color='tab:gray', linestyle=':')  # Bias
 
             if i == len(animals) - 1:
 
@@ -222,6 +228,8 @@ def intersession_across_animals(experiment='2AFC_3', send_slack=False):
                 # Instantiate a second axes that shares the same x-axis
                 ax4_twin = ax4.twinx()
                 ax4_twin.set_ylim(ax4.get_ylim())
+                ax4_twin.set_xticklabels([])
+                ax4_twin.set_yticks([0, 0.25, 0.5, 0.75, 1])
                 # ax4_twin.set_yticks(list(np.arange(0, trials.max() + 100, 100)[0::2]))
                 ax4_twin.set_yticklabels([])
                 ax4_twin.spines['top'].set_visible(False)
@@ -324,10 +332,6 @@ def intersession_across_animals(experiment='2AFC_3', send_slack=False):
         plt.close()
 
         ################################################################################################################
-
-        print(time.time())
-        time.sleep(60)
-        print(time.time())
 
         # This block needs to be the last otherwise it sends the file too soon and corrupted
         if send_slack:

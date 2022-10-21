@@ -143,10 +143,10 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
     # Get fits for bias = 0 and lapses = 0
     # fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(np.min(x), np.max(x), n_points) - x0)))  # PC function
     fit_bias0 = lr_lower + (1 - lr_lower - lr_upper) / (1 + np.exp(- sensitivity * (np.linspace(np.min(ilds), np.max(ilds), n_points) - 0)))
-    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_bias0, color='tab:olive', mfc='tab:olive', ls=':', label='fit|B=0')
+    # plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_bias0, color='tab:olive', mfc='tab:olive', ls=':', label='fit|B=0')
     pc0_bias0 = lr_lower + (1 - lr_lower - lr_upper) / 2  # Value of the PC for x = 0 when bias = 0
     fit_lapses0 = 0 + (1 - 0 - 0) / (1 + np.exp(- sensitivity * (np.linspace(np.min(ilds), np.max(ilds), n_points) - bias)))
-    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_lapses0, color='tab:cyan', mfc='tab:cyan', ls=':', label='fit|LR=0')
+    # plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_lapses0, color='tab:cyan', mfc='tab:cyan', ls=':', label='fit|LR=0')
     # plt.axhline(pc0_bias0, color='tab:blue', ls=':', label='y(x=0)|B=0')
     pc0_lapses0 = 1 / (1 + np.exp(sensitivity * bias))  # Value of the PC for x = 0 when lapses = 0
     # plt.axhline(pc0_lapses0, color='tab:orange', ls=':', label='y(x=0)|LR=0')
@@ -160,7 +160,7 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
     plt.ylim([-0.025, 1.025])
     plt.yticks([0, 0.5, 1])
-    plt.legend(loc=loc, frameon=False)
+    # plt.legend(loc=loc, frameon=False)
     plt.gca().spines['top'].set_visible(False)
     plt.gca().spines['right'].set_visible(False)
 
@@ -174,6 +174,7 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
 
     # return psych_curve, pc0_bias0, pc0_lapses0
     return psych_curve, fit_bias0, fit_lapses0
+    # return psych_curve
 
 
 def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_right',
@@ -255,7 +256,6 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     n_points = 100
 
     plt.figure(constrained_layout=True)
-
 
     for i in range(len(animals)):
         print(folder_in + animals[i] + '.csv')

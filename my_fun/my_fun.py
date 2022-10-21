@@ -675,14 +675,12 @@ def compute_psych_curve(x, y, n_points=100):
     def sigmoid_mme(fit_params: tuple):
         k, x0, b, p = fit_params
 
-        # k = weight (pendiente)
+        # k = weight (slope)
         # x0 = bias
         # b, p = lapses
 
         # Function to fit:
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
-
-        # If take x0 out of parenthesis
 
         # Calculate negative log likelihood:
         ll = - np.sum(stats.norm.logpdf(ydata, loc=y_pred))

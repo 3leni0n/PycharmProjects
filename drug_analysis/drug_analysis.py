@@ -74,7 +74,6 @@ sns.set_context('poster')
 
 
 # def pussy_plot(x, y):
-
 df = pd.read_csv('/home/alexis/PycharmProjects/intersession/all_intersessions.csv')
 df = df[df.Drug.notna()]
 
@@ -131,10 +130,9 @@ def cat_drug_2_drug_binary():
 cat_drug_2_drug_binary()
 
 
-
 x = 'Drug'
 y = 'CorrRepBias'
-hue = 'Subject'e
+hue = 'Subject'
 order = ['saline', 'MK801', 'rest']
 palette = {'saline': 'tab:gray', 'MK801': 'tab:pink', 'rest': 'tab:gray'}  # Gotta be pink
 

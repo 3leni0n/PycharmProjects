@@ -5,6 +5,7 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam
 
 
@@ -19,17 +20,14 @@ from my_fun.my_fun import compute_psych_curve, slack_spam
 ########################################################################################################################
 
 def intersession_within_animal(path, to_csv=False, send_slack=False):
-    """Do intersession reports per animal, where the x axis is the number of training days (not sessions) and y axis
+    """Do intersession report per animal, where the x axis is the number of training days (not sessions) and y axis
     the variable of interest
     """
 
     # Register time
     time_start_total = time.time()
 
-    ####################################################################################################################
-
     # Import dates_indexes
-
     # Group by date (not session as animals sometimes do several dates_indexes within a day)
     # df = glue_sessions()
     # path = '/home/alexis/PycharmProjects/glue_sessions/' + str(animal) + '.csv'  # Where the data for all animals is
@@ -48,73 +46,34 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     # doi = 'yyyy-mm-dd'  # Select a date of interest to plot a vertical line
 
     # For 2AFC_2 (batch 2)
-    doi_1 = '2021-05-26'  # Filename2 start being recorded
+    doi_0 = '2021-05-26'  # Filename2 start being recorded
     # df.Date[df.Filename2.first_valid_index()] should return '2021-05-27'
-    doi_2 = '2021-10-25'  # Messages from Arduino start being recorded
+    doi_1 = '2021-10-25'  # Messages from Arduino start being recorded
     # df.Date[np.where(df.MessageFound == 0)[0][0]] should return '2021-10-25'
-    doi_3 = '2021-10-27'  # Albert board installed
+    doi_2 = '2021-10-27'  # Albert board installed
     # df.Date[df.Sound.first_valid_index()] should return '2021-10-27'
-    doi_4 = '2022-02-21'  # First training day after the retreat (February 17-19)
-    doi_5 = '2022-02-25'  # Pep visited the animals in sala C to examine 326 and 329
-    doi_6 = '2022-03-03'  # First day without bringing down Tiffany's animals
-    doi_7 = '2022-03-09'  # Mice moved from sala C to sala B
-    doi_8 = '2022-03-21'  # Ad lib CA 2% water
-    doi_9 = '2022-04-07'  # First day without bringing down Balma's animals
+    doi_3 = '2022-02-21'  # First training day after the retreat (February 17-19)
+    doi_4 = '2022-02-25'  # Pep visited the animals in sala C to examine 326 and 329
+    doi_5 = '2022-03-03'  # First day without bringing down Tiffany's animals
+    doi_6 = '2022-03-09'  # Mice moved from sala C to sala B
+    doi_7 = '2022-03-21'  # Ad lib CA 2% water
+    doi_8 = '2022-04-07'  # First day without bringing down Balma's animals
     # Add elastic p (March 11)
 
-    try:
-        doi_1_index = np.where(dates == doi_1)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_1}')
-        doi_1_index = np.nan
+    # For 2AFC_3 (batch 3)
+    doi_9 = '2022-09-12'  # First session after BAMB! 2022
+    doi_10 = '2022-09-13'  # Ad lib. CA 2% in the cage + 10% sweetened water in the task
+    doi_11 = '2022-10-10'  # Caged alone
 
-    try:
-        doi_2_index = np.where(dates == doi_2)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_2}')
-        doi_2_index = np.nan
+    dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8, doi_9, doi_10, doi_11]
+    dois_indexes = []
 
-    try:
-        doi_3_index = np.where(dates == doi_3)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_3}')
-        doi_3_index = np.nan
-
-    try:
-        doi_4_index = np.where(dates == doi_4)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_4}')
-        doi_4_index = np.nan
-
-    try:
-        doi_5_index = np.where(dates == doi_5)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_5}')
-        doi_5_index = np.nan
-
-    try:
-        doi_6_index = np.where(dates == doi_6)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_6}')
-        doi_6_index = np.nan
-
-    try:
-        doi_7_index = np.where(dates == doi_7)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_7}')
-        doi_7_index = np.nan
-
-    try:
-        doi_8_index = np.where(dates == doi_8)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_8}')
-        doi_8_index = np.nan
-
-    try:
-        doi_9_index = np.where(dates == doi_9)[0][0]
-    except IndexError:
-        print(f'No data from this animal on {doi_9}')
-        doi_9_index = np.nan
+    for i in range(len(dois)):
+        try:
+            dois_indexes.append(np.where(dates == dois[i])[0][0])
+        except IndexError:
+            print(f'No data from this animal on {dois[i]}')
+            dois_indexes.append(np.nan)
 
     ####################################################################################################################
 
@@ -266,7 +225,6 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     fit_pc_rep = []
     fit_error_pc_rep = []
 
-
     for i in range(len(dates)):
 
         # Prob. right
@@ -281,7 +239,6 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ydata_pc_right.append(pc_right[i].ydata)
         fit_pc_right.append(pc_right[i].fit)
         fit_error_pc_right.append(pc_right[i].fit_error)
-
 
         # Prob. rep
         pc_rep.append(compute_psych_curve(ilds_rep[dates[i]], rep_choices[dates[i]]))
@@ -309,7 +266,6 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     ydata_pc_right = pd.Series(ydata_pc_right, dates)
     fit_pc_right = pd.Series(fit_pc_right, dates)
     fit_error_pc_right = pd.Series(fit_error_pc_right, dates)
-
 
     # Prob. rep
     pc_rep = pd.Series(pc_rep, dates)
@@ -358,11 +314,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # Plot number of responses per session
         ax.plot(dates_indexes, responses, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -410,11 +362,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax1.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax1.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax1.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax1.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax1.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax1.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax1.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
         ax1.plot(dates_indexes, water, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -458,11 +406,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax2.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax2.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax2.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax2.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax2.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax2.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax2.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
         ax2.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -508,11 +452,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax3.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax3.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax3.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax3.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax3.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax3.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax3.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # Plot rep/alt accuracy per session
         ax3.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
@@ -557,11 +497,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax4.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax4.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax4.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax4.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax4.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax4.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax4.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # Plot misses per session
         ax4.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
@@ -607,11 +543,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax5.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax5.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax5.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax5.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax5.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax5.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax5.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # Plot stage/substage/motor per session
         ax5.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
@@ -702,11 +634,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax6.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax6.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax6.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax6.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax6.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax6.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax6.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
         ax6.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
@@ -744,11 +672,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         # Plot vertical line for date of interest
         # ax7.axvline(date_of_interest_index, color='tab:red', linestyle='--')
-        # ax7.axvline(doi_4_index, color='tab:red', linestyle='--')
-        # ax7.axvline(doi_5_index, color='tab:red', linestyle='--')
-        # ax7.axvline(doi_6_index, color='tab:red', linestyle='--')
-        # ax7.axvline(doi_7_index, color='tab:red', linestyle='--')
-        # ax7.axvline(doi_8_index, color='tab:red', linestyle='--')
+        ax7.axvline(dois_indexes[11], color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
         ax7.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k', label='P')
@@ -842,13 +766,13 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
 ########################################################################################################################
 
-def do_intersessions(experiment='2AFC_3', to_csv=True, send_slack=False):
+def do_intersessions(protocol='stage_training_v3', experiment='2AFC_3', to_csv=True, send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     time_start = time.time()
 
-    # To do:
-    # Update glue_sessions before
+    # Update glued sessions first
+    update_glued_sessions(protocol=protocol, experiment=experiment)
 
     if experiment is None:
 
