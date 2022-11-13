@@ -423,7 +423,7 @@ def enterthematrix(filepath):
     return df
 
 
-def sounds_dict(start, stop, num, n_decimals):
+def do_sounds_dict(start, stop, num, n_decimals):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")

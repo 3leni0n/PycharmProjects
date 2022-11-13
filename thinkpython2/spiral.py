@@ -20,7 +20,7 @@ def draw_spiral(t, n, length=3, a=0.1, b=0.0002):
     Args:
       n: how many line segments to draw
       length: how long each segment is
-      a: how loose the initial spiral starts out (larger is looser)
+      a: how loose the initial_ts spiral starts out (larger is looser)
       b: how loosly coiled the spiral is (larger is looser)
 
     http://en.wikipedia.org/wiki/Spiral
