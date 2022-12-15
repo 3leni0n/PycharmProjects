@@ -30,12 +30,11 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 # Add parameter for residuals                   To do
 
 
-
 # Comments from Jaime:
 # - Are you using any type of regularisation when computing the kernels?
 # - Another nice control would be to generate synthetic data with an agent that e.g. only uses 1 frame (1st or n-th).
-# Generate responses using that frame plus noise and compute kernels at different coherences.
-# - Can you also try to compute kernels using the AUC method that Genis describes in his paper (Prat-Ortega et al 2020)'
+# - Generate responses using that frame plus noise and compute kernels at different coherences.
+# - Can you also try to compute kernels using the AUC method that Genis describes in his paper (Prat-Ortega et. al 2020)'
 
 # 1. For each animal and each stim evidence level, compute the mean and std. dev. of the stimuli used. Check that the
 # means and std dev obtained numerically coincide with the nominal values.
@@ -63,8 +62,8 @@ sns.set_context('poster')
 # sns.despine()
 
 
-def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None,
-                n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=False, residuals=False,
+                zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
@@ -129,13 +128,22 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     frames_ild = pd.DataFrame(
         sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
 
-    # Zscore
-    if zscore:
-        frames_ild = pd.DataFrame(stats.zscore(frames_ild, axis=None))  # Z-score the ILDs (along axis 0 or None
-    # returns same result, but not axis 1)
-        ylabel = 'GLM weight (z-scored)'
+    # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
+    if residuals:
+        sounds_ild = sounds.ILD
+        frames_ild = frames_ild.sub(sounds_ild, axis='rows')
+        ylabel = 'GLM weight (residuals)'
     else:
         ylabel = 'GLM weight'
+
+    # Zscore
+    if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+        if zscore:
+            frames_ild = pd.DataFrame(stats.zscore(frames_ild, axis=None))  # Z-score the ILDs (along axis 0 or None
+        # returns same result, but not axis 1)
+            ylabel = 'GLM weight (z-scored)'
+        else:
+            ylabel = 'GLM weight'
 
     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
@@ -146,15 +154,40 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     # frames_mean.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
     # Load behavioral data
-    df = pd.read_csv(folder_in)  # Load behavioral data
+    df = pd.read_csv(folder_in)
+
+    # Load intersession data
+    df_intersession = pd.read_csv('/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv')
+
+    # Add intersession data to df (all sessions concatenated). Needs to be done before filtering out trials so lengths match
+    session_index = []
+    accuracy = []
+    accuracy_left = []
+    accuracy_right = []
+    for i in range(len(df_intersession)):
+        session_index += [df_intersession.index.values[i]] * df_intersession.Trials[i]
+        accuracy += [df_intersession.Accuracy[i]] * df_intersession.Trials[i]
+        accuracy_left += [df_intersession.AccuracyLeft[i]] * df_intersession.Trials[i]
+        accuracy_right += [df_intersession.AccuracyRight[i]] * df_intersession.Trials[i]
+    df['SessionIndex'] = session_index
+    df['Accuracy'] = accuracy
+    df['AccuracyLeft'] = accuracy_left
+    df['AccuracyRight'] = accuracy_right
+
+    # Filter out some trials
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
 
-    try:
-        df = df[df.Drug.isnull()]  # Remove drug experimental sessions
-    except AttributeError:
-        pass
+    # Drug sessions/trials
+    if drug:  # Select drug session trials
+        df = df[df.Drug.notnull()]
+    else:  # Select NOT drug session trials
+        try:
+            df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+        except AttributeError:
+            pass
+
     n_trials = len(df)
 
     ####################################################################################################################
@@ -188,8 +221,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     color = 'k'
     color_upper_shuffle = 'tab:red'
     label = ''
-    # filename = f'_PK_ILDs: {target_ilds}'
-    filename = f'_PK_ILDs: {target_ilds}_68%'
+    filename = f'_PK_ILDs: {target_ilds}'
+    # filename = f'_PK_ILDs: {target_ilds}_68%'
 
     # Control
     if control is not None:
@@ -348,7 +381,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # Permutation test (shuffled_var)
         shuffles = []
         for _ in range(iterations):
-            # choices = choices.sample(frac=1).reset_index(drop=True)
+            # choices_shuffled = choices.sample(frac=1).reset_index(drop=True)
             stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
             # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
             choices = list(choices)  # Otherwise 'ValueError: The indices for endog and exog are not aligned'
@@ -390,8 +423,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
 
 def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
-               target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
-               format='svg', transparent=False):
+               target_ilds=[-2, 0, 2], drug=False, residuals=False, zscore=True, control=None, n_mean_frames=None,
+               iterations=1000, save=False, format='svg', transparent=False):
     """Do the kernels for all animals of a given batch (experiment)"""
 
     time_start = time.time()
@@ -416,8 +449,9 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
     for i in range(len(animals)):
         path = folder + animals[i]
         print(path)
-        plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, zscore=zscore,
-                    control=control, n_mean_frames=n_mean_frames, iterations=iterations, save=save, format=format, transparent=transparent)
+        plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
+                    residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                    iterations=iterations, save=save, format=format, transparent=transparent)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -425,8 +459,8 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
 
 
 def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                                library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None,
-                                iterations=1000, save=False, format='svg', transparent=False):
+                                library='sm', target_ilds=[-2, 0, 2], drug=False, residuals=False, zscore=True, control=None,
+                                n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
@@ -455,9 +489,9 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 
     for i in range(len(animals)):
         params, shuffles_mean, percentiles, n_trials = plot_kernel(experiment=experiment, animal=animals[i], library=library,
-                                                         target_ilds=target_ilds, control=control,
+                                                         target_ilds=target_ilds, drug=drug, control=control,
                                                          n_mean_frames=n_mean_frames, iterations=iterations,
-                                                         zscore=zscore, save=save)
+                                                         residuals=residuals, zscore=zscore, save=save)
         params_across_animals.append(params)
         shuffles_means_across_animals.append(shuffles_mean)
         percentiles_across_animals.append(percentiles)
@@ -534,4 +568,10 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 # plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
 #                                 library='sm', target_ilds=[-2, 0, 2], zscore=True, control=None, n_mean_frames=None,
 #                                 iterations=100, save=False, format='png', transparent=False)
+
+
+
+
+
+
 

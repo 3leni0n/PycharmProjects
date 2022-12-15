@@ -48,20 +48,20 @@ def parse_v2(path):
 
     # VAL
     # Bpod's VARs
-    aw = [int(df[df.MSG == 'VAR_AW']['+INFO'].iloc[0])] * n_trials
-    switch = [float(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0])] * n_trials
-    timeout = [float(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0])] * n_trials
-    fixation = [float(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0])] * n_trials
-    stage = [int(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0])] * n_trials
-    # substage = [int(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0])] * n_trials
-    motor = [int(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0])] * n_trials
-    rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
-    progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
-    cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
-    resp_win = [int(df[df.MSG == 'VAR_RESP_WIN']['+INFO'].iloc[0])] * n_trials
-    iti = [int(df[df.MSG == 'VAR_ITI']['+INFO'].iloc[0])] * n_trials
-    warm_up = [int(df[df.MSG == 'VAR_WARM_UP']['+INFO'].iloc[0])] * n_trials
-    recovery_mode = [int(df[df.MSG == 'VAR_RECOVERY_MODE']['+INFO'].iloc[0])] * n_trials
+    aw = [int(str(df[df.MSG == 'VAR_AW']['+INFO'].iloc[0]))] * n_trials
+    switch = [float(str(df[df.MSG == 'VAR_SWITCH']['+INFO'].iloc[0]))] * n_trials
+    timeout = [float(str(df[df.MSG == 'VAR_TIMEOUT']['+INFO'].iloc[0]))] * n_trials
+    fixation = [float(str(df[df.MSG == 'VAR_FIXATION']['+INFO'].iloc[0]))] * n_trials
+    stage = [int(str(df[df.MSG == 'VAR_STAGE']['+INFO'].iloc[0]))] * n_trials
+    # substage = [int(str(df[df.MSG == 'VAR_SUBSTAGE']['+INFO'].iloc[0]))] * n_trials
+    motor = [int(str(df[df.MSG == 'VAR_MOTOR']['+INFO'].iloc[0]))] * n_trials
+    rec = [int(str(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0]))] * n_trials
+    progression = [int(str(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0]))] * n_trials
+    cb = [int(float(str(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])))] * n_trials
+    resp_win = [int(str(df[df.MSG == 'VAR_RESP_WIN']['+INFO'].iloc[0]))] * n_trials
+    iti = [int(str(df[df.MSG == 'VAR_ITI']['+INFO'].iloc[0]))] * n_trials
+    warm_up = [int(str(df[df.MSG == 'VAR_WARM_UP']['+INFO'].iloc[0]))] * n_trials
+    recovery_mode = [int(str(df[df.MSG == 'VAR_RECOVERY_MODE']['+INFO'].iloc[0]))] * n_trials
     try:
         p_right = [float(df[df.MSG == 'VAR_P_RIGHT']['+INFO'].iloc[0])] * n_trials  # Added 06-04-2022
     except IndexError:

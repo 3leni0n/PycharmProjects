@@ -40,21 +40,21 @@ def do_daily_reports(version=3, send_slack=False):
     except ValueError:
         pass
 
-    # try:
-    #     animals.remove('419')
-    # except ValueError:
-    #     pass
-    #
-    # try:
-    #     animals.remove('420')
-    # except ValueError:
-    #     pass
-    #
+    try:
+        animals.remove('419')
+    except ValueError:
+        pass
+
+    try:
+        animals.remove('420')
+    except ValueError:
+        pass
+
     # try:
     #     animals.remove('422')
     # except ValueError:
     #     pass
-    #
+
     try:
         animals.remove('501')
     except ValueError:
@@ -75,10 +75,10 @@ def do_daily_reports(version=3, send_slack=False):
     # except ValueError:
     #     pass
 
-    # try:
-    #     animals.remove('617')
-    # except ValueError:
-    #     pass
+    try:
+        animals.remove('617')
+    except ValueError:
+        pass
 
     try:
         animals.remove('618')
@@ -94,6 +94,11 @@ def do_daily_reports(version=3, send_slack=False):
         animals.remove('620')
     except ValueError:
         pass
+
+    # try:
+    #     animals.remove('623')
+    # except ValueError:
+    #     pass
 
     try:
         animals.remove('625')
