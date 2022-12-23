@@ -17,7 +17,7 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 - y is a vector with the subjects' choices
 """
 
-# To do:
+# To-do/done:
 # Fit a line to the kernel                      To do
 # z-score ilds                                  Done
 # ILDs = [-2, 0, 2] vs ILDs = [0]               Done
@@ -27,7 +27,7 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 # Rep vs Alt                                    To do
 # Permutation CI                                Done
 # Bootstrap errorbars                           Done (akin to bse)
-# Add parameter for residuals                   To do
+# Add parameter for residuals                   Done
 
 
 # Comments from Jaime:
@@ -62,22 +62,25 @@ sns.set_context('poster')
 # sns.despine()
 
 
-def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=False, residuals=False,
-                zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False,
+                residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
+                format='svg', transparent=False):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
     :param animal: Mouse ID number
-    :param library: library used to compute the kernel
+    :param library: Library used to compute the kernel
     :param target_ilds: ILDs to use (ideally just 0)
-    :param zscore: if True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
+    :param drug: Use or drug trials/sessions or not
+    :param residuals: If True substract residuals and set zscore to False
+    :param zscore: If True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
     :param control: What control analysis to run
     :param n_mean_frames: Number of mean frames (end/final frames)
-    :param iterations:
+    :param iterations: Number of iterations to compute the CI by permutation method
     :param save: If True, saves the plot
-    :param format: output format of the saved figure
-    :param transparent: set background transparent
+    :param format: Output format of the saved figure
+    :param transparent: Set background transparent
     :return: GLM model parameters
     """
 
@@ -147,7 +150,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
-    # # Frames mean (elementwise) - not needed not used
+    # # Frames mean (elementwise) - not needed nor used
     # sounds_concat = pd.concat((pd.DataFrame(frames_left.values), pd.DataFrame(frames_right.values)))  # DataFrame concatenating left and right frames
     # sounds_concat_indices = sounds_concat.groupby(sounds_concat.index)
     # frames_mean = sounds_concat_indices.mean()
@@ -159,7 +162,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     # Load intersession data
     df_intersession = pd.read_csv('/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv')
 
-    # Add intersession data to df (all sessions concatenated). Needs to be done before filtering out trials so lengths match
+    # Add intersession data to df. Needs to be done before filtering out trials so lengths match
     session_index = []
     accuracy = []
     accuracy_left = []
@@ -178,6 +181,9 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
+    accuracy_threshold = 0.6
+    df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
+    # with accuracy >= threshold
 
     # Drug sessions/trials
     if drug:  # Select drug session trials
@@ -423,9 +429,25 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
 
 def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
-               target_ilds=[-2, 0, 2], drug=False, residuals=False, zscore=True, control=None, n_mean_frames=None,
-               iterations=1000, save=False, format='svg', transparent=False):
-    """Do the kernels for all animals of a given batch (experiment)"""
+               target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False, residuals=False, zscore=True, control=None,
+               n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+    """
+    Do the kernels for all animals of a given batch (experiment)
+    :param experiment: Batch of animals, needed to specify where the root folder with the data is
+    :param animals: Mouse ID number
+    :param library: Library used to compute the kernel
+    :param target_ilds: ILDs to use (ideally just 0)
+    :param drug: Use or drug trials/sessions or not
+    :param residuals: If True substract residuals and set zscore to False
+    :param zscore: If True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
+    :param control: What control analysis to run
+    :param n_mean_frames: Number of mean frames (end/final frames)
+    :param iterations: Number of iterations to compute the CI by permutation method
+    :param save: If True, saves the plot
+    :param format: Output format of the saved figure
+    :param transparent: Set background transparent
+    :return: Nothing
+    """
 
     time_start = time.time()
 
@@ -459,8 +481,26 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
 
 
 def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                                library='sm', target_ilds=[-2, 0, 2], drug=False, residuals=False, zscore=True, control=None,
-                                n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+                                library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False, residuals=False,
+                                zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
+                                format='svg', transparent=False):
+    """
+    Do the kernels for all animals of a given batch (experiment)
+    :param experiment: Batch of animals, needed to specify where the root folder with the data is
+    :param animals: Mouse ID number
+    :param library: Library used to compute the kernel
+    :param target_ilds: ILDs to use (ideally just 0)
+    :param drug: Use or drug trials/sessions or not
+    :param residuals: If True substract residuals and set zscore to False
+    :param zscore: If True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
+    :param control: What control analysis to run
+    :param n_mean_frames: Number of mean frames (end/final frames)
+    :param iterations: Number of iterations to compute the CI by permutation method
+    :param save: If True, saves the plot
+    :param format: Output format of the saved figure
+    :param transparent: Set background transparent
+    :return: GLM model parameters
+    """
 
     time_start = time.time()
 
@@ -558,11 +598,6 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     print('The script took', round(runtime, 2), 'seconds to run')
 
     return params_across_animals, shuffles_means_across_animals, percentiles_across_animals
-
-
-# plt.savefig('/home/alexis/Escritorio/PK_saline_332+333+337_ILDs:[+-8, +-4, +-2, 0].png')
-# plt.savefig('/home/alexis/Escritorio/PK_MK801_332+333+337_ILDs:[+-8, +-4, +-2, 0].png')
-# plt.savefig('/home/alexis/Escritorio/PK_rest_332+333+337_ILDs:[+-8, +-4, +-2, 0].png')
 
 # Debug
 # plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
