@@ -26,17 +26,20 @@ def do_daily_reports(version=4, send_slack=False):
     except ValueError:
         pass
 
-    # # Remove animals not training
-    try:
-        animals.remove('808')
-    except ValueError:
-        pass
+    # Remove animals not training
+    animals_to_remove = ['808']
+    for i in range(len(animals_to_remove)):
+        try:
+            animals.remove(animals_to_remove[i])
+        except ValueError:
+            pass
 
     for i in range(len(animals)):
 
-        folder2 = folder + animals[i] + '/sessions/'  # Replace 0 with i in for loop with n = len(animals)
+        folder2 = folder + animals[i] + '/sessions/'
         sessions = os.listdir(folder2)
         sessions.sort()  # Sort them by date
+        sessions = [s for s in sessions if 'stage_training' in s]  # Ignore lick_teaching sessions
         index = -1  # last session
 
         sessionID = sessions[index]  # Add scenario in which there are several sessions per day
@@ -50,7 +53,7 @@ def do_daily_reports(version=4, send_slack=False):
             for j in range(len(split_sessions)):
                 path = folder2 + split_sessions[j] + '/' + split_sessions[
                     j] + '.csv'  # Get csv file path to input parse/parse_vX.py
-                print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
+                print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found in the same date(s)'"", sep='')
                 # print(path)
                 if version == 1:
@@ -66,7 +69,7 @@ def do_daily_reports(version=4, send_slack=False):
                     daily_report_v4(path, send_slack=send_slack)
         else:
             path = folder2 + sessionID + '/' + sessionID + '.csv'  # Get csv file path to input parse/parse_v2.py
-            print(""'Doing the daily report(s) of animal ', animals[i], ': ', len(split_sessions),
+            print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                   ' sessions found in the same date(s)'"", sep='')
             # print(path)
 

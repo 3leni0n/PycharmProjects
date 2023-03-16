@@ -64,22 +64,22 @@ def parse_v4(path):
     try:
         p_right = [float(df[df.MSG == 'VAR_P_RIGHT']['+INFO'].iloc[0])] * n_trials  # Added on 06-04-2022
     except IndexError:
-        p_right = np.nan
+        p_right = [np.nan] * n_trials
 
     try:
-        blocks = [float(df[df.MSG == 'VAR_BLOCKS']['+INFO'].iloc[0])] * n_trials  # Added on 08-03-2023
+        blocks = [(df[df.MSG == 'VAR_BLOCKS']['+INFO'].iloc[0])] * n_trials  # Added on 08-03-2023
     except IndexError:
-        blocks = np.nan
+        blocks = [np.nan] * n_trials
 
     try:
-        stim_dur = [float(df[df.MSG == 'VAR_STIM_DUR']['+INFO'].iloc[0])] * n_trials # Added on 14-03-2023
+        stim_dur = [float(df[df.MSG == 'VAR_STIM_DUR']['+INFO'].iloc[0])] * n_trials  # Added on 14-03-2023
     except IndexError:
-        stim_dur = np.nan
+        stim_dur = [np.nan] * n_trials
 
     try:
-        delay = [float(df[df.MSG == 'VAR_DELAY']['+INFO'].iloc[0])] * n_trials # Added on 14-03-2023
+        delay = [float(df[df.MSG == 'VAR_DELAY']['+INFO'].iloc[0])] * n_trials  # Added on 14-03-2023
     except IndexError:
-        delay = np.nan
+        delay = [np.nan] * n_trials
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on

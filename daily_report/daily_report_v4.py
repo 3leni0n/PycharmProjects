@@ -1,29 +1,10 @@
 # To do:
 # Check using GridSpec instead of plt.subplot2grid as suggested by matplotlib doc
 # (https://matplotlib.org/stable/gallery/userdemo/demo_gridspec01.html)
-# Create and keep a different axis for every subplot (ax1, ax2, ax3, etc) instead of overwriting a single axis 'ax'
-# Clean, dense to read!
-# Finish fixing bin_size --> weights
-# In motor 2 the stimulus is only plotted in miss and error trials (but not incorrect ones)
-
 # Make code detect OS and fill the destiny path automatically
-# Check if Filename and Filename2 match: df.Filename.equals(df.Filename2), np.unique(np.equal(df.Filename, df.Filename2))
-# np.where(df.Filename != df.Filename2)
-# Fix the len os stim bar in error and misses trials
-
-"""
-# Tiffany's comments:
-
-4. Raster plot.
-    a. Why are you plotting the stimulus? You already segregated by stimulus in two rasters, left and right. This is
-    only obscuring the view and adding confusion. If you wanna mark the sound duration, much lighter neutral color. DONE
-    b. Something still looks funny in the licks for me. Too much aligned to the left. Also, why do licks suddenly stop
-    on the right? DONE
-    c. Also, the display from -3 to 2 is not helpful. You wanna know what they do after reward as well, this -3 is not
-    useful and it will become even less useful in the future. Put something more like from -1 until end of trial (6?)
-    d. Also, but this is a more personal opinion, I wouldn't use bars to mark reward, punish and miss but rather an icon.
-    It's a single event, reward doesn't last the duration of the bar, for instance. Also it happens after a lick, not before.
-"""
+# Select what sessions to do the reports (GUI)
+# Choose between plotting together sessions from the same day (with maybe a vertical red line) to separate them, or
+# in separate reports
 
 ########################################################################################################################
 
@@ -207,7 +188,7 @@ def daily_report_v4(path, send_slack=False):
 
         # fig = plt.figure()
 
-        change_p = df.P.diff()  # Find trials in which substage changes
+        change_p = df.P.diff()  # Find trials in which substage/p changes
         change_p = change_p[change_p != 0].dropna()  # Omit 0s and drop first nan
 
         # PLOT 1: ACCURACY PER SIDE
@@ -705,65 +686,6 @@ def daily_report_v4(path, send_slack=False):
             #               xy=(np.sort(df.ILD.unique())[1], 1), xytext=(np.sort(df.ILD.unique())[1], 1), color='tab:brown',
             #               va='top', ha='left', fontsize='medium')
 
-            ################################################################################################################
-
-            # if df.Progression.unique()[0] == 1:
-            #
-            #     # Psychometric curves per substage
-            #     ax_list = [plt.subplot2grid((16, 6), (10, 3), rowspan=2, colspan=1),  # Substage 1
-            #                plt.subplot2grid((16, 6), (10, 4), rowspan=2, colspan=1),  # Substage 2
-            #                plt.subplot2grid((16, 6), (10, 5), rowspan=2, colspan=1),  # Substage 3
-            #                plt.subplot2grid((16, 6), (12, 3), rowspan=2, colspan=1),  # Substage 4
-            #                plt.subplot2grid((16, 6), (12, 4), rowspan=2, colspan=1),  # Substage 5
-            #                plt.subplot2grid((16, 6), (12, 5), rowspan=2, colspan=1),  # Substage 6
-            #                plt.subplot2grid((16, 6), (14, 3), rowspan=2, colspan=1),  # Substage 7
-            #                plt.subplot2grid((16, 6), (14, 4), rowspan=2, colspan=1),  # Substage 8
-            #                plt.subplot2grid((16, 6), (14, 5), rowspan=2, colspan=1)]  # Substage 9
-            #
-            #     substages_session = df.Substage.unique()
-            #     df_substages = {}  # Create empty dictionary
-            #
-            #     for i in range(len(ax_list)):
-            #         if i + 1 not in substages_session:  # +1 because ax_list is from 0 to 8 and substages can go from 1 to 9
-            #             ax_list[i].set_visible(False)  # Make axes invisible
-            #             continue
-            #         else:
-            #             df_substages[i + 1] = df[df.Substage == i + 1]
-            #
-            #         # Compute psychometric curves
-            #         psych_curve = compute_psych_curve(
-            #             df_substages[i + 1].Evidence[df_substages[i + 1].Miss == 0],
-            #             df_substages[i + 1].Choice[df_substages[i + 1].Miss == 0])
-            #
-            #         ax = ax_list[i]
-            #
-            #         # Plot horizontal and vertical lines
-            #         ax.axhline(0.5, color='tab:gray', ls='--')
-            #         ax.axvline(0., color='tab:gray', ls='--')
-            #
-            #         # Plot left-right psychometric curve and errorbars
-            #         ax.plot(np.linspace(-1, 1, 30), psych_curve.fit, color='tab:orange', label='L-R')
-            #         ax.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
-            #                     fmt='o', markerfacecolor='none')
-            #
-            #         ax.set_title(f'Sub.{i + 1}, n={len(df_substages[i + 1])}')
-            #         ax.set_xlim([-1.1, 1.1])  # Important so set_aspect can work for all subplots the same
-            #         ax.set_xticks([], [])
-            #         ax.set_ylim([-0.1, 1.1])
-            #         ax.set_yticks([], [])
-            #         # plt.axis('equal')
-            #
-            #         # x0, x1 = plt.gca().get_xlim()
-            #         # y0, y1 = plt.gca().get_ylim()
-            #         # plt.gca().set_aspect((x1 - x0) / (y1 - y0))  # Height is float times the width
-            #
-            #     # plt.tight_layout()
-            #
-            #     # This won't work unless updating matplotlib
-            #     # plt.suptitle('Substage')
-            #     # fig.supxlabel('Prob. right')
-            #     # fig.supylabel('Evidence')
-
         ################################################################################################################
 
         # PLOT 8: ILDS DISTRIBUTION
@@ -1169,11 +1091,6 @@ def daily_report_v4(path, send_slack=False):
 
 
 ########################################################################################################################
-
-# To do:
-# Select what sessions to do the reports
-# Choose between plotting together sessions from the same day (with maybe a vertical red line) to separate them, or
-# in separate reports
 
 # Line of bash code to sync the cluster data with the local machine:
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/
