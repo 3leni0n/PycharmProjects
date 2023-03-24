@@ -103,7 +103,7 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
                 elif protocol == 'stage_training_v2' or 'stage_training_v3':
                     df_session = parse_v2(path)  # Parse session
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
-            except (IndexError, ValueError):  # When passing 2 exceptions it must be in this syntax
+            except (IndexError, ValueError, FileNotFoundError):  # When passing 2 exceptions it must be in this syntax
                 print(
                     f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with "
                     f"next session...")
