@@ -164,21 +164,25 @@ def daily_report_v4(path, send_slack=False):
               str(int(round(accuracy_right * 100))) + '% R)' + ', ' +
               '\n')
 
-        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(responses_right) + ' R)' + ', ' +
+        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
+            responses_right) + ' R)' + ', ' +
               'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
               'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' + ', ' +
               'Misses: ' + str(misses) + ' (' + str(misses_left) + ' L, ' +
               '\n')
 
         s5 = (str(misses_right) + ' R)' + ', ' +
-              'Miss rate: ' + str(int(round(miss_rate * 100))) + '% (' + str(int(round(miss_rate_left * 100))) + '% L, ' +
+              'Miss rate: ' + str(int(round(miss_rate * 100))) + '% (' + str(
+                    int(round(miss_rate_left * 100))) + '% L, ' +
               str(int(round(miss_rate_right * 100))) + '% R)' + ', ' +
-              'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
+              'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(
+                    round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
               'No sound: ' + str(no_sound) + ' (' + str(round((no_sound / trials) * 100, 1)) + '%)' + ', ' +
               '\n')
 
         s6 = ('Messages: ' + str(message_count) + ' (' + str(round((message_count / trials) * 100, 1)) + '%)' + ', ' +
-              'Water: ' + str(water) + ' μL' + ' (' + str(water_left) + ' μL L' + ', ' + str(water_right) + ' μL R' + ')' + ', ' +
+              'Water: ' + str(water) + ' μL' + ' (' + str(water_left) + ' μL L' + ', ' + str(
+                    water_right) + ' μL R' + ')' + ', ' +
               'AW: ' + str(df.AW.unique()[0]) + ' trials' +
               '\n' + '\n')
 
@@ -438,7 +442,8 @@ def daily_report_v4(path, send_slack=False):
 
         if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
             scatter = sns.scatterplot(x=df.index, y=df.Side, hue=hue, palette=palette,
-                                      hue_order=hue_order, s=ms ** 3, zorder=2.5)  # zorder=2.5 to plot the dots over the line
+                                      hue_order=hue_order, s=ms ** 3,
+                                      zorder=2.5)  # zorder=2.5 to plot the dots over the line
             ax4.set_ylim(-0.8, 1.8)
             ax4.set_yticks([0, 1])
             ax4.set_yticklabels(['L', 'R'])
@@ -453,7 +458,8 @@ def daily_report_v4(path, send_slack=False):
 
         else:  # Plot coherences
             scatter = sns.scatterplot(x=df.index, y=df.ILD, hue=hue, palette=palette,
-                                      hue_order=hue_order, s=ms ** 3, zorder=2.5)  # zorder=2.5 to plot the dots over the line
+                                      hue_order=hue_order, s=ms ** 3,
+                                      zorder=2.5)  # zorder=2.5 to plot the dots over the line
 
             ax4.set_yscale('symlog', linthresh=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax4.set_ylim(-100, 100)
@@ -517,7 +523,8 @@ def daily_report_v4(path, send_slack=False):
             ax11.axvline(0., color='tab:gray', ls='--')
 
             # Plot left-right psychometric curve and errorbars
-            ax11.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve.fit, color='tab:orange', label='L-R')
+            ax11.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve.fit,
+                      color='tab:orange', label='L-R')
             ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
                           markerfacecolor='none')
 
@@ -554,7 +561,7 @@ def daily_report_v4(path, send_slack=False):
 
             # Annotate min and max
             ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
-                          xytext=(psych_curve.xdata[0], psych_curve.ydata[0]),  color='tab:orange', va='bottom',
+                          xytext=(psych_curve.xdata[0], psych_curve.ydata[0]), color='tab:orange', va='bottom',
                           ha='left', fontsize='medium')
             ax11.annotate(str(round(psych_curve.ydata[-1], 2)), xy=(psych_curve.xdata[-1], psych_curve.ydata[-1]),
                           xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:orange', va='top',
@@ -619,7 +626,8 @@ def daily_report_v4(path, send_slack=False):
             #               markerfacecolor='none')
 
             # Plot alt-rep psychometric curve and errorbars
-            ax13.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
+            ax13.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve_rep.fit,
+                      color='tab:brown', label='Alt-Rep')
             ax13.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
                           color='tab:brown', fmt='o', markerfacecolor='none')
 
@@ -650,10 +658,12 @@ def daily_report_v4(path, send_slack=False):
             ax13_right_yaxis.spines['left'].set_visible(False)
 
             # Annotate min and max
-            ax13.annotate(str(round(psych_curve_rep.ydata[0], 2)), xy=(psych_curve_rep.xdata[0], psych_curve_rep.ydata[0]),
+            ax13.annotate(str(round(psych_curve_rep.ydata[0], 2)),
+                          xy=(psych_curve_rep.xdata[0], psych_curve_rep.ydata[0]),
                           xytext=(psych_curve_rep.xdata[0], psych_curve_rep.ydata[0]), color='tab:brown', va='bottom',
                           ha='left', fontsize='medium')
-            ax13.annotate(str(round(psych_curve_rep.ydata[-1], 2)), xy=(psych_curve_rep.xdata[-1], psych_curve_rep.ydata[-1]),
+            ax13.annotate(str(round(psych_curve_rep.ydata[-1], 2)),
+                          xy=(psych_curve_rep.xdata[-1], psych_curve_rep.ydata[-1]),
                           xytext=(psych_curve_rep.xdata[-1], psych_curve_rep.ydata[-1]), color='tab:brown', va='top',
                           ha='right', fontsize='medium')
 
@@ -763,6 +773,9 @@ def daily_report_v4(path, send_slack=False):
         fig = plt.figure(figsize=(8.27, 11.69))  # A4 size in inches portrait
         # fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
+        # Set max xlim for lick rasters and histograms
+        xlim_max = df.RespWin.unique()[0] + df.StimDur.unique()[0] + df.Delay.unique()[0] + df.Timeout.unique()[0]
+
         # PLOT 5: PERISTIMULUS LICK RASTER
 
         time_start_raster = time.time()
@@ -810,11 +823,21 @@ def daily_report_v4(path, send_slack=False):
                 if df_side.WrongLick[j] == 1.0:
                     resp_win_color = 'tab:pink'
                 elif df_side.Hit[j] == 0.0:
-                    resp_win_color = 'tab:red'
-                elif df_side.Hit[j] == 1.0:
-                    resp_win_color = 'tab:green'
-                elif np.isnan(df_side.Hit[j]):
+                    # resp_win_color = 'tab:red'
                     resp_win_color = 'tab:gray'
+                elif df_side.Hit[j] == 1.0:
+                    # resp_win_color = 'tab:green'
+                    resp_win_color = 'tab:gray'
+                elif np.isnan(df_side.Hit[j]):
+                    # resp_win_color = 'tab:gray'
+                    resp_win_color = 'tab:gray'
+
+                # Plot delay length
+                ax.barh(df_side.index.values[j],
+                        df_side.Delay[j],
+                        left=df_side.RespWinStart[j] -
+                             df_side.StimStart[j] - df_side.Delay[j],
+                        color='lightgray', zorder=2)
 
                 # Plot response window length
                 ax.barh(df_side.index.values[j],
@@ -822,6 +845,22 @@ def daily_report_v4(path, send_slack=False):
                         left=df_side.RespWinStart[j] -
                              df_side.StimStart[j],
                         color=resp_win_color, zorder=2)
+
+                # Plot reward
+                if df_side.Reward[j] == 1:
+                    ax.barh(df_side.index.values[j],
+                            df_side.Timeout[j],  # Same length as TimeOut as valve time is too short to be seen
+                            left=df_side.RespWinEnd[j] -
+                                 df_side.StimStart[j],
+                            color='tab:green', alpha=0.5, zorder=2)
+
+                # Plot timeout
+                if df_side.Punish[j] == 1:
+                    ax.barh(df_side.index.values[j],
+                            df_side.Timeout[j],
+                            left=df_side.RespWinEnd[j] -
+                                 df_side.StimStart[j],
+                            color='tab:red', alpha=0.5, zorder=2)
 
                 # Left licks
                 for i in range(len(df_side.Port1In[j])):  # n licks
@@ -878,15 +917,20 @@ def daily_report_v4(path, send_slack=False):
                         # markersize = ax.containers[1][0].get_height()
 
             xlim[k] = [ax.get_xlim()]  # Store xlim from left and right psychometric_curves
-            ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+            # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+            ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
 
         # Custom legend
         legend_elements = [Patch(facecolor='tab:blue', label='Stim. left'),
                            Patch(facecolor='tab:orange', label='Stim. right'),
-                           Patch(facecolor='tab:green', label='Correct'),
-                           Patch(facecolor='tab:red', label='Error'),
-                           Patch(facecolor='tab:pink', label='WrongLick'),
-                           Patch(facecolor='tab:gray', label='Miss'),
+                           Patch(facecolor='tab:gray', label='Resp. Win.'),
+                           Patch(facecolor='lightgray', label='Delay'),
+                           Patch(facecolor='tab:green', label='Reward'),
+                           Patch(facecolor='tab:red', label='Timeout'),
+                           # Patch(facecolor='tab:green', label='Correct'),
+                           # Patch(facecolor='tab:red', label='Error'),
+                           # Patch(facecolor='tab:pink', label='WrongLick'),
+                           # Patch(facecolor='tab:gray', label='Miss'),
                            Line2D([0], [0], marker='o', color='w', label='Left licks', markerfacecolor='tab:blue'),
                            Line2D([0], [0], marker='o', color='w', label='Right licks', markerfacecolor='tab:orange')]
 
@@ -965,7 +1009,8 @@ def daily_report_v4(path, send_slack=False):
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1)])) / bin_size,
                                       len(histcounts_R)))
 
-            ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+            # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+            ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
 
         ax.legend(loc='upper right', fontsize='xx-small', frameon=False)
 
@@ -1049,7 +1094,8 @@ def daily_report_v4(path, send_slack=False):
             # ax.hist(first_lick_L, density=True, histtype='step', color='tab:blue', label='Left')
             # ax.hist(first_lick_R, density=True, histtype='step', color='tab:orange', label='Right')
 
-            ax.hist(first_lick_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks', bins=np.linspace(0, 2),
+            ax.hist(first_lick_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
+                    bins=np.linspace(0, 2),
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
                                       len(first_lick_L)))
             ax.hist(first_lick_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
@@ -1058,6 +1104,9 @@ def daily_report_v4(path, send_slack=False):
                                       len(first_lick_R)))
 
             ax.patch.set_facecolor('none')  # Make axes transparent so the xaxes labels from the upper plot are visible
+            # ax.set_xlim([-1, xlim[k][0][1]])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+            ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+
         # ax.legend(loc='upper right')
 
         time_end_psth_first = time.time()
@@ -1089,8 +1138,7 @@ def daily_report_v4(path, send_slack=False):
         filepath = folder + '/' + df.Session.unique()[0]
         slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
-
-########################################################################################################################
+    ####################################################################################################################
 
 # Line of bash code to sync the cluster data with the local machine:
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/

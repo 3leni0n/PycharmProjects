@@ -13,7 +13,7 @@ import csv
 
 
 # Define functions
-def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
+def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
 
     time_start = time.time()
 
@@ -106,7 +106,7 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
             except (IndexError, ValueError):  # When passing 2 exceptions it must be in this syntax
                 print(
-                    f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continueing with "
+                    f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with "
                     f"next session...")
                 corrupted_sessions.append(sessions[i])
 
@@ -132,7 +132,7 @@ def glue_sessions(animal=None, protocol=None, experiment=None, to_csv=False):
     return df, corrupted_sessions
 
 
-def update_glued_sessions(protocol='stage_training_v3', experiment=None):
+def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
     """Update the glued_sessions .csv files for all animals with the non yet included sessions."""
 
     time_start = time.time()
@@ -172,7 +172,7 @@ def update_glued_sessions(protocol='stage_training_v3', experiment=None):
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def glue_all(protocol='stage_training_v3', experiment=None, to_csv=False):
+def glue_all(protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
 
     time_start = time.time()
 
@@ -184,7 +184,7 @@ def glue_all(protocol='stage_training_v3', experiment=None, to_csv=False):
         experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
 
         try:
-            experiments.remove('__pycache__')  # Pycharm's archive
+            experiments.remove('__pycache__')  # Pycharm's file
         except ValueError:
             pass
 
@@ -208,5 +208,9 @@ def glue_all(protocol='stage_training_v3', experiment=None, to_csv=False):
 
     if to_csv:
         df.to_csv(folder_out + 'all' + '.csv', index=False)  # index=False to avoid the 'Unnamed: 0' column
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
 
     return df
