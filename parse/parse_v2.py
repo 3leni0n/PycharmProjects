@@ -64,7 +64,22 @@ def parse_v2(path):
     try:
         p_right = [float(df[df.MSG == 'VAR_P_RIGHT']['+INFO'].iloc[0])] * n_trials  # Added on 06-04-2022
     except IndexError:
-        p_right = np.nan
+        p_right = [np.nan] * n_trials
+
+    try:
+        blocks = [(df[df.MSG == 'VAR_BLOCKS']['+INFO'].iloc[0])] * n_trials  # Added on 08-03-2023
+    except IndexError:
+        blocks = [np.nan] * n_trials
+
+    try:
+        stim_dur = [float(df[df.MSG == 'VAR_STIM_DUR']['+INFO'].iloc[0])] * n_trials  # Added on 14-03-2023
+    except IndexError:
+        stim_dur = [np.nan] * n_trials
+
+    try:
+        delay = [float(df[df.MSG == 'VAR_DELAY']['+INFO'].iloc[0])] * n_trials  # Added on 14-03-2023
+    except IndexError:
+        delay = [np.nan] * n_trials
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
@@ -345,17 +360,17 @@ def parse_v2(path):
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In', 'Port1Out', 'Port2In',
                'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor', 'REC',
-               'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'SerialPort', 'Protocol',
-               'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session',
-               'Date', 'SessionStart', 'SessionEnd']
+               'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks', 'StimDur',
+               'Delay', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort',
+               'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice, rep_choice,
                     response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len, resp_win_start,
                     resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found, sound_left,
-                    sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw, switch,
-                    timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up, recovery_mode, p,
-                    p_right, serial_port, protocol, creator, project, experiment, board, setup, net_port, subject,
-                    bpod_api_version, session, date, time_session_started, time_session_ended))
+                    sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw,
+                    switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up, recovery_mode,
+                    p, p_right, blocks, stim_dur, delay, serial_port, protocol, creator, project, experiment, board,
+                    setup, net_port, subject, bpod_api_version, session, date, time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
 

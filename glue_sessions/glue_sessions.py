@@ -6,7 +6,6 @@ from parse.parse import parse
 from parse.parse_v2 import parse_v2
 import csv
 
-
 # To do:
 # Single corrupted session csv
 # Add training day index column to df
