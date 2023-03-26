@@ -766,7 +766,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
 ########################################################################################################################
 
-def do_intersessions(protocol='stage_training_v3', experiment='2AFC_3', to_csv=True, send_slack=False):
+def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', to_csv=True, send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     time_start = time.time()

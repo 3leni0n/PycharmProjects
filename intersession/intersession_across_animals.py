@@ -8,7 +8,7 @@ from my_fun.my_fun import slack_spam
 ########################################################################################################################
 
 
-def intersession_across_animals(experiment='2AFC_3', send_slack=False):
+def intersession_across_animals(experiment='2AFC_4', send_slack=False):
 
     # Register time
     time_start_total = time.time()
