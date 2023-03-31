@@ -21,7 +21,7 @@ import os
 import slack
 
 from my_fun.my_fun import *  # Or from my_fun.my_fun import my_fun
-from parse.parse_v4 import *  # Or from parse.parse_v4 import parse_v4
+from parse.parse_v2 import *  # Or from parse.parse_v4 import parse_v4
 
 
 ########################################################################################################################
@@ -34,7 +34,7 @@ def daily_report_v4(path, send_slack=False):
     ####################################################################################################################
 
     # Import session to be parsed
-    df = parse_v4(path)
+    df = parse_v2(path)
 
     ####################################################################################################################
 

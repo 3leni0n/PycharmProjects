@@ -79,9 +79,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                         pass
                     elif version == 4:
                         daily_report_v4(path, send_slack=send_slack)
-                        # parse_v4(path)
                         pass
-                except (IndexError, ValueError, FileNotFoundError):  # When passing 2 exceptions it must be in this syntax
+                except (IndexError, ValueError, FileNotFoundError, KeyError):  # When passing 2 exceptions it must be in this syntax
                     print(
                         f"The session '{session}' is corrupted. Adding to corrupted sessions log and continuing "
                         f"with next session...")
@@ -116,9 +115,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                             pass
                         elif version == 4:
                             daily_report_v4(path, send_slack=send_slack)
-                            # parse_v4(path)
                             pass
-                    except (IndexError, ValueError, FileNotFoundError):  # When passing 2 exceptions it must be in this syntax
+                    except (IndexError, ValueError, FileNotFoundError, KeyError):  # When passing 2 exceptions it must be in this syntax
                         print(
                             f"The session '{session}' is corrupted. Adding to corrupted sessions log and continuing "
                             f"with next session...")
@@ -139,9 +137,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                         pass
                     elif version == 4:
                         daily_report_v4(path, send_slack=send_slack)
-                        # parse_v4(path)
                         pass
-                except (IndexError, ValueError, FileNotFoundError):  # When passing 2 exceptions it must be in this syntax
+                except (IndexError, ValueError, FileNotFoundError, KeyError):  # When passing 2 exceptions it must be in this syntax
                     print(
                         f"The session '{sessions}' is corrupted. Adding to corrupted sessions log and continuing "
                         f"with next session...")
