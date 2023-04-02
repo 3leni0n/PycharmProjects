@@ -151,6 +151,8 @@ def parse_v2(path):
     # substage = []
     p = []
 
+    aw_trials = []  # Trials in which AW was given. Should capture the initial AW trials plus the ones as CB measure
+
     ####################################################################################################################
 
     for i in range(len(index) - 1):  # -1 to not take into account last trial
@@ -197,6 +199,12 @@ def parse_v2(path):
 
         if wrong_lick[i] == 1:  # Consider wrong licks as punish
             hit[i] = 0
+
+        # Get all trials with AW, including those as counter bias measure (02.04.2023):
+        if pd.isnull(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'AW')]['+INFO'].iloc[0])):
+            aw_trials.append(0)  # If it's nan AW state was not visited
+        else:
+            aw_trials.append(1)  # Else Aw was given
 
         # Trial timestamps
         trial_start.append(band[band.TYPE == 'INFO']['BPOD-INITIAL-TIME'].iloc[0])
@@ -365,7 +373,7 @@ def parse_v2(path):
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In', 'Port1Out', 'Port2In',
-               'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor', 'REC',
+               'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'AWTrials', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor', 'REC',
                'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks', 'BlockLen',
                'StimDur', 'Delay', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup',
                'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
@@ -373,7 +381,7 @@ def parse_v2(path):
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice, rep_choice,
                     response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len, resp_win_start,
                     resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found, sound_left,
-                    sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw,
+                    sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw, aw_trials,
                     switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up, recovery_mode,
                     p, p_right, blocks, block_len, stim_dur, delay, serial_port, protocol, creator, project, experiment,
                     board, setup, net_port, subject, bpod_api_version, session, date, time_session_started,
@@ -387,3 +395,8 @@ def parse_v2(path):
 
 # if __name__ == "__main__":
 #     parse()
+
+# Debug
+# path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_4/setups/561/sessions/561_stage_training_v4_20230329-110651' \
+#        '/561_stage_training_v4_20230329-110651.csv'
+# df = parse_v2(path)
