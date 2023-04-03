@@ -89,6 +89,7 @@ def parse_v2(path):
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
+    reward_side_original = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[0]  # [0] to take the first one in case CB was on
 
     # # under testing: objective is to plot the cb trials in daily report
     # reward_side_cb = df[df.MSG == 'REWARD_SIDE']['+INFO']
@@ -107,6 +108,15 @@ def parse_v2(path):
     reward_side = list(map(int, reward_side))  # Convert list elements from string to integers
     # reward_side = np.array(reward_side, dtype=int)  # Convert to array
     reward_side = reward_side[:n_trials]
+
+    # Added on 02.04.2023
+    reward_side_original = reward_side_original[1:-1].split(',')  # Convert string to list, [1:-1] to get rid of the square brackets []
+    reward_side_original = list(map(int, reward_side_original))  # Convert list elements from string to integers
+    # reward_side_original = np.array(reward_side_original, dtype=int)  # Convert to array
+    reward_side_original = reward_side_original[:n_trials]
+
+    # Trials in which CB was activated. Should capture the trials in which the reward side was changed
+    cb_trials = cb_trials = [1 if reward_side[i] != reward_side_original[i] else 0 for i in range(len(reward_side))]
 
     ####################################################################################################################
 
@@ -151,6 +161,7 @@ def parse_v2(path):
     # substage = []
     p = []
 
+    # Added on 02.04.2023, but it should have 100% backwards compatibility
     aw_trials = []  # Trials in which AW was given. Should capture the initial AW trials plus the ones as CB measure
 
     ####################################################################################################################
@@ -397,6 +408,6 @@ def parse_v2(path):
 #     parse()
 
 # Debug
-# path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_4/setups/561/sessions/561_stage_training_v4_20230329-110651' \
-#        '/561_stage_training_v4_20230329-110651.csv'
-# df = parse_v2(path)
+path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_4/setups/561/sessions/561_stage_training_v4_20230329-110651' \
+       '/561_stage_training_v4_20230329-110651.csv'
+df = parse_v2(path)

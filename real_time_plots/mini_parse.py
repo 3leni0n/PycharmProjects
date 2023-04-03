@@ -143,7 +143,7 @@ def mini_parse(file):
         try:
             message_str = float(band[band['MSG'] == 'MESSAGE']['+INFO'].iloc[0])
         except:
-            message_str = 1
+            message_str = np.nan
 
         message.append(message_str)
 
@@ -159,11 +159,11 @@ def mini_parse(file):
             filename2.append(np.nan)
 
         if filename[i] == filename2[i]:
-            files_match.append(1)
+            files_match.append(np.nan)
         elif filename2[i] is np.nan:
-            files_match.append(0)
+            files_match.append(1)
         else:
-            files_match.append(0)
+            files_match.append(1)
 
         # Sound detected with Albert's card?
         # Sound from left
@@ -178,10 +178,12 @@ def mini_parse(file):
         else:
             sound_right.append(0)
 
-        sound.append(sound_left[i] + sound_right[i])
+        if sound_left[-1] == 0 and sound_right[-1] == 0:
+            sound.append(0)
+        else:
+            sound.append(np.nan)
 
-
-
+        # sound.append(sound_left[i] + sound_right[i])
 
 
         if pd.isnull(band[(band.TYPE == 'STATE') & (band.MSG == 'Reward')]['+INFO'].iloc[0]) == False:
@@ -231,12 +233,19 @@ def mini_parse(file):
             band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
         # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
-        if miss[i] == 1:
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
-        elif punish[i] == 1:
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
-        else:  # Reward or WrongLick
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+        if stage[i] <= 3:
+            if miss[i] == 1:
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
+            elif punish[i] == 1:
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
+            else:  # Reward or WrongLick
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+        else:  # Leads to erroneous stimulus length in stage 4, but probably was there for stage 1. Readjust if needed
+            stim_end.append(
+                float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
         stim_len.append(stim_end[i] - stim_start[i])
 
@@ -336,13 +345,7 @@ def mini_parse(file):
     else:
         trials = file.df.shape[0]
         new_df.Trial = new_df.Trial + trials
-        # print("old")
-        # print(file.df.index)
-        # print("new")
-        # print(new_df.index)
         file.df = pd.concat([file.df, new_df])
         file.df = file.df.reset_index(drop=True)
-        # print("final")
-        # print(file.df.index)
 
     file.skip += index[-1]
