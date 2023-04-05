@@ -25,6 +25,11 @@ from parse.parse_v2 import *  # Or from parse.parse_v4 import parse_v4
 
 
 ########################################################################################################################
+# To do list
+# Include new VARs in the upper text: ITI, Recovery, Blocks, Block length, Block accuracy, Resp win, stim_sur, delay
+# Collapse all sound errors into one to make space. Done
+
+########################################################################################################################
 
 # Define function
 def daily_report_v4(path, send_slack=False):
@@ -96,6 +101,30 @@ def daily_report_v4(path, send_slack=False):
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
 
+    # Block accuracy
+    if not pd.isnull(df.Blocks.unique()[0]) or int(df.Blocks.unique()[0]) != 0:  # If blocks isn't NaN or 0
+        block_change_index = [i for i in range(1, len(df.Side)) if df.Side[i - 1] != df.Side[i]]
+        if not pd.isnull(df.BlockLen.unique()[0]) and float(df.BlockLen.unique()[0]) != 0:
+            # BlockLen wasn't there from the beginning of blocks (block length = running window in the task = 20 trials),
+            # so the previous method is a way to detect blocks regardless of the BlockLen. Nevertheless, in sessions
+            # where there was block length, it should match with the previous method
+            assert block_change_index == df.Side[
+                                         int(df.BlockLen.unique()[0])::int(
+                                             df.BlockLen.unique()[0])].index.values.tolist()
+
+        hits_blocks = df.Hit[block_change_index].sum().astype(int)
+        responses_blocks = df.Response[block_change_index].sum()
+        accuracy_blocks = hits_blocks / responses_blocks
+        hits_blocks_left = df.Hit[block_change_index][df.Side == 0].sum().astype(int)
+        responses_block_left = df.Response[block_change_index][df.Side == 0].sum()
+        accuracy_blocks_left = hits_blocks_left / responses_block_left
+        hits_blocks_right = df.Hit[block_change_index][df.Side == 1].sum().astype(int)
+        responses_block_right = df.Response[block_change_index][df.Side == 1].sum()
+        accuracy_blocks_right = hits_blocks_right / responses_block_right
+    else:
+        hits_blocks = responses_blocks = accuracy_blocks = hits_blocks_left = responses_blocks_left = \
+            accuracy_blocks_left = hits_blocks_right = responses_blocks_right = accuracy_blocks_right = np.nan
+
     # Misses (invalid trials)
     misses = df.Miss.sum()
     misses_left = df.Miss[df.Side == 0].sum()
@@ -121,6 +150,7 @@ def daily_report_v4(path, send_slack=False):
     sounds_mismatch = len(np.where(df.Filename != df.Filename2)[0])
     no_sound = len(np.where(df.Sound == 0)[0])
     message_count = len(np.where(df.Message != 'nan')[0])
+    sound_errors = sounds_mismatch + no_sound + message_count
 
     ####################################################################################################################
 
@@ -135,58 +165,59 @@ def daily_report_v4(path, send_slack=False):
         ################################################################################################################
 
         # SUMMARY TEXT
+        new_line = '\n'  # Trick to include new lines in formatted strings
+        # https://towardsdatascience.com/how-to-add-new-line-in-python-f-strings-7b4ccc605f4a
+        sum_text = (
+            f'Date: {df.Date.unique()[0]}, '
+             # [0:-7] to get rid of the floating numbers in the seconds
+            f'Time: {df.SessionStart.unique()[0][0:-7]} - {df.SessionEnd.unique()[0][0:-7]}, '
+            f'Subject: {df.Subject.unique()[0]}, '
+            f'Box: {df.Board.unique()[0][4]}, '
+            f'Stage: {str(df.Stage.unique()[0])}, '
+            f'Fixation: {str(df.Fixation.unique()[0])},'
+            f'{new_line}'
+            f'Switch: {str(df.Switch.unique()[0])}, '
+            f'Timeout: {str(df.Timeout.unique()[0])}, '
+            f'Motor: {str(df.Motor.unique()[0])}, '
+            f'REC: {str(df.REC.unique()[0])}, '
+            f'CB: {str(df.CB.unique()[0])}, '
+            f'Warm up: {str(df.WarmUp.unique()[0])}, '
+            f'Progression: {str(df.Progression.unique()[0])}, '
+            f'P: {str(round(df.P.iloc[1], 2))}, '
+            f'P right:'
+            f'{new_line}'
+            f'{str(round(df.PRight.iloc[1], 2))}, '
+            f'ITI: {df.ITI.unique()[0]}, '
+            f'Recovery: {df.RecoveryMode.unique()[0]}, '
+            f'Blocks: {df.Blocks.unique()[0]}, '
+            f'Block length: {df.BlockLen.unique()[0]}, '
+            f'Response window: {df.RespWin.unique()[0]}s, '
+            f'Stimulus duration:'
+            f'{new_line}'
+            f'{df.StimDur.unique()[0]}s, '
+            f'Delay: {df.Delay.unique()[0]}s, '
+            f'Trials: {str(trials)} ({str(trials_left)} L, {str(trials_right)} R), '
+            f'Performance: {str(int(round(performance * 100)))}% ({str(int(round(performance_left * 100)))}% L, {str(int(round(performance_right * 100)))}% R), '
+            f'Accuracy:'
+            f'{new_line}'
+            f'{str(int(round(accuracy * 100)))}% '
+            f'({str(int(round(accuracy_left * 100)))}% L, {str(int(round(accuracy_right * 100)))}% R), '
+            f'Accuracy blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, {str(int(round(accuracy_blocks_right * 100)))}% R), '
+            f'Responses: {str(responses)} ({str(responses_left)} L, {str(responses_right)} R), '
+            f'{new_line}'
+            f'Hits: {str(hits)} ({str(hits_left)} L, {str(hits_right)} R), '
+            f'Errors: {str(errors)} ({str(errors_left)} L, {str(errors_right)} R), '
+            f'Misses: {str(misses)} ({str(misses_left)} L, {str(misses_right)} R), '
+            f'Miss rate: {str(int(round(miss_rate * 100)))}% ' 
+            f'{new_line}'
+            f'({str(int(round(miss_rate_left * 100)))}% L, {str(int(round(miss_rate_right * 100)))}% R), '
+            f'Sound errors: {str(sound_errors)} ({str(round((sound_errors / trials) * 100, 1))}%), '
+            f'AW: {str(df.AW.unique()[0])} trials, '
+            f'Water: {str(water)} μL ({str(water_left)}μL L {str(water_right)}μL R)'
+            f'{new_line}'
+            f'{new_line}')
 
-        s1 = ('Date: ' + df.Date.unique()[0] + ', ' +
-              'Time: ' + df.SessionStart.unique()[0][0:-7] + ' - ' + df.SessionEnd.unique()[0][0:-7] + ', ' +
-              # [0:-7] to get rid of the floating numbers in the seconds
-              'Subject: ' + df.Subject.unique()[0] + ', ' +
-              'Box: ' + df.Board.unique()[0][4] + ', ' +
-              'Stage: ' + str(df.Stage.unique()[0]) + ', ' +
-              'Fixation: ' + str(df.Fixation.unique()[0]) + ', ' +
-              '\n')
-
-        s2 = ('Switch: ' + str(df.Switch.unique()[0]) + ', ' +
-              'Timeout: ' + str(df.Timeout.unique()[0]) + ', ' +
-              'Motor: ' + str(df.Motor.unique()[0]) + ', ' +
-              'REC : ' + str(df.REC.unique()[0]) + ', ' +
-              'CB: ' + str(df.CB.unique()[0]) + ', ' +
-              'Warm up: ' + str(df.WarmUp.unique()[0]) + ', ' +
-              'Progression: ' + str(df.Progression.unique()[0]) + ', ' +
-              'P: ' + str(round(df.P.iloc[1], 2)) + ', ' +
-              'P right: '
-              '\n')
-
-        s3 = (str(round(df.PRight.iloc[1], 2)) + ', ' +
-              'Trials: ' + str(trials) + ' (' + str(trials_left) + ' L, ' + str(trials_right) + ' R)' + ', ' +
-              'Performance: ' + str(int(round(performance * 100))) + '% (' + str(int(round(performance_left * 100))) +
-              '% L, ' + str(int(round(performance_right * 100))) + '% R)' + ', ' +
-              'Accuracy: ' + str(int(round(accuracy * 100))) + '% (' + str(int(round(accuracy_left * 100))) + '% L, ' +
-              str(int(round(accuracy_right * 100))) + '% R)' + ', ' +
-              '\n')
-
-        s4 = ('Responses: ' + str(responses) + ' (' + str(responses_left) + ' L, ' + str(
-            responses_right) + ' R)' + ', ' +
-              'Hits: ' + str(hits) + ' (' + str(hits_left) + ' L, ' + str(hits_right) + ' R)' + ', ' +
-              'Errors: ' + str(errors) + ' (' + str(errors_left) + ' L, ' + str(errors_right) + ' R)' + ', ' +
-              'Misses: ' + str(misses) + ' (' + str(misses_left) + ' L, ' +
-              '\n')
-
-        s5 = (str(misses_right) + ' R)' + ', ' +
-              'Miss rate: ' + str(int(round(miss_rate * 100))) + '% (' + str(
-                    int(round(miss_rate_left * 100))) + '% L, ' +
-              str(int(round(miss_rate_right * 100))) + '% R)' + ', ' +
-              'Sounds mismatch: ' + str(sounds_mismatch) + ' (' + str(
-                    round((sounds_mismatch / trials) * 100, 1)) + '%)' + ', ' +
-              'No sound: ' + str(no_sound) + ' (' + str(round((no_sound / trials) * 100, 1)) + '%)' + ', ' +
-              '\n')
-
-        s6 = ('Messages: ' + str(message_count) + ' (' + str(round((message_count / trials) * 100, 1)) + '%)' + ', ' +
-              'Water: ' + str(water) + ' μL' + ' (' + str(water_left) + ' μL L' + ', ' + str(
-                    water_right) + ' μL R' + ')' + ', ' +
-              'AW: ' + str(df.AW.unique()[0]) + ' trials' +
-              '\n' + '\n')
-
-        # plt.text(0.1, 0.90, s1 + s2 + s3 + s4 + s5 + s6, fontsize=8, transform=plt.gcf().transFigure)
+        # plt.text(0.1, 0.90, sum_text, fontsize=8, transform=plt.gcf().transFigure)
 
         ################################################################################################################
 
@@ -276,7 +307,8 @@ def daily_report_v4(path, send_slack=False):
         print("'Plot 1: accuracy per side' took", round(runtime_acc_side, 2), 'seconds to run')
 
         # Plot text
-        ax1.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6)
+        # ax1.text(0, 1, s1 + s2 + s3 + s4 + s5 + s6, fontsize='medium')
+        ax1.text(0, 1, sum_text, fontsize='medium')
 
         ################################################################################################################
 
