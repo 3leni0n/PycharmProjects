@@ -190,7 +190,7 @@ def daily_report_v4(path, send_slack=False):
             f'ITI: {df.ITI.unique()[0]}, '
             f'Recovery: {df.RecoveryMode.unique()[0]}, '
             f'Blocks: {df.Blocks.unique()[0]}, '
-            f'Block length: {df.BlockLen.unique()[0]}, '
+            f'Block length: {int(df.BlockLen.unique()[0])}, '
             f'Response window: {df.RespWin.unique()[0]}s, '
             f'Stimulus duration:'
             f'{new_line}'
