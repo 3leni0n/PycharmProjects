@@ -72,8 +72,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     doi_15 = '2023-03-24'  # Removed motor in AW
     doi_16 = '2023-03-30'  # Reintroduction of blocks
 
-    dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8, doi_9, doi_10, doi_11, doi_13, doi_14,
-            doi_12, doi_15, doi_16]
+    dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8, doi_9, doi_10, doi_11, doi_14, doi_15]
     dois_indexes = []
 
     for i in range(len(dois)):
@@ -169,48 +168,36 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     # but like this the output is a pd.Series
     corr_alt_bias = alt_rate_left * 0.5 + alt_rate_right * 0.5
 
+    # Accuracy blocks (accuracy of first trial of each block)
+    blocks = df.groupby('Date').Blocks.unique()
+    # block_len = df.groupby('Date').BlockLen.unique()
+    side = df.groupby('Date').Side.apply(list)
+    warm_up = df.groupby('Date').WarmUp.unique()
+    block_change_indexes = []
+    block_change_dist = []  # Should be the same as block_len, but block_len wasn't from the beginning of blocks
+    block_change_dist_mode = []
+    accuracy_blocks = []
+    accuracy_blocks_left = []
+    accuracy_blocks_right = []
 
-
-
-    # # Accuracy blocks (accuracy of first trial of each block)
-    # blocks = df.groupby('Date').Blocks.unique()
-    # side = df.groupby('Date').Side.apply(list)
-    # block_change_index = []
-    # for i in range(len(dates)):
-    #     if not pd.isnull(blocks[i][0]) and blocks[i][0] != '0':
-    #         print(i)
-    #         test = []
-    #         for j in range(1, len(side[i])):
-    #             test2 =
-    #             test.append([k for k in range(1, len(side[i]) if side[i][j - j] != side[i][j]])
-    #     else:
-    #         pass
-    #
-    #
-    # if not pd.isnull(df.Blocks.unique()[0]) or int(df.Blocks.unique()[0]) != 0:  # If blocks isn't NaN or 0
-    #     block_change_index = [i for i in range(1, len(df.Side)) if df.Side[i - 1] != df.Side[i]]
-    #     if not pd.isnull(df.BlockLen.unique()[0]) and float(df.BlockLen.unique()[0]) != 0:
-    #         # BlockLen wasn't there from the beginning of blocks (block length = running window in the task = 20 trials),
-    #         # so the previous method is a way to detect blocks regardless of the BlockLen. Nevertheless, in sessions
-    #         # where there was block length, it should match with the previous method
-    #         # Assertion not valid if transitioning from blocks to trials. Need to include Warming up blocks
-    #         # assert block_change_index == df.Side[
-    #         #                              int(df.BlockLen.unique()[0])::int(
-    #         #                                  df.BlockLen.unique()[0])].index.values.tolist()
-    #         pass
-    #
-    #     hits_blocks = df.Hit[block_change_index].sum().astype(int)
-    #     responses_blocks = df.Response[block_change_index].sum()
-    #     accuracy_blocks = hits_blocks / responses_blocks
-    #     hits_blocks_left = df.Hit[block_change_index][df.Side == 0].sum().astype(int)
-    #     responses_block_left = df.Response[block_change_index][df.Side == 0].sum()
-    #     accuracy_blocks_left = hits_blocks_left / responses_block_left
-    #     hits_blocks_right = df.Hit[block_change_index][df.Side == 1].sum().astype(int)
-    #     responses_block_right = df.Response[block_change_index][df.Side == 1].sum()
-    #     accuracy_blocks_right = hits_blocks_right / responses_block_right
-    # else:
-    #     hits_blocks = responses_blocks = accuracy_blocks = hits_blocks_left = responses_blocks_left = \
-    #         accuracy_blocks_left = hits_blocks_right = responses_blocks_right = accuracy_blocks_right = np.nan
+    for i in range(len(dates)):
+        df_session = df[df.Date == dates[i]].reset_index()
+        # Take only sessions with blocks (VAR_BLOCKS not nan and != 0) and without warm_up (VAR_WARM_UP == 0) as warm up
+        # is used to transition from blocks to random
+        if not pd.isnull(blocks[i][0]) and blocks[i][0] != '0' and warm_up[i][0] == 0:
+            block_change_indexes.append([j for j in range(1, len(side[i])) if side[i][j - 1] != side[i][j]])
+            block_change_dist.append([block_change_indexes[i][j] - block_change_indexes[i][j-1] for j in range(1, len(block_change_indexes[i]))])
+            block_change_dist_mode.append(float(max(set(block_change_dist[i]), key=block_change_dist[i].count)))
+            accuracy_blocks.append(df_session.loc[block_change_indexes[i]].Hit.mean())
+            accuracy_blocks_left.append(df_session.loc[block_change_indexes[i]].loc[df_session.Side == 0].Hit.mean())
+            accuracy_blocks_right.append(df_session.loc[block_change_indexes[i]].loc[df_session.Side == 1].Hit.mean())
+        else:
+            block_change_indexes.append(np.nan)
+            block_change_dist.append(np.nan)
+            block_change_dist_mode.append(np.nan)
+            accuracy_blocks.append(np.nan)
+            accuracy_blocks_left.append(np.nan)
+            accuracy_blocks_right.append(np.nan)
 
     # Misses (invalid trials)
     misses = df.groupby('Date').Miss.sum()
@@ -387,7 +374,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         ax.set_xlim([0, len(dates_indexes)])
         ax.set_xticklabels([])
-        ax.set_ylabel('Acc.\n(%)')
+        ax.set_ylabel('Acc.\nL/R (%)')
         ax.set_ylim([0, 1.1])
         ax.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
@@ -407,20 +394,20 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_end = time.time()
         runtime = time_end - time_start
-        print("'Plot 0: accuracy per sides' took", round(runtime, 2), 'seconds to run')
+        print("'Plot 0: 'accuracy per sides' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 1: REPEATING VS ALTERNATING ACCURACY
+        # PLOT 1: LATERAL BIAS
 
         time_start = time.time()
 
         ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
-        ax1.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
-        ax1.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
-        ax1.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+        ax1.axhline(0, color='tab:gray', linestyle='--')  # Unbias
+        ax1.axhline(-0.5, color='tab:gray', linestyle=':')  # Bias to the left
+        ax1.axhline(0.5, color='tab:gray', linestyle=':')  # Bias to the right
 
         # Plot vertical line for date of interest
         for i in range(len(dois)):
@@ -429,37 +416,36 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
             except IndexError:
                 pass
 
-        # Plot rep/alt accuracy per session
-        ax1.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
-        ax1.plot(dates_indexes, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
+        # Plot lateral bias per session
+        ax1.plot(dates_indexes, lateral_bias, marker='o', ms=ms, lw=lw, color='black')
 
         ax1.set_xlim([0, len(dates_indexes)])
         ax1.set_xticklabels([])
-        ax1.set_ylabel('Acc.\n(%)')
-        ax1.set_ylim([0, 1.1])
-        ax1.set_yticks(list(np.arange(0, 1.1, 0.1)))
-        ax1.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        ax1.set_ylabel('Lateral\nBias (%)')
+        ax1.set_ylim([-1, 1])
+        ax1.set_yticks(list(np.linspace(-1, 1, 11)))
+        ax1.set_yticklabels(['L', '', '', '', '', '0', '', '', '', '', 'R'])
         # ax1.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
-        ax1.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        # ax1.legend(loc='lower right', fontsize='xx-small', frameon=True)
         ax1.spines['top'].set_visible(False)
         ax1.spines['bottom'].set_visible(False)
         # ax1.spines['right'].set_visible(False)
 
         # Instantiate a second axes that shares the same x-axis
         ax1_twin = ax1.twinx()
-        ax1_twin.set_ylim([0, 1.1])
-        ax1_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax1_twin.set_ylim([-1, 1])
+        ax1_twin.set_yticks(list(np.linspace(-1, 1, 11)))
         ax1_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax1_twin.spines['top'].set_visible(False)
         ax1_twin.spines['bottom'].set_visible(False)
 
         time_end = time.time()
         runtime = time_end - time_start
-        print("'Plot 1: accuracy repeating vs alternating' took", round(runtime, 2), 'seconds to run')
+        print("'Plot 1: 'lateral bias' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 2: MISSES
+        # PLOT 2: REPEATING VS ALTERNATING ACCURACY
 
         time_start = time.time()
 
@@ -477,15 +463,14 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
             except IndexError:
                 pass
 
-        # Plot misses per session
-        ax2.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax2.plot(dates_indexes, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax2.plot(dates_indexes, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        # Plot rep/alt accuracy per session
+        ax2.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
+        ax2.plot(dates_indexes, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
 
         ax2.set_xlim([0, len(dates_indexes)])
         ax2.set_xticklabels([])
+        ax2.set_ylabel('Acc.\nAlt/Rep (%)')
         ax2.set_ylim([0, 1.1])
-        ax2.set_ylabel('Miss\n(%)')
         ax2.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
         # ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
@@ -504,7 +489,144 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_end = time.time()
         runtime = time_end - time_start
-        print("'Plot 2: misses' took", round(runtime, 2), 'seconds to run')
+        print("'Plot 2: 'accuracy repeating vs alternating' took", round(runtime, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 3: BLOCK ACCURACY
+
+        time_start = time.time()
+
+        ax3 = plt.subplot2grid((8, 1), (3, 0), rowspan=1, colspan=1)
+
+        # Plot horizontal lines
+        ax3.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+        ax3.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+        # Plot vertical line for date of interest
+        for i in range(len(dois)):
+            try:
+                ax3.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+            except IndexError:
+                pass
+
+        # Plot block accuracy per session
+        ax3.plot(dates_indexes, accuracy_blocks, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax3.plot(dates_indexes, accuracy_blocks_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax3.plot(dates_indexes, accuracy_blocks_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+
+        ax3.set_xlim([0, len(dates_indexes)])
+        ax3.set_xticklabels([])
+        ax3.set_ylabel('Acc.\nblocks (%)')
+        ax3.set_ylim([0, 1.1])
+        ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        # ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax3.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax3.spines['top'].set_visible(False)
+        ax3.spines['bottom'].set_visible(False)
+        # ax3.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax3_twin = ax3.twinx()
+        ax3_twin.set_ylim([0, 1.1])
+        ax3_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax3_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax3_twin.spines['top'].set_visible(False)
+        ax3_twin.spines['bottom'].set_visible(False)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 3: 'block accuracy' took", round(runtime, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 4: BLOCK LENGTH
+
+        time_start = time.time()
+
+        ax4 = plt.subplot2grid((8, 1), (4, 0), rowspan=1, colspan=1)
+
+        # Plot vertical line for date of interest
+        for i in range(len(dois)):
+            try:
+                ax4.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+            except IndexError:
+                pass
+
+        # # Plot block_length per session
+        ax4.plot(dates_indexes, block_change_dist_mode, marker='o', ms=ms, lw=lw, color='black')
+
+        # ax4.set_xlabel('Days')
+        ax4.set_xlim([0, len(dates_indexes)])
+        ax4.set_xticklabels([])
+        # ax4.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
+        ax4.set_ylabel('Block length')
+        ax4.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax4.spines['top'].set_visible(False)
+        ax4.spines['bottom'].set_visible(False)
+        # ax4.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax4_twin = ax4.twinx()
+        ax4_twin.set_ylim([ax4.get_ylim()[0], ax4.get_ylim()[1]])  # Get ylims from ax6 and set them for ax6_twin
+        ax4_twin.set_yticklabels([])
+        ax4_twin.spines['top'].set_visible(False)
+        ax4_twin.spines['bottom'].set_visible(False)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 6: 'block length' took", round(runtime, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 5: MISSES
+
+        time_start = time.time()
+
+        ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
+
+        # Plot horizontal lines
+        ax5.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+        ax5.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        ax5.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+        # Plot vertical line for date of interest
+        for i in range(len(dois)):
+            try:
+                ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+            except IndexError:
+                pass
+
+        # Plot misses per session
+        ax5.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax5.plot(dates_indexes, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax5.plot(dates_indexes, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+
+        ax5.set_xlim([0, len(dates_indexes)])
+        ax5.set_xticklabels([])
+        ax5.set_ylim([0, 1.1])
+        ax5.set_ylabel('Miss rate\nL/R (%)')
+        ax5.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax5.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
+        # ax5.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax5.legend(loc='lower right', fontsize='xx-small', frameon=True)
+        ax5.spines['top'].set_visible(False)
+        ax5.spines['bottom'].set_visible(False)
+        # ax5.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax5_twin = ax5.twinx()
+        ax5_twin.set_ylim([0, 1.1])
+        ax5_twin.set_yticks(list(np.arange(0, 1.1, 0.1)))
+        ax5_twin.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
+        ax5_twin.spines['top'].set_visible(False)
+        ax5_twin.spines['bottom'].set_visible(False)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 2: 'misses' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -591,7 +713,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_end = time.time()
         runtime = time_end - time_start
-        print("'Plot 6: sound checks' took", round(runtime, 2), 'seconds to run')
+        print("'Plot 6: 'sound checks' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -629,7 +751,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_end = time.time()
         runtime = time_end - time_start
-        print("'Plot 7: sound checks' took", round(runtime, 2), 'seconds to run')
+        print("'Plot 7: 'sound checks' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -685,7 +807,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         #
         # time_end = time.time()
         # runtime = time_end - time_start
-        # print("'Plot 0: responses' took", round(runtime, 2), 'seconds to run')
+        # print("'Plot 0: 'responses' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -727,7 +849,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         #
         # time_end = time.time()
         # runtime = time_end - time_start
-        # print("'Plot 1: water' took", round(runtime, 2), 'seconds to run')
+        # print("'Plot 1: 'water' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -786,7 +908,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         #
         # time_end = time.time()
         # runtime = time_end - time_start
-        # print("'Plot 5: stages/motor' took", round(runtime, 2), 'seconds to run')
+        # print("'Plot 5: 'stages/motor' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
         ################################################################################################################

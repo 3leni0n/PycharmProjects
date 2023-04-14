@@ -104,15 +104,15 @@ def daily_report_v4(path, send_slack=False):
     # Block accuracy (accuracy of first trial of each block)
     if not pd.isnull(df.Blocks.unique()[0]) or int(df.Blocks.unique()[0]) != 0:  # If blocks isn't NaN or 0
         block_change_index = [i for i in range(1, len(df.Side)) if df.Side[i - 1] != df.Side[i]]
-        if not pd.isnull(df.BlockLen.unique()[0]) and float(df.BlockLen.unique()[0]) != 0:
+        # if not pd.isnull(df.BlockLen.unique()[0]) and float(df.BlockLen.unique()[0]) != 0:
             # BlockLen wasn't there from the beginning of blocks (block length = running window in the task = 20 trials),
             # so the previous method is a way to detect blocks regardless of the BlockLen. Nevertheless, in sessions
             # where there was block length, it should match with the previous method
-            # Assertion not valid if transitioning from blocks to trials. Need to include Warming up blocks
+            # Assertion not valid if transitioning from blocks to random trials. Need to include Warming up blocks
             # assert block_change_index == df.Side[
             #                              int(df.BlockLen.unique()[0])::int(
             #                                  df.BlockLen.unique()[0])].index.values.tolist()
-            pass
+            # pass
 
         hits_blocks = df.Hit[block_change_index].sum().astype(int)
         responses_blocks = df.Response[block_change_index].sum()
