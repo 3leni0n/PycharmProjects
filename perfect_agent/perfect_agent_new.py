@@ -4,8 +4,17 @@ import os
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+import statsmodels.api as sm
+import seaborn as sns
 from my_fun.my_fun import select_ilds, compute_psych_curve
 from create_sounds.create_sounds_v2 import create_sounds_v2
+
+# Mel's code snippet for poster
+sns.set_theme()
+sns.set_style('white')
+sns.set_style('ticks')
+sns.set_context('poster')
+# sns.despine()
 
 
 def perfect_agent(n_trials=1000, sim_stim=False, sigma=1, plot=False):
@@ -168,3 +177,169 @@ def test_stim_set(n_iterations=3, n_trials=1000, plot=True):
     print('The script took', round(runtime, 2), 'seconds to run')
 
     return df_list
+
+def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[-2, 0, 2], iterations=100):
+    """
+    Simulates a perfect agent that perform an 2AFC ILD discrimination task
+    :param n_trials: Number of trials
+    :param sim_stim: Simulates stimuli. If False uses real stimuli used for training mice
+    :param sigma: std of the envelope fluctuations. Only used when sim_stim=True
+    :param plot: If plot the results or not
+    :return: DataFrame with the number of unfair trials, errors, hits and accuracy
+    """
+
+    time_start = time.time()
+
+    if experiment is None:
+
+        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
+        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's archive
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+
+    if animal is None:
+        animals = os.listdir(folder_in)  # List animals
+        animals.sort()  # Sort them by name
+        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
+
+        print('Animals: ' + str(animals))  # Remove square brackets
+        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
+
+    folder_in = folder_in + animal + '.csv'
+
+    # Load sounds
+    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
+    sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
+    sounds = pd.read_csv(sounds_path)
+    n_frames = 10
+
+    # Left frames
+    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
+    frames_left = sounds[left_frames_column_names]
+
+    # Right frames
+    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
+    frames_right = sounds[right_frames_column_names]
+
+    # Frames ILD (elementwise)
+    frames_ild = pd.DataFrame(
+        sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
+    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+
+    # Load behavioral data
+    df = pd.read_csv(folder_in)
+    df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
+    df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
+    n_trials = len(df)
+    filenames = df.Filename.tolist()
+    stim_strength = frames_ild.loc[
+        [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        columns=['filename'])
+    # accum_evi = stim_strength.iloc[:,frame_index].tolist()
+    accum_evi = stim_strength.mean(axis=1).tolist()
+
+    choices = []
+    for i in range(len(accum_evi)):
+        noise = np.random.choice([-1,1]) * np.random.random()
+        if accum_evi[i] + noise < 0:
+            choices.append(0)
+        else:
+            choices.append(1)
+
+    stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
+    stim_strength.reset_index(inplace=True, drop=True)
+    model = sm.GLM(choices, stim_strength, family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+    results = model.fit()
+    params = results.params
+    beta_std_err = results.bse
+    p_values = results.pvalues
+    summary = results.summary()
+    print(summary)
+
+    color = 'b'
+    label = 'Test'
+    ylabel = 'Weight'
+
+    plt.figure(constrained_layout=True)
+
+    # Plot kernel
+    plt.plot(np.arange(1, len(params)), params.iloc[1:11], color=color, marker='o', label=label)
+    plt.errorbar(np.arange(1, len(params)), params.iloc[1:11], yerr=beta_std_err.iloc[1:11], color=color,
+                 marker='o', fmt='none', mec='none', ms=0)  # Without constant (bias)
+    plt.title(f'Mouse {df.Setup.unique()[0]}, {n_trials} trials')
+    plt.xlabel('Stimulus frame')
+    plt.ylabel(ylabel)
+    plt.legend(frameon=False)
+    yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+    # Permutation test (shuffled_var)
+    shuffles = []
+    for _ in range(iterations):
+        # choices_shuffled = choices.sample(frac=1).reset_index(drop=True)
+        stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
+        # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
+        choices = list(choices)  # Otherwise 'ValueError: The indices for endog and exog are not aligned'
+        model_shuffled = sm.GLM(choices, stim_strength_shuffled,
+                                family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+        results_shuffled = model_shuffled.fit()
+        params_shuffled = results_shuffled.params
+        shuffles.append(params_shuffled)
+        # plt.plot(np.arange(1, len(params_shuffled)), params_shuffled.iloc[1:11], color='tab:gray', marker=None,
+        #          mfc='none', mec='none', mew=0, ms=0, label=label, alpha=0.1, zorder=1.7)  # Plot all shuffles
+
+    shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
+    percentiles = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    # percentiles = np.percentile(shuffles, 68, axis=0)  # Get upper 32 percentile of the shuffled_var
+    plt.plot(np.arange(1, len(params)), shuffles_mean[1:11], color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(np.arange(1, len(params)), percentiles[1:11], color=color_upper_shuffle, ls=':', zorder=1.9)
+    plt.xticks(np.arange(1, n_frames + 1, 1))  # Put one xtick for observation for triming later
+    sns.despine(offset=10, trim=True)  # Despine axes triming the 0
+    plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
+
+
+    # # Select the folder where to save the PDF or create it if it doesn't exist
+    # folder = '/home/alexis/Documentos/perfect agent/'
+    # if not os.path.exists(folder):
+    #     os.mkdir(folder)
+    # os.chdir(folder)
+    #
+    # trial_types = [0, 1]  # 0=left, 1=right
+    # ilds = np.sort(df.ILD.unique().astype('int'))
+    # path = '/home/alexis/PycharmProjects/glue_sessions/2AFC_2/333.csv'
+    # df = pd.read_csv(path)
+    #
+    # # Set cycling colors
+    # color_cycle = ['tab:blue',
+    #                'tab:orange',
+    #                'tab:green',
+    #                'tab:red',
+    #                'tab:purple',
+    #                'tab:brown',
+    #                'tab:pink',
+    #                'tab:gray',
+    #                'tab:olive',
+    #                'tab:cyan']
+    #
+    # # Initialize empty lists to evaluate performance
+    # unfair_trials = []
+    # errors = []
+    # hits = []
+    # accuracy = []
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+    return print(results.summary())
+
+test_kernels(experiment='2AFC_2', animal='333', target_ilds=[-2, 0, 2])

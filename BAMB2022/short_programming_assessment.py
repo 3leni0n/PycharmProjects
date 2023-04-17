@@ -11,7 +11,7 @@ difficulties following the pace of tutorial sessions.
 1- Download the data (either in .mat or .csv format) at https://bit.ly/bhvdata
 2- Open the data in Matlab or Python. The data corresponds to behavioral variables from a subject performing a
 two-alternative forced-choice discrimination task. There are two vectors in the data: 'stimulus_evidence' describes the
-strength of evidence of each stimulus in favour of of either response, from -1 (very clear stimulus associated with
+strength of evidence of each stimulus in favour of either response, from -1 (very clear stimulus associated with
 lefward response) to +1 (very clear stimulus associated with rightward response); 'response' is the response of the
 participant (0 for leftward response, 1 for rightward response).
 3- Plot the psychometric curve. This is the proportion of rightward responses as a function of stimulus evidence.
