@@ -62,9 +62,6 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-# sns.despine()
-
-
 def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=False,
                 residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
                 format='svg', transparent=False):
@@ -134,6 +131,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     frames_ild = pd.DataFrame(
         sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
 
+    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+
     ####################################################################################################################
     # # After cafesito with Leonsito on 30.03.2023:
     # frames_ild = []
@@ -154,17 +153,6 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         ylabel = 'GLM weight (residuals)'
     else:
         ylabel = 'GLM weight'
-
-    # # Zscore
-    # if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
-    #     if zscore:
-    #         frames_ild = pd.DataFrame(stats.zscore(frames_ild, axis=0))  # Z-score the ILDs (along axis 0 or None
-    #     # returns same result, but not axis 1). 0 along trials that's what I wamnna do :)
-    #         ylabel = 'GLM weight (z-scored)'
-    #     else:
-    #         ylabel = 'GLM weight'
-
-    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
     # # Frames mean (elementwise) - not needed nor used
     # sounds_concat = pd.concat((pd.DataFrame(frames_left.values), pd.DataFrame(frames_right.values)))  # DataFrame concatenating left and right frames
@@ -263,8 +251,16 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         stim_strength = frames_ild.loc[
             [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
             columns=['filename'])
-        stim_strength = stats.zscore(stim_strength, axis=0)
-        stim_strength = pd.DataFrame(stim_strength)
+
+        # Zscore
+        # if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+        if zscore:
+            stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+            # returns same result, but not axis 1). 0 along trials that's what I wamnna do :)
+            ylabel = 'GLM weight (z-scored)'
+        else:
+            ylabel = 'GLM weight'
+
         stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
 
         # Average frames (to have more trials per regressor)

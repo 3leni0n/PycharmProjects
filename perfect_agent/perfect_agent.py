@@ -3,9 +3,11 @@ import time
 import os
 import pandas as pd
 import numpy as np
-from matplotlib import pyplot as plt
+from scipy import stats
 import statsmodels.api as sm
+from matplotlib import pyplot as plt
 import seaborn as sns
+
 from my_fun.my_fun import select_ilds, compute_psych_curve
 from create_sounds.create_sounds_v2 import create_sounds_v2
 
@@ -14,7 +16,6 @@ sns.set_theme()
 sns.set_style('white')
 sns.set_style('ticks')
 sns.set_context('poster')
-# sns.despine()
 
 
 def perfect_agent(n_trials=1000, sim_stim=False, sigma=1, plot=False):
@@ -29,7 +30,7 @@ def perfect_agent(n_trials=1000, sim_stim=False, sigma=1, plot=False):
 
     time_start = time.time()
 
-    # Select the folder where to save the PDF or create it if it doesn't exist
+    # Select the folder where to save the plot or create it if it doesn't exist
     folder = '/home/alexis/Documentos/perfect agent/'
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -146,10 +147,9 @@ def perfect_agent(n_trials=1000, sim_stim=False, sigma=1, plot=False):
 
 
 def test_stim_set(n_iterations=3, n_trials=1000, plot=True):
-
     time_start = time.time()
 
-    # Select the folder where to save the PDF or create it if it doesn't exist
+    # Select the folder where to save the plot or create it if it doesn't exist
     folder = '/home/alexis/Documentos/perfect agent/'
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -178,7 +178,9 @@ def test_stim_set(n_iterations=3, n_trials=1000, plot=True):
 
     return df_list
 
-def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[-2, 0, 2], iterations=100):
+
+def test_kernels(experiment='2AFC_2', animal='333', frame_index=None, target_ilds=[-2, 0, 2], zscore=True,
+                 iterations=100, save=False, format='svg', transparent=False):
     """
     Simulates a perfect agent that perform an 2AFC ILD discrimination task
     :param n_trials: Number of trials
@@ -245,19 +247,37 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[
     stim_strength = frames_ild.loc[
         [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
         columns=['filename'])
-    # accum_evi = stim_strength.iloc[:,frame_index].tolist()
-    accum_evi = stim_strength.mean(axis=1).tolist()
+    n_frames = stim_strength.shape[1]
 
+    # Evidence accumulation regime
+    if frame_index == 'all':  # Perfect integrator
+        accum_evi = stim_strength.mean(axis=1).tolist()
+    elif frame_index == 'random_snapshot':  # Random integrator of 1 frame
+        random_frames_indexes = [np.random.choice(np.arange(10)) for i in range(len(stim_strength))]
+        accum_evi = [stim_strength.iloc[i, random_frames_indexes[i]] for i in range(len(stim_strength))]
+    else:  # Discrete integrator
+        accum_evi = stim_strength.iloc[:, frame_index].tolist()
+
+    # Create choices vector according the evidence accumulation regime
     choices = []
     for i in range(len(accum_evi)):
-        noise = np.random.choice([-1,1]) * np.random.random()
+        noise = np.random.choice([-1, 1]) * np.random.random()
         if accum_evi[i] + noise < 0:
             choices.append(0)
         else:
             choices.append(1)
 
+    # Zscore
+    # if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+    if zscore:
+        stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+        # returns same result, but not axis 1). 0 along trials that's what I wamnna do :)
+        ylabel = 'GLM weight (z-scored)'
+    else:
+        ylabel = 'GLM weight'
+
+    stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
     stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
-    stim_strength.reset_index(inplace=True, drop=True)
     model = sm.GLM(choices, stim_strength, family=sm.families.Binomial())  # GLM with Binomial family and Logit link
     results = model.fit()
     params = results.params
@@ -266,9 +286,11 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[
     summary = results.summary()
     print(summary)
 
-    color = 'b'
-    label = 'Test'
-    ylabel = 'Weight'
+    # Default plotting parameters
+    color = 'k'
+    color_upper_shuffle = 'tab:red'
+    label = ''
+    filename = f'_PK_PA_frame_{frame_index}_ILDs: {target_ilds}'
 
     plt.figure(constrained_layout=True)
 
@@ -281,6 +303,22 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
     yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+    # # Annotate significance
+    # if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
+    #     n_frames = n_mean_frames
+
+    for i in range(n_frames):
+        if p_values[i] <= 0.05:  # +i to skip constant
+            text = '*'
+        else:
+            # text = 'ns'
+            text = ''
+        # plt.annotate(str(round(p_values[0+i], 2)),
+        #              xy=(i+1, yticks[1]), xytext=(i+1, yticks[1]), color='k',
+        #              va='top', ha='center', fontsize='medium')
+        plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1, yticks[1]), color=color, va='center', ha='center',
+                     fontsize='medium')  # i+1 to skip constant
 
     # Permutation test (shuffled_var)
     shuffles = []
@@ -306,35 +344,14 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[
     sns.despine(offset=10, trim=True)  # Despine axes triming the 0
     plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
 
-
-    # # Select the folder where to save the PDF or create it if it doesn't exist
-    # folder = '/home/alexis/Documentos/perfect agent/'
-    # if not os.path.exists(folder):
-    #     os.mkdir(folder)
-    # os.chdir(folder)
-    #
-    # trial_types = [0, 1]  # 0=left, 1=right
-    # ilds = np.sort(df.ILD.unique().astype('int'))
-    # path = '/home/alexis/PycharmProjects/glue_sessions/2AFC_2/333.csv'
-    # df = pd.read_csv(path)
-    #
-    # # Set cycling colors
-    # color_cycle = ['tab:blue',
-    #                'tab:orange',
-    #                'tab:green',
-    #                'tab:red',
-    #                'tab:purple',
-    #                'tab:brown',
-    #                'tab:pink',
-    #                'tab:gray',
-    #                'tab:olive',
-    #                'tab:cyan']
-    #
-    # # Initialize empty lists to evaluate performance
-    # unfair_trials = []
-    # errors = []
-    # hits = []
-    # accuracy = []
+    if save:
+        folder_out = '/home/alexis/Documentos/perfect agent/' + experiment + '/'
+        if not os.path.exists(folder_out):
+            os.mkdir(folder_out)
+        os.chdir(folder_out)
+        plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format,
+                    transparent=transparent)
+        plt.close()
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -342,4 +359,8 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=0, target_ilds=[
 
     return print(results.summary())
 
-test_kernels(experiment='2AFC_2', animal='333', target_ilds=[-2, 0, 2])
+
+# test_kernels(experiment='2AFC_2', animal='333', frame_index='random_snapshot', target_ilds=[-70, -8, -4, -2, 0, 2,
+# 4, 8, 70], zscore=True, iterations=100, save=True, format='png', transparent=False)
+test_kernels(experiment='2AFC_2', animal='333', frame_index='random_snapshot', target_ilds=[0],
+             zscore=True, iterations=100, save=True, format='png', transparent=False)
