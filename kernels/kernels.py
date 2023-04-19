@@ -164,8 +164,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     df = pd.read_csv(folder_in)
 
     # Load intersession data
-    df_intersession = pd.read_csv(
-        '/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv')
+    # df_intersession = pd.read_csv(
+    #     '/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv')
 
     # # Add intersession data to df. Needs to be done before filtering out trials so lengths match
     # session_index = []
@@ -187,7 +187,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
     # df = df[df.Hit == 1]  # Only correct trials
-    accuracy_threshold = 0.6
+    # accuracy_threshold = 0.6
     # df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
     # with accuracy >= threshold
 
@@ -234,7 +234,6 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     color_upper_shuffle = 'tab:red'
     label = ''
     filename = f'_PK_ILDs: {target_ilds}'
-    # filename = f'_PK_ILDs: {target_ilds}_68%'
 
     # Control
     if control is not None:
@@ -402,12 +401,17 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
         # Permutation test (shuffled_var)
         shuffles = []
+        # Shuffling the choices or the stim_strength index is the same, so it doesn't matter. Shuffling along the
+        # columns of stim_strength is wrong because it breaks the temporal structure of the data. Shuffling the frames
+        # within trial could be an interesting test, as it preserves the overall weight of the stimulus for each trial
+        # but breaks the frame structure
         for _ in range(iterations):
-            # choices_shuffled = choices.sample(frac=1).reset_index(drop=True)
+            choices_shuffled = choices.sample(frac=1).reset_index(drop=True)
             stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
             # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-            choices = list(choices)  # Otherwise 'ValueError: The indices for endog and exog are not aligned'
-            model_shuffled = sm.GLM(choices, stim_strength_shuffled,
+            # model_shuffled = sm.GLM(choices_shuffled, stim_strength,  # Shuffled choices
+            #                         family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+            model_shuffled = sm.GLM(choices, stim_strength_shuffled,  # Shuffled stim_strength
                                     family=sm.families.Binomial())  # GLM with Binomial family and Logit link
             results_shuffled = model_shuffled.fit()
             params_shuffled = results_shuffled.params
@@ -416,10 +420,9 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
             #          mfc='none', mec='none', mew=0, ms=0, label=label, alpha=0.1, zorder=1.7)  # Plot all shuffles
 
         shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
-        percentiles = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-        # percentiles = np.percentile(shuffles, 68, axis=0)  # Get upper 32 percentile of the shuffled_var
+        percentiles95 = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
         plt.plot(np.arange(1, len(params)), shuffles_mean[1:11], color='tab:gray', ls='--', zorder=1.8)
-        plt.plot(np.arange(1, len(params)), percentiles[1:11], color=color_upper_shuffle, ls=':', zorder=1.9)
+        plt.plot(np.arange(1, len(params)), percentiles95[1:11], color=color_upper_shuffle, ls=':', zorder=1.9)
         plt.xticks(np.arange(1, n_frames + 1, 1))  # Put one xtick for observation for triming later
         sns.despine(offset=10, trim=True)  # Despine axes triming the 0
         plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
@@ -442,7 +445,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
-    return params, shuffles_mean, percentiles, n_trials
+    return params, shuffles, shuffles_mean, percentiles95, n_trials
 
 
 def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
@@ -538,33 +541,44 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 
     folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
 
-    n_frames = 10
     params_across_animals = []
+    shuffles_across_animals = []
     shuffles_means_across_animals = []
-    percentiles_across_animals = []
+    percentiles95_across_animals = []
     n_trials_across_animals = []
 
     for i in range(len(animals)):
-        params, shuffles_mean, percentiles, n_trials = plot_kernel(experiment=experiment, animal=animals[i],
+        print(f'Doing kernel of animal {animals[i]} ({i}/{len(animals)})')
+        params, shuffles, shuffles_mean, percentiles95, n_trials = plot_kernel(experiment=experiment, animal=animals[i],
                                                                    library=library,
                                                                    target_ilds=target_ilds, drug=drug, control=control,
                                                                    n_mean_frames=n_mean_frames, iterations=iterations,
                                                                    residuals=residuals, zscore=zscore, save=save)
         params_across_animals.append(params)
+        shuffles_across_animals.append(shuffles)
         shuffles_means_across_animals.append(shuffles_mean)
-        percentiles_across_animals.append(percentiles)
+        percentiles95_across_animals.append(percentiles95)
         n_trials_across_animals.append(n_trials)
         # n_trials.append(len(pd.read_csv(folder_in + animals[i] + '.csv')))
 
     # plt.close('all')
+    n_frames = len(params) - 1
 
     params_across_animals = np.array(params_across_animals)
     params_mean_across_animals = np.mean(params_across_animals, 0)
     params_sem_across_animals = stats.sem(params_across_animals, 0)
-    shuffles_means_across_animals = np.array(shuffles_means_across_animals)
+
+    shuffles_across_animals = np.array(shuffles_across_animals)  # Convert list os lists to 3 dim array (animal x
+    # iterations x params)
+    shuffles_means_across_animals = np.mean(shuffles_across_animals, 0)
     shuffles_means_mean_across_animals = np.mean(shuffles_means_across_animals, 0)
-    percentiles_across_animals = np.array(percentiles_across_animals)
-    percentiles_mean_across_animals = np.mean(percentiles_across_animals, 0)
+    percentiles95_across_animals = np.percentile(shuffles_means_across_animals, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+
+    # Wrong old method
+    # shuffles_means_across_animals = np.array(shuffles_means_across_animals)
+    # shuffles_means_mean_across_animals = np.mean(shuffles_means_across_animals, 0)
+    # percentiles95_across_animals = np.array(percentiles95_across_animals)
+    # percentiles95_mean_across_animals = np.mean(percentiles95_across_animals, 0)
 
     plt.figure(constrained_layout=True)
 
@@ -578,10 +592,12 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
                  yerr=params_sem_across_animals[1:11], color=color, marker='o', fmt='none', mec='none')
     plt.plot(np.arange(1, len(shuffles_means_mean_across_animals)), shuffles_means_mean_across_animals[1:11],
              color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(np.arange(1, len(percentiles_mean_across_animals)), percentiles_mean_across_animals[1:11], color='tab:red',
+    plt.plot(np.arange(1, len(percentiles95_across_animals)), percentiles95_across_animals[1:11], color='tab:red',
              ls=':', zorder=1.9)
 
-    n_frames = n_mean_frames
+    if n_mean_frames is not None:
+        n_frames = n_mean_frames
+
     plt.xticks(np.arange(1, n_frames + 1, 1))  # Put one xtick for observation for triming later
     sns.despine(offset=10, trim=True)  # Despine axes triming the 0
     plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
@@ -615,7 +631,7 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
-    return params_across_animals, shuffles_means_across_animals, percentiles_across_animals
+    return params_across_animals, shuffles_means_across_animals, percentiles95_across_animals
 
 # Debug
 # plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[0], drug=False,
