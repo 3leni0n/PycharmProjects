@@ -131,7 +131,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     frames_ild = pd.DataFrame(
         sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
 
-    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+
 
     ####################################################################################################################
     # # After cafesito with Leonsito on 30.03.2023:
@@ -153,6 +153,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         ylabel = 'GLM weight (residuals)'
     else:
         ylabel = 'GLM weight'
+
+    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
     # # Frames mean (elementwise) - not needed nor used
     # sounds_concat = pd.concat((pd.DataFrame(frames_left.values), pd.DataFrame(frames_right.values)))  # DataFrame concatenating left and right frames
