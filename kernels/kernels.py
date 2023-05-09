@@ -647,3 +647,4 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 
 # Good animals batch 2:['325', '327', '329', '330', '332', '333', '335', '337']
 # Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']
+

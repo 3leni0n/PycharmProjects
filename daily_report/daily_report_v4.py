@@ -198,13 +198,14 @@ def daily_report_v4(path, send_slack=False):
             f'{new_line}'
             f'{df.StimDur.unique()[0]}s, '
             f'Delay: {df.Delay.unique()[0]}s, '
+            f'Task: {df.Task.unique()[0]}, '
             f'Trials: {str(trials)} ({str(trials_left)} L, {str(trials_right)} R), '
             f'Performance: {str(int(round(performance * 100)))}% ({str(int(round(performance_left * 100)))}% L, {str(int(round(performance_right * 100)))}% R), '
             f'Accuracy:'
             f'{new_line}'
             f'{str(int(round(accuracy * 100)))}% '
             f'({str(int(round(accuracy_left * 100)))}% L, {str(int(round(accuracy_right * 100)))}% R), '
-            f'Accuracy blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, {str(int(round(accuracy_blocks_right * 100)))}% R), '
+            f'Accuracy blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, {str(int(round(accuracy_blocks_right * 100)))}% R),'
             f'Responses: {str(responses)} ({str(responses_left)} L, {str(responses_right)} R), '
             f'{new_line}'
             f'Hits: {str(hits)} ({str(hits_left)} L, {str(hits_right)} R), '
@@ -808,7 +809,8 @@ def daily_report_v4(path, send_slack=False):
         # fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
         # Set max xlim for lick rasters and histograms
-        xlim_max = df.RespWin.unique()[0] + df.StimDur.unique()[0] + df.Delay.unique()[0] + df.Timeout.unique()[0]
+        # xlim_max = df.RespWin.unique()[0] + df.StimDur.unique()[0] + df.Delay.unique()[0] + df.Timeout.unique()[0]
+        xlim_max = df.RespWin.unique()[0] + df.StimDur.unique()[0] + df.VarDelay.unique()[0] + df.Timeout.unique()[0]
 
         # PLOT 5: PERISTIMULUS LICK RASTER
 
@@ -866,11 +868,18 @@ def daily_report_v4(path, send_slack=False):
                     # resp_win_color = 'tab:gray'
                     resp_win_color = 'tab:gray'
 
-                # Plot delay length
+                # # Plot delay length
+                # ax.barh(df_side.index.values[j],
+                #         df_side.Delay[j],
+                #         left=df_side.RespWinStart[j] -
+                #              df_side.StimStart[j] - df_side.Delay[j],
+                #         color='lightgray', zorder=2)
+
+                # Plot variable delay length
                 ax.barh(df_side.index.values[j],
-                        df_side.Delay[j],
+                        df_side.VarDelay[j],
                         left=df_side.RespWinStart[j] -
-                             df_side.StimStart[j] - df_side.Delay[j],
+                             df_side.StimStart[j] - df_side.VarDelay[j],
                         color='lightgray', zorder=2)
 
                 # Plot response window length

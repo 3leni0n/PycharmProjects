@@ -7,12 +7,19 @@ from parse.parse_v2 import parse_v2
 import csv
 
 # To do:
-# Single corrupted session csv
 # Add training day index column to df
 
 
 # Define functions
 def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
+    """
+    Glue all the sessions of a given animal.
+    :param animal: ID number of the animal
+    :param protocol: task code version
+    :param experiment: batch of the animal
+    :param to_csv: if True save data as .csv file
+    :return: pandas DataFrame with the data, .csv file with the ID of the corrupted sessions
+    """
 
     time_start = time.time()
 
@@ -132,7 +139,12 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
 
 
 def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
-    """Update the glued_sessions .csv files for all animals with the non yet included sessions."""
+    """
+    Update the glued_sessions .csv files for all animals with the non yet included sessions.
+    :param protocol: task code version
+    :param experiment: batch of the animals
+    :return:
+    """
 
     time_start = time.time()
 
@@ -171,7 +183,14 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def glue_all(protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
+def glue_animals(protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
+    """
+    Glue all the sessions from all the animals of a given batch.
+    :param protocol: task code version
+    :param experiment: batch of animals
+    :param to_csv: if True save data as .csv file
+    :return: pandas DataFrame with the data
+    """
 
     time_start = time.time()
 
@@ -213,3 +232,10 @@ def glue_all(protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
     print('The script took', round(runtime, 2), 'seconds to run')
 
     return df
+
+
+def glue_batches():
+    """
+    Glue all sessions from all animals from all batches.
+    :return: padas Dataframe with the data
+    """

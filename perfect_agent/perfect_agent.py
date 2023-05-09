@@ -261,7 +261,8 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=None, target_ild
     # Create choices vector according the evidence accumulation regime
     choices = []
     for i in range(len(accum_evi)):
-        noise = np.random.choice([-1, 1]) * np.random.random()
+        # noise = np.random.choice([-1, 1]) * np.random.random()
+        noise = np.random.normal()  # loc=0.0, scale=1.0  # Same but more correct
         if accum_evi[i] + noise < 0:
             choices.append(0)
         else:

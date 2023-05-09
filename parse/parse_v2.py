@@ -61,6 +61,7 @@ def parse_v2(path):
     iti = [int(str(df[df.MSG == 'VAR_ITI']['+INFO'].iloc[0]))] * n_trials
     warm_up = [int(str(df[df.MSG == 'VAR_WARM_UP']['+INFO'].iloc[0]))] * n_trials
     recovery_mode = [int(str(df[df.MSG == 'VAR_RECOVERY_MODE']['+INFO'].iloc[0]))] * n_trials
+
     try:
         p_right = [float(df[df.MSG == 'VAR_P_RIGHT']['+INFO'].iloc[0])] * n_trials  # Added on 06-04-2022
     except IndexError:
@@ -80,11 +81,18 @@ def parse_v2(path):
         delay = [float(df[df.MSG == 'VAR_DELAY']['+INFO'].iloc[0])] * n_trials  # Added on 14-03-2023
     except IndexError:
         delay = [np.nan] * n_trials
+    except ValueError:  # Variable delay added on 09-05-2023
+        delay = [str(df[df.MSG == 'VAR_DELAY']['+INFO'].iloc[0])] * n_trials
 
     try:
         block_len = [float(df[df.MSG == 'VAR_BLOCK_LEN']['+INFO'].iloc[0])] * n_trials  # Added on 31-03-2023
     except IndexError:
         block_len = [np.nan] * n_trials
+
+    try:
+        task = [str(df[df.MSG == 'VAR_TASK']['+INFO'].iloc[0])] * n_trials  # Added on 31-03-2023
+    except IndexError:
+        task = [np.nan] * n_trials
 
 
     # Registered values (out of loop)
@@ -160,6 +168,7 @@ def parse_v2(path):
     port2out = []
     # substage = []
     p = []
+    var_delay = []  # Added on 09-05-2023
 
     # Added on 02.04.2023, but it should have 100% backwards compatibility
     aw_trials = []  # Trials in which AW was given. Should capture the initial AW trials plus the ones as CB measure
@@ -215,7 +224,7 @@ def parse_v2(path):
         if pd.isnull(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'AW')]['+INFO'].iloc[0])):
             aw_trials.append(0)  # If it's nan AW state was not visited
         else:
-            aw_trials.append(1)  # Else Aw was given
+            aw_trials.append(1)  # Else AW was given
 
         # Trial timestamps
         trial_start.append(band[band.TYPE == 'INFO']['BPOD-INITIAL-TIME'].iloc[0])
@@ -325,6 +334,10 @@ def parse_v2(path):
         except IndexError:
             p.append(np.nan)
 
+        # Variable delay
+        # var_delay.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'DELAY')]['+INFO'].iloc[0]))  # More precission
+        var_delay.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Delay')]['+INFO'].iloc[0]))  # Less precission
+
         if i == 0:
             after_hit.append(np.nan)
             rep_choice.append(np.nan)
@@ -377,6 +390,10 @@ def parse_v2(path):
         sound_right = [np.nan] * n_trials
         sound = [np.nan] * n_trials
 
+    # # Correct for variable delays when they were fixed
+    # if len(np.unique(var_delay)) == 1:
+    #     var_delay = [np.nan] * n_trials
+
     ####################################################################################################################
 
     # Construct DataFrame
@@ -384,19 +401,19 @@ def parse_v2(path):
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'Message',
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In', 'Port1Out', 'Port2In',
-               'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'AWTrials', 'Switch', 'Timeout', 'Fixation', 'Stage', 'Motor', 'REC',
-               'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks', 'BlockLen',
-               'StimDur', 'Delay', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup',
-               'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
+               'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'AWTrials', 'Switch', 'Timeout', 'Fixation', 'Stage',
+               'Motor', 'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks',
+               'BlockLen', 'Task', 'StimDur', 'Delay', 'VarDelay', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment',
+               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice, rep_choice,
                     response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len, resp_win_start,
                     resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found, sound_left,
-                    sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw, aw_trials,
-                    switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up, recovery_mode,
-                    p, p_right, blocks, block_len, stim_dur, delay, serial_port, protocol, creator, project, experiment,
-                    board, setup, net_port, subject, bpod_api_version, session, date, time_session_started,
-                    time_session_ended))
+                    sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw,
+                    aw_trials, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up,
+                    recovery_mode, p, p_right, blocks, block_len, task, stim_dur, delay, var_delay, serial_port, protocol, creator,
+                    project, experiment, board, setup, net_port, subject, bpod_api_version, session, date,
+                    time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
 
