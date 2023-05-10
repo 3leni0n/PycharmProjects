@@ -133,7 +133,13 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     hue = ['Error' if i == 0 else 'Hit' if i == 1 else 'Miss' for i in df.Hit]
     hue_order = ['Error', 'Hit', 'Miss']
 
-    if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
+    # Plot horizontal lines
+    ax3.axhline(0, color='tab:gray', linestyle='--')  # Chance level
+    # ax3.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+    # ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+    # if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
+    if df.P.unique()[0] == 0:  # No coherences, plot sides
         scatter = sns.scatterplot(x=df.Trial, y=df.Side, hue=hue, palette=palette,
                                   hue_order=hue_order,
                                   s=ms ** 2, ax=ax3)
@@ -141,10 +147,15 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         ax3.set_yticklabels(['L', 'R'])
 
     else:  # Plot coherences
+
+        # Replace extreme evidences for closer ones to zoom in
+        df.ILD.replace(-70, -16, inplace=True)
+        df.ILD.replace(70, 16, inplace=True)
+
         scatter = sns.scatterplot(x=df.Trial, y=df.ILD, hue=hue, palette=palette,
                                   hue_order=hue_order, s=ms ** 2, ax=ax3)
         ax3.set_yticks(df.ILD.unique())
-        # ax3.set_yscale('log')
+        # ax3.set_yticklabels(['-70', '', '', '', '0', '', '', '', '70'])
 
     try:
         scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax3, color='purple')
@@ -250,7 +261,7 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     accuracy_left = round(df.loc[df.Side == 0].Hit[-running_window:].mean(), 2)
     accuracy_right = round(df.loc[df.Side == 1].Hit[-running_window:].mean(), 2)
     reward = df.loc[df.Hit == 1].shape[0]
-    water = 2.5 * reward
+    # water = 2.5 * reward
     p = round(df.P.iloc[-1], 2)
 
     ax4.text(1, 1,

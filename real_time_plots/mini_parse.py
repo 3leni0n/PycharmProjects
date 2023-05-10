@@ -64,6 +64,7 @@ def mini_parse(file):
     # rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
     # progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
     # cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
+    task = [str(df[(df.TYPE == 'VAL') & (df.MSG == 'TASK')]['+INFO'].iloc[0])] * n_trials
 
     # Registered values (out of loop)
     # reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
@@ -105,7 +106,7 @@ def mini_parse(file):
     trial_len = []
     stim_start = []
     stim_end = []
-    stim_len = []  # Adddddddd
+    stim_len = []
     resp_win_start = []
     resp_win_end = []
     resp_win_len = []
@@ -128,10 +129,7 @@ def mini_parse(file):
     sound_left = []
     sound_right = []
     sound = []
-
     message = []
-
-
 
     ####################################################################################################################
 
@@ -232,8 +230,11 @@ def mini_parse(file):
         stim_start.append(float(
             band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
+        p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
+
         # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
-        if stage[i] <= 3:
+        # if stage[i] <= 3:  # Legacy
+        if p[i] == 0 and task[i] == 'RT':
             if miss[i] == 1:
                 stim_end.append(
                     float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
@@ -270,7 +271,7 @@ def mini_parse(file):
         except:
             ild.append(reward_side[i])
 
-        p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
+        # p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
 
         # Sound filename + sound2 filename + coherence/evidence + presented coherences/evidences
         # Stage, motor, substage for tracking changes within session when running a single script
@@ -328,13 +329,13 @@ def mini_parse(file):
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'ILD', 'ILDRep',
                'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'SoundLeft', 'SoundRight', 'Sound',
-               'Stage', 'Message', 'P']
+               'Stage', 'Message', 'P', 'Task']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, ild, ild_rep,
                     port1in, port1out, port2in, port2out, sound_left, sound_right, sound, stage,
-                    message, p))
+                    message, p, task))
 
 
 
