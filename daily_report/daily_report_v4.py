@@ -245,7 +245,8 @@ def daily_report_v4(path, send_slack=False):
         # # ax1 = plt.subplot2grid((4, 1), (0, 0))
 
         # Prepares the grid for the psychometric_curves
-        if df.Stage.unique()[0] == 4:
+        # if df.Stage.unique()[0] == 4:  # Legacy
+        if df.Task.unique()[0] == 'FD':
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
@@ -324,7 +325,8 @@ def daily_report_v4(path, send_slack=False):
         ra_alt = compute_window(df.Hit[(df.Miss == 0) & (df.RepTrial == 0)], 20)
 
         # Prepares the grid for the psychometric_curves
-        if df.Stage.unique()[0] == 4:
+        # if df.Stage.unique()[0] == 4:  # Legacy
+        if df.Task.unique()[0] == 'FD':
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
             ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
@@ -394,7 +396,8 @@ def daily_report_v4(path, send_slack=False):
         ra_right_miss = compute_window(df.Miss[df.Side == 1], 20)  # Right valid trials
 
         # Prepares the grid for the psychometric_curves
-        if df.Stage.unique()[0] == 4:
+        # if df.Stage.unique()[0] == 4:  # Legacy
+        if df.Task.unique()[0] == 'FD':
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
             ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
@@ -460,7 +463,8 @@ def daily_report_v4(path, send_slack=False):
         time_start_hit = time.time()
 
         # Prepares the grid for the psychometric_curves
-        if df.Stage.unique()[0] == 4:
+        # if df.Stage.unique()[0] == 4:  # Legacy
+        if df.Task.unique()[0] == 'FD':
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
@@ -475,7 +479,8 @@ def daily_report_v4(path, send_slack=False):
         hue = ['Error' if i == 0 else 'Hit' if i == 1 else 'Miss' for i in df.Hit]
         hue_order = ['Error', 'Hit', 'Miss']
 
-        if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
+        # if df.Stage.unique()[0] <= 3:  # Legacy
+        if df.Task.unique()[0] == 'RT':  # No coherences, plot sides
             scatter = sns.scatterplot(x=df.index, y=df.Side, hue=hue, palette=palette,
                                       hue_order=hue_order, s=ms ** 3,
                                       zorder=2.5)  # zorder=2.5 to plot the dots over the line
@@ -543,7 +548,7 @@ def daily_report_v4(path, send_slack=False):
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
 
         # Only draw PC if evidences are introduced (stage 4)
-        if len(df.ILD.unique()) > 2 and df.Stage.unique()[0] == 4:
+        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD':
             # fig = plt.figure()
 
             # Psychometric curve of the whole session (all trials)
@@ -639,7 +644,7 @@ def daily_report_v4(path, send_slack=False):
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
 
         # Only draw PC if evidences are introduced (stage 4)
-        if len(df.ILD.unique()) > 2 and df.Stage.unique()[0] == 4:
+        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD':
             # fig = plt.figure()
 
             # Psychometric curve of the whole session (all trials)
@@ -736,7 +741,7 @@ def daily_report_v4(path, send_slack=False):
         # PLOT 8: ILDS DISTRIBUTION
 
         # Only draw ILDs distribution if evidences are introduced (stage 4)
-        if len(df.ILD.unique()) > 2 and df.Stage.unique()[0] == 4:
+        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD':
             # fig = plt.figure()
 
             # ILDs distribution of the whole session (all trials)

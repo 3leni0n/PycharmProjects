@@ -73,7 +73,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     doi_16 = '2023-03-30'  # Reintroduction of blocks
     doi_17 = '2023-03-31'  # Added task parameter to choose from a reaction time (RT) or a fixed duration (FD)
     doi_18 = '2023-05-09'  # Added variable delay
-    doi_19 = '2023-05-10'  # Installation of SAI on setup pcs
+    doi_19 = '2023-05-10'  # Installation of SAI on pcs and of insdustrial quality SDs
 
     dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8, doi_9, doi_10, doi_11, doi_14, doi_15, doi_16,
             doi_17, doi_18, doi_19]
