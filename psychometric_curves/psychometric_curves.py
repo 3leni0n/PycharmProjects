@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 import os
 import pandas as pd
 from my_fun.my_fun import *
@@ -23,10 +24,12 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
 
     if experiment is None:
 
-        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects/glue_sessions'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if os.path.isdir(folder_in / x)]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's archive
@@ -36,7 +39,8 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    folder_in = Path.home() / 'PycharmProjects/glue_sessions' / experiment  # Where the data for all animals is
 
     if animal is None:
 
@@ -47,7 +51,8 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
         print('Animals: ' + str(animals))  # Remove square brackets
         animal = input('Enter animal')  # Ask user to input animal to glue sessions from
 
-    folder_in = folder_in + animal + '.csv'
+    # folder_in = folder_in + animal + '.csv'
+    folder_in = Path(folder_in / animal).with_suffix('.csv')
     df = pd.read_csv(folder_in)  # Read behavioral data
     df = df[df.P > 0]  # Only those sessions with ilds
     # df = df[df.Stage == 4]  # Only those sessions in stage 4
@@ -166,10 +171,12 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
 
     if save:
         folder_out = '/home/alexis/Documentos/psychometric curves/'
+        # folder_out = Path.home() / 'Documentos/psychometric curves/'
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
-        plt.savefig(folder_out + animal + filename + '.' + format, format=format, transparent=transparent)
+        # plt.savefig(folder_out + animal + filename)
+        plt.savefig(folder_out / (animal + filename))
         plt.close()
 
     # return psych_curve, pc0_bias0, pc0_lapses0
@@ -231,7 +238,8 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
 
     if experiment is None:
 
-        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects/glue_sessions'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
         experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
@@ -244,7 +252,8 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    folder_in = Path.home() / 'PycharmProjects/glue_sessions' / experiment  # Where the data for all animals is
 
     fit = []
     fit_error = []
@@ -258,9 +267,11 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     plt.figure(constrained_layout=True)
 
     for i in range(len(animals)):
-        print(folder_in + animals[i] + '.csv')
-        df = pd.read_csv(folder_in + animals[i] + '.csv')
-        df = df[df.P > 0]
+        # print(folder_in + animals[i] + '.csv')
+        # df = pd.read_csv(folder_in + animals[i] + '.csv')
+        df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
+        # df = df[df.P > 0]  # Only those sessions with ilds
+        # df = df[df.Stage == 4]  # Only those sessions in stage 4
         ilds = np.sort(df.ILD.unique())
 
         if kind == 'prob_right':
@@ -368,14 +379,18 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
 
     if save:
         folder_out = '/home/alexis/Documentos/psychometric curves/'
+        folder_out = Path.home() / 'Documentos/psychometric curves/'
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
-        plt.savefig(folder_out + filename + '.' + format, format=format, transparent=transparent)
+        # plt.savefig(folder_out + filename)
+        plt.savefig(folder_out / filename)
         plt.close()
 
     return np.array(params)
 
+
+########################################################################################################################
 
 def test_lapses(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_rep',
                 save=True, format='png', transparent=False):
@@ -420,7 +435,8 @@ def test_lapses(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
 
     if save:
         filename = kind + '_lapses'
-        folder_out = '/home/alexis/Documentos/psychometric curves/'
+        # folder_out = '/home/alexis/Documentos/psychometric curves/'
+        folder_out = Path.home() / 'Documentos/psychometric curves/'
         plt.savefig(folder_out + filename + '.' + format, format=format, transparent=transparent)
 
 
@@ -552,7 +568,8 @@ def pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save
         filename = '_PC_prob_rep_MK-801_'
 
     if save:
-        folder_out = '/home/alexis/Documentos/psychometric curves/MK-801/' + animal + '/'
+        # folder_out = '/home/alexis/Documentos/psychometric curves/MK-801/' + animal + '/'
+        folder_out = Path.home() / 'Documentos/psychometric curves/' + animal + '/'
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
@@ -630,7 +647,8 @@ def plot_bias_vs_lapses(kind='prob_rep', save=False, format='svg', transparent=F
 
     if save:
         filename = kind + '_lapses_vs_bias'
-        folder_out = '/home/alexis/Documentos/lapses vs bias/'
+        # folder_out = '/home/alexis/Documentos/lapses vs bias/'
+        folder_out = Path.home() / 'Documentos/lapses vs bias/'
         plt.savefig(folder_out + filename + '.' + format, format=format, transparent=transparent)
 
     # # Annotate each dot
@@ -723,10 +741,12 @@ def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337
 
     if experiment is None:
 
-        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects/glue_sessions'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if os.path.isdir(folder_in / x)]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's archive
@@ -736,7 +756,8 @@ def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    folder_in = Path.home() / 'PycharmProjects/glue_sessions' / experiment  # Where the data for all animals is
 
     fit = []
     fit_error = []
@@ -876,7 +897,8 @@ def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337
                  va=va, ha=ha, fontsize=fontsize)
 
     if save:
-        folder_out = '/home/alexis/Documentos/psychometric curves/'
+        # folder_out = '/home/alexis/Documentos/psychometric curves/'
+        folder_out = Path.home() / 'Documentos/psychometric curves/'
         if not os.path.exists(folder_out):
             os.mkdir(folder_out)
         os.chdir(folder_out)
