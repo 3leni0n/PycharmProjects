@@ -46,6 +46,7 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 
 
 import time
+from pathlib import Path
 import os
 import pandas as pd
 import numpy as np
@@ -60,6 +61,7 @@ sns.set_theme()
 sns.set_style('white')
 sns.set_style('ticks')
 sns.set_context('poster')
+# sns.despine()
 
 
 def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=False,
@@ -88,10 +90,12 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     if experiment is None:
 
-        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's archive
@@ -101,7 +105,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
     if animal is None:
         animals = os.listdir(folder_in)  # List animals
@@ -111,11 +116,13 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         print('Animals: ' + str(animals))  # Remove square brackets
         animal = input('Enter animal')  # Ask user to input animal to glue sessions from
 
-    folder_in = folder_in + animal + '.csv'
+    # folder_in = folder_in + animal + '.csv'
+    folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     # Load sounds
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
+    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
+    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     sounds = pd.read_csv(sounds_path)
     n_frames = 10
 
@@ -156,7 +163,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
-    # # Frames mean (elementwise) - not needed nor used
+    # # Frames mean (elementwise) - not needed not used
     # sounds_concat = pd.concat((pd.DataFrame(frames_left.values), pd.DataFrame(frames_right.values)))  # DataFrame concatenating left and right frames
     # sounds_concat_indices = sounds_concat.groupby(sounds_concat.index)
     # frames_mean = sounds_concat_indices.mean()
@@ -433,12 +440,15 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         plt.xticks([1, 2])  # Readjust xticks
 
     if save:
-        folder_out = '/home/alexis/Documentos/kernels/' + experiment + '/'
-        if not os.path.exists(folder_out):
-            os.mkdir(folder_out)
+        # folder_out = '/home/alexis/Documentos/kernels/' + experiment + '/'
+        folder_out = Path.home() / 'Documentos' / 'kernels' / experiment
+        # if not os.path.exists(folder_out):
+        #     os.mkdir(folder_out)
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format,
-                    transparent=transparent)
+        # plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format, transparent=transparent)
+        plt.savefig(Path(folder_out, str(df.Setup.unique()[0]) + filename + '.' + format), format=format, transparent=transparent)
         plt.close()
 
     # plt.close()
@@ -475,10 +485,12 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
 
     if experiment is None:
 
-        folder = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        # folder = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
         experiments = os.listdir(folder)  # List experiments
         experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder + x)]  # Get rid of non folders
+        # experiments = [x for x in experiments if os.path.isdir(folder + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if Path(folder / x).is_dir()]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's archive
@@ -488,10 +500,12 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
     for i in range(len(animals)):
-        path = folder + animals[i]
+        # path = folder + animals[i]
+        path = Path(folder, animals[i])
         print(path)
         plot_kernel(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
@@ -528,10 +542,12 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 
     if experiment is None:
 
-        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's archive
@@ -541,7 +557,8 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
     params_across_animals = []
     shuffles_across_animals = []
@@ -621,12 +638,16 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
     if save:
-        folder_out = '/home/alexis/Documentos/kernels/' + experiment + '/'
+        # folder_out = '/home/alexis/Documentos/kernels/'
+        folder_out = Path.home() / 'Documentos' / 'kernels'
         filename = f'mean_PK_across_animals: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
-        if not os.path.exists(folder_out):
-            os.mkdir(folder_out)
+        # if not os.path.exists(folder_out):
+        #     os.mkdir(folder_out)
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        plt.savefig(folder_out + filename, format=format, transparent=transparent)
+        # plt.savefig(folder_out + filename, format=format, transparent=transparent)
+        plt.savefig(Path(folder_out, filename, format=format), transparent=transparent)
         # plt.close()
 
     time_end = time.time()
