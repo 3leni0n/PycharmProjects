@@ -425,6 +425,6 @@ def parse_v2(path):
 #     parse()
 
 # Debug
-path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_4/setups/561/sessions/561_stage_training_v4_20230329-110651' \
-       '/561_stage_training_v4_20230329-110651.csv'
-df = parse_v2(path)
+# path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_4/setups/561/sessions/561_stage_training_v4_20230329-110651' \
+#        '/561_stage_training_v4_20230329-110651.csv'
+# df = parse_v2(path)
