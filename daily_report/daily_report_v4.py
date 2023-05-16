@@ -19,7 +19,7 @@ import pandas as pd
 import time
 import os
 
-from my_fun.my_fun import compute_psych_curve, slack_spam  # Or from my_fun.my_fun import my_fun
+from my_fun.my_fun import compute_window, compute_psych_curve, slack_spam  # Or from my_fun.my_fun import my_fun
 from parse.parse_v2 import *  # Or from parse.parse_v4 import parse_v4
 
 

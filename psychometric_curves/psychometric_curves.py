@@ -43,7 +43,6 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
     folder_in = Path.home() / 'PycharmProjects/glue_sessions' / experiment  # Where the data for all animals is
 
     if animal is None:
-
         animals = os.listdir(folder_in)  # List animals
         animals.sort()  # Sort them by name
         animals = [x[:-4] for x in animals]  # Get rid of .csv extension
