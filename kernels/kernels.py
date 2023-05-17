@@ -689,6 +689,7 @@ plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-8, -4
             residuals=False, zscore=False, control=None, n_mean_frames=None, iterations=10, save=False,
             format='svg', transparent=False)
 
+
 # plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
 #                                 library='sm', target_ilds=[-2, 0, 2], drug=False, residuals=False,
 #                                 zscore=False, control=None, n_mean_frames=None, iterations=10, save=False,
