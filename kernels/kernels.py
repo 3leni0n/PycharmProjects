@@ -685,8 +685,8 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
 
 
 # Debug
-plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-70, -8, -4, -2, 0, 2, 4, 8, 70], drug=False,
-            residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=10, save=False,
+plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False,
+            residuals=False, zscore=False, control=None, n_mean_frames=None, iterations=10, save=False,
             format='svg', transparent=False)
 
 # plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
@@ -697,16 +697,16 @@ plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-70, -
 # Good animals batch 2:['325', '327', '329', '330', '332', '333', '335', '337']
 # Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']
 
-experiment = '2AFC_2'
-animal = '325'
-library = 'sm'
-target_ilds = [-2, 0, 2]
-drug = False
-residuals = True
-zscore = False
-control = None
-n_mean_frames = None
-iterations = 1000
-save = False
-format = 'svg'
-transparent = False
+# experiment = '2AFC_2'
+# animal = '325'
+# library = 'sm'
+# target_ilds = [-2, 0, 2]
+# drug = False
+# residuals = True
+# zscore = False
+# control = None
+# n_mean_frames = None
+# iterations = 1000
+# save = False
+# format = 'svg'
+# transparent = False
