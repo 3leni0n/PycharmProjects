@@ -32,7 +32,7 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 
 
 # Comments from Jaime:
-# - Are you using any type of regularisation when computing the kernels?
+# - Are you using any type of regularisation when computing the kernels?  No
 # - Another nice control would be to generate synthetic data with an agent that e.g. only uses 1 frame (1st or n-th).
 # - Generate responses using that frame plus noise and compute kernels at different coherences.
 # - Can you also try to compute kernels using the AUC method that Genis describes in his paper (Prat-Ortega et. al 2020)'
@@ -174,29 +174,32 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     ####################################################################################################################
 
-    # Animals batch 2 whose session number from glue_sessions and intersessions don't match:
-    # ['325', '330', '332', '335']
-    # Need to re_run glue_sessions recursively (all animals) and then intersession (all animals)
-
     # Load intersession data
-    # # path_intersession = '/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv'
-    # path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (animal + '_intersession.csv')
-    # df_intersession = pd.read_csv(path_intersession)
-    #
-    # # Add intersession data to df. Needs to be done before filtering out trials so lengths match
-    # session_index = []
-    # accuracy = []
-    # accuracy_left = []
-    # accuracy_right = []
-    # for i in range(len(df_intersession)):
-    #     session_index += [df_intersession.index.values[i]] * df_intersession.Trials[i]
-    #     accuracy += [df_intersession.Accuracy[i]] * df_intersession.Trials[i]
-    #     accuracy_left += [df_intersession.AccuracyLeft[i]] * df_intersession.Trials[i]
-    #     accuracy_right += [df_intersession.AccuracyRight[i]] * df_intersession.Trials[i]
-    # df['SessionIndex'] = session_index
-    # df['Accuracy'] = accuracy
-    # df['AccuracyLeft'] = accuracy_left
-    # df['AccuracyRight'] = accuracy_right
+    # path_intersession = '/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv'
+    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (animal + '_intersession.csv')
+    df_intersession = pd.read_csv(path_intersession)
+
+    # There are some short, corrupted sessions (dates) for which there is no intersession data because one of the values
+    # for some of the columns is empty. Remove them from trial data
+    dates_trials = df.Date.unique()
+    dates_intersession = df_intersession.Dates.unique()
+    dates_to_remove = [x for x in dates_trials if x not in dates_intersession]
+    df = df[~df.Date.isin(dates_to_remove)]
+
+    # Add intersession data to df. Needs to be done before filtering out trials so lengths match
+    session_index = []
+    accuracy = []
+    accuracy_left = []
+    accuracy_right = []
+    for i in range(len(df_intersession)):
+        session_index += [df_intersession.index.values[i]] * df_intersession.Trials[i]
+        accuracy += [df_intersession.Accuracy[i]] * df_intersession.Trials[i]
+        accuracy_left += [df_intersession.AccuracyLeft[i]] * df_intersession.Trials[i]
+        accuracy_right += [df_intersession.AccuracyRight[i]] * df_intersession.Trials[i]
+    df['SessionIndex'] = session_index
+    df['Accuracy'] = accuracy
+    df['AccuracyLeft'] = accuracy_left
+    df['AccuracyRight'] = accuracy_right
 
     ####################################################################################################################
 
@@ -694,16 +697,16 @@ plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-70, -
 # Good animals batch 2:['325', '327', '329', '330', '332', '333', '335', '337']
 # Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']
 
-# experiment = '2AFC_2'
-# animal = '333'
-# library = 'sm'
-# target_ilds = [-2, 0, 2]
-# drug = False
-# residuals = True
-# zscore = False
-# control = None
-# n_mean_frames = None
-# iterations = 1000
-# save = False
-# format = 'svg'
-# transparent = False
+experiment = '2AFC_2'
+animal = '325'
+library = 'sm'
+target_ilds = [-2, 0, 2]
+drug = False
+residuals = True
+zscore = False
+control = None
+n_mean_frames = None
+iterations = 1000
+save = False
+format = 'svg'
+transparent = False

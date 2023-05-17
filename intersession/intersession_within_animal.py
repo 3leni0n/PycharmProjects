@@ -73,9 +73,11 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     doi_16 = '2023-03-30'  # Reintroduction of blocks
     doi_17 = '2023-03-31'  # Added task parameter to choose from a reaction time (RT) or a fixed duration (FD)
     doi_18 = '2023-05-09'  # Added variable delay
-    doi_19 = '2023-05-10'  # Installation of SAI on pcs and of insdustrial quality SDs
+    doi_19 = '2023-05-10'  # Installation of SAI on pcs and of industrial quality SDs
+    doi_20 = '2023-05-15'  # Installation of powered USB hubs
 
-    dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8, doi_9, doi_10, doi_11, doi_14, doi_15, doi_16,
+    dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8, doi_9, doi_10, doi_11, doi_14, doi_15,
+            doi_16,
             doi_17, doi_18, doi_19]
     dois_indexes = []
 
@@ -172,36 +174,43 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     # but like this the output is a pd.Series
     corr_alt_bias = alt_rate_left * 0.5 + alt_rate_right * 0.5
 
-    # Accuracy blocks (accuracy of first trial of each block)
-    blocks = df.groupby('Date').Blocks.unique()
-    # block_len = df.groupby('Date').BlockLen.unique()
-    side = df.groupby('Date').Side.apply(list)
-    warm_up = df.groupby('Date').WarmUp.unique()
-    block_change_indexes = []
-    block_change_dist = []  # Should be the same as block_len, but block_len wasn't from the beginning of blocks
-    block_change_dist_mode = []
-    accuracy_blocks = []
-    accuracy_blocks_left = []
-    accuracy_blocks_right = []
+    # Blocks were introduced in batch 4, so this won't work for the first 3 batches
+    try:
+        # Accuracy blocks (accuracy of first trial of each block)
+        blocks = df.groupby('Date').Blocks.unique()
+        # block_len = df.groupby('Date').BlockLen.unique()
+        side = df.groupby('Date').Side.apply(list)
+        warm_up = df.groupby('Date').WarmUp.unique()
+        block_change_indexes = []
+        block_change_dist = []  # Should be the same as block_len, but block_len wasn't from the beginning of blocks
+        block_change_dist_mode = []
+        accuracy_blocks = []
+        accuracy_blocks_left = []
+        accuracy_blocks_right = []
 
-    for i in range(len(dates)):
-        df_session = df[df.Date == dates[i]].reset_index()
-        # Take only sessions with blocks (VAR_BLOCKS not nan and != 0) and without warm_up (VAR_WARM_UP == 0) as warm up
-        # is used to transition from blocks to random
-        if not pd.isnull(blocks[i][0]) and blocks[i][0] != '0' and warm_up[i][0] == 0:
-            block_change_indexes.append([j for j in range(1, len(side[i])) if side[i][j - 1] != side[i][j]])
-            block_change_dist.append([block_change_indexes[i][j] - block_change_indexes[i][j-1] for j in range(1, len(block_change_indexes[i]))])
-            block_change_dist_mode.append(float(max(set(block_change_dist[i]), key=block_change_dist[i].count)))
-            accuracy_blocks.append(df_session.loc[block_change_indexes[i]].Hit.mean())
-            accuracy_blocks_left.append(df_session.loc[block_change_indexes[i]].loc[df_session.Side == 0].Hit.mean())
-            accuracy_blocks_right.append(df_session.loc[block_change_indexes[i]].loc[df_session.Side == 1].Hit.mean())
-        else:
-            block_change_indexes.append(np.nan)
-            block_change_dist.append(np.nan)
-            block_change_dist_mode.append(np.nan)
-            accuracy_blocks.append(np.nan)
-            accuracy_blocks_left.append(np.nan)
-            accuracy_blocks_right.append(np.nan)
+        for i in range(len(dates)):
+            df_session = df[df.Date == dates[i]].reset_index()
+            # Take only sessions with blocks (VAR_BLOCKS not nan and != 0) and without warm_up (VAR_WARM_UP == 0) as warm up
+            # is used to transition from blocks to random
+            if not pd.isnull(blocks[i][0]) and blocks[i][0] != '0' and warm_up[i][0] == 0:
+                block_change_indexes.append([j for j in range(1, len(side[i])) if side[i][j - 1] != side[i][j]])
+                block_change_dist.append([block_change_indexes[i][j] - block_change_indexes[i][j - 1] for j in
+                                          range(1, len(block_change_indexes[i]))])
+                block_change_dist_mode.append(float(max(set(block_change_dist[i]), key=block_change_dist[i].count)))
+                accuracy_blocks.append(df_session.loc[block_change_indexes[i]].Hit.mean())
+                accuracy_blocks_left.append(
+                    df_session.loc[block_change_indexes[i]].loc[df_session.Side == 0].Hit.mean())
+                accuracy_blocks_right.append(
+                    df_session.loc[block_change_indexes[i]].loc[df_session.Side == 1].Hit.mean())
+            else:
+                block_change_indexes.append(np.nan)
+                block_change_dist.append(np.nan)
+                block_change_dist_mode.append(np.nan)
+                accuracy_blocks.append(np.nan)
+                accuracy_blocks_left.append(np.nan)
+                accuracy_blocks_right.append(np.nan)
+    except AttributeError:
+        pass
 
     # Misses (invalid trials)
     misses = df.groupby('Date').Miss.sum()
@@ -324,11 +333,6 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     ydata_pc_rep = pd.Series(ydata_pc_rep, dates)
     fit_pc_rep = pd.Series(fit_pc_rep, dates)
     fit_error_pc_rep = pd.Series(fit_error_pc_rep, dates)
-
-    # # Construct DataFrame
-    # columns = []
-    # data = list(zip())
-    # df_intersession = pd.DataFrame(data=data, columns=columns)
 
     ####################################################################################################################
 
@@ -515,10 +519,14 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
             except IndexError:
                 pass
 
-        # Plot block accuracy per session
-        ax3.plot(dates_indexes, accuracy_blocks, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax3.plot(dates_indexes, accuracy_blocks_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax3.plot(dates_indexes, accuracy_blocks_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        # Blocks were introduced in batch 4, so this won't work for the first 3 batches
+        try:
+            # Plot block accuracy per session
+            ax3.plot(dates_indexes, accuracy_blocks, marker='o', ms=ms, lw=lw, color='black', label='Total')
+            ax3.plot(dates_indexes, accuracy_blocks_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+            ax3.plot(dates_indexes, accuracy_blocks_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        except UnboundLocalError:
+            pass
 
         ax3.set_xlim([0, len(dates_indexes)])
         ax3.set_xticklabels([])
@@ -559,8 +567,12 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
             except IndexError:
                 pass
 
-        # # Plot block_length per session
-        ax4.plot(dates_indexes, block_change_dist_mode, marker='o', ms=ms, lw=lw, color='black')
+        # Blocks were introduced in batch 4, so this won't work for the first 3 batches
+        try:
+            # Plot block_length per session
+            ax4.plot(dates_indexes, block_change_dist_mode, marker='o', ms=ms, lw=lw, color='black')
+        except UnboundLocalError:
+            pass
 
         # ax4.set_xlabel('Days')
         ax4.set_xlim([0, len(dates_indexes)])
@@ -951,9 +963,8 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
                         rewards_right, water, water_left, water_right, stage, sounds_mismatch, no_sound, message_count,
                         pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
                         sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep,
-                        ydata_pc_rep,
-                        fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep,
-                        lapse_alt))
+                        ydata_pc_rep, fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep,
+                        lapse_rep, lapse_alt))
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
@@ -1161,3 +1172,8 @@ def add_drug_data_to_glued_sessions(path_drug='/home/alexis/Descargas/Mouse inje
             df_sessions.to_csv('/home/alexis/PycharmProjects/glue_sessions/2AFC_2/' + animal + '.csv', index=False)
 
     return df_sessions
+
+
+# To debug:
+# intersession_within_animal('/home/alexis/PycharmProjects/glue_sessions/2AFC_2/325.csv', to_csv=True, send_slack=False)
+do_intersessions(protocol='stage_training_v2', experiment='2AFC_2', to_csv=True, send_slack=False)
