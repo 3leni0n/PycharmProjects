@@ -200,7 +200,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     df['Accuracy'] = accuracy
     df['AccuracyLeft'] = accuracy_left
     df['AccuracyRight'] = accuracy_right
-    
+
 
     ####################################################################################################################
 
