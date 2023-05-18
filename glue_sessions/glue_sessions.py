@@ -46,11 +46,15 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
         animals = os.listdir(folder_in)  # List animals
         animals.sort()  # Sort them by name
 
-        try:
-            animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
-            animals.remove('.idea')  # Pycharm's archive
-        except ValueError:
-            pass
+        # Usually I don't want Test subject(s)
+        animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
+                             '.idea']  # Pycharm's file
+
+        for i in range(len(animals_to_remove)):
+            try:
+                animals.remove(animals_to_remove[i])
+            except ValueError:
+                pass
 
         print('Animals: ' + str(animals)[1:-1])  # Remove square brackets
         animal = input('Enter animal')  # Ask user to input animal to glue sessions from
@@ -110,7 +114,7 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
                 elif protocol == 'stage_training_v2' or 'stage_training_v3':
                     df_session = parse_v2(path)  # Parse session
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
-            except (IndexError, ValueError, FileNotFoundError):  # When passing 2 exceptions it must be in this syntax
+            except (IndexError, ValueError, FileNotFoundError, ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                 print(
                     f"The session '{sessions[i]}' is corrupted. Adding to corrupted sessions log and continuing with "
                     f"next session...")
@@ -168,11 +172,15 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
     animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
 
-    try:
-        animals.remove('Test')  # Usually I don't want to do the daily reports of the Test subject
-        animals.remove('.idea')  # Pycharm's archive
-    except ValueError:
-        pass
+    # Usually I don't want Test subject(s)
+    animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
+                         '.idea']  # Pycharm's file
+
+    for i in range(len(animals_to_remove)):
+        try:
+            animals.remove(animals_to_remove[i])
+        except ValueError:
+            pass
 
     for i in range(len(animals)):
         print(f'Updating sessions of animal {animals[i]}...')

@@ -1176,4 +1176,4 @@ def add_drug_data_to_glued_sessions(path_drug='/home/alexis/Descargas/Mouse inje
 
 # To debug:
 # intersession_within_animal('/home/alexis/PycharmProjects/glue_sessions/2AFC_2/325.csv', to_csv=True, send_slack=False)
-do_intersessions(protocol='stage_training_v2', experiment='2AFC_2', to_csv=True, send_slack=False)
+# do_intersessions(protocol='stage_training_v2', experiment='2AFC_2', to_csv=True, send_slack=False)
