@@ -1173,6 +1173,51 @@ def add_drug_data_to_glued_sessions(path_drug='/home/alexis/Descargas/Mouse inje
 
     return df_sessions
 
+def add_drug_data(path_drug='/home/alexis/Descargas/Mouse injections MK801.csv', data_type='intersession',
+                                    to_csv=False):
+    """
+    Takes all session/intersession .csv files from an experiment (batch) and a drug' .csv paths as inputs and adds
+    the drug data to a new 'Drug' column to the session/intersession .csv to the corresponding dates (otherwise it adds
+    nans) and saves the updated intersession .csv file
+    :param path_drug: path of the drug data .csv. First column is 'Date' in format 'YYYY-MM-DD', subsequent columns are
+    mouse number and the injection they received ('saline', 'drug' or 'rest')
+    :data_type: 'glue_sessions' or 'intersession'
+    :to_csv: if True, saves the updated intersession .csv file
+    :return: Last iteration DataFrame with a 'Drug' column added to the end
+    """
+
+    folder = '/home/alexis/PycharmProjects/' + data_type + '/2AFC_2/'  # Where the data for all animals is
+    data_list = os.listdir(folder)  # List experiments
+    data_list.sort()  # Sort them by name
+    data_list = [i for i in data_list if '_corrupted_sessions' not in i]  # Remove '_corrupted_sessions'.csv files
+    df_drug = pd.read_csv(path_drug)
+
+    for j in data_list:
+
+        path = folder + j
+        print(path)
+        df = pd.read_csv(path)
+        animal = df.Subject.unique()[0].astype('str')
+        drug = []
+
+        if data_type == 'glue_sessions':  # Trial data
+            dates = df.Date
+        elif data_type == 'intersession':  # Intersession data
+            dates = df.Dates
+
+        for i in range(len(df)):
+            if len(df_drug.Date.str.contains(dates[i]).unique()) == 2:
+                drug.append(df_drug[df_drug.Date == dates[i]][animal].values[0])
+            else:
+                drug.append(np.nan)
+
+        drug = pd.Series(drug)
+        df['Drug'] = drug
+
+        if to_csv:
+            df.to_csv('/home/alexis/PycharmProjects/' + data_type + '/2AFC_2/' + animal + '.csv', index=False)
+
+    return df
 
 # To debug:
 # intersession_within_animal('/home/alexis/PycharmProjects/glue_sessions/2AFC_2/325.csv', to_csv=True, send_slack=False)

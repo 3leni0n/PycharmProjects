@@ -141,6 +141,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     #     elif sounds.ILD[i] > 0:  # Right trials
     #         frames_ild.append(sounds[right_frames_column_names].values[i] - sounds[left_frames_column_names].values[i])
     # frames_ild = pd.DataFrame(frames_ild)
+
     ####################################################################################################################
 
     # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
@@ -187,14 +188,16 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     ####################################################################################################################
 
-    # Filter out trials
+    # Filter trials
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
     # df = df[df.Hit == 1]  # Only correct trials
-    # accuracy_threshold = 0.6
+    # accuracy_threshold = 0.5
     # df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
     # with accuracy >= threshold
+
+    ####################################################################################################################
 
     # Drug sessions/trials
     if drug:  # Select drug session trials
@@ -205,33 +208,30 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         except AttributeError:
             pass
 
+    # drug_type = 'rest'
+    # drug_type = 'saline'
+    drug_type = 'MK801'
+
+    drug_session_dates = df_intersession[df_intersession.Drug == drug_type].Dates
+
+    # Drop sessions in which the animal didn't do the task
+    # df.drop(index=df[(df.Date == '2022-05-24') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 4%
+    # df.drop(index=df[(df.Date == '2022-05-25') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 3%
+    # df.drop(index=df[(df.Date == '2022-06-01') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 43%
+    # df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)  # 200 trials, miss rate 50%
+    # df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)  # 200 trials, miss rate 83%
+
+
+
+    # df = df[df.Drug == 'saline']
+    df = df[df.Drug == 'MK801']
+    # df = df[df.Drug == 'rest']
+
+
+
+    ####################################################################################################################
+
     n_trials = len(df)
-
-    ####################################################################################################################
-    'UNDER CONSTRUCTION >>> DRUG DATA'
-    ####################################################################################################################
-
-    # # Index drug sessions
-    # df_intersession = pd.read_csv('/home/alexis/PycharmProjects/intersession/' + '/' + experiment + '/' + animal +
-    #                               '_intersession.csv')
-    # # df_intersession = df_intersession[(df_intersession.AccuracyLeft >= 0.75) & (df_intersession.AccuracyRight >= 0.75)]
-    # # Select only sessions with accuracy above threshold
-    # drug_session_dates = df_intersession[df_intersession.Drug == 'MK801'].Dates
-    # # df = df[df.Drug.isnull()]  # Remove drug experimental sessions
-    #
-    # df.drop(index=df[(df.Date == '2022-05-25') & (df.Setup == 337)].index, inplace=True)
-    # df.drop(index=df[(df.Date == '2022-05-24') & (df.Setup == 337)].index, inplace=True)
-    # df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)
-    # df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)
-    # df.drop(index=df[(df.Date == '2022-05-31') & (df.Setup == 333)].index, inplace=True)
-    #
-    # # df = df[df.Drug == 'saline']
-    # df = df[df.Drug == 'MK801']
-    # # df = df[df.Drug == 'rest']
-    # n_trials = len(df)
-
-    ####################################################################################################################
-
     filenames = df.Filename.tolist()
 
     # Default plotting parameters
@@ -682,16 +682,16 @@ plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-8, -4
 # Good animals batch 2:['325', '327', '329', '330', '332', '333', '335', '337']
 # Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']
 
-# experiment = '2AFC_2'
-# animal = '325'
-# library = 'sm'
-# target_ilds = [-2, 0, 2]
-# drug = False
-# residuals = True
-# zscore = False
-# control = None
-# n_mean_frames = None
-# iterations = 1000
-# save = False
-# format = 'svg'
-# transparent = False
+experiment = '2AFC_2'
+animal = '333'
+library = 'sm'
+target_ilds = [-2, 0, 2]
+drug = True
+residuals = False
+zscore = False
+control = None
+n_mean_frames = None
+iterations = 10
+save = False
+format = 'svg'
+transparent = False
