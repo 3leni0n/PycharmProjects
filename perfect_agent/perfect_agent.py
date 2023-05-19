@@ -7,6 +7,7 @@ from scipy import stats
 import statsmodels.api as sm
 from matplotlib import pyplot as plt
 import seaborn as sns
+from my_fun.my_fun import get_ild
 
 from my_fun.my_fun import select_ilds, compute_psych_curve
 from create_sounds.create_sounds_v2 import create_sounds_v2
@@ -221,22 +222,11 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=None, target_ild
 
     # Load sounds
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
+    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
+    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     sounds = pd.read_csv(sounds_path)
     n_frames = 10
-
-    # Left frames
-    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
-    frames_left = sounds[left_frames_column_names]
-
-    # Right frames
-    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
-    frames_right = sounds[right_frames_column_names]
-
-    # Frames ILD (elementwise)
-    frames_ild = pd.DataFrame(
-        sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
-    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+    frames_ild = get_ild(n_frames)
 
     # Load behavioral data
     df = pd.read_csv(folder_in)
@@ -363,5 +353,5 @@ def test_kernels(experiment='2AFC_2', animal='333', frame_index=None, target_ild
 
 # test_kernels(experiment='2AFC_2', animal='333', frame_index='random_snapshot', target_ilds=[-70, -8, -4, -2, 0, 2,
 # 4, 8, 70], zscore=True, iterations=100, save=True, format='png', transparent=False)
-test_kernels(experiment='2AFC_2', animal='333', frame_index='random_snapshot', target_ilds=[0],
-             zscore=True, iterations=100, save=True, format='png', transparent=False)
+# test_kernels(experiment='2AFC_2', animal='333', frame_index='random_snapshot', target_ilds=[0],
+#              zscore=True, iterations=100, save=True, format='png', transparent=False)

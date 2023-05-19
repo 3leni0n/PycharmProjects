@@ -55,14 +55,13 @@ import statsmodels.api as sm
 from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
+from my_fun.my_fun import get_ild
 
-# Mel's code snippet for poster
+# Plotting parameters
 sns.set_theme()
 sns.set_style('white')
 sns.set_style('ticks')
 sns.set_context('poster')
-
-
 # sns.despine()
 
 
@@ -121,24 +120,15 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     # folder_in = folder_in + animal + '.csv'
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
+    ####################################################################################################################
+
     # Load sounds
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
     sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     sounds = pd.read_csv(sounds_path)
     n_frames = 10
-
-    # Left frames
-    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
-    frames_left = sounds[left_frames_column_names]
-
-    # Right frames
-    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
-    frames_right = sounds[right_frames_column_names]
-
-    # Frames ILD (elementwise)
-    frames_ild = pd.DataFrame(
-        sounds[right_frames_column_names].values - sounds[left_frames_column_names].values)  # Directly on the dataframe
+    frames_ild = get_ild(n_frames)
 
     ####################################################################################################################
     # # After cafesito with Leonsito on 30.03.2023:
@@ -161,13 +151,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     else:
         ylabel = 'GLM weight'
 
-    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
-
-    # Frames mean (elementwise) - not needed not used
-    # sounds_concat = pd.concat((pd.DataFrame(frames_left.values), pd.DataFrame(frames_right.values)))  # DataFrame concatenating left and right frames
-    # sounds_concat_indices = sounds_concat.groupby(sounds_concat.index)
-    # frames_mean = sounds_concat_indices.mean()
-    # frames_mean.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+    ####################################################################################################################
 
     # Load behavioral data
     df = pd.read_csv(folder_in)
@@ -203,7 +187,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
     ####################################################################################################################
 
-    # Filter out some trials
+    # Filter out trials
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs

@@ -11,6 +11,7 @@ import os
 import csv
 import random
 from matplotlib import pyplot as plt
+from pathlib import Path
 
 # For compute_psych_curve
 from scipy import stats
@@ -595,7 +596,7 @@ def get_dBs_and_amps_from_diff(diff, max_vol):
 
 def ild():
     """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
-    The input should be a csv file to convert to DataFrame
+    The input should be a csv file to convert to DataFrame. Only for sounds.csv (batch 1)
     """
     path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     df = pd.read_csv(path)
@@ -624,35 +625,26 @@ def ild():
     return df_ild
 
 
-"""
-dB_cal = 73  # Calibration value of the speakers in dB
-ambient_noise = 33  # Ambient noise in the behavioral box measured with the microphone
-emp_left_dB = np.array([33, 43.3, 53.9, 56.9, 59.2, 62.2, 64.5, 64.9, 65.4, 66.4,
-                        68.6, 69.8, 70.7, 70.5, 70.85, 70.35, 70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB
-# recorded with micro from left speaker of box 8 with Rafa on March 3rd 2021
-exp_right_dB = np.flip(emp_left_dB)
+def get_ild(n_frames):
+    # Load sounds
+    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    sounds = pd.read_csv(sounds_path)
+    # n_frames = 10
 
-theor_left_dB = power_dB(coherences)
-error = theor_left_dB - emp_left_dB
-error = np.mean(error[1:])  # Exclude -Inf
+    # Left frames
+    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
+    frames_left = sounds[left_frames_column_names].values
 
-# Plot left
-x = np.linspace(0, 1, 1000)
-y = power_dB(x) - error
-plt.plot(x, y, 'g', label='theoretical left')
-plt.plot(coherences, emp_left_dB, 'go', markerfacecolor='None', label='empirical left')
+    # Right frames
+    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
+    frames_right = sounds[right_frames_column_names].values
 
-# Plot right
-plt.plot(np.flip(x), y, 'm', label='theoretical right')
-plt.plot(coherences, exp_right_dB, 'mo', markerfacecolor='None', label='expected right')
+    # Frames ILD (elementwise substraction)
+    frames_ild = frames_right - frames_left
+    frames_ild = pd.DataFrame(frames_ild)
+    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
-plt.xlabel('Amplitude')
-plt.ylabel('dB')
-plt.legend()
-plt.title('SPL')
-plt.savefig('SPL.png')
-# From datahandler's utils.py
-"""
+    return frames_ild
 
 
 def compute_window(data, runningwindow):
@@ -670,6 +662,7 @@ def compute_window(data, runningwindow):
 
 def compute_psych_curve(x, y, n_points=100):
     """Computes a psychometric function."""
+
     # https://psychology.stackexchange.com/questions/13347/how-can-i-fit-a-psychometric-function-such-that-the-minimum-is-50-chance-level
 
     def sigmoid_mme(fit_params: tuple):
