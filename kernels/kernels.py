@@ -20,16 +20,7 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 # To-do/done:
 # Fix z-score
 # Fit a line to the kernel                      To do
-# z-score ilds                                  Done
-# ILDs = [-2, 0, 2] vs ILDs = [0]               Done
-# 1st half vs 2nd half                          Done
-# Random 50% vs 50%                             Done
-# Left vs right kernels                         Done
 # Rep vs Alt                                    To do
-# Permutation CI                                Done
-# Bootstrap errorbars                           Done (akin to bse)
-# Add parameter for residuals                   Done
-
 
 # Comments from Jaime:
 # - Are you using any type of regularisation when computing the kernels?  No
@@ -65,7 +56,7 @@ sns.set_context('poster')
 # sns.despine()
 
 
-def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=False,
+def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
                 residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
                 format='svg', transparent=False):
     """
@@ -75,7 +66,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     :param animal: Mouse ID number
     :param library: Library used to compute the kernel
     :param target_ilds: ILDs to use (ideally just 0)
-    :param drug: Use or drug trials/sessions or not
+    :param drug: Use drug trials/sessions or not. If so, specify which drug; if not, specify None
     :param residuals: If True substract residuals and set zscore to False
     :param zscore: If True zscore the ILDs per frame, resulting in heavier weights nad allowing comparisons
     :param control: What control analysis to run
@@ -99,7 +90,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
 
         try:
-            experiments.remove('__pycache__')  # Pycharm's archive
+            experiments.remove('__pycache__')  # Pycharm's file
         except ValueError:
             pass
 
@@ -147,7 +138,8 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
     if residuals:
         sounds_ild = sounds.ILD
-        frames_ild = frames_ild.sub(sounds_ild, axis='rows')
+        frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
+        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
         ylabel = 'GLM weight (residuals)'
     else:
         ylabel = 'GLM weight'
@@ -193,41 +185,32 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
     ilds = np.sort(df.ILD.unique())
     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
     # df = df[df.Hit == 1]  # Only correct trials
-    # accuracy_threshold = 0.5
-    # df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
+    accuracy_threshold = 0.5
+    df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
     # with accuracy >= threshold
 
     ####################################################################################################################
 
     # Drug sessions/trials
-    if drug:  # Select drug session trials
+    if drug is not None:  # Select drug session trials
         df = df[df.Drug.notnull()]
+        # drug_type = 'rest'
+        # drug_type = 'saline'
+        # drug_type = 'MK801'
+        drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
+        df = df[df.Drug == drug]
     else:  # Don't select drug session trials
         try:
             df = df[df.Drug.isnull()]  # Remove drug experimental sessions
         except AttributeError:
             pass
 
-    # drug_type = 'rest'
-    # drug_type = 'saline'
-    drug_type = 'MK801'
-
-    drug_session_dates = df_intersession[df_intersession.Drug == drug_type].Dates
-
-    # Drop sessions in which the animal didn't do the task
+    # Drop sessions in which the animal didn't do the task. This can be achieved by using an accuracy threshold of 0.5
     # df.drop(index=df[(df.Date == '2022-05-24') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 4%
     # df.drop(index=df[(df.Date == '2022-05-25') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 3%
     # df.drop(index=df[(df.Date == '2022-06-01') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 43%
-    # df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)  # 200 trials, miss rate 50%
-    # df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)  # 200 trials, miss rate 83%
-
-
-
-    # df = df[df.Drug == 'saline']
-    df = df[df.Drug == 'MK801']
-    # df = df[df.Drug == 'rest']
-
-
+    # df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)  # Miss rate 50%
+    # df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)  # Miss rate 83%
 
     ####################################################################################################################
 
@@ -377,7 +360,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
         # stderr = result.stderr
 
         # Plot kernel (stimulus frames beta weights)
-        # + i to skip constant; + int(residuals) to skip ILD
+        # + 1 to skip constant; + int(residuals) to skip ILD
         x = np.arange(1 + int(residuals), len(params))
         y = params.iloc[1 + int(residuals):len(params)]
         yerr = beta_std_err.iloc[1 + int(residuals):len(params)]
@@ -468,7 +451,7 @@ def plot_kernel(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2,
 
 
 def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
-               target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False, residuals=False, zscore=True, control=None,
+               target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False, zscore=True, control=None,
                n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
     """
     Do the kernels for all animals of a given batch (experiment)
@@ -524,7 +507,7 @@ def do_kernels(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', 
 
 
 def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                                library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False, residuals=False,
+                                library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False,
                                 zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
                                 format='svg', transparent=False):
     """
@@ -668,10 +651,38 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     return params_across_animals, shuffles_means_across_animals, percentiles95_across_animals
 
 
+def primacy_recency_index(n_frames):
+    """
+    From 'Flexible categorization in perceptual decision making':
+    (https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z#Sec11)
+    "where β1 and β2 are the coefficients of a logistic regression with the coherence of the first and second part of
+    the stimuli as predictors. Ranges from −1 (primacy) to 1 (recency)."
+    :return: Primacy-recency index
+    """
+
+    betas = params.iloc[-n_frames:]
+    beta1 = betas.iloc[0:int(len(betas) / 2)].mean()
+    beta2 = betas.iloc[int(len(betas) / 2):].mean()
+    index = beta2 - beta1 / beta1 + beta2
+
+    return index
+
 # Debug
-plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=False,
-            residuals=False, zscore=False, control=None, n_mean_frames=None, iterations=10, save=False,
-            format='svg', transparent=False)
+# params, shuffles, shuffles_mean, percentiles95, n_trials = plot_kernel(experiment='2AFC_2', animal='333', library='sm',
+#                                                                        target_ilds=[-70, -8, -4, -2, 0, 2, 4, 8, 70],
+#                                                                        drug='MK801', residuals=True, zscore=False,
+#                                                                        control=None, n_mean_frames=None, iterations=100,
+#                                                                        save=False, format='svg', transparent=False)
+
+
+# Drugs across animals
+params_across_animals, \
+shuffles_means_across_animals, \
+percentiles95_across_animals = plot_kernels_across_animals(experiment='2AFC_2', animals=['332', '333', '337'],
+                                                           library='sm', target_ilds=[-70, -8, -4, -2, 0, 2, 4, 8, 70],
+                                                           drug='MK801', residuals=True,  zscore=False, control=None,
+                                                           n_mean_frames=None, iterations=10, save=False, format='svg',
+                                                           transparent=False)
 
 
 # plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
@@ -683,15 +694,15 @@ plot_kernel(experiment='2AFC_2', animal='333', library='sm', target_ilds=[-8, -4
 # Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']
 
 experiment = '2AFC_2'
-animal = '333'
+animal = '337'
 library = 'sm'
-target_ilds = [-2, 0, 2]
-drug = True
+target_ilds=[-70, -8, -4, -2, 0, 2, 4, 8, 70]
+drug = 'MK801'
 residuals = False
 zscore = False
 control = None
 n_mean_frames = None
-iterations = 10
+iterations = 100
 save = False
 format = 'svg'
 transparent = False
