@@ -830,3 +830,58 @@ def check_date_exist(date, dates):
         else:
             print(f'Date {date} doesnt exist')
             return False
+
+
+# The fllowing 2 functions are under testing were developped for kernels. Will need to adapt to make them work for
+# other cases
+def get_experiment(experiment=None):
+    """
+    Get experiment
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :return: experiment
+    """
+
+    if experiment is None:
+
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
+        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's file
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    return experiment
+
+
+def get_animal(experiment, animal=None):
+    """
+    Get animal
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :param animal: If not None, animal=animal. Else, show possible animals and ask for user input.
+    :return: animal
+    """
+
+    if experiment is None:
+        experiment = get_experiment(experiment)
+
+    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+
+    if animal is None:
+        animals = os.listdir(folder_in)  # List animals
+        animals.sort()  # Sort them by name
+        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
+        animals = [i for i in animals if '_corrupted_sessions' not in i]  # Remove '_corrupted_sessions'.csv files
+
+        print('Animals: ' + str(animals))  # Remove square brackets
+        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
+
+    return animal
+

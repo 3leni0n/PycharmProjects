@@ -47,7 +47,7 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_ild
+from my_fun.my_fun import get_experiment, get_animal, get_ild
 
 # Plotting parameters
 sns.set_theme()
@@ -72,42 +72,18 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
     :param control: What control analysis to run
     :param n_mean_frames: Number of mean frames (end/final frames)
     :param iterations: Number of iterations to compute the CI by permutation method
-    :param save: If True, saves the plot
-    :param format: Output format of the saved figure
-    :param transparent: Set background transparent
     :return: GLM model parameters
     """
 
     time_start = time.time()
 
-    if experiment is None:
+    ####################################################################################################################
 
-        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
-        experiments = os.listdir(folder_in)  # List experiments
-        experiments.sort()  # Sort them by name
-        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
-        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
-
-        try:
-            experiments.remove('__pycache__')  # Pycharm's file
-        except ValueError:
-            pass
-
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
-
+    # Get the path to the data
+    experiment = get_experiment(experiment)
     # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
     folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-
-    if animal is None:
-        animals = os.listdir(folder_in)  # List animals
-        animals.sort()  # Sort them by name
-        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
-
-        print('Animals: ' + str(animals))  # Remove square brackets
-        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
-
+    animal = get_animal(experiment, animal)
     # folder_in = folder_in + animal + '.csv'
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
@@ -399,7 +375,7 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
         pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
                          residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                          iterations=iterations)
-        title = f'N={len(pk.id)}, {sum(n_trials_across_animals)} trials'
+        title = f'N={len(pk.id)}, {pk.n_trials} trials'
         filename = f'mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
     else:
         pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
@@ -414,14 +390,6 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
     # rvalue = result.rvalue
     # slope = result.slope
     # stderr = result.stderr
-
-    # Load sounds
-    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
-    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    sounds = pd.read_csv(sounds_path)
-    n_frames = pk.n_frames
-    # frames_ild = get_ild(n_frames)
 
     # Residuals
     if residuals:
@@ -445,6 +413,7 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
     # Plot kernel (stimulus frames beta weights)
     # + 1 to skip constant; + int(residuals) to skip ILD
     plt.figure(constrained_layout=True)
+    n_frames = pk.n_frames
     x = np.arange(1 + int(residuals), len(pk.params))
     y = pk.params.iloc[1 + int(residuals):len(pk.params)]
     yerr = pk.std_err.iloc[1 + int(residuals):len(pk.params)]
@@ -532,22 +501,7 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
 
     time_start = time.time()
 
-    if experiment is None:
-
-        # folder = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
-        experiments = os.listdir(folder)  # List experiments
-        experiments.sort()  # Sort them by name
-        # experiments = [x for x in experiments if os.path.isdir(folder + x)]  # Get rid of non folders
-        experiments = [x for x in experiments if Path(folder / x).is_dir()]  # Get rid of non folders
-
-        try:
-            experiments.remove('__pycache__')  # Pycharm's archive
-        except ValueError:
-            pass
-
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
+    experiment = get_experiment(experiment)
 
     # folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
     folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
@@ -589,22 +543,7 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
 
     time_start = time.time()
 
-    if experiment is None:
-
-        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
-        experiments = os.listdir(folder_in)  # List experiments
-        experiments.sort()  # Sort them by name
-        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
-        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
-
-        try:
-            experiments.remove('__pycache__')  # Pycharm's archive
-        except ValueError:
-            pass
-
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
+    experiment = get_experiment(experiment)
 
     # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
     folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
@@ -696,7 +635,7 @@ def primacy_recency_index(n_frames):
 
 # Debugging
 
-experiment = '2AFC_2'
+experiment = None
 animal = '333'
 animals=['325', '327', '329', '330', '332', '333', '335', '337']
 library = 'sm'
@@ -716,9 +655,9 @@ transparent = False
 #                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
 # Plot PK
-plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
-            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-            save=save, format=format, transparent=transparent)
+# plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+#             save=save, format=format, transparent=transparent)
 
 # Plot PKs
 # plot_pks(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
@@ -729,19 +668,6 @@ plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=targe
 # mean_pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
 #                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
-
-
-
-
-
-# Drugs across animals
-# params_across_animals, \
-# shuffles_means_across_animals, \
-# percentiles95_across_animals = plot_kernels_across_animals(experiment='2AFC_2', animals=['332', '333', '337'],
-#                                                            library='sm', target_ilds=[-70, -8, -4, -2, 0, 2, 4, 8, 70],
-#                                                            drug='MK801', residuals=True,  zscore=False, control=None,
-#                                                            n_mean_frames=None, iterations=10, save=False, format='svg',
-#                                                            transparent=False)
 
 # Good animals batch 2:['325', '327', '329', '330', '332', '333', '335', '337']
 # Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']

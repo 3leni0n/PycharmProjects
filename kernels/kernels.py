@@ -600,6 +600,7 @@ def plot_kernels_across_animals(experiment='2AFC_2', animals=['325', '327', '329
     # color = 'tab:gray'
 
     # Plot kernel
+    print(params_mean_across_animals)
     plt.plot(np.arange(1, len(params_mean_across_animals)), params_mean_across_animals[1:11], color=color, marker='o')
     plt.errorbar(np.arange(1, len(params_mean_across_animals)), params_mean_across_animals[1:11],
                  yerr=params_sem_across_animals[1:11], color=color, marker='o', fmt='none', mec='none')
