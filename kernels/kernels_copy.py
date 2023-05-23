@@ -169,11 +169,18 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
     # Drug sessions/trials
     if drug is not None:  # Select drug session trials
+        df_drug = pd.read_csv(Path.home() / 'PycharmProjects' / 'drugs' / 'Mouse injections MK801.csv')  # Load drug data
         df = df[df.Drug.notnull()]
-        # drug_type = 'rest'
-        # drug_type = 'saline'
-        # drug_type = 'MK801'
-        drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
+        # drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
+        df_intersession = df_intersession[df_intersession.Drug.notnull()]
+
+        # Get paired saline sessions prior to drug inyection (i.e. paired)
+        if drug == 'saline':
+            mk901_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
+            paired_saline_indexes = mk901_indexes - 1
+            paired_saline_dates = df_intersession.Dates[paired_saline_indexes]
+            df = df[df.Date.isin(paired_saline_dates)]
+
         df = df[df.Drug == drug]
     else:  # Don't select drug session trials
         try:
@@ -353,9 +360,13 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
         # percentiles95 = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
 
         # Store results in a namedtuple
-        PK = namedtuple('PK', ['id', 'params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames'])
-        pk = PK(id=id, params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-                n_frames=n_frames)
+        PK = namedtuple('PK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
+                               'animal', 'library', 'target_ilds', 'drug', 'residuals', 'zscore', 'control',
+                               'n_mean_frames', 'iterations'])
+        pk = PK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
+                n_frames=n_frames, experiment=experiment, animal=animal, library=library, target_ilds=target_ilds,
+                drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                iterations=iterations)
 
         time_end = time.time()
         runtime = time_end - time_start
@@ -376,13 +387,13 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
         pk = get_mean_pk(experiment=experiment, animals=animal, library=library, target_ilds=target_ilds, drug=drug,
                          residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                          iterations=iterations)
-        title = f'N={len(pk.id)}, {pk.n_trials} trials'
+        title = f'N={len(pk.animal)}, {pk.n_trials} trials'
         filename = f'mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
     else:
         pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
-        title = f'Mouse {pk.id}, {pk.n_trials} trials'
+        title = f'Mouse {pk.animal}, {pk.n_trials} trials'
         filename = f'_PK_ILDs: {target_ilds}'
 
     # Fit a line to the weights check primacy vs recency
@@ -550,7 +561,7 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
     # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
     folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
-    ids = []
+    # animals = []
     params_across_animals = []
     shuffles_across_animals = []
     shuffles_means_across_animals = []
@@ -563,7 +574,7 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
         pk = get_pk(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
-        ids.append(pk.id)
+        # animals.append(pk.animal)
         params_across_animals.append(pk.params)
         shuffles_across_animals.append(pk.shuffles)
         shuffles_mean = np.mean(pk.shuffles, axis=0)  # Get the mean of all the shuffles
@@ -610,10 +621,14 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
     shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
                                      range(len(shuffles_means_across_animals))]
 
-    MeanPK = namedtuple('MeanPK', ['id', 'params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames'])
-    mean_pk = MeanPK(id=ids, params=params_mean_across_animals, std_err=params_sem_across_animals,
-                     p_values=None, shuffles=shuffles_means_across_animals,
-                     n_trials=n_trials, n_frames=n_frames)
+    # Store results in a namedtuple
+    MeanPK = namedtuple('MeanPK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
+                                   'animal', 'library', 'target_ilds', 'drug', 'residuals', 'zscore', 'control',
+                                   'n_mean_frames', 'iterations'])
+    mean_pk = MeanPK(params=params_mean_across_animals, std_err=params_sem_across_animals, p_values=None,
+                     shuffles=shuffles_means_across_animals, n_trials=n_trials, n_frames=n_frames, experiment=experiment,
+                     animal=animals, library=library, target_ilds=target_ilds, drug=drug, residuals=residuals,
+                     zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -633,7 +648,10 @@ def normalized_pi_pk_area(pk):
     :param pk: Psychophysical kernel as namedtuple
     :return: 
     """
-    n_frames = pk.n_frames
+    if pk.n_mean_frames is not None:
+        n_frames = pk.n_mean_frames
+    else:
+        n_frames = pk.n_frames
     betas = pk.params.iloc[-n_frames:]
     area_pi = n_frames * (0.5 + 2 / np.pi * np.arctan(1 / np.sqrt(2 * n_frames - 1))) - 0.5 * n_frames
     npk_pi_area = np.sum(betas - 0.5) / area_pi
@@ -650,13 +668,18 @@ def normalized_pk_slope(pk):
     :param pk: Psychophysical kernel as namedtuple
     :return: Normalizaed PK slope
     """
-    n_frames = pk.n_frames
+    if pk.n_mean_frames is not None:
+        n_frames = pk.n_mean_frames
+    else:
+        n_frames = pk.n_frames
     # aux = np.linspace(1, -1, n_frames)  # Like this primacy is positive and recency is negative
     aux = np.linspace(-1, 1, n_frames)
     betas = pk.params.iloc[-n_frames:]
     npk = betas - 0.5
     npk = npk / sum(npk)  # Normalized pk, must sum 1
-    npk_slope = -sum(aux * npk)  # Remove the minus if using aux = np.linspace(1, -1, n_frames)
+    # npk_slope = -sum(aux * npk)  # Remove the minus if using aux = np.linspace(1, -1, n_frames)
+    results = stats.linregress(npk.index.values, npk.values)
+    npk_slope = results.slope
     return npk_slope
 
 
@@ -668,11 +691,14 @@ def primacy_recency_index(pk):
     :param pk: Psychophysical kernel as namedtuple
     :return: Primacy-recency index
     """
-    n_frames = pk.n_frames
+    if pk.n_mean_frames is not None:
+        n_frames = pk.n_mean_frames
+    else:
+        n_frames = pk.n_frames
     betas = pk.params.iloc[-n_frames:]
     beta1 = betas.iloc[0:int(len(betas) / 2)].mean()
     beta2 = betas.iloc[int(len(betas) / 2):].mean()
-    index = beta2 - beta1 / beta1 + beta2
+    index = (beta2 - beta1) / (beta1 + beta2)
     return index
 
 
@@ -680,23 +706,23 @@ def primacy_recency_index(pk):
 
 # Debugging
 
-experiment = '2AFC_2'
-animal = None
-# animals = ['325', '326', '327', '329', '330', '332', '333', '334', '335', '337']  # Bach 2 (with ILDs)
-animals = ['325', '326', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -334
-# animals = ['419', '420', '422', '616', '617', '619', '620', '623']  # Batch 3 (with ILDs)
-animals = ['332', '333', '337']
-library = 'sm'
-target_ilds = [-8, -4, -2, 0, 2, 4, 8]
-drug = None
-residuals = False
-zscore = False
-control = None
-n_mean_frames = None
-iterations = 10
-save = False
-format = 'svg'
-transparent = False
+# experiment = '2AFC_2'
+# animal = None
+# # animals = ['325', '326', '327', '329', '330', '332', '333', '334', '335', '337']  # Bach 2 (with ILDs)
+# animals = ['325', '326', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -334
+# # animals = ['419', '420', '422', '616', '617', '619', '620', '623']  # Batch 3 (with ILDs)
+# animals = ['332', '333', '337']
+# library = 'sm'
+# target_ilds = [-8, -4, -2, 0, 2, 4, 8]
+# drug = None
+# residuals = False
+# zscore = False
+# control = None
+# n_mean_frames = None
+# iterations = 10
+# save = False
+# format = 'svg'
+# transparent = False
 
 # Get PK
 # pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
