@@ -54,11 +54,13 @@ sns.set_theme()
 sns.set_style('white')
 sns.set_style('ticks')
 sns.set_context('poster')
+
+
 # sns.despine()
 
 
 def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
-                residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000):
+           residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
@@ -220,7 +222,8 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
         # Zscore
         if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
             if zscore:
-                stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+                stim_strength = pd.DataFrame(
+                    stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
                 # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
                 # ylabel = 'GLM weight (z-scored)'
             else:
@@ -354,7 +357,7 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
         # Store results in a namedtuple
         PK = namedtuple('PK', ['id', 'params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames'])
-        pk = PK(id=id, params=params, std_err=beta_std_err, p_values=p_values,shuffles=shuffles, n_trials=n_trials,
+        pk = PK(id=id, params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
                 n_frames=n_frames)
 
         time_end = time.time()
@@ -366,9 +369,8 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
 
 def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
-                residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
-                format='svg', transparent=False):
-
+            residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
+            format='svg', transparent=False):
     time_start = time.time()
 
     if animal == 'mean':
@@ -379,7 +381,8 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
         filename = f'mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
     else:
         pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
-                    residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+                    residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                    iterations=iterations)
         title = f'Mouse {pk.id}, {pk.n_trials} trials'
         filename = f'_PK_ILDs: {target_ilds}'
 
@@ -479,8 +482,8 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
 
 
 def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
-               target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False, zscore=True, control=None,
-               n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+             target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False, zscore=True, control=None,
+             n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
     """
     Do the kernels for all animals of a given batch (experiment)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
@@ -512,8 +515,8 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
         print(path)
         print(f'Plotting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
         plot_pk(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
-                    residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                    iterations=iterations, save=save, format=format, transparent=transparent)
+                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                iterations=iterations, save=save, format=format, transparent=transparent)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -521,8 +524,8 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
 
 
 def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                                library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False,
-                                zscore=True, control=None, n_mean_frames=None, iterations=1000):
+                library='sm', target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False,
+                zscore=True, control=None, n_mean_frames=None, iterations=1000):
     """
     Do the kernels for all animals of a given batch (experiment)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
@@ -557,7 +560,7 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
     pks = []
 
     for i in range(len(animals)):
-        print(f'Getting kernel of animal {animals[i]} ({i+1}/{len(animals)})')
+        print(f'Getting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
         pk = get_pk(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
@@ -602,32 +605,75 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
     params_sem_across_animals = pd.Series(params_sem_across_animals)
 
     # Transform suffles_means_across_animals into a list of pd.Series
-    shuffles_means_across_animals = [pd.Series(shuffles_means_across_animals[i, :]) for i in range(len(shuffles_means_across_animals))]
+    shuffles_means_across_animals = [pd.Series(shuffles_means_across_animals[i, :]) for i in
+                                     range(len(shuffles_means_across_animals))]
     # Rename the first element of each pd.Series as 'const' instead of '0'
-    shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in range(len(shuffles_means_across_animals))]
+    shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
+                                     range(len(shuffles_means_across_animals))]
 
     MeanPK = namedtuple('MeanPK', ['id', 'params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames'])
     mean_pk = MeanPK(id=ids, params=params_mean_across_animals, std_err=params_sem_across_animals,
                      p_values=None, shuffles=shuffles_means_across_animals,
                      n_trials=n_trials, n_frames=n_frames)
 
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
     return mean_pk
 
 
-def primacy_recency_index(n_frames):
+# From 'Flexible categorization in perceptual decision making'
+# Paper: (https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z#Sec11)
+# Code: https://bitbucket.org/delaRochaLab/flexible-categorization/src/master/functions/analysis_fc.py
+# betas = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0, 0])  # Primacy (for testing)
+# betas = np.array([0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5])  # Recency (for testing)
+def normalized_pi_pk_area(pk):
     """
-    From 'Flexible categorization in perceptual decision making':
-    (https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z#Sec11)
-    "where β1 and β2 are the coefficients of a logistic regression with the coherence of the first and second part of
-    the stimuli as predictors. Ranges from −1 (primacy) to 1 (recency)."
+    Compute the PK area normalized by the area of a PI
+    :param pk: Psychophysical kernel as namedtuple
+    :return: 
+    """
+    n_frames = pk.n_frames
+    betas = pk.params.iloc[-n_frames:]
+    area_pi = n_frames * (0.5 + 2 / np.pi * np.arctan(1 / np.sqrt(2 * n_frames - 1))) - 0.5 * n_frames
+    npk_pi_area = np.sum(betas - 0.5) / area_pi
+    return npk_pi_area
+
+
+def normalized_pk_slope(pk):
+    """
+    The normalized PK slope is the slope of a linear regression of the PK, normalized between −1 (decaying PK, primacy)
+    to +1 (increasing PK, recency). Because we wanted the PK slope to quantify the shape of the PK rather than its
+    magnitude (which is captured by the PK area), we first normalized the PK to have unit area, where T is the stimulus
+    duration. We then fit the NPK with a linear function of time, where β1 is the PK slope and k=12⋅var(t) is a factor
+    that normalizes the PK slope to the interval (−1, +1).
+    :param pk: Psychophysical kernel as namedtuple
+    :return: Normalizaed PK slope
+    """
+    n_frames = pk.n_frames
+    # aux = np.linspace(1, -1, n_frames)  # Like this primacy is positive and recency is negative
+    aux = np.linspace(-1, 1, n_frames)
+    betas = pk.params.iloc[-n_frames:]
+    npk = betas - 0.5
+    npk = npk / sum(npk)  # Normalized pk, must sum 1
+    npk_slope = -sum(aux * npk)  # Remove the minus if using aux = np.linspace(1, -1, n_frames)
+    return npk_slope
+
+
+def primacy_recency_index(pk):
+    """
+    Where β1 and β2 are the coefficients of a logistic regression with the coherence of the first and second part of
+    the stimuli as predictors. Similar to the Normalized PK slope, the primacy-recency index ranges from −1 (primacy) to
+    1 (recency).
+    :param pk: Psychophysical kernel as namedtuple
     :return: Primacy-recency index
     """
-
-    betas = params.iloc[-n_frames:]
+    n_frames = pk.n_frames
+    betas = pk.params.iloc[-n_frames:]
     beta1 = betas.iloc[0:int(len(betas) / 2)].mean()
     beta2 = betas.iloc[int(len(betas) / 2):].mean()
     index = beta2 - beta1 / beta1 + beta2
-
     return index
 
 
@@ -635,14 +681,17 @@ def primacy_recency_index(n_frames):
 
 # Debugging
 
-experiment = None
-animal = '333'
-animals=['325', '327', '329', '330', '332', '333', '335', '337']
+experiment = '2AFC_2'
+animal = None
+# animals = ['325', '326', '327', '329', '330', '332', '333', '334', '335', '337']  # Bach 2 (with ILDs)
+animals = ['325', '326', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -334
+# animals = ['419', '420', '422', '616', '617', '619', '620', '623']  # Batch 3 (with ILDs)
+animals = ['332', '333', '337']
 library = 'sm'
-target_ilds=[-2, 0, 2]
+target_ilds = [-8, -4, -2, 0, 2, 4, 8]
 drug = None
 residuals = False
-zscore = True
+zscore = False
 control = None
 n_mean_frames = None
 iterations = 10
@@ -665,9 +714,6 @@ transparent = False
 #             save=save, format=format, transparent=transparent)
 
 # Get mean PK
-# mean_pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
-#                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
-
-
-# Good animals batch 2:['325', '327', '329', '330', '332', '333', '335', '337']
-# Good animals batch 3: ['419', '420', '422', '616', '617', '619', '623']
+mean_pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
+                      residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                      iterations=iterations)
