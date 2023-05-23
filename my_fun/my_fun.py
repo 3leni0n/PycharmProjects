@@ -377,21 +377,6 @@ def select_ilds(ilds, p, side):
     return selected_ild
 
 
-"""
-n_trials = 10000
-trial_types = [0, 1]  # 0 (rewarded left) or 1 (rewarded right)
-# trial_list = np.random.choice(trial_types, n_trials).tolist()  # Generate random trial vector of length n_trials
-trial_list = np.random.choice(trial_types, n_trials).tolist() 
-ilds = np.array([-70, -8, -4, -2, 0, 2, 4, 8, 70])
-p = 0.5
-ild = []
-for i in range(n_trials):
-    ild.append(select_ilds(ilds, p, trial_list[i]))
-plt.hist(ild, bins=100)
-plt.title(f'p={p}')
-"""
-
-
 def enterthematrix(filepath):
     """Create sounds matrix"""
     # Import sounds DataFrame but only the filenames

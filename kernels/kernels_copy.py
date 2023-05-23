@@ -56,9 +56,6 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-# sns.despine()
-
-
 def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
            residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000):
     """
@@ -371,10 +368,12 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
             residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
             format='svg', transparent=False):
+
     time_start = time.time()
 
-    if animal == 'mean':
-        pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
+    # if animal == 'mean':
+    if type(animal) == list:
+        pk = get_mean_pk(experiment=experiment, animals=animal, library=library, target_ilds=target_ilds, drug=drug,
                          residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                          iterations=iterations)
         title = f'N={len(pk.id)}, {pk.n_trials} trials'
@@ -704,7 +703,7 @@ transparent = False
 #                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
 # Plot PK
-# plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+# plot_pk(experiment=experiment, animal=animals, library=library, target_ilds=target_ilds, drug=drug,
 #             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
 #             save=save, format=format, transparent=transparent)
 
@@ -714,6 +713,6 @@ transparent = False
 #             save=save, format=format, transparent=transparent)
 
 # Get mean PK
-mean_pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
-                      residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                      iterations=iterations)
+# mean_pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
+#                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+#                       iterations=iterations)

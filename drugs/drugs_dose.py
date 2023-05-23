@@ -8,3 +8,16 @@ concentration = 1/25  # 25mg/ml
 
 iny_vol = dose * trans_gr * animal_weight * concentration
 print(iny_vol)
+
+
+def drug(dose, trans_gr, animal_weight, concentration):
+    """
+    Get inyected volume of a drug
+    :param dose:
+    :param trans_gr:
+    :param animal_weight:
+    :param concentration:
+    :return:
+    """
+    iny_vol = dose * trans_gr * animal_weight * concentration
+    return iny_vol
