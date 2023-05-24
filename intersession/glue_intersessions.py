@@ -3,7 +3,7 @@ import pandas as pd
 from glue_sessions.glue_sessions import update_glued_sessions
 
 
-def glue_intersessions(protocol='stage_training_v3', experiment='2AFC_3', to_csv=False):
+def glue_intersessions(protocol='stage_training_v2', experiment='2AFC_2', to_csv=False):
     """
     Concatenate all intersession .csv files from each animal into a single .csv file
     :param to_csv: True for saving the output DataFrame, default is False (do not save)

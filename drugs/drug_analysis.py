@@ -18,7 +18,7 @@ sns.set_context('poster')
 # (https://matplotlib.org/stable/gallery/lines_bars_and_markers/barchart.html)
 
 
-# def drug_vs_saline_bar_chart(ylabel, path='/home/alexis/PycharmProjects/intersession/337_intersession.csv', nrows=1, ncols=1, index=1):
+# def drug_vs_saline_bar_chart(ylabel, path='/home/alexis/PycharmProjects/intersession/2AFC_2/337_intersession.csv', nrows=1, ncols=1, index=1):
 #     """
 #     :param ylabel: DataFrame columm label of the intersession .csv with the variable to plot (str)
 #     :return: Grouped bar chart for the variable of interest between saline and drug sessions
@@ -54,8 +54,8 @@ sns.set_context('poster')
 #
 #     ax.legend()
 #
-#     ax.bar_label(rects1, padding=3)
-#     ax.bar_label(rects2, padding=3)
+#     # ax.bar_label(rects1, padding=3)
+#     # ax.bar_label(rects2, padding=3)
 #
 #     fig.tight_layout()
 #     plt.show()
@@ -72,9 +72,11 @@ sns.set_context('poster')
 # plt.suptitle('337')
 # plt.savefig('/home/alexis/Escritorio/337.png')
 
+########################################################################################################################
 
 # def pussy_plot(x, y):
 df = pd.read_csv('/home/alexis/PycharmProjects/intersession/all_intersessions.csv')
+df = glue_intersessions(protocol='stage_training_v2', experiment='2AFC_2', to_csv=False)
 df = df[df.Drug.notna()]
 
 # Find outliers based on accuracy and drop them
@@ -88,6 +90,7 @@ min_rest = df[df.Drug == 'rest'].Accuracy.min()
 min_rest_index = df[df.Accuracy == min_rest].index[0]
 min_rest_date = df[df.Accuracy == min_rest].Dates
 df.drop(index=[min_saline_index, min_drug_index, min_rest_index], inplace=True)
+
 # Find outlier based on misses and drop it
 min_rest2 = df[df.Drug == 'rest'].Misses.max()
 min_rest_index2 = df[df.Misses == min_rest2].index[0]
@@ -273,6 +276,8 @@ md = smf.mixedlm("SensitivityPCRep ~ MK801 + Saline", df, groups=df.Subject)
 mdf = md.fit()
 print(mdf.summary())
 
+plt.ylim(0, 2)
+
 # Stats annotation
 for i in range(len(df.Drug.unique()) - 1):
 
@@ -293,6 +298,8 @@ for i in range(len(df.Drug.unique()) - 1):
         x1, x2 = 0, 2  # x coordinates of the 2 variables to compare
         y1 = plt.gca().get_ylim()[1]  # Upper ylim
         y2 = plt.gca().get_ylim()[1] * 1 / 100  # 1% of the upper ylim
+        y1 = 1.5
+        y2 = y1 * 1 / 100
         plt.plot([x1, x1, x2, x2], [y1, y1 + y2, y1 + y2, y1], lw=1.5, c=color)
         plt.text((x1 + x2) * .5, y1 + y2, symbol, ha='center', va='bottom', c=color)
 
@@ -312,12 +319,20 @@ for i in range(len(df.Drug.unique()) - 1):
         y1 = plt.gca().get_ylim()[1]  # Upper ylim
         y2 = plt.gca().get_ylim()[1] * 1 / 100  # 1% of the upper ylim
         y3 = plt.gca().get_ylim()[1] * 5 / 100  # 5% of the upper ylim, spacing between significant bars
+        # y3 = plt.gca().get_ylim()[1] * 20 / 100  # 5% of the upper ylim, spacing between significant bars
+        y1 = 1.5
+        y2 = y1 * 1 / 100
+        y3 = y1 * 20 / 100
         plt.plot([x1, x1, x2, x2], [y1 + y3, y1 + y2 + y3, y1 + y2 + y3, y1 + y3], lw=1.5, c=color)
         plt.text((x1 + x2) * .5, y1 + y3, symbol, ha='center', va='bottom', c=color)
 
-plt.savefig('/home/alexis/Escritorio/' + y + ' vs ' + x + '_box_plot_intercept=rest.svg', transparent=True)
+plt.savefig('/home/alexis/Escritorio/' + y + ' vs ' + x + '_box_plot_intercept=rest.png', transparent=False)
+
 
 ########################################################################################################################
+                                                # PSYCH CURVES
+########################################################################################################################
+
 
 df_saline = df[df.Drug == 'saline']
 df_MK801 = df[df.Drug == 'MK801']
