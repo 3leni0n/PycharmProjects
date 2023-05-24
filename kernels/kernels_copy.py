@@ -80,10 +80,8 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
     # Get the path to the data
     experiment = get_experiment(experiment)
-    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
     folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
     animal = get_animal(experiment, animal)
-    # folder_in = folder_in + animal + '.csv'
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     ####################################################################################################################
@@ -490,14 +488,12 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
         plt.xticks([1, 2])  # Readjust xticks
 
     if save:
-        # folder_out = '/home/alexis/Documentos/kernels/' + experiment + '/'
         folder_out = Path.home() / 'Documentos' / 'kernels' / experiment
         # if not os.path.exists(folder_out):
         #     os.mkdir(folder_out)
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        # plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format, transparent=transparent)
         plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
 
@@ -835,7 +831,6 @@ def primacy_recency_index(pk):
 ########################################################################################################################
 
 # Debugging
-
 experiment = '2AFC_2'
 experiments = ['2AFC_2', '2AFC_3']
 # animal = '333'

@@ -2,11 +2,11 @@ import time
 from pathlib import Path
 import os
 import pandas as pd
-from my_fun.my_fun import *
 from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
 import seaborn as sns
+from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve
 from parse.parse_v2 import parse_v2
 
 # Mel's code snippet for poster
@@ -22,41 +22,30 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
 
     time_start = time.time()
 
-    if experiment is None:
+    ####################################################################################################################
 
-        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder_in = Path.home() / 'PycharmProjects/glue_sessions'  # Where the data for all animals is
-        experiments = os.listdir(folder_in)  # List experiments
-        experiments.sort()  # Sort them by name
-        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
-        experiments = [x for x in experiments if os.path.isdir(folder_in / x)]  # Get rid of non folders
-
-        try:
-            experiments.remove('__pycache__')  # Pycharm's archive
-        except ValueError:
-            pass
-
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
-
-    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
-    folder_in = Path.home() / 'PycharmProjects/glue_sessions' / experiment  # Where the data for all animals is
-
-    if animal is None:
-        animals = os.listdir(folder_in)  # List animals
-        animals.sort()  # Sort them by name
-        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
-
-        print('Animals: ' + str(animals))  # Remove square brackets
-        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
-
-    # folder_in = folder_in + animal + '.csv'
+    # Get the path to the data
+    experiment = get_experiment(experiment)
+    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+    animal = get_animal(experiment, animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
-    df = pd.read_csv(folder_in)  # Read behavioral data
+
+    ####################################################################################################################
+
+    # Load behavioral data
+    df = pd.read_csv(folder_in)
+
+    ####################################################################################################################
+
+    # Filter trials
     df = df[df.P > 0]  # Only those sessions with ilds
-    # df = df[df.Stage == 4]  # Only those sessions in stage 4
     # Only sessions with accuracy > X threshold?
-    df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+    try:
+        df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+    except AttributeError:  # As 24.05.2023 only batch 2 has drug data. Need to reparse batch 3 to add Drug column
+        pass
+
+    ####################################################################################################################
 
     # Compute psychometric curves
     n_points = 100
@@ -64,7 +53,6 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
     ilds = np.sort(df.ILD.unique())
 
     # Plot psychometric curves
-    # plt.figure()
     plt.figure(constrained_layout=True)
 
     if kind == 'prob_right':
@@ -91,7 +79,7 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
         fontsize = 'medium'
         loc = 'lower right'
 
-        filename = '_PC_prob_right'
+        filename = f'{animal}_PC_prob_right' + '.' + format
 
     elif kind == 'prob_rep':
 
@@ -117,7 +105,7 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
         fontsize = 'medium'
         loc = 'upper left'
 
-        filename = '_PC_prob_rep'
+        filename = f'{animal}_PC_prob_rep' + '.' + format
 
     # Plot psychometric curve and errorbars
     plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
@@ -169,42 +157,38 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
     plt.gca().spines['right'].set_visible(False)
 
     if save:
-        folder_out = '/home/alexis/Documentos/psychometric curves/'
-        # folder_out = Path.home() / 'Documentos/psychometric curves/'
-        if not os.path.exists(folder_out):
-            os.mkdir(folder_out)
+        folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        # plt.savefig(folder_out + animal + filename)
-        plt.savefig(folder_out / (animal + filename))
+        # plt.savefig(folder_out / (animal + filename))
+        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
 
     # return psych_curve, pc0_bias0, pc0_lapses0
     return psych_curve, fit_bias0, fit_lapses0
     # return psych_curve
 
 
-def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_right',
+def plot_pcs(experiment='2AFC_3', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_right',
            save=False, format='svg', transparent=False):
+
     """Do the kernels for all animals of a given batch (experiment)"""
 
     time_start = time.time()
 
-    if experiment is None:
+    ####################################################################################################################
 
-        folder = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        experiments = os.listdir(folder)  # List experiments
-        experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder + x)]  # Get rid of non folders
+    # Get the path to the data
+    experiment = get_experiment(experiment)
+    # folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+    # folder_in = Path(folder_in / animal).with_suffix('.csv')
 
-        try:
-            experiments.remove('__pycache__')  # Pycharm's archive
-        except ValueError:
-            pass
-
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
-
-    folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    ####################################################################################################################
 
     # Initialize empty lists where to store PC parameters
     psych_curves = []
@@ -214,7 +198,6 @@ def do_pcs(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333
     fits_lapses0 = []
 
     for i in range(len(animals)):
-        path = folder + animals[i]
         # plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
         # psych_curve, pc0_bias0, pc0_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
         psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
@@ -235,24 +218,13 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
 
     time_start = time.time()
 
-    if experiment is None:
+    ####################################################################################################################
 
-        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder_in = Path.home() / 'PycharmProjects/glue_sessions'  # Where the data for all animals is
-        experiments = os.listdir(folder_in)  # List experiments
-        experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+    # Get the path to the data
+    experiment = get_experiment(experiment)
+    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
-        try:
-            experiments.remove('__pycache__')  # Pycharm's archive
-        except ValueError:
-            pass
-
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
-
-    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
-    folder_in = Path.home() / 'PycharmProjects/glue_sessions' / experiment  # Where the data for all animals is
+    ####################################################################################################################
 
     fit = []
     fit_error = []
@@ -266,11 +238,8 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     plt.figure(constrained_layout=True)
 
     for i in range(len(animals)):
-        # print(folder_in + animals[i] + '.csv')
-        # df = pd.read_csv(folder_in + animals[i] + '.csv')
         df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
         # df = df[df.P > 0]  # Only those sessions with ilds
-        # df = df[df.Stage == 4]  # Only those sessions in stage 4
         ilds = np.sort(df.ILD.unique())
 
         if kind == 'prob_right':
@@ -314,7 +283,7 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         ha = 'left'
         fontsize = 'medium'
 
-        filename = ' PC_prob_right_all_animals'
+        filename = ' PC_prob_right_all_animals' + '.' + format
 
     elif kind == 'prob_rep':
 
@@ -336,7 +305,7 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         ha = 'right'
         fontsize = 'medium'
 
-        filename = ' PC_prob_rep_all_animals'
+        filename = ' PC_prob_rep_all_animals' + '.' + format
 
     plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
              label=label)
@@ -377,14 +346,232 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
                  va=va, ha=ha, fontsize=fontsize)
 
     if save:
-        folder_out = '/home/alexis/Documentos/psychometric curves/'
-        folder_out = Path.home() / 'Documentos/psychometric curves/'
-        if not os.path.exists(folder_out):
-            os.mkdir(folder_out)
+        folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        # plt.savefig(folder_out + filename)
-        plt.savefig(folder_out / filename)
+        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+    return np.array(params)
+
+
+########################################################################################################################
+
+# Across batches
+def plot_pcs_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None, kind='prob_right',
+           save=False, format='svg', transparent=False):
+
+    """Do the kernels for all animals of a given batch (experiment)"""
+
+    time_start = time.time()
+
+    ####################################################################################################################
+
+    # Get the path to the data
+    # experiment = get_experiment(experiment)
+    # folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+    # folder_in = Path(folder_in / animal).with_suffix('.csv')
+
+    ####################################################################################################################
+
+    # Initialize empty lists where to store PC parameters
+    psych_curves = []
+    pc0_bias0s = []
+    pc0_lapses0s = []
+    fits_bias0 = []
+    fits_lapses0 = []
+
+    for k in range(len(experiments)):
+
+        # Get the path to the data
+        # experiment = get_experiment(experiment[experiments[k]])
+        experiment = experiments[k]
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+
+        if experiment == '2AFC_2':
+            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            n_animals_batch2 = len(animals)
+        elif experiment == '2AFC_3':
+            animals = ['419', '420', '422', '616', '619', '623']
+            n_animals_batch3 = len(animals)
+
+        for i in range(len(animals)):
+            # plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
+            # psych_curve, pc0_bias0, pc0_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
+            psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
+            psych_curves.append(psych_curve)
+            fits_bias0.append(fit_bias0)
+            fits_lapses0.append(fit_lapses0)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+    # return psych_curves, pc0_bias0s, pc0_lapses0s
+    return psych_curves, fits_bias0, fits_lapses0
+
+
+def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
+                           save=False, kind='prob_right', format='svg', transparent=False):
+
+    time_start = time.time()
+
+    ####################################################################################################################
+
+    fit = []
+    fit_error = []
+    params = []
+    xdata = []
+    ydata = []
+    trials = 0
+
+    n_points = 100
+
+    plt.figure(constrained_layout=True)
+
+    for k in range(len(experiments)):
+
+        # Get the path to the data
+        # experiment = get_experiment(experiment[experiments[k]])
+        experiment = experiments[k]
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+
+        if experiment == '2AFC_2':
+            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            n_animals_batch2 = len(animals)
+        elif experiment == '2AFC_3':
+            animals = ['419', '420', '422', '616', '619', '623']
+            n_animals_batch3 = len(animals)
+
+        ####################################################################################################################
+
+        for i in range(len(animals)):
+            df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
+            # df = df[df.P > 0]  # Only those sessions with ilds
+            ilds = np.sort(df.ILD.unique())
+
+            if kind == 'prob_right':
+                psych_curve = compute_psych_curve(df.ILD, df.Choice, n_points)
+            elif kind == 'prob_rep':
+                psych_curve = compute_psych_curve(df.ILDRep, df.RepChoice, n_points)
+
+            plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color='tab:grey', marker=None,
+                     mfc='none', mec='none', mew=0, ms=0, alpha=0.25)
+            # mec='none, mew=0 and ms=0 to not plot markers in individual animals
+            # plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:grey', fmt='o',
+            #              mfc='none', alpha=0.25)  # Don't plot the errorbars in individual animals
+
+            fit.append(psych_curve.fit)
+            fit_error.append(psych_curve.fit_error)
+            params.append(psych_curve.params)
+            xdata.append(psych_curve.xdata)
+            ydata.append(psych_curve.ydata)
+            trials += len(df)
+
+    xdata = np.array(xdata).flatten()
+    ydata = np.array(ydata).flatten()
+    psych_curve = compute_psych_curve(xdata, ydata, n_points)
+
+    n_animals = n_animals_batch2 + n_animals_batch3
+
+    if kind == 'prob_right':
+
+        # Plot params
+        color = 'tab:orange'
+        label = 'Prob. right'
+        xlabel = 'Stimulus ILD (dB)'
+        ylabel = 'Prob. choose right'
+
+        # Annotation params
+        lower_lapse = "LR_R="
+        upper_lapse = "LR_L="
+        # xy = (ilds[0], 1)
+        # xytext = (ilds[0], 1)
+        xy = (-20, 1)
+        xytext = (-20, 1)
+        va = 'top'
+        ha = 'left'
+        fontsize = 'medium'
+
+        filename = ' PC_prob_right_all_animals' + '.' + format
+
+    elif kind == 'prob_rep':
+
+        # Plot params
+        color = 'tab:brown'
+        label = 'Prob. repeat'
+        xlabel = 'Repeating stimulus ILD (dB)'
+        ylabel = 'Prob. choose repeat'
+
+        # Annotate params
+        lower_lapse = "LR_Rep="
+        upper_lapse = "LR_Alt="
+        # xy = (ilds[-1], 0)
+        # xytext = (ilds[-1], 0)
+        xy = (20, 0)
+        xytext = (20, 0)
+        color = 'tab:brown'
+        va = 'bottom'
+        ha = 'right'
+        fontsize = 'medium'
+
+        filename = ' PC_prob_rep_all_animals' + '.' + format
+
+    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
+             label=label)
+
+    # Move extreme datapoints closer to the center to zoom in
+    psych_curve.xdata[0] = -20
+    psych_curve.xdata[-1] = 20
+
+    plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o',
+                 mfc=color)
+
+    # plt.xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+    # plt.minorticks_off()  # Remove minor ticks
+    plt.axhline(0.5, color='tab:gray', ls='--')
+    plt.axvline(0., color='tab:gray', ls='--')
+    # plt.title(f'N={len(animals)}, {trials} trials')
+    plt.title(f'N={n_animals}, {trials} trials')
+    # plt.title(f'N={len(df.Setup.unique())}, {len(df)} trials')
+    # plt.xlim([ilds[0] - 7, ilds[-1] + 7])
+    plt.xlim([-21, 21])  # To chop the extreme values
+    ilds[0] = -20
+    ilds[-1] = 20
+    plt.xticks(ilds)
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
+    plt.ylim([-0.025, 1.025])
+    plt.yticks([0, 0.5, 1])
+    # plt.legend(loc='lower center')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    plt.gca().spines['top'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+
+    sensitivity, bias, lr_lower, lr_upper = psych_curve.params
+    plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
+                 "B=" + str(round(bias, 2)) + "\n" +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + "\n" +  # Upper lapse rate
+                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                 xy=xy, xytext=xytext, color=color,
+                 va=va, ha=ha, fontsize=fontsize)
+
+    if save:
+        folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
+        os.chdir(folder_out)
+        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
+        plt.close()
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
 
     return np.array(params)
 
@@ -403,6 +590,8 @@ def test_lapses(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
     y = x
     plt.plot(x, y, 'r')
     plt.axis('square')
+    plt.axhline(0.2, color='tab:gray', ls=':')
+    plt.axvline(0.2, color='tab:gray', ls=':')
     # plt.title('Rep. vs Alt. lapses')
     # plt.xlim(0, 0.5)
     plt.xlim(0, np.round(np.max(lower_lapses), 1))
@@ -424,19 +613,18 @@ def test_lapses(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
     # why one mean would be larger than the other one)
 
     plt.annotate('Rep. lapse = ' + str(np.round(np.mean(lower_lapses), 2)) + ' ± ' +
-                 str(np.round(stats.sem(lower_lapses), 2)), xy=(0.15, 0.04), color='k', va='bottom', ha='center',
+                 str(np.round(stats.sem(lower_lapses), 2)), xy=(0.2, 0.04), color='k', va='bottom', ha='center',
                  fontsize='xx-small')
     plt.annotate('Alt. lapse = ' + str(np.round(np.mean(upper_lapses), 2)) + ' ± ' +
                  str(np.round(stats.sem(upper_lapses), 2)),
-                 xy=(0.15, 0.02), color='k', va='bottom', ha='center', fontsize='xx-small')
-    plt.annotate('p = ' + str(np.round(t_test.pvalue, 4)), xy=(0.15, 0), color='k', va='bottom', ha='center',
+                 xy=(0.2, 0.02), color='k', va='bottom', ha='center', fontsize='xx-small')
+    plt.annotate('p = ' + str(np.round(t_test.pvalue, 4)), xy=(0.2, 0), color='k', va='bottom', ha='center',
                  fontsize='xx-small')
 
     if save:
-        filename = kind + '_lapses'
-        # folder_out = '/home/alexis/Documentos/psychometric curves/'
-        folder_out = Path.home() / 'Documentos/psychometric curves/'
-        plt.savefig(folder_out + filename + '.' + format, format=format, transparent=transparent)
+        filename = kind + '_lapses' + '.' + format
+        folder_out = Path.home() / 'Documentos' / 'psychometric curves' / experiment
+        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
 
 
 def plot_pc_session(path, kind='prob_right', annotation_loc='upper left', color='tab:orange', label=''):
@@ -578,12 +766,12 @@ def pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save
 
 def plot_bias_vs_lapses(kind='prob_rep', save=False, format='svg', transparent=False):
 
-    # psych_curves, pc0_bias0s, pc0_lapses0s = do_pcs(experiment='2AFC_2',
+    # psych_curves, pc0_bias0s, pc0_lapses0s = plot_pcs(experiment='2AFC_2',
     #                                                 animals=['325', '327', '329', '330', '332', '333', '335', '337'],
     #                                                 kind=kind,
     #                                                 save=False, format='svg', transparent=False)
 
-    psych_curves, fits_bias0, fits_lapses0 = do_pcs(experiment='2AFC_2',
+    psych_curves, fits_bias0, fits_lapses0 = plot_pcs(experiment='2AFC_2',
                                                     animals=['325', '327', '329', '330', '332', '333', '335', '337'],
                                                     kind=kind,
                                                     save=False, format='svg', transparent=False)
@@ -645,91 +833,26 @@ def plot_bias_vs_lapses(kind='prob_rep', save=False, format='svg', transparent=F
     plt.savefig('/home/alexis/Escritorio/' + 'Lapses vs bias impact on choose rep.', format='svg', transparent=True)
 
     if save:
-        filename = kind + '_lapses_vs_bias'
-        # folder_out = '/home/alexis/Documentos/lapses vs bias/'
-        folder_out = Path.home() / 'Documentos/lapses vs bias/'
-        plt.savefig(folder_out + filename + '.' + format, format=format, transparent=transparent)
+        filename = kind + '_lapses_vs_bias' + '.' + format
+        folder_out = Path.home() / 'Documentos' / 'psychometric curves' / experiment
+        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
 
     # # Annotate each dot
     # for i, txt in enumerate(animals):
     #     plt.gca().annotate(txt, (pc0_bias0s[i], pc0_lapses0s[i]))
 
 
-
-# # PROB. REP
-# # 332
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220520-111627/332_stage_training_v2_20220520-111627.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220521-123227/332_stage_training_v2_20220521-123227.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220523-111705/332_stage_training_v2_20220523-111705.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220524-111056/332_stage_training_v2_20220524-111056.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220601-123831/332_stage_training_v2_20220601-123831.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220602-112855/332_stage_training_v2_20220602-112855.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-#
-# # 333
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220515-112535/333_stage_training_v2_20220515-112535.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220516-113238/333_stage_training_v2_20220516-113238.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220518-102053/333_stage_training_v2_20220518-102053.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220520-111416/333_stage_training_v2_20220520-111416.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220523-111330/333_stage_training_v2_20220523-111330.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220524-110827/333_stage_training_v2_20220524-110827.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220601-123634/333_stage_training_v2_20220601-123634.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220602-112547/333_stage_training_v2_20220602-112547.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-#
-# # 337
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220519-105338/337_stage_training_v2_20220519-105338.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220520-112736/337_stage_training_v2_20220520-112736.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220523-111832/337_stage_training_v2_20220523-111832.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220524-111333/337_stage_training_v2_20220524-111333.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220531-103028/337_stage_training_v2_20220531-103028.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220601-125410/337_stage_training_v2_20220601-125410.csv'
-# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
-#
-#
-# # PROB. RIGHT
-# # 332
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220520-111627/332_stage_training_v2_20220520-111627.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220521-123227/332_stage_training_v2_20220521-123227.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220523-111705/332_stage_training_v2_20220523-111705.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220524-111056/332_stage_training_v2_20220524-111056.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220601-123831/332_stage_training_v2_20220601-123831.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220602-112855/332_stage_training_v2_20220602-112855.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-#
-# # 333
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220515-112535/333_stage_training_v2_20220515-112535.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220516-113238/333_stage_training_v2_20220516-113238.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220518-102053/333_stage_training_v2_20220518-102053.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220520-111416/333_stage_training_v2_20220520-111416.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220523-111330/333_stage_training_v2_20220523-111330.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220524-110827/333_stage_training_v2_20220524-110827.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220601-123634/333_stage_training_v2_20220601-123634.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220602-112547/333_stage_training_v2_20220602-112547.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-#
-# # 337
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220519-105338/337_stage_training_v2_20220519-105338.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220520-112736/337_stage_training_v2_20220520-112736.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220523-111832/337_stage_training_v2_20220523-111832.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220524-111333/337_stage_training_v2_20220524-111333.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
-# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220531-103028/337_stage_training_v2_20220531-103028.csv'
-# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220601-125410/337_stage_training_v2_20220601-125410.csv'
-# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# Debugging
+# experiment = '2AFC_2'
+# experiment = '2AFC_3'
+# # animal = '333'
+# animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
+# animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
+# # animals = ['332', '333', '337']  # Drug experiments
+kind = 'prob_rep'
+save = False
+format = 'svg'
+transparent = True
 
 
 # Psych curves for drug data
@@ -905,3 +1028,81 @@ def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337
         plt.close()
 
     return np.array(params)
+
+
+########################################################################################################################
+
+# # PROB. REP
+# # 332
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220520-111627/332_stage_training_v2_20220520-111627.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220521-123227/332_stage_training_v2_20220521-123227.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220523-111705/332_stage_training_v2_20220523-111705.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220524-111056/332_stage_training_v2_20220524-111056.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220601-123831/332_stage_training_v2_20220601-123831.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220602-112855/332_stage_training_v2_20220602-112855.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+#
+# # 333
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220515-112535/333_stage_training_v2_20220515-112535.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220516-113238/333_stage_training_v2_20220516-113238.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220518-102053/333_stage_training_v2_20220518-102053.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220520-111416/333_stage_training_v2_20220520-111416.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220523-111330/333_stage_training_v2_20220523-111330.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220524-110827/333_stage_training_v2_20220524-110827.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220601-123634/333_stage_training_v2_20220601-123634.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220602-112547/333_stage_training_v2_20220602-112547.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+#
+# # 337
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220519-105338/337_stage_training_v2_20220519-105338.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220520-112736/337_stage_training_v2_20220520-112736.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220523-111832/337_stage_training_v2_20220523-111832.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220524-111333/337_stage_training_v2_20220524-111333.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220531-103028/337_stage_training_v2_20220531-103028.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220601-125410/337_stage_training_v2_20220601-125410.csv'
+# pc_session_comparison(path1, path2, kind='prob_rep', color='tab:brown', save=True, format='png', transparent=False)
+#
+#
+# # PROB. RIGHT
+# # 332
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220520-111627/332_stage_training_v2_20220520-111627.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220521-123227/332_stage_training_v2_20220521-123227.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220523-111705/332_stage_training_v2_20220523-111705.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220524-111056/332_stage_training_v2_20220524-111056.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220601-123831/332_stage_training_v2_20220601-123831.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/332/sessions/332_stage_training_v2_20220602-112855/332_stage_training_v2_20220602-112855.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+#
+# # 333
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220515-112535/333_stage_training_v2_20220515-112535.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220516-113238/333_stage_training_v2_20220516-113238.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220518-102053/333_stage_training_v2_20220518-102053.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220520-111416/333_stage_training_v2_20220520-111416.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220523-111330/333_stage_training_v2_20220523-111330.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220524-110827/333_stage_training_v2_20220524-110827.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220601-123634/333_stage_training_v2_20220601-123634.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/333/sessions/333_stage_training_v2_20220602-112547/333_stage_training_v2_20220602-112547.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+#
+# # 337
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220519-105338/337_stage_training_v2_20220519-105338.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220520-112736/337_stage_training_v2_20220520-112736.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220523-111832/337_stage_training_v2_20220523-111832.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220524-111333/337_stage_training_v2_20220524-111333.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+# path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220531-103028/337_stage_training_v2_20220531-103028.csv'
+# path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220601-125410/337_stage_training_v2_20220601-125410.csv'
+# pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
