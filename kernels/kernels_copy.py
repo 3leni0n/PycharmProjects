@@ -171,13 +171,22 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
     if drug is not None:  # Select drug session trials
         df_drug = pd.read_csv(Path.home() / 'PycharmProjects' / 'drugs' / 'Mouse injections MK801.csv')  # Load drug data
         df = df[df.Drug.notnull()]
-        # drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
         df_intersession = df_intersession[df_intersession.Drug.notnull()]
+        # drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
 
-        # Get paired saline sessions prior to drug inyection (i.e. paired)
+        # Get paired rest sessions prior to drug inyection
+        if drug == 'rest':
+            mk801_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
+            n_mk801_indexes = len(mk801_indexes)
+            paired_rest_indexes = df_intersession[df_intersession.Drug == 'rest'].Dates.index.values
+            paired_rest_indexes = np.random.choice(paired_rest_indexes, n_mk801_indexes, False)
+            paired_rest_dates = df_intersession.Dates[paired_rest_indexes]
+            df = df[df.Date.isin(paired_rest_dates)]
+
+        # Get paired saline sessions prior to drug inyection
         if drug == 'saline':
-            mk901_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
-            paired_saline_indexes = mk901_indexes - 1
+            mk801_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
+            paired_saline_indexes = mk801_indexes - 1
             paired_saline_dates = df_intersession.Dates[paired_saline_indexes]
             df = df[df.Date.isin(paired_saline_dates)]
 
@@ -388,13 +397,14 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
                          residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                          iterations=iterations)
         title = f'N={len(pk.animal)}, {pk.n_trials} trials'
-        filename = f'mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
+        filename = f'{pk.animal}mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
     else:
         pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
         title = f'Mouse {pk.animal}, {pk.n_trials} trials'
-        filename = f'_PK_ILDs: {target_ilds}'
+        filename = f'{pk.animal}_PK_ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
+    print(filename)
 
     # Fit a line to the weights check primacy vs recency
     # result = stats.linregress(np.arange(len(params)-1), params.iloc[1:11])
@@ -421,7 +431,6 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
     color = 'k'
     color_upper_shuffle = 'tab:red'
     label = ''
-    filename = f'_PK_ILDs: {target_ilds}'
 
     # Plot kernel (stimulus frames beta weights)
     # + 1 to skip constant; + int(residuals) to skip ILD
@@ -483,7 +492,7 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
         # plt.savefig(folder_out + str(df.Setup.unique()[0]) + filename + '.' + format, format=format, transparent=transparent)
-        plt.savefig(Path(folder_out, filename, format=format), transparent=transparent)
+        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
 
     time_end = time.time()
@@ -640,8 +649,8 @@ def get_mean_pk(experiment='2AFC_2', animals=['325', '327', '329', '330', '332',
 # From 'Flexible categorization in perceptual decision making'
 # Paper: (https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z#Sec11)
 # Code: https://bitbucket.org/delaRochaLab/flexible-categorization/src/master/functions/analysis_fc.py
-# betas = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0, 0])  # Primacy (for testing)
-# betas = np.array([0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5])  # Recency (for testing)
+# betas = pd.Series([0.5, 0.5, 0.5, 0.5, 0.5, 0, 0, 0, 0, 0])  # Primacy (for testing)
+# betas = pd.Series([0, 0, 0, 0, 0, 0.5, 0.5, 0.5, 0.5, 0.5])  # Recency (for testing)
 def normalized_pi_pk_area(pk):
     """
     Compute the PK area normalized by the area of a PI
@@ -678,7 +687,7 @@ def normalized_pk_slope(pk):
     npk = betas - 0.5
     npk = npk / sum(npk)  # Normalized pk, must sum 1
     # npk_slope = -sum(aux * npk)  # Remove the minus if using aux = np.linspace(1, -1, n_frames)
-    results = stats.linregress(npk.index.values, npk.values)
+    results = stats.linregress(aux, npk.values)
     npk_slope = results.slope
     return npk_slope
 
@@ -706,39 +715,39 @@ def primacy_recency_index(pk):
 
 # Debugging
 
-# experiment = '2AFC_2'
-# animal = None
-# # animals = ['325', '326', '327', '329', '330', '332', '333', '334', '335', '337']  # Bach 2 (with ILDs)
-# animals = ['325', '326', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -334
-# # animals = ['419', '420', '422', '616', '617', '619', '620', '623']  # Batch 3 (with ILDs)
+experiment = '2AFC_3'
+# animal = '333'
+# animals = ['325', '326', '327', '329', '330', '332', '333', '334', '335', '337']  # Bach 2 (with ILDs)
+# animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
+animals = ['419', '420', '422', '616', '617', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']
-# library = 'sm'
-# target_ilds = [-8, -4, -2, 0, 2, 4, 8]
-# drug = None
-# residuals = False
-# zscore = False
-# control = None
-# n_mean_frames = None
-# iterations = 10
-# save = False
-# format = 'svg'
-# transparent = False
+library = 'sm'
+target_ilds = [-2, 0, 2]
+drug = None
+residuals = True
+zscore = False
+control = None
+n_mean_frames = None
+iterations = 1000
+save = True
+format = 'svg'
+transparent = True
 
 # Get PK
 # pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
 #                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
-# Plot PK
-# plot_pk(experiment=experiment, animal=animals, library=library, target_ilds=target_ilds, drug=drug,
-#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-#             save=save, format=format, transparent=transparent)
-
-# Plot PKs
-# plot_pks(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
-#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-#             save=save, format=format, transparent=transparent)
-
 # Get mean PK
 # mean_pk = get_mean_pk(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
 #                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
 #                       iterations=iterations)
+
+# Plot individual PKs
+plot_pks(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
+            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+            save=save, format=format, transparent=transparent)
+
+# Plot  mean PK
+plot_pk(experiment=experiment, animal=animals, library=library, target_ilds=target_ilds, drug=drug,
+            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+            save=save, format=format, transparent=transparent)

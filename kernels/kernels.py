@@ -695,9 +695,9 @@ transparent = False
 #                                                                        iterations=iterations, save=save, format=format,
 #                                                                        transparent=transparent)
 
-plot_kernels_across_animals(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
-                            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                            iterations=iterations, save=save, format=format, transparent=transparent)
+# plot_kernels_across_animals(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
+#                             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+#                             iterations=iterations, save=save, format=format, transparent=transparent)
 
 # Drugs across animals
 # params_across_animals, \

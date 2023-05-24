@@ -6,10 +6,10 @@ import seaborn as sns
 from kernels.kernels_copy import *
 
 # Plotting parameters
-sns.set_theme()
-sns.set_style('white')
-sns.set_style('ticks')
-sns.set_context('poster')
+# sns.set_theme()
+# sns.set_style('white')
+# sns.set_style('ticks')
+# sns.set_context('poster')
 
 # Kernel parameters
 experiment = '2AFC_2'
@@ -19,7 +19,7 @@ library = 'sm'
 target_ilds = [-8, -4, -2, 0, 2, 4, 8]
 # drug = None
 residuals = False
-zscore = True
+zscore = False
 control = None
 n_mean_frames = 2
 iterations = 10
@@ -54,7 +54,7 @@ plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=targe
         save=False, format='svg', transparent=False)
 
 
-# # Normalized PK Area
+# Normalized PK Area
 # npka_rest = normalized_pi_pk_area(pk_rest)
 # npka_saline = normalized_pi_pk_area(pk_saline)
 # npka_mk801 = normalized_pi_pk_area(pk_mk801)
@@ -85,7 +85,33 @@ print(f'\nThe Primacy-recency indexes are: \n'
       f'MK801: {round(pri_mk801, 3)}')
 
 
+labels = ['rest', 'saline', 'MK801']
+# Plotting
+# plt.figure(constrained_layout=True)
 
+# # ax1 = plt.subplot(1, 3, 1)
+# plt.figure(constrained_layout=True)
+# plt.plot([npka_rest, npka_saline, npka_mk801], marker='o', linestyle='-', color='k')
+# plt.title('Normalized PK area')
+# plt.xlabel('Drug')
+# plt.ylabel('NPKA')
+# plt.xticks([0, 1, 2], labels)
+# sns.despine()
 
+# ax2 = plt.subplot(1, 3, 2)
+plt.figure(constrained_layout=True)
+plt.plot([npks_rest, npks_saline, npks_mk801], marker='o', linestyle='-', color='k')
+plt.title('Normalized PK slope')
+plt.xlabel('Drug')
+plt.ylabel('NPKS')
+plt.xticks([0, 1, 2], labels)
+sns.despine()
 
-
+# ax3 = plt.subplot(1, 3, 3)
+plt.figure(constrained_layout=True)
+plt.plot([pri_rest, pri_saline, pri_mk801], marker='o', linestyle='-', color='k')
+plt.title('Primacy-recency index')
+plt.xlabel('Drug')
+plt.ylabel('PRI')
+plt.xticks([0, 1, 2], labels)
+sns.despine()
