@@ -93,7 +93,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
     # Select the folder where to save the PDF or create it if it doesn't exist
     # folder_pdf_out = '/home/alexis/Documentos/intersession reports/' + experiment
-    folder_pdf_out = Path.home() / 'Documentos' / 'intersession' / experiment
+    folder_pdf_out = Path.home() / 'Documentos' / 'intersession reports' / experiment
 
     if not os.path.exists(folder_pdf_out):
         os.mkdir(folder_pdf_out)
@@ -176,6 +176,12 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     corr_rep_bias = rep_rate_left * 0.5 + rep_rate_right * 0.5  # Corrected for the lateral bias. Equivalent to the mean
     # but like this the output is a pd.Series
     corr_alt_bias = alt_rate_left * 0.5 + alt_rate_right * 0.5
+
+    # Delay
+    try:
+        var_delay = df.groupby('Date').VarDelay.mean()
+    except AttributeError:  # 'DataFrameGroupBy' object has no attribute 'VarDelay'
+        var_delay = [np.nan] * len(dates)
 
     # Blocks were introduced in batch 4, so this won't work for the first 3 batches
     try:
@@ -364,7 +370,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax = plt.subplot2grid((8, 1), (0, 0), rowspan=1, colspan=1)
+        ax = plt.subplot2grid((9, 1), (0, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -413,7 +419,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
+        ax1 = plt.subplot2grid((9, 1), (1, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax1.axhline(0, color='tab:gray', linestyle='--')  # Unbias
@@ -460,7 +466,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax2 = plt.subplot2grid((8, 1), (2, 0), rowspan=1, colspan=1)
+        ax2 = plt.subplot2grid((9, 1), (2, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax2.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -508,7 +514,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax3 = plt.subplot2grid((8, 1), (3, 0), rowspan=1, colspan=1)
+        ax3 = plt.subplot2grid((9, 1), (3, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax3.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -561,7 +567,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax4 = plt.subplot2grid((8, 1), (4, 0), rowspan=1, colspan=1)
+        ax4 = plt.subplot2grid((9, 1), (4, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
         for i in range(len(dois)):
@@ -604,7 +610,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax5 = plt.subplot2grid((8, 1), (5, 0), rowspan=1, colspan=1)
+        ax5 = plt.subplot2grid((9, 1), (5, 0), rowspan=1, colspan=1)
 
         # Plot horizontal lines
         ax5.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
@@ -699,7 +705,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax6 = plt.subplot2grid((8, 1), (6, 0), rowspan=1, colspan=1)
+        ax6 = plt.subplot2grid((9, 1), (6, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
         for i in range(len(dois)):
@@ -740,7 +746,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
         time_start = time.time()
 
-        ax7 = plt.subplot2grid((8, 1), (7, 0), rowspan=1, colspan=1)
+        ax7 = plt.subplot2grid((9, 1), (7, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
         for i in range(len(dois)):
@@ -750,7 +756,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
                 pass
 
         # # Plot sound issues per session
-        ax7.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k', label='P')
+        ax7.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k')
 
         ax7.set_xlabel('Days')
         ax7.set_xlim([0, len(dates_indexes)])
@@ -766,11 +772,49 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax7_twin = ax7.twinx()
         ax7_twin.set_yticklabels([])
         ax7_twin.spines['top'].set_visible(False)
-        ax7_twin.spines['bottom'].set_visible(False)
+        # ax7_twin.spines['bottom'].set_visible(False)
 
         time_end = time.time()
         runtime = time_end - time_start
         print("'Plot 7: 'sound checks' took", round(runtime, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 8: DELAYS
+
+        time_start = time.time()
+
+        ax8 = plt.subplot2grid((9, 1), (8, 0), rowspan=1, colspan=1)
+
+        # Plot vertical line for date of interest
+        for i in range(len(dois)):
+            try:
+                ax7.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+            except IndexError:
+                pass
+
+        # # Plot sound issues per session
+        ax8.plot(dates_indexes, var_delay, marker='o', ms=ms, lw=lw, color='k')
+
+        ax8.set_xlabel('Days')
+        ax8.set_xlim([0, len(dates_indexes)])
+        # ax8.set_xticklabels([])
+        # ax8.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
+        ax8.set_ylabel('Delay')
+        ax8.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        ax8.spines['top'].set_visible(False)
+        # ax8.spines['bottom'].set_visible(False)
+        # ax8.spines['right'].set_visible(False)
+
+        # Instantiate a second axes that shares the same x-axis
+        ax8_twin = ax8.twinx()
+        ax8_twin.set_yticklabels([])
+        ax8_twin.spines['top'].set_visible(False)
+        ax8_twin.spines['bottom'].set_visible(False)
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print("'Plot 8: 'delays' took", round(runtime, 2), 'seconds to run')
 
         ################################################################################################################
 
@@ -952,9 +996,10 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
                    'LateralBias', 'AccuracyRep', 'AccuracyAlt', 'RepBias', 'CorrRepBias', 'CorrAltBias', 'Misses',
                    'MissesLeft', 'MissesRight', 'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards', 'RewardsLeft',
                    'RewardsRight', 'Water', 'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch', 'NoSound',
-                   'MessageCount', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight', 'FitErrorPCRight', 'ParamsPCRight',
-                   'SensitivityPCRight', 'BiasPCRight', 'LapseRight', 'LapseLeft', 'PCRep', 'xPCRep', 'yPCRep',
-                   'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep', 'BiasPCRep', 'LapseRep', 'LapseAlt']
+                   'MessageCount', 'VarDelay', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight', 'FitErrorPCRight',
+                   'ParamsPCRight', 'SensitivityPCRight', 'BiasPCRight', 'LapseRight', 'LapseLeft', 'PCRep', 'xPCRep',
+                   'yPCRep', 'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep', 'BiasPCRep', 'LapseRep',
+                   'LapseAlt']
 
         data = list(zip(dates, dow, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
                         hits_left, hits_right, hits_rep, hits_alt, errors, errors_left, errors_right, performance,
@@ -964,10 +1009,9 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
                         lateral_bias, accuracy_rep, accuracy_alt, rep_bias, corr_rep_bias, corr_alt_bias, misses,
                         misses_left, misses_right, miss_rate, miss_rate_left, miss_rate_right, rewards, rewards_left,
                         rewards_right, water, water_left, water_right, stage, sounds_mismatch, no_sound, message_count,
-                        pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
-                        sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep,
-                        ydata_pc_rep, fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep,
-                        lapse_rep, lapse_alt))
+                        var_delay, pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
+                        sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep, ydata_pc_rep,
+                        fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt))
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
@@ -978,7 +1022,8 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         os.mkdir(folder_csv_out)
 
     if to_csv:
-        df_intersession.to_csv(folder_csv_out + setup + '_intersession.csv', index=False)  # index=False to avoid the
+        # df_intersession.to_csv(folder_csv_out + setup + '_intersession.csv', index=False)  # index=False to avoid the
+        df_intersession.to_csv(Path(folder_csv_out / (setup + '_intersession.csv')), index=False)  # index=False to avoid the
         # 'Unmmaed: 0' column
 
     # Register time again and compute the total run time of the script
@@ -1036,7 +1081,8 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', to_csv=T
     animals.sort()
 
     for i in range(len(animals)):
-        path = folder + animals[i]
+        # path = folder + animals[i]
+        path = Path(folder / animals[i])
         intersession_within_animal(path, to_csv=to_csv, send_slack=send_slack)
 
     time_end = time.time()

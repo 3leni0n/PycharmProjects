@@ -702,7 +702,7 @@ def primacy_recency_index(pk):
 # Debugging
 experiment = '2AFC_2'
 experiments = ['2AFC_2', '2AFC_3']
-# animal = '333'
+animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
@@ -713,19 +713,19 @@ residuals = True
 zscore = False
 control = None
 n_mean_frames = None
-iterations = 100
+iterations = 1000
 save = False
 format = 'svg'
 transparent = True
 
 # Get PK
-# pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
-#                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
 # Get mean PK
-mean_pk = get_mean_pk(experiments=experiments, animals=None, library=library, target_ilds=target_ilds, drug=drug,
-                      residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                      iterations=iterations)
+# mean_pk = get_mean_pk(experiments=experiments, animals=None, library=library, target_ilds=target_ilds, drug=drug,
+#                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+#                       iterations=iterations)
 
 # Plot individual PKs
 # plot_pks(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
@@ -733,6 +733,6 @@ mean_pk = get_mean_pk(experiments=experiments, animals=None, library=library, ta
 #             save=save, format=format, transparent=transparent)
 
 # Plot  mean PK
-# plot_pk(experiment=experiment, animal=animals, library=library, target_ilds=target_ilds, drug=drug,
-#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-#             save=save, format=format, transparent=transparent)
+plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+            save=save, format=format, transparent=transparent)

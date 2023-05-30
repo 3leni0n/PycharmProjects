@@ -19,7 +19,7 @@ sns.set_context('poster')
 
 
 def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, kind=None,
-           iterations=1000):
+           iterations=100):
 
     time_start = time.time()
 
@@ -127,16 +127,16 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     # From 'Response outcomes gate the impact of expectations on perceptual decisions', Figure 4
     # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
 
-    # r+ (t-k)
-    r_plus_5 = [1 if df.Hit[i - 5] == 1 and df.Choice[i - 5] == 1 else -1 if df.Hit[i - 5] == 1 and df.Choice[i - 5] == 0 else 0 for i in range(5, len(df))]
+    # r+ (t-k): reward right = +1, reward left = -1, no reward (error) = 0
+    r_plus_5 = [1 if df.Hit[i - 5] == 1 and df.Side[i - 5] == 1 else -1 if df.Hit[i - 5] == 1 and df.Side[i - 5] == 0 else 0 for i in range(5, len(df))]
     r_plus_5 = [np.nan] * 5 + r_plus_5
-    r_plus_4 = [1 if df.Hit[i - 4] == 1 and df.Choice[i - 4] == 1 else -1 if df.Hit[i - 4] == 1 and df.Choice[i - 4] == 0 else 0 for i in range(4, len(df))]
+    r_plus_4 = [1 if df.Hit[i - 4] == 1 and df.Side[i - 4] == 1 else -1 if df.Hit[i - 4] == 1 and df.Side[i - 4] == 0 else 0 for i in range(4, len(df))]
     r_plus_4 = [np.nan] * 4 + r_plus_4
-    r_plus_3 = [1 if df.Hit[i - 3] == 1 and df.Choice[i - 3] == 1 else -1 if df.Hit[i - 3] == 1 and df.Choice[i - 3] == 0 else 0 for i in range(3, len(df))]
+    r_plus_3 = [1 if df.Hit[i - 3] == 1 and df.Side[i - 3] == 1 else -1 if df.Hit[i - 3] == 1 and df.Side[i - 3] == 0 else 0 for i in range(3, len(df))]
     r_plus_3 = [np.nan] * 3 + r_plus_3
-    r_plus_2 = [1 if df.Hit[i - 2] == 1 and df.Choice[i - 2] == 1 else -1 if df.Hit[i - 2] == 1 and df.Choice[i - 2] == 0 else 0 for i in range(2, len(df))]
+    r_plus_2 = [1 if df.Hit[i - 2] == 1 and df.Side[i - 2] == 1 else -1 if df.Hit[i - 2] == 1 and df.Side[i - 2] == 0 else 0 for i in range(2, len(df))]
     r_plus_2 = [np.nan] * 2 + r_plus_2
-    r_plus_1 = [1 if df.Hit[i - 1] == 1 and df.Choice[i - 1] == 1 else -1 if df.Hit[i - 1] == 1 and df.Choice[i - 1] == 0 else 0 for i in range(1, len(df))]
+    r_plus_1 = [1 if df.Hit[i - 1] == 1 and df.Side[i - 1] == 1 else -1 if df.Hit[i - 1] == 1 and df.Side[i - 1] == 0 else 0 for i in range(1, len(df))]
     r_plus_1 = [np.nan] * 1 + r_plus_1
     df['Rplus5'] = r_plus_5
     df['Rplus4'] = r_plus_4
@@ -144,16 +144,16 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     df['Rplus2'] = r_plus_2
     df['Rplus1'] = r_plus_1
 
-    # r-(t-k)
-    r_minus_5 = [1 if df.Hit[i - 5] == 0 and df.Choice[i - 5] == 1 else -1 if df.Hit[i - 5] == 0 and df.Choice[i - 5] == 0 else 0 for i in range(5, len(df))]
+    # r-(t-k): error right = +1, error left = -1, no error (reward) = 0
+    r_minus_5 = [1 if df.Hit[i - 5] == 0 and df.Side[i - 5] == 1 else -1 if df.Hit[i - 5] == 0 and df.Side[i - 5] == 0 else 0 for i in range(5, len(df))]
     r_minus_5 = [np.nan] * 5 + r_minus_5
-    r_minus_4 = [1 if df.Hit[i - 4] == 0 and df.Choice[i - 4] == 1 else -1 if df.Hit[i - 4] == 0 and df.Choice[i - 4] == 0 else 0 for i in range(4, len(df))]
+    r_minus_4 = [1 if df.Hit[i - 4] == 0 and df.Side[i - 4] == 1 else -1 if df.Hit[i - 4] == 0 and df.Side[i - 4] == 0 else 0 for i in range(4, len(df))]
     r_minus_4 = [np.nan] * 4 + r_minus_4
-    r_minus_3 = [1 if df.Hit[i - 3] == 0 and df.Choice[i - 3] == 1 else -1 if df.Hit[i - 3] == 0 and df.Choice[i - 3] == 0 else 0 for i in range(3, len(df))]
+    r_minus_3 = [1 if df.Hit[i - 3] == 0 and df.Side[i - 3] == 1 else -1 if df.Hit[i - 3] == 0 and df.Side[i - 3] == 0 else 0 for i in range(3, len(df))]
     r_minus_3 = [np.nan] * 3 + r_minus_3
-    r_minus_2 = [1 if df.Hit[i - 2] == 0 and df.Choice[i - 2] == 1 else -1 if df.Hit[i - 2] == 0 and df.Choice[i - 2] == 0 else 0 for i in range(2, len(df))]
+    r_minus_2 = [1 if df.Hit[i - 2] == 0 and df.Side[i - 2] == 1 else -1 if df.Hit[i - 2] == 0 and df.Side[i - 2] == 0 else 0 for i in range(2, len(df))]
     r_minus_2 = [np.nan] * 2 + r_minus_2
-    r_minus_1 = [1 if df.Hit[i - 1] == 0 and df.Choice[i - 1] == 1 else -1 if df.Hit[i - 1] == 0 and df.Choice[i - 1] == 0 else 0 for i in range(1, len(df))]
+    r_minus_1 = [1 if df.Hit[i - 1] == 0 and df.Side[i - 1] == 1 else -1 if df.Hit[i - 1] == 0 and df.Side[i - 1] == 0 else 0 for i in range(1, len(df))]
     r_minus_1 = [np.nan] * 1 + r_minus_1
     df['Rminus5'] = r_minus_5
     df['Rminus4'] = r_minus_4
@@ -162,6 +162,9 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     df['Rminus1'] = r_minus_1
 
     ####################################################################################################################
+
+    test_rplus = df[['Side', 'Hit', 'Rplus5', 'Rplus4',  'Rplus3', 'Rplus2', 'Rplus1']]
+    test_rminus = df[['Side', 'Hit', 'Rminus5', 'Rminus4', 'Rminus3', 'Rminus2', 'Rminus1']]
 
     choices = df.Choice
     r_plus = df[['ILD', 'Rplus5', 'Rplus4',  'Rplus3', 'Rplus2', 'Rplus1']]
@@ -220,7 +223,7 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
 
 
 def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, kind=None,
-            iterations=1000, save=False, format='svg', transparent=False):
+            iterations=100, save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
@@ -256,20 +259,20 @@ def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dr
     plt.legend(frameon=False)
     yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
-    if hk.p_values is not None:
-        for i in range(n_trials_lag):
-            if hk.p_values[i] <= 0.05:
-                text = '*'
-            else:
-                # text = 'ns'
-                text = ''
-            plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
-                         color=color, va='center', ha='center', fontsize='medium')
+    # if hk.p_values is not None:
+    #     for i in range(n_trials_lag):
+    #         if hk.p_values[i] <= 0.05:
+    #             text = '*'
+    #         else:
+    #             # text = 'ns'
+    #             text = ''
+    #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+    #                      color=color, va='center', ha='center', fontsize='medium')
 
     shuffles_mean = np.mean(hk.shuffles, axis=0)  # Get the mean of all the shuffles
     percentiles95 = np.percentile(hk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    plt.plot(x, shuffles_mean[1 + int(residuals):len(shuffles_mean)], color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(x, percentiles95[1 + int(residuals):len(shuffles_mean)], color=color_upper_shuffle, ls=':', zorder=1.9)
+    plt.plot(x, shuffles_mean[2:len(shuffles_mean)], color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(x, percentiles95[2:len(shuffles_mean)], color=color_upper_shuffle, ls=':', zorder=1.9)
 
     # Adjust xticks to number of regressors (cont + ILD + n_trials_lag)
     xticks = np.arange(2, n_trials_lag + 2, 1)
