@@ -88,7 +88,6 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
     # Load sounds
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
     sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
@@ -126,7 +125,6 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
     ####################################################################################################################
 
     # Load intersession data
-    # path_intersession = '/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv'
     path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (animal + '_intersession.csv')
     df_intersession = pd.read_csv(path_intersession)
 
@@ -204,15 +202,9 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
     ####################################################################################################################
 
-    id = df.Setup.unique()[0]
+    # id = df.Setup.unique()[0]
     n_trials = len(df)
     filenames = df.Filename.tolist()
-
-    # # Default plotting parameters
-    # color = 'k'
-    # color_upper_shuffle = 'tab:red'
-    # label = ''
-    # filename = f'_PK_ILDs: {target_ilds}'
 
     # Control
     if control is not None:
@@ -419,7 +411,7 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
     color_upper_shuffle = 'tab:red'
     label = ''
 
-    # Plot kernel (stimulus frames beta weights)
+    # Plot psychophysical kernel (stimulus frames beta weights)
     # + 1 to skip constant; + int(residuals) to skip ILD
     plt.figure(constrained_layout=True)
     n_frames = pk.n_frames
