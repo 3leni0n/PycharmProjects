@@ -700,8 +700,8 @@ def primacy_recency_index(pk):
 ########################################################################################################################
 
 # Debugging
-experiment = '2AFC_2'
-experiments = ['2AFC_2', '2AFC_3']
+experiments = '2AFC_2'
+# experiments = ['2AFC_2', '2AFC_3']
 animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
@@ -719,8 +719,8 @@ format = 'svg'
 transparent = True
 
 # Get PK
-pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
-                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+# pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+#                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
 # Get mean PK
 # mean_pk = get_mean_pk(experiments=experiments, animals=None, library=library, target_ilds=target_ilds, drug=drug,

@@ -18,6 +18,12 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
+# GLM weights of previously rewarded (r+) and previously unrewarded (r-) responses. These kernels quantify the
+# influence on choice of the side (left vs. right) of previous responses.
+# From 'Response outcomes gate the impact of expectations on perceptual decisions', Figure 4
+# (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
+
+
 def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, kind=None,
            iterations=100):
 
@@ -120,64 +126,59 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
 
     df = df.reset_index(drop=True)
     n_trials = len(df)
-    n_trials_lag = 5  # Number of trials to use for lagged variables
+    trial_lag = 10  # Number of trials to use for lagged variables
 
-    # GLM weights of previously rewarded (r+) and previously unrewarded (r-) responses. These kernels quantify the
-    # influence on choice of the side (left vs. right) of previous responses.
-    # From 'Response outcomes gate the impact of expectations on perceptual decisions', Figure 4
-    # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
+    def get_choice_history(df, k):
+        """
+        Get the choice history for a trial number k.
+        :param df: DataFrame with hit and choice data
+        :param k: number of trials to look back
+        :return:
+        """
+        r_minus = []
+        r_plus = []
+        for i in range(len(df)):
+            if i < k:
+                r_minus.append(np.nan)
+                r_plus.append(np.nan)
+            else:
+                # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
+                if df.Hit[i - k] == 0 and df.Choice[i - k] == 1:
+                    r_minus.append(1)
+                elif df.Hit[i - k] == 0 and df.Choice[i - k] == 0:
+                    r_minus.append(-1)
+                elif df.Hit[i - k] == 1:
+                    r_minus.append(0)
+                # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
+                if df.Hit[i - k] == 1 and df.Choice[i - k] == 1:
+                    r_plus.append(1)
+                elif df.Hit[i - k] == 1 and df.Choice[i - k] == 0:
+                    r_plus.append(-1)
+                elif df.Hit[i - k] == 0:
+                    r_plus.append(0)
+        return r_minus, r_plus
 
-    # r+ (t-k): reward right = +1, reward left = -1, no reward (error) = 0
-    r_plus_5 = [1 if df.Hit[i - 5] == 1 and df.Side[i - 5] == 1 else -1 if df.Hit[i - 5] == 1 and df.Side[i - 5] == 0 else 0 for i in range(5, len(df))]
-    r_plus_5 = [np.nan] * 5 + r_plus_5
-    r_plus_4 = [1 if df.Hit[i - 4] == 1 and df.Side[i - 4] == 1 else -1 if df.Hit[i - 4] == 1 and df.Side[i - 4] == 0 else 0 for i in range(4, len(df))]
-    r_plus_4 = [np.nan] * 4 + r_plus_4
-    r_plus_3 = [1 if df.Hit[i - 3] == 1 and df.Side[i - 3] == 1 else -1 if df.Hit[i - 3] == 1 and df.Side[i - 3] == 0 else 0 for i in range(3, len(df))]
-    r_plus_3 = [np.nan] * 3 + r_plus_3
-    r_plus_2 = [1 if df.Hit[i - 2] == 1 and df.Side[i - 2] == 1 else -1 if df.Hit[i - 2] == 1 and df.Side[i - 2] == 0 else 0 for i in range(2, len(df))]
-    r_plus_2 = [np.nan] * 2 + r_plus_2
-    r_plus_1 = [1 if df.Hit[i - 1] == 1 and df.Side[i - 1] == 1 else -1 if df.Hit[i - 1] == 1 and df.Side[i - 1] == 0 else 0 for i in range(1, len(df))]
-    r_plus_1 = [np.nan] * 1 + r_plus_1
-    df['Rplus5'] = r_plus_5
-    df['Rplus4'] = r_plus_4
-    df['Rplus3'] = r_plus_3
-    df['Rplus2'] = r_plus_2
-    df['Rplus1'] = r_plus_1
+    # Create empty DataFrame to store previous choices
+    exog = pd.DataFrame()
 
-    # r-(t-k): error right = +1, error left = -1, no error (reward) = 0
-    r_minus_5 = [1 if df.Hit[i - 5] == 0 and df.Side[i - 5] == 1 else -1 if df.Hit[i - 5] == 0 and df.Side[i - 5] == 0 else 0 for i in range(5, len(df))]
-    r_minus_5 = [np.nan] * 5 + r_minus_5
-    r_minus_4 = [1 if df.Hit[i - 4] == 0 and df.Side[i - 4] == 1 else -1 if df.Hit[i - 4] == 0 and df.Side[i - 4] == 0 else 0 for i in range(4, len(df))]
-    r_minus_4 = [np.nan] * 4 + r_minus_4
-    r_minus_3 = [1 if df.Hit[i - 3] == 0 and df.Side[i - 3] == 1 else -1 if df.Hit[i - 3] == 0 and df.Side[i - 3] == 0 else 0 for i in range(3, len(df))]
-    r_minus_3 = [np.nan] * 3 + r_minus_3
-    r_minus_2 = [1 if df.Hit[i - 2] == 0 and df.Side[i - 2] == 1 else -1 if df.Hit[i - 2] == 0 and df.Side[i - 2] == 0 else 0 for i in range(2, len(df))]
-    r_minus_2 = [np.nan] * 2 + r_minus_2
-    r_minus_1 = [1 if df.Hit[i - 1] == 0 and df.Side[i - 1] == 1 else -1 if df.Hit[i - 1] == 0 and df.Side[i - 1] == 0 else 0 for i in range(1, len(df))]
-    r_minus_1 = [np.nan] * 1 + r_minus_1
-    df['Rminus5'] = r_minus_5
-    df['Rminus4'] = r_minus_4
-    df['Rminus3'] = r_minus_3
-    df['Rminus2'] = r_minus_2
-    df['Rminus1'] = r_minus_1
+    for _ in reversed(range(1, trial_lag + 1)):
+        print(_)
+        r_minus, r_plus = get_choice_history(df, _)
+        exog['Rminus' + str(_)] = r_minus
+        exog['Rplus' + str(_)] = r_plus
+
+    # Reorder exog columns so I can split later in half the params for plotting r+ or r-
+    r_minus_columns = ['Rminus' + str(_) for _ in reversed(range(1, trial_lag + 1))]
+    r_plus_columns = ['Rplus' + str(_) for _ in reversed(range(1, trial_lag + 1))]
+    exog = exog[r_minus_columns + r_plus_columns]
 
     ####################################################################################################################
 
-    test_rplus = df[['Side', 'Hit', 'Rplus5', 'Rplus4',  'Rplus3', 'Rplus2', 'Rplus1']]
-    test_rminus = df[['Side', 'Hit', 'Rminus5', 'Rminus4', 'Rminus3', 'Rminus2', 'Rminus1']]
+    exog = sm.add_constant(exog)
+    exog.insert(0, 'ILD', df.ILD)
+    endog = df.Choice
 
-    choices = df.Choice
-    r_plus = df[['ILD', 'Rplus5', 'Rplus4',  'Rplus3', 'Rplus2', 'Rplus1']]
-    r_plus = sm.add_constant(r_plus)
-    r_minus = df[['ILD', 'Rminus5', 'Rminus4', 'Rminus3', 'Rminus2', 'Rminus1']]
-    r_minus = sm.add_constant(r_minus)
-
-    if kind =='r_plus':
-        exog = r_plus
-    elif kind == 'r_minus':
-        exog = r_minus
-
-    model = sm.GLM(choices, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
+    model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
     results = model.fit()
     params = results.params
     beta_std_err = results.bse
@@ -192,10 +193,11 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     # within trial could be an interesting test, as it preserves the overall weight of the stimulus for each trial
     # but breaks the frame structure
     for _ in range(iterations):
-        choices_shuffled = choices.sample(frac=1).reset_index(drop=True)
+        print(f'Iteration {_}/{iterations}')
+        endog_shuffled = endog.sample(frac=1).reset_index(drop=True)
         # stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
         # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-        model_shuffled = sm.GLM(choices_shuffled, exog,  # Shuffled choices
+        model_shuffled = sm.GLM(endog_shuffled, exog,  # Shuffled choices
                                 family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
         # model_shuffled = sm.GLM(choices, stim_strength_shuffled,  # Shuffled stim_strength
         #                         family=sm.families.Binomial())  # GLM with Binomial family and Logit link
@@ -209,11 +211,11 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     # percentiles95 = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
 
     # Store results in a namedtuple
-    HK = namedtuple('HK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_trials_lag', 'experiment',
-                           'animal', 'library', 'target_ilds', 'drug', 'zscore', 'kind', 'iterations'])
+    HK = namedtuple('HK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'trial_lag', 'experiment',
+                           'animal', 'library', 'target_ilds', 'drug', 'zscore', 'iterations'])
     hk = HK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-            n_trials_lag=n_trials_lag, experiment=experiment, animal=animal, library=library, target_ilds=None,
-            drug=drug, zscore=zscore, kind=kind, iterations=iterations)
+            trial_lag=trial_lag, experiment=experiment, animal=animal, library=library, target_ilds=None,
+            drug=drug, zscore=zscore, iterations=iterations)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -222,70 +224,79 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     return hk
 
 
-def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, kind=None,
-            iterations=100, save=False, format='svg', transparent=False):
+def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, iterations=100,
+            save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
     ####################################################################################################################
 
     hk = get_hk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug, zscore=zscore,
-                kind=kind, iterations=iterations)
+                iterations=iterations)
+
+    ####################################################################################################################
 
     # Default plotting parameters
     color = 'k'
     color_upper_shuffle = 'tab:red'
     label = ''
 
-    if kind == 'r_plus':
-        title = '$r^{+}$'
-    elif kind == 'r_minus':
-        title = '$r^{-}$'
+    trial_lag = hk.trial_lag
 
-    ylabel = 'GLM weight'
+    for _ in range(2):
 
-    # Plot history kernel (responses lag beta weights)
-    # + 1 to skip constant; + int(residuals) to skip ILD
-    plt.figure(constrained_layout=True)
-    n_trials_lag = hk.n_trials_lag
-    x = np.arange(1 + 1, len(hk.params))
-    y = hk.params.iloc[1 + 1:len(hk.params)]
-    yerr = hk.std_err.iloc[1 + 1:len(hk.params)]
-    plt.plot(x, y, color=color, marker='o', label=label)
-    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-    plt.title(title)
-    plt.xlabel('Trial lag')
-    plt.ylabel(ylabel)
-    plt.legend(frameon=False)
-    yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+        if _ == 0:
+            title = '$r^{-}$'
+            params_indexes = np.arange(2, 2 + trial_lag, 1)
+        else:
+            title = '$r^{+}$'
+            params_indexes = np.arange(2 + trial_lag, len(hk.params), 1)
 
-    # if hk.p_values is not None:
-    #     for i in range(n_trials_lag):
-    #         if hk.p_values[i] <= 0.05:
-    #             text = '*'
-    #         else:
-    #             # text = 'ns'
-    #             text = ''
-    #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
-    #                      color=color, va='center', ha='center', fontsize='medium')
+        # Plot history kernel (responses lag beta weights)
+        # + 1 to skip constant; + int(residuals) to skip ILD
+        plt.figure(constrained_layout=True)
+        x = np.arange(1, trial_lag + 1)
+        y = hk.params.iloc[params_indexes]
+        yerr = hk.std_err.iloc[params_indexes]
+        plt.plot(x, y, color=color, marker='o', label=label)
+        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xticks(x, x[::-1])
+        plt.xlabel('Trial lag')
+        ylabel = 'GLM weight'
+        plt.ylabel(ylabel)
+        plt.legend(frameon=False)
+        yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
-    shuffles_mean = np.mean(hk.shuffles, axis=0)  # Get the mean of all the shuffles
-    percentiles95 = np.percentile(hk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    plt.plot(x, shuffles_mean[2:len(shuffles_mean)], color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(x, percentiles95[2:len(shuffles_mean)], color=color_upper_shuffle, ls=':', zorder=1.9)
+        # if hk.p_values is not None:
+        #     for i in range(n_trials_lag):
+        #         if hk.p_values[i] <= 0.05:
+        #             text = '*'
+        #         else:
+        #             # text = 'ns'
+        #             text = ''
+        #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+        #                      color=color, va='center', ha='center', fontsize='medium')
 
-    # Adjust xticks to number of regressors (cont + ILD + n_trials_lag)
-    xticks = np.arange(2, n_trials_lag + 2, 1)
-    xticklabels = np.arange(1, n_trials_lag + 1, 1)
-    xticklabels = reversed(xticklabels)
-    plt.xticks(xticks, xticklabels)  # Readjust xticks
-    sns.despine(offset=10, trim=True)  # Despine axes triming the 0
+        shuffles_mean = np.mean(hk.shuffles, axis=0)  # Get the mean of all the shuffles
+        percentiles2_5 = np.percentile(hk.shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97_5 = np.percentile(hk.shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean[params_indexes], color='tab:gray', ls='--', zorder=1.8)
+        plt.plot(x, percentiles2_5[params_indexes], color=color_upper_shuffle, ls=':', zorder=1.9)
+        plt.plot(x, percentiles97_5[params_indexes], color=color_upper_shuffle, ls=':', zorder=2)
+
+        sns.despine(offset=10, trim=True)  # Despine axes triming the 0
+
+        time_end = time.time()
+        runtime = time_end - time_start
+        print('The script took', round(runtime, 2), 'seconds to run')
+
 
 ########################################################################################################################
 
 # Debugging
 experiment = '2AFC_2'
-experiments = ['2AFC_2', '2AFC_3']
+# experiments = ['2AFC_2', '2AFC_3']
 animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
