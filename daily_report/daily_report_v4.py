@@ -196,7 +196,8 @@ def daily_report_v4(path, send_slack=False):
             f'Stimulus duration:'
             f'{new_line}'
             f'{df.StimDur.unique()[0]}s, '
-            f'Delay: {df.Delay.unique()[0]}s, '
+            # f'Delay: {df.Delay.unique()[0]}s, '
+            f'Delay: {round(df.VarDelay.mean(), 1)}s, '
             f'Task: {df.Task.unique()[0]}, '
             f'Trials: {str(trials)} ({str(trials_left)} L, {str(trials_right)} R), '
             f'Performance: {str(int(round(performance * 100)))}% ({str(int(round(performance_left * 100)))}% L, {str(int(round(performance_right * 100)))}% R), '
@@ -204,7 +205,7 @@ def daily_report_v4(path, send_slack=False):
             f'{new_line}'
             f'{str(int(round(accuracy * 100)))}% '
             f'({str(int(round(accuracy_left * 100)))}% L, {str(int(round(accuracy_right * 100)))}% R), '
-            f'Accuracy blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, {str(int(round(accuracy_blocks_right * 100)))}% R),'
+            f'Accuracy blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, {str(int(round(accuracy_blocks_right * 100)))}% R), '
             f'Responses: {str(responses)} ({str(responses_left)} L, {str(responses_right)} R), '
             f'{new_line}'
             f'Hits: {str(hits)} ({str(hits_left)} L, {str(hits_right)} R), '
@@ -245,7 +246,7 @@ def daily_report_v4(path, send_slack=False):
 
         # Prepares the grid for the psychometric_curves
         # if df.Stage.unique()[0] == 4:  # Legacy
-        if df.Task.unique()[0] == 'FD':
+        if df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=2, colspan=4)
         else:
             ax1 = plt.subplot2grid((16, 4), (0, 0), rowspan=4, colspan=4)
@@ -325,7 +326,7 @@ def daily_report_v4(path, send_slack=False):
 
         # Prepares the grid for the psychometric_curves
         # if df.Stage.unique()[0] == 4:  # Legacy
-        if df.Task.unique()[0] == 'FD':
+        if df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             ax2 = plt.subplot2grid((16, 4), (2, 0), rowspan=2, colspan=4)
         else:
             ax2 = plt.subplot2grid((16, 4), (4, 0), rowspan=4, colspan=4)
@@ -396,7 +397,7 @@ def daily_report_v4(path, send_slack=False):
 
         # Prepares the grid for the psychometric_curves
         # if df.Stage.unique()[0] == 4:  # Legacy
-        if df.Task.unique()[0] == 'FD':
+        if df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             ax3 = plt.subplot2grid((16, 4), (4, 0), rowspan=2, colspan=4)
         else:
             ax3 = plt.subplot2grid((16, 4), (8, 0), rowspan=4, colspan=4)
@@ -463,7 +464,7 @@ def daily_report_v4(path, send_slack=False):
 
         # Prepares the grid for the psychometric_curves
         # if df.Stage.unique()[0] == 4:  # Legacy
-        if df.Task.unique()[0] == 'FD':
+        if df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             ax4 = plt.subplot2grid((16, 4), (6, 0), rowspan=3, colspan=4)
         else:
             ax4 = plt.subplot2grid((16, 4), (12, 0), rowspan=4, colspan=4)
@@ -547,7 +548,7 @@ def daily_report_v4(path, send_slack=False):
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
 
         # Only draw PC if evidences are introduced (stage 4)
-        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD':
+        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             # fig = plt.figure()
 
             # Psychometric curve of the whole session (all trials)
@@ -643,7 +644,7 @@ def daily_report_v4(path, send_slack=False):
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
 
         # Only draw PC if evidences are introduced (stage 4)
-        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD':
+        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             # fig = plt.figure()
 
             # Psychometric curve of the whole session (all trials)
@@ -740,7 +741,7 @@ def daily_report_v4(path, send_slack=False):
         # PLOT 8: ILDS DISTRIBUTION
 
         # Only draw ILDs distribution if evidences are introduced (stage 4)
-        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD':
+        if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
             # fig = plt.figure()
 
             # ILDs distribution of the whole session (all trials)

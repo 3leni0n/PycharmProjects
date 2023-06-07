@@ -24,8 +24,54 @@ sns.set_context('poster')
 # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
 
 
-def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, kind=None,
-           iterations=100):
+def get_choice_history(df, k):
+    """
+    Get the choice history for a trial number k.
+    :param df: DataFrame with hit and choice data
+    :param k: number of trials to look back
+    :return:
+    """
+    r_minus = []
+    r_plus = []
+    for i in range(len(df)):
+        if i < k:
+            r_minus.append(np.nan)
+            r_plus.append(np.nan)
+        else:
+            # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
+            if df.Hit[i - k] == 0 and df.Choice[i - k] == 1:
+                r_minus.append(1)
+            elif df.Hit[i - k] == 0 and df.Choice[i - k] == 0:
+                r_minus.append(-1)
+            elif df.Hit[i - k] == 1:
+                r_minus.append(0)
+            # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
+            if df.Hit[i - k] == 1 and df.Choice[i - k] == 1:
+                r_plus.append(1)
+            elif df.Hit[i - k] == 1 and df.Choice[i - k] == 0:
+                r_plus.append(-1)
+            elif df.Hit[i - k] == 0:
+                r_plus.append(0)
+    return r_minus, r_plus
+
+
+def get_session_index_dm(df, column='Date'):
+    """
+    # Make a design matrix in which there are as many columns as unique dates. Then, for each column, there is a 1 if
+    the trial belongs to that session and a 0 otherwise
+    :param df: Input DataFrame
+    :param column: Column of the DataFrame that contains the dates
+    :return: Design matrix
+    """
+    dates = df[column].unique()
+    design_matrix = np.zeros((len(df), len(dates)), dtype=int)
+    for i, date in enumerate(dates):
+        design_matrix[df[column] == date, i] = 1
+    design_matrix = pd.DataFrame(design_matrix)
+    return design_matrix
+
+
+def get_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100):
 
     time_start = time.time()
 
@@ -128,36 +174,6 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     n_trials = len(df)
     trial_lag = 10  # Number of trials to use for lagged variables
 
-    def get_choice_history(df, k):
-        """
-        Get the choice history for a trial number k.
-        :param df: DataFrame with hit and choice data
-        :param k: number of trials to look back
-        :return:
-        """
-        r_minus = []
-        r_plus = []
-        for i in range(len(df)):
-            if i < k:
-                r_minus.append(np.nan)
-                r_plus.append(np.nan)
-            else:
-                # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
-                if df.Hit[i - k] == 0 and df.Choice[i - k] == 1:
-                    r_minus.append(1)
-                elif df.Hit[i - k] == 0 and df.Choice[i - k] == 0:
-                    r_minus.append(-1)
-                elif df.Hit[i - k] == 1:
-                    r_minus.append(0)
-                # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
-                if df.Hit[i - k] == 1 and df.Choice[i - k] == 1:
-                    r_plus.append(1)
-                elif df.Hit[i - k] == 1 and df.Choice[i - k] == 0:
-                    r_plus.append(-1)
-                elif df.Hit[i - k] == 0:
-                    r_plus.append(0)
-        return r_minus, r_plus
-
     # Create empty DataFrame to store previous choices
     exog = pd.DataFrame()
 
@@ -167,15 +183,15 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
         exog['Rminus' + str(_)] = r_minus
         exog['Rplus' + str(_)] = r_plus
 
-    # Reorder exog columns so I can split later in half the params for plotting r+ or r-
+    # Reorder exog columns, so I can split later in half the params for plotting r+ or r-
     r_minus_columns = ['Rminus' + str(_) for _ in reversed(range(1, trial_lag + 1))]
     r_plus_columns = ['Rplus' + str(_) for _ in reversed(range(1, trial_lag + 1))]
     exog = exog[r_minus_columns + r_plus_columns]
 
     ####################################################################################################################
 
-    exog = sm.add_constant(exog)
-    exog.insert(0, 'ILD', df.ILD)
+    # exog = sm.add_constant(exog)
+    # exog.insert(0, 'ILD', df.ILD)
     endog = df.Choice
 
     model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
@@ -210,12 +226,17 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     # shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
     # percentiles95 = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
 
+    # Remove session index constants
+    params = params.iloc[:trial_lag * 2]  # From params
+    shuffles = [shuffles[i].iloc[:trial_lag * 2] for i in range(len(shuffles))]  # From shuffles
+    beta_std_err = beta_std_err.iloc[:trial_lag * 2]  # From beta_std_err
+    p_values = p_values.iloc[:trial_lag * 2]  # From p_values
+
     # Store results in a namedtuple
     HK = namedtuple('HK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'trial_lag', 'experiment',
-                           'animal', 'library', 'target_ilds', 'drug', 'zscore', 'iterations'])
+                           'animal', 'drug', 'iterations'])
     hk = HK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-            trial_lag=trial_lag, experiment=experiment, animal=animal, library=library, target_ilds=None,
-            drug=drug, zscore=zscore, iterations=iterations)
+            trial_lag=trial_lag, experiment=experiment, animal=animal, drug=drug, iterations=iterations)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -224,17 +245,11 @@ def get_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dru
     return hk
 
 
-def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, drug=None, zscore=True, iterations=100,
-            save=False, format='svg', transparent=False):
+def plot_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100, save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
-    ####################################################################################################################
-
-    hk = get_hk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug, zscore=zscore,
-                iterations=iterations)
-
-    ####################################################################################################################
+    hk = get_hk(experiment=experiment, animal=animal, drug=drug, iterations=iterations)
 
     # Default plotting parameters
     color = 'k'
@@ -243,14 +258,14 @@ def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dr
 
     trial_lag = hk.trial_lag
 
-    for _ in range(2):
+    for _ in range(1, 3):
 
-        if _ == 0:
+        if _ == 1:
             title = '$r^{-}$'
-            params_indexes = np.arange(2, 2 + trial_lag, 1)
-        else:
+            params_indexes = np.arange(trial_lag * _)
+        elif _ == 2:
             title = '$r^{+}$'
-            params_indexes = np.arange(2 + trial_lag, len(hk.params), 1)
+            params_indexes = np.arange(trial_lag, trial_lag * _)
 
         # Plot history kernel (responses lag beta weights)
         # + 1 to skip constant; + int(residuals) to skip ILD
@@ -266,7 +281,7 @@ def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dr
         ylabel = 'GLM weight'
         plt.ylabel(ylabel)
         plt.legend(frameon=False)
-        yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+        # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
 
         # if hk.p_values is not None:
         #     for i in range(n_trials_lag):
@@ -285,7 +300,7 @@ def plot_hk(experiment='2AFC_2', animal=None, library='sm', target_ilds=None, dr
         plt.plot(x, percentiles2_5[params_indexes], color=color_upper_shuffle, ls=':', zorder=1.9)
         plt.plot(x, percentiles97_5[params_indexes], color=color_upper_shuffle, ls=':', zorder=2)
 
-        sns.despine(offset=10, trim=True)  # Despine axes triming the 0
+        sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
 
         time_end = time.time()
         runtime = time_end - time_start
@@ -301,13 +316,9 @@ animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
-library = 'sm'
 target_ilds = None
 drug = None
 residuals = True
-zscore = False
-control = None
-n_mean_frames = None
 iterations = 100
 save = False
 format = 'svg'
