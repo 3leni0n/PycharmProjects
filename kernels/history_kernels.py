@@ -24,38 +24,55 @@ sns.set_context('poster')
 # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
 
 
-def get_choice_history(df, k):
-    """
-    Get the choice history for a trial number k.
-    :param df: DataFrame with hit and choice data
-    :param k: number of trials to look back
-    :return:
-    """
-    r_minus = []
-    r_plus = []
-    for i in range(len(df)):
-        if i < k:
-            r_minus.append(np.nan)
-            r_plus.append(np.nan)
-        else:
-            # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
-            if df.Hit[i - k] == 0 and df.Choice[i - k] == 1:
-                r_minus.append(1)
-            elif df.Hit[i - k] == 0 and df.Choice[i - k] == 0:
-                r_minus.append(-1)
-            elif df.Hit[i - k] == 1:
-                r_minus.append(0)
-            # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
-            if df.Hit[i - k] == 1 and df.Choice[i - k] == 1:
-                r_plus.append(1)
-            elif df.Hit[i - k] == 1 and df.Choice[i - k] == 0:
-                r_plus.append(-1)
-            elif df.Hit[i - k] == 0:
-                r_plus.append(0)
-    return r_minus, r_plus
+def make_choice_history_dm(df, k):
+    def get_choice_history(df, k):
+        """
+        Get the choice history for a trial number k.
+        :param df: DataFrame with hit and choice data
+        :param k: number of trials to look back
+        :return:  r_minus, r_plus
+        """
+        r_minus = []
+        r_plus = []
+        for _ in range(len(df)):
+            if _ < k:
+                r_minus.append(np.nan)
+                r_plus.append(np.nan)
+            else:
+                # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
+                if df.Hit[_ - k] == 0 and df.Choice[_ - k] == 1:
+                    r_minus.append(1)
+                elif df.Hit[_ - k] == 0 and df.Choice[_ - k] == 0:
+                    r_minus.append(-1)
+                elif df.Hit[_ - k] == 1:
+                    r_minus.append(0)
+                # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
+                if df.Hit[_ - k] == 1 and df.Choice[_ - k] == 1:
+                    r_plus.append(1)
+                elif df.Hit[_ - k] == 1 and df.Choice[_ - k] == 0:
+                    r_plus.append(-1)
+                elif df.Hit[_ - k] == 0:
+                    r_plus.append(0)
+
+        return r_minus, r_plus
+
+    design_matrix = pd.DataFrame()  # Create empty DataFrame to store previous choices
+
+    for _ in reversed(range(1, k + 1)):
+        print(_)
+        r_minus, r_plus = get_choice_history(df, _)
+        design_matrix['Rminus' + str(_)] = r_minus
+        design_matrix['Rplus' + str(_)] = r_plus
+
+    # Reorder exog columns, so I can split later in half the params for plotting r+ or r-
+    r_minus_columns = ['Rminus' + str(_) for _ in reversed(range(1, k + 1))]
+    r_plus_columns = ['Rplus' + str(_) for _ in reversed(range(1, k + 1))]
+    design_matrix = design_matrix[r_minus_columns + r_plus_columns]
+
+    return design_matrix
 
 
-def get_session_index_dm(df, column='Date'):
+def make_session_index_dm(df, column='Date'):
     """
     # Make a design matrix in which there are as many columns as unique dates. Then, for each column, there is a 1 if
     the trial belongs to that session and a 0 otherwise
@@ -172,28 +189,15 @@ def get_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100):
 
     df = df.reset_index(drop=True)
     n_trials = len(df)
-    trial_lag = 10  # Number of trials to use for lagged variables
+    trial_lag = 10  # Number of trials to use for lagged variables ---------->>> PARAMETER
 
-    # Create empty DataFrame to store previous choices
-    exog = pd.DataFrame()
-
-    for _ in reversed(range(1, trial_lag + 1)):
-        print(_)
-        r_minus, r_plus = get_choice_history(df, _)
-        exog['Rminus' + str(_)] = r_minus
-        exog['Rplus' + str(_)] = r_plus
-
-    # Reorder exog columns, so I can split later in half the params for plotting r+ or r-
-    r_minus_columns = ['Rminus' + str(_) for _ in reversed(range(1, trial_lag + 1))]
-    r_plus_columns = ['Rplus' + str(_) for _ in reversed(range(1, trial_lag + 1))]
-    exog = exog[r_minus_columns + r_plus_columns]
+    dm_choice_history = make_choice_history_dm(df, trial_lag)
+    dm_session_index = make_session_index_dm(df)
+    exog = pd.concat([dm_choice_history, dm_session_index], axis=1)
 
     ####################################################################################################################
 
-    # exog = sm.add_constant(exog)
-    # exog.insert(0, 'ILD', df.ILD)
     endog = df.Choice
-
     model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
     results = model.fit()
     params = results.params
