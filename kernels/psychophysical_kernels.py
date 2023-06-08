@@ -56,14 +56,13 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
-           residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000):
+def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, residuals=False, zscore=True,
+           control=None, n_mean_frames=None, iterations=1000):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
     options for control are available
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
     :param animal: Mouse ID number
-    :param library: Library used to compute the kernel
     :param target_ilds: ILDs to use (ideally just 0)
     :param drug: Use drug trials/sessions or not. If so, specify which drug; if not, specify None
     :param residuals: If True substract residuals and set zscore to False
@@ -310,30 +309,20 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
             trials_ild = df.ILD.reset_index(drop=True)  # Nominal ILDs per trial
             stim_strength.insert(0, 'ILD', trials_ild)  # Add nominal ILSs to stim_strength
 
-        if library == 'sklearn':  # Scikit-learn library
-            clf = LogisticRegression(random_state=0).fit(stim_strength, choices)
-            clf.get_params()
-            plt.plot(np.arange(len(clf.coef_[0])), clf.coef_[0], marker='o', mfc='None', label='Method 1')
-            # plt.title('Psychophysical kernel')
-            # plt.title('Psychophysical kernel')
-            # plt.xlabel('Number of frames')
-            # plt.ylabel('Weight')
-
-        elif library == 'sm':  # Statsmodels library
-            # From Genis' paper analysis code (gives directly the error)
-            # Paper: https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z
-            # Code: https://bitbucket.org/delaRochaLab/flexible-categorization/src/master/functions/analysis_fc.py
-            # GLM with Binomial family and Logit link = discrete Logit model
-            stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
-            # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-            model = sm.GLM(choices, stim_strength,
-                           family=sm.families.Binomial())  # GLM with Binomial family and Logit link
-            results = model.fit()
-            params = results.params
-            beta_std_err = results.bse
-            p_values = results.pvalues
-            summary = results.summary()
-            print(summary)
+        # From Genis' paper analysis code (gives directly the error)
+        # Paper: https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z
+        # Code: https://bitbucket.org/delaRochaLab/flexible-categorization/src/master/functions/analysis_fc.py
+        # GLM with Binomial family and Logit link = discrete Logit model
+        stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
+        # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
+        model = sm.GLM(choices, stim_strength,
+                       family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+        results = model.fit()
+        params = results.params
+        beta_std_err = results.bse
+        p_values = results.pvalues
+        summary = results.summary()
+        print(summary)
 
         # Permutation test (shuffled_var)
         shuffles = []
@@ -360,12 +349,11 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
 
         # Store results in a namedtuple
         PK = namedtuple('PK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
-                               'animal', 'library', 'target_ilds', 'drug', 'residuals', 'zscore', 'control',
-                               'n_mean_frames', 'iterations'])
+                               'animal', 'target_ilds', 'drug', 'residuals', 'zscore', 'control', 'n_mean_frames',
+                               'iterations'])
         pk = PK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-                n_frames=n_frames, experiment=experiment, animal=animal, library=library, target_ilds=target_ilds,
-                drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                iterations=iterations)
+                n_frames=n_frames, experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
+                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
         time_end = time.time()
         runtime = time_end - time_start
@@ -375,19 +363,18 @@ def get_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2
     return pk
 
 
-def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
-            residuals=False, zscore=True, control=None, n_mean_frames=None, iterations=1000, save=False,
-            format='svg', transparent=False):
+def plot_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, residuals=False, zscore=True,
+            control=None, n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
     if type(experiments) == list:
-        pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
+        pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2, 0, 2], drug=None,
                          residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=1)
         title = f'N={len(pk.animal)}, {pk.n_trials} trials'
         filename = f'{pk.animal}mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
     else:
-        pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+        pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
         title = f'Mouse {pk.animal}, {pk.n_trials} trials'
@@ -477,7 +464,7 @@ def plot_pk(experiment='2AFC_2', animal=None, library='sm', target_ilds=[-2, 0, 
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], library='sm',
+def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
              target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False, zscore=True, control=None,
              n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
     """
@@ -510,23 +497,22 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
         path = Path(folder, animals[i])
         print(path)
         print(f'Plotting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
-        plot_pk(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
-                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                iterations=iterations, save=save, format=format, transparent=transparent)
+        plot_pk(experiment=experiment, animal=animals[i], target_ilds=target_ilds, drug=drug, residuals=residuals,
+                zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations, save=save,
+                format=format, transparent=transparent)
 
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, library='sm', target_ilds=[-2, 0, 2], drug=None,
-                residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=1000):
+def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2, 0, 2], drug=None, residuals=True,
+                zscore=False, control=None, n_mean_frames=None, iterations=1000):
     """
     Get the kernels for all animals of a given batch (single string experiment) or across batches (list of experiments)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is. If a list, get mean
     kernel across batches
     :param animals: Mouse ID number
-    :param library: Library used to compute the kernel
     :param target_ilds: ILDs to use (ideally just 0)
     :param drug: Use or drug trials/sessions or not
     :param residuals: If True substract residuals and set zscore to False
@@ -567,7 +553,7 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, library='sm', ta
 
         for i in range(len(animals)):
             print(f'Getting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
-            pk = get_pk(experiment=experiment, animal=animals[i], library=library, target_ilds=target_ilds, drug=drug,
+            pk = get_pk(experiment=experiment, animal=animals[i], target_ilds=target_ilds, drug=drug,
                         residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                         iterations=iterations)
             animals_across_batches.append(pk.animal)
@@ -613,14 +599,14 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, library='sm', ta
 
     # Store results in a namedtuple
     MeanPK = namedtuple('MeanPK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
-                                   'animal', 'library', 'target_ilds', 'drug', 'residuals', 'zscore', 'control',
+                                   'animal', 'target_ilds', 'drug', 'residuals', 'zscore', 'control',
                                    'n_mean_frames', 'iterations'])
 
     mean_pk = MeanPK(params=params_mean_across_animals, std_err=params_sem_across_animals, p_values=None,
                      shuffles=shuffles_means_across_animals, n_trials=n_trials, n_frames=n_frames,
-                     experiment=experiments_across_batches, animal=animals_across_batches, library=library,
-                     target_ilds=target_ilds, drug=drug, residuals=residuals, zscore=zscore, control=control,
-                     n_mean_frames=n_mean_frames, iterations=iterations)
+                     experiment=experiments_across_batches, animal=animals_across_batches, target_ilds=target_ilds,
+                     drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                     iterations=iterations)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -733,6 +719,6 @@ transparent = True
 #             save=save, format=format, transparent=transparent)
 
 # Plot  mean PK
-plot_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
             save=save, format=format, transparent=transparent)

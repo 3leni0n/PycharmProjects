@@ -24,12 +24,20 @@ sns.set_context('poster')
 # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
 
 
+# Define functions to make design matrices
 def make_choice_history_dm(df, k):
+    """
+    Make a design matrix with the choice history. There is a column for each previous trial (up to k). In each trial,
+    only one of these regressors is non-zero.
+    :param df: DataFrame with hit and choice data
+    :param k: Number of trials to look back
+    :return: Design matrix
+    """
     def get_choice_history(df, k):
         """
         Get the choice history for a trial number k.
         :param df: DataFrame with hit and choice data
-        :param k: number of trials to look back
+        :param k: Number of trials to look back
         :return:  r_minus, r_plus
         """
         r_minus = []
@@ -88,7 +96,33 @@ def make_session_index_dm(df, column='Date'):
     return design_matrix
 
 
-def get_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100):
+def make_ild_dm(df):
+    """
+    Make a design matrix with the net ILDs. There is a column for each absolute, unique ILD value (except 0). It
+    transforms the nominal ILD into ILD net magnitude (2, 4, 8 , 70 dB) that take values +1, 0 or -1. In each trial,
+    only one of these regressors is non-zero.
+    When separating the stimuli S_k =  nominal_ILD + residuals and give a separate beta for the nominal and for each
+    residual frame, you are somehow assuming that the impact of the nominal ILD grows linearly with ILD. But this is
+    probably not the case. Particularly if spanning a range from ILD 0 to 70 dB. One simple way to not assume anything
+    about how the impact of the stimuli grows with ILD is to define separate regressors for each absolute value of the
+    ILD, that is 2, 4, 8 and 70. Each of this ILDs will define a regressor e.g. ILD_8 =  +1 (if ILD was +8 dB), -1 (if
+    ILD was -8 db) and 0 (if ILD was other than +- 8dB). This way, you should be able to include ALL stimuli in the
+    analysis (maximum evidence too).
+    :param df:
+    :return: Design matrix
+    """
+    ilds = df.ILD.astype('int')
+    net_ilds = np.sort(df.ILD.abs().unique().astype('int'))[1:]
+    design_matrix = np.zeros((len(df), len(net_ilds)), dtype=int)
+    # columns = [str(_) for _ in net_ilds]
+    design_matrix = pd.DataFrame(design_matrix, columns=net_ilds)
+    for i, ild in enumerate(ilds):
+        if ild != 0:
+            design_matrix.loc[i, abs(ild)] = np.sign(ild)
+    return design_matrix
+
+
+def get_hk(experiment='2AFC_2', animal=None, drug=None, trial_lag=10, iterations=100):
 
     time_start = time.time()
 
@@ -189,11 +223,10 @@ def get_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100):
 
     df = df.reset_index(drop=True)
     n_trials = len(df)
-    trial_lag = 10  # Number of trials to use for lagged variables ---------->>> PARAMETER
-
     dm_choice_history = make_choice_history_dm(df, trial_lag)
     dm_session_index = make_session_index_dm(df)
-    exog = pd.concat([dm_choice_history, dm_session_index], axis=1)
+    dm_ild = make_ild_dm(df)
+    exog = pd.concat([dm_choice_history, dm_session_index, dm_ild], axis=1)
 
     ####################################################################################################################
 
@@ -327,3 +360,4 @@ iterations = 100
 save = False
 format = 'svg'
 transparent = True
+trial_lag = 10
