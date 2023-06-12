@@ -41,13 +41,13 @@ from pathlib import Path
 import os
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LogisticRegression
 import statsmodels.api as sm
 from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 from collections import namedtuple
 from my_fun.my_fun import get_experiment, get_animal, get_ild
+from kernels.kernels_tools import *
 
 # Plotting parameters
 sns.set_theme()
@@ -56,7 +56,7 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, residuals=False, zscore=True,
+def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
            control=None, n_mean_frames=None, iterations=1000):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
@@ -93,28 +93,12 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
     frames_ild = get_ild(n_frames)
 
     ####################################################################################################################
-    # # After cafesito with Leonsito on 30.03.2023:
-    # frames_ild = []
-    # for i in range(len(sounds)):
-    #     if sounds.ILD[i] < 0:  # Left trials
-    #         frames_ild.append(sounds[left_frames_column_names].values[i] - sounds[right_frames_column_names].values[i])
-    #     elif sounds.ILD[i] == 0:  # Impossible trials
-    #         frames_ild.append(sounds[right_frames_column_names].values[i] - sounds[left_frames_column_names].values[i])
-    #     elif sounds.ILD[i] > 0:  # Right trials
-    #         frames_ild.append(sounds[right_frames_column_names].values[i] - sounds[left_frames_column_names].values[i])
-    # frames_ild = pd.DataFrame(frames_ild)
-
-    ####################################################################################################################
 
     # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
     if residuals:
         sounds_ild = sounds.ILD
         frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
         frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
-        # ylabel = 'GLM weight (residuals)'
-    else:
-        # ylabel = 'GLM weight'
-        pass
 
     ####################################################################################################################
 
@@ -153,9 +137,9 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
 
     # Filter trials
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
-    ilds = np.sort(df.ILD.unique())
-    df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
-    # df = df[df.Hit == 1]  # Only correct trials
+    df = df[df.P > 0]  # Only trials/sessions with P > 0
+    if target_ilds is not None:
+        df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
     accuracy_threshold = 0.5
     df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
     # with accuracy >= threshold
@@ -201,7 +185,6 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
 
     ####################################################################################################################
 
-    # id = df.Setup.unique()[0]
     n_trials = len(df)
     filenames = df.Filename.tolist()
 
@@ -211,8 +194,6 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
     else:
         n_plots = 1  # If not running control, 1 plot
 
-    # plt.figure(constrained_layout=True)
-
     for j in range(n_plots):
 
         # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
@@ -220,6 +201,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
         stim_strength = frames_ild.loc[
             [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
             columns=['filename'])
+        stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
 
         # Zscore
         if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
@@ -227,11 +209,6 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
                 stim_strength = pd.DataFrame(
                     stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
                 # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
-                # ylabel = 'GLM weight (z-scored)'
-            else:
-                # ylabel = 'GLM weight'
-                pass
-        stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
 
         # Average frames (to have more trials per regressor)
         if n_mean_frames is not None:
@@ -304,19 +281,20 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
                 color = 'tab:orange'
                 color_upper_shuffle = 'tab:orange'
 
-        # Add nominal ILDs to design matrix as regressor
+        endog = choices
+        dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
         if residuals:
-            trials_ild = df.ILD.reset_index(drop=True)  # Nominal ILDs per trial
-            stim_strength.insert(0, 'ILD', trials_ild)  # Add nominal ILSs to stim_strength
+            dm_ild = make_ild_dm(df)
+            exog = pd.concat([stim_strength, dm_session_index, dm_ild], axis=1)
+        else:
+            exog = pd.concat([stim_strength, dm_session_index], axis=1)
 
         # From Genis' paper analysis code (gives directly the error)
         # Paper: https://www-nature-com.sire.ub.edu/articles/s41467-021-21501-z
         # Code: https://bitbucket.org/delaRochaLab/flexible-categorization/src/master/functions/analysis_fc.py
         # GLM with Binomial family and Logit link = discrete Logit model
-        stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
-        # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-        model = sm.GLM(choices, stim_strength,
-                       family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+        # stim_strength = sm.add_constant(stim_strength)  # Add constant (bias)
+        model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
         results = model.fit()
         params = results.params
         beta_std_err = results.bse
@@ -324,28 +302,14 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
         summary = results.summary()
         print(summary)
 
-        # Permutation test (shuffled_var)
-        shuffles = []
-        # Shuffling the choices or the stim_strength index is the same, so it doesn't matter. Shuffling along the
-        # columns of stim_strength is wrong because it breaks the temporal structure of the data. Shuffling the frames
-        # within trial could be an interesting test, as it preserves the overall weight of the stimulus for each trial
-        # but breaks the frame structure
-        for _ in range(iterations):
-            choices_shuffled = choices.sample(frac=1).reset_index(drop=True)
-            stim_strength_shuffled = stim_strength.sample(frac=1).reset_index(drop=True)
-            # model = sm.Logit(choices, stim_strength)  # Discrete Logit model
-            # model_shuffled = sm.GLM(choices_shuffled, stim_strength,  # Shuffled choices
-            #                         family=sm.families.Binomial())  # GLM with Binomial family and Logit link
-            model_shuffled = sm.GLM(choices, stim_strength_shuffled,  # Shuffled stim_strength
-                                    family=sm.families.Binomial())  # GLM with Binomial family and Logit link
-            results_shuffled = model_shuffled.fit()
-            params_shuffled = results_shuffled.params
-            shuffles.append(params_shuffled)
-            # plt.plot(np.arange(1, len(params_shuffled)), params_shuffled.iloc[1:11], color='tab:gray', marker=None,
-            #          mfc='none', mec='none', mew=0, ms=0, label=label, alpha=0.1, zorder=1.7)  # Plot all shuffles
+        # Get shuffles
+        shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)
 
-        # shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
-        # percentiles95 = np.percentile(shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # Remove session index and stimulus constants
+        params = params.iloc[:n_frames]  # From params
+        shuffles = [shuffles[i].iloc[:n_frames] for i in range(len(shuffles))]  # From shuffles
+        beta_std_err = beta_std_err.iloc[:n_frames]  # From beta_std_err
+        p_values = p_values.iloc[:n_frames]  # From p_values
 
         # Store results in a namedtuple
         PK = namedtuple('PK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
@@ -359,16 +323,15 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, 
         runtime = time_end - time_start
         print('The script took', round(runtime, 2), 'seconds to run')
 
-    # return params, beta_std_err, shuffles, shuffles_mean, percentiles95, n_trials
     return pk
 
 
-def plot_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None, residuals=False, zscore=True,
+def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
             control=None, n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
 
     time_start = time.time()
 
-    if type(experiments) == list:
+    if type(experiment) == list:
         pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2, 0, 2], drug=None,
                          residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=1)
         title = f'N={len(pk.animal)}, {pk.n_trials} trials'
@@ -384,11 +347,7 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None,
     if residuals:
         ylabel = 'GLM weight (residuals)'
     else:
-        ylabel = 'GLM weight'
-
-    # Zscore
-    if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
-        if zscore:
+        if zscore:   # To not do both (otherwise I'd be subtracting the mean twice)
             ylabel = 'GLM weight (z-scored)'
         else:
             ylabel = 'GLM weight'
@@ -398,53 +357,45 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None,
     color_upper_shuffle = 'tab:red'
     label = ''
 
-    # Plot psychophysical kernel (stimulus frames beta weights)
-    # + 1 to skip constant; + int(residuals) to skip ILD
+    ###################################################################################################################
+
     plt.figure(constrained_layout=True)
     n_frames = pk.n_frames
-    x = np.arange(1 + int(residuals), len(pk.params))
-    y = pk.params.iloc[1 + int(residuals):len(pk.params)]
-    yerr = pk.std_err.iloc[1 + int(residuals):len(pk.params)]
+    x = np.arange(n_frames)
+    y = pk.params
+    yerr = pk.std_err
     plt.plot(x, y, color=color, marker='o', label=label)
     plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
     plt.title(title)
     plt.xlabel('Stimulus frame')
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
-    yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+    ####################################################################################################################
 
     # Annotate significance
     if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
         n_frames = n_mean_frames
 
-    if pk.p_values is not None:
-        for i in range(n_frames):
-            if pk.p_values[i] <= 0.05:
-                text = '*'
-            else:
-                # text = 'ns'
-                text = ''
-            plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
-                         color=color, va='center', ha='center', fontsize='medium')
+    # if pk.p_values is not None:
+    #     for i in range(n_frames):
+    #         if pk.p_values[i] <= 0.05:
+    #             text = '*'
+    #         else:
+    #             # text = 'ns'
+    #             text = ''
+    #         plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+    #                      color=color, va='center', ha='center', fontsize='medium')
 
     shuffles_mean = np.mean(pk.shuffles, axis=0)  # Get the mean of all the shuffles
     percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    plt.plot(x, shuffles_mean[1 + int(residuals):len(shuffles_mean)], color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(x, percentiles95[1 + int(residuals):len(shuffles_mean)], color=color_upper_shuffle, ls=':', zorder=1.9)
+    plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
 
-    # Adjust xticks to number of regressors (cont/ILD + frames)
-    if residuals:
-        xticks = np.arange(2, n_frames + 2, 1)
-        plt.xticks(xticks)  # Put one xtick for observation for triming later
-        xticks = np.arange(2 + int(residuals), n_frames + 1 + int(residuals), 2)
-        xticklabels = xticks - 1
-        sns.despine(offset=10, trim=True)  # Despine axes triming the 0
-        plt.xticks(xticks, xticklabels)  # Readjust xticks
-    else:
-        xticks = np.arange(1, n_frames + 1, 1)
-        plt.xticks(xticks)  # Put one xtick for observation for triming later
-        sns.despine(offset=10, trim=True)  # Despine axes triming the 0
-        plt.xticks(np.arange(2, n_frames + 1, 2))  # Readjust xticks
+    xticks = np.arange(1, n_frames + 1, 2)
+    xticklabels = xticks + 1
+    plt.xticks(xticks, xticklabels)
+    sns.despine(trim=True)  # Despine axes triming the 0
 
     if n_mean_frames == 2:
         plt.xticks([1, 2])  # Readjust xticks
@@ -465,13 +416,12 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=[-2, 0, 2], drug=None,
 
 
 def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-             target_ilds=[-8, -4, -2, 0, 2, 4, 8], drug=None, residuals=False, zscore=True, control=None,
+             target_ilds=None, drug=None, residuals=False, zscore=True, control=None,
              n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
     """
     Do the kernels for all animals of a given batch (experiment)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
     :param animals: Mouse ID number
-    :param library: Library used to compute the kernel
     :param target_ilds: ILDs to use (ideally just 0)
     :param drug: Use or drug trials/sessions or not
     :param residuals: If True substract residuals and set zscore to False
@@ -506,7 +456,7 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2, 0, 2], drug=None, residuals=True,
+def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None, drug=None, residuals=True,
                 zscore=False, control=None, n_mean_frames=None, iterations=1000):
     """
     Get the kernels for all animals of a given batch (single string experiment) or across batches (list of experiments)
@@ -532,8 +482,6 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2,
     animals_across_batches = []
     params_across_animals = []
     shuffles_across_animals = []
-    # shuffles_means_across_animals = []
-    # percentiles95_across_animals = []
     n_trials_across_animals = []
     pks = []
 
@@ -559,16 +507,10 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2,
             animals_across_batches.append(pk.animal)
             params_across_animals.append(pk.params)
             shuffles_across_animals.append(pk.shuffles)
-
-            # shuffles_mean = np.mean(pk.shuffles, axis=0)  # Get the mean of all the shuffles
-            # percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-            # shuffles_means_across_animals.append(shuffles_mean)
-            # percentiles95_across_animals.append(percentiles95)
             n_trials_across_animals.append(pk.n_trials)
             pks.append(pk)
         experiments_across_batches.append(experiment)
 
-    # plt.close('all')
     n_trials = sum(n_trials_across_animals)
     n_frames = pk.n_frames
 
@@ -582,10 +524,6 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2,
     # iterations x params)
     shuffles_means_across_animals = np.mean(shuffles_across_animals, 0)
 
-    # shuffles_means_mean_across_animals = np.mean(shuffles_means_across_animals, 0)
-    # percentiles95_across_animals = np.percentile(shuffles_means_across_animals, 95,
-    #                                              axis=0)  # Get upper 5 percentile of the shuffled_var
-
     # Store results in a namedtuple
     params_mean_across_animals = pd.Series(params_mean_across_animals)
     params_sem_across_animals = pd.Series(params_sem_across_animals)
@@ -594,8 +532,8 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2,
     shuffles_means_across_animals = [pd.Series(shuffles_means_across_animals[i, :]) for i in
                                      range(len(shuffles_means_across_animals))]
     # Rename the first element of each pd.Series as 'const' instead of '0'
-    shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
-                                     range(len(shuffles_means_across_animals))]
+    # shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
+    #                                  range(len(shuffles_means_across_animals))]
 
     # Store results in a namedtuple
     MeanPK = namedtuple('MeanPK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
@@ -686,14 +624,13 @@ def primacy_recency_index(pk):
 ########################################################################################################################
 
 # Debugging
-experiments = '2AFC_2'
-# experiments = ['2AFC_2', '2AFC_3']
+experiment = '2AFC_2'
+experiments = ['2AFC_2', '2AFC_3']
 animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
-library = 'sm'
-target_ilds = [-8, -4, -2, 0, 2, 4, 8]
+target_ilds = None
 drug = None
 residuals = True
 zscore = False
@@ -705,20 +642,20 @@ format = 'svg'
 transparent = True
 
 # Get PK
-# pk = get_pk(experiment=experiment, animal=animal, library=library, target_ilds=target_ilds, drug=drug,
+# pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
 #                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
 # Get mean PK
-# mean_pk = get_mean_pk(experiments=experiments, animals=None, library=library, target_ilds=target_ilds, drug=drug,
-#                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-#                       iterations=iterations)
+mean_pk = get_mean_pk(experiments=experiments, animals=None, target_ilds=target_ilds, drug=drug,
+                      residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                      iterations=iterations)
 
 # Plot individual PKs
-# plot_pks(experiment=experiment, animals=animals, library=library, target_ilds=target_ilds, drug=drug,
+# plot_pks(experiment=experiment, animals=animals, target_ilds=target_ilds, drug=drug,
 #             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
 #             save=save, format=format, transparent=transparent)
 
 # Plot  mean PK
-plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
-            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-            save=save, format=format, transparent=transparent)
+# plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
+#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+#             save=save, format=format, transparent=transparent)
