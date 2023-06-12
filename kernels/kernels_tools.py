@@ -128,3 +128,4 @@ def get_shuffles_GLM(endog, exog, iterations):
         shuffles.append(params_shuffled)
 
     return shuffles
+

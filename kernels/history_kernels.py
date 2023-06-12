@@ -5,10 +5,12 @@ import pandas as pd
 import numpy as np
 import statsmodels.api as sm
 from matplotlib import pyplot as plt
+from scipy import stats
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_experiment, get_animal, get_ild
+from my_fun.my_fun import get_experiment, get_animal, save_fig
 from kernels.kernels_tools import *
+
 
 # Plotting parameters
 sns.set_theme()
@@ -23,7 +25,18 @@ sns.set_context('poster')
 # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
 
 
-def get_hk(experiment='2AFC_2', animal=None, drug=None, trial_lag=10, iterations=100):
+def get_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000):
+    """
+    Get history kernels for a given animal. The history kernel is the GLM weight of previously rewarded (r+) and
+    previously unrewarded (r-) responses (choices). These kernels quantify the influence on choice of the side (left vs.
+    right) of previous responses.
+    :param experiment: str, name of the experiment
+    :param animal: str, name of the animal
+    :param drug: bool, drug session to analyze. If None, all sessions are analyzed
+    :param trial_lag: int, number of trials to consider in the past
+    :param iterations: int, number of iterations to compute shuffles of the kernel
+    :return: hk: namedtuple, history kernel
+    """
 
     time_start = time.time()
 
@@ -141,7 +154,7 @@ def get_hk(experiment='2AFC_2', animal=None, drug=None, trial_lag=10, iterations
     print(summary)
 
     # Get shuffles
-    shuffles = get_shuffles_GLM(endog, exog, iterations=100)
+    shuffles = get_shuffles_GLM(endog, exog, iterations)
 
     # Remove session index and stimulus constants
     params = params.iloc[:trial_lag * 2]  # From params
@@ -162,11 +175,27 @@ def get_hk(experiment='2AFC_2', animal=None, drug=None, trial_lag=10, iterations
     return hk
 
 
-def plot_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100, save=False, format='svg', transparent=False):
+def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000, save=False):
+    """
+    Plot the history kernel of a given animal.
+    :param experiment: str, name of the experiment
+    :param animal: str, name of the animal
+    :param drug: bool, drug session to analyze. If None, all sessions are analyzed
+    :param trial_lag: int, number of trials to consider in the past
+    :param iterations: int, number of iterations to compute shuffles of the kernel
+    :param save: bool, whether to save the figure or not
+    :return:
+    """
 
     time_start = time.time()
 
-    hk = get_hk(experiment=experiment, animal=animal, drug=drug, iterations=iterations)
+    if type(experiment) == list:
+        hk = get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial_lag=trial_lag,
+                         iterations=iterations)
+        title = f'N={len(hk.animal)}, {hk.n_trials} trials'
+    else:
+        hk = get_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
+        title = f'Mouse {hk.animal}, {hk.n_trials} trials'
 
     # Default plotting parameters
     color = 'k'
@@ -178,14 +207,15 @@ def plot_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100, save=Fa
     for _ in range(1, 3):
 
         if _ == 1:
-            title = '$r^{-}$'
+            xlabel = 'Trial lag (' + '$r^{-}$)'
             params_indexes = np.arange(trial_lag * _)
+            filename = f'{hk.animal} r- HK, trial lag: {hk.trial_lag}'  # + '.' + format
         elif _ == 2:
-            title = '$r^{+}$'
+            xlabel = 'Trial lag (' + '$r^{+}$)'
             params_indexes = np.arange(trial_lag, trial_lag * _)
+            filename = f'{hk.animal} r+ HK, trial lag: {hk.trial_lag}'  # + '.' + format
 
         # Plot history kernel (responses lag beta weights)
-        # + 1 to skip constant; + int(residuals) to skip ILD
         plt.figure(constrained_layout=True)
         x = np.arange(1, trial_lag + 1)
         y = hk.params.iloc[params_indexes]
@@ -194,7 +224,7 @@ def plot_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100, save=Fa
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
         plt.title(title)
         plt.xticks(x, x[::-1])
-        plt.xlabel('Trial lag')
+        plt.xlabel(xlabel)
         ylabel = 'GLM weight'
         plt.ylabel(ylabel)
         plt.legend(frameon=False)
@@ -219,16 +249,134 @@ def plot_hk(experiment='2AFC_2', animal=None, drug=None, iterations=100, save=Fa
 
         sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
 
+        if save:
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
+            save_fig(folder_out, filename)
+            plt.close()
+
         time_end = time.time()
         runtime = time_end - time_start
         print('The script took', round(runtime, 2), 'seconds to run')
+
+
+def plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], drug=None,
+             trial_lag=10, iterations=1000, save=False):
+    """
+    Plot the history kernels of all animals of a given batch.
+    :param experiment: str, name of the experiment
+    :param animal: str, name of the animal
+    :param drug: bool, drug session to analyze. If None, all sessions are analyzed
+    :param trial_lag: int, number of trials to consider in the past
+    :param iterations: int, number of iterations to compute shuffles of the kernel
+    :param save: bool, whether to save the figure or not
+    :return:
+    """
+
+    time_start = time.time()
+
+    experiment = get_experiment(experiment)
+
+    # folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment  # Where the data for all animals is
+
+    for i in range(len(animals)):
+        # path = Path(folder, animals[i])
+        # print(path)
+        print(f'Plotting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
+        plot_hk(experiment=experiment, animal=animals[i], drug=drug, trial_lag=trial_lag, iterations=iterations,
+                save=save)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+
+def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial_lag=10, iterations=1000):
+    """
+    Get the mean peak of the history kernel of all animals of a given batch.
+    :param experiments: list of str, name of the experiments
+    :param animals: list of str, name of the animal
+    :param drug: bool, drug session to analyze. If None, all sessions are analyzed
+    :param trial_lag: int, number of trials to consider in the past
+    :param iterations: int, number of iterations to compute shuffles of the kernel
+    :return:
+    """
+
+    time_start = time.time()
+
+    experiments_across_batches = []
+    animals_across_batches = []
+    params_across_animals = []
+    shuffles_across_animals = []
+    n_trials_across_animals = []
+    pks = []
+
+    for j in range(len(experiments)):
+
+        experiment = get_experiment(experiments[j])
+        print(experiment)
+
+        if experiments[j] == '2AFC_2':
+            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+        elif experiments[j] == '2AFC_3':
+            animals = ['419', '420', '422', '616', '619', '623']
+
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+
+        print(folder_in)
+
+        for i in range(len(animals)):
+            print(f'Getting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
+            hk = get_hk(experiment=experiment, animal=animals[i], drug=drug, trial_lag=trial_lag, iterations=iterations)
+            animals_across_batches.append(hk.animal)
+            params_across_animals.append(hk.params)
+            shuffles_across_animals.append(hk.shuffles)
+            n_trials_across_animals.append(hk.n_trials)
+            pks.append(hk)
+        experiments_across_batches.append(experiment)
+
+    n_trials = sum(n_trials_across_animals)
+
+    # Get mean and sem of the parameters across animals
+    params_across_animals = np.array(params_across_animals)
+    params_mean_across_animals = np.mean(params_across_animals, 0)
+    params_sem_across_animals = stats.sem(params_across_animals, 0)
+
+    # Get the mean and percentile 95 of the shuffles across animals
+    shuffles_across_animals = np.array(shuffles_across_animals)  # Convert list of lists to 3 dim array (animal x
+    # iterations x params)
+    shuffles_means_across_animals = np.mean(shuffles_across_animals, 0)
+
+    # Store results in a namedtuple
+    params_mean_across_animals = pd.Series(params_mean_across_animals)
+    params_sem_across_animals = pd.Series(params_sem_across_animals)
+
+    # Transform suffles_means_across_animals into a list of pd.Series
+    shuffles_means_across_animals = [pd.Series(shuffles_means_across_animals[i, :]) for i in
+                                     range(len(shuffles_means_across_animals))]
+    # Rename the first element of each pd.Series as 'const' instead of '0'
+    # shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
+    #                                  range(len(shuffles_means_across_animals))]
+
+    # Store results in a namedtuple
+    MeanHK = namedtuple('MeanPK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'experiment', 'animal',
+                                   'drug', 'trial_lag', 'iterations'])
+
+    mean_hk = MeanHK(params=params_mean_across_animals, std_err=params_sem_across_animals, p_values=None,
+                     shuffles=shuffles_means_across_animals, n_trials=n_trials, experiment=experiments_across_batches,
+                     animal=animals_across_batches, drug=drug, trial_lag=trial_lag, iterations=iterations)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+    return mean_hk
 
 
 ########################################################################################################################
 
 # Debugging
 experiment = '2AFC_2'
-# experiments = ['2AFC_2', '2AFC_3']
+experiments = ['2AFC_2', '2AFC_3']
 animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
@@ -236,8 +384,6 @@ animal = '333'
 target_ilds = None
 drug = None
 residuals = True
-iterations = 100
-save = False
-format = 'svg'
-transparent = True
+iterations = 1
+save = True
 trial_lag = 10

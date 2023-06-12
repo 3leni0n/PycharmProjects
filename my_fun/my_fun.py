@@ -817,7 +817,7 @@ def check_date_exist(date, dates):
             return False
 
 
-# The fllowing 2 functions are under testing were developped for kernels. Will need to adapt to make them work for
+# The following 2 functions are under testing were developed for kernels. Will need to adapt to make them work for
 # other cases
 def get_experiment(experiment=None):
     """
@@ -870,3 +870,16 @@ def get_animal(experiment, animal=None):
 
     return animal
 
+
+def save_fig(folder_out, filename):
+    """
+    Save figure twice, one in png with white background and another one in svg with transparent background.
+    :param folder_out: Folder where to save the figures
+    :param filename: Name of the figure
+    :return:
+    """
+    if not folder_out.exists():
+        folder_out.mkdir(parents=True, exist_ok=True)
+    os.chdir(folder_out)
+    plt.savefig(Path(folder_out / (filename + '.' + 'png')), format='png', transparent=False)
+    plt.savefig(Path(folder_out / (filename + '.' + 'svg')), format='svg', transparent=True)

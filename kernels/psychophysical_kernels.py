@@ -46,7 +46,7 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_experiment, get_animal, get_ild
+from my_fun.my_fun import get_experiment, get_animal, get_ild, save_fig
 from kernels.kernels_tools import *
 
 # Plotting parameters
@@ -432,7 +432,7 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
     :param save: If True, saves the plot
     :param format: Output format of the saved figure
     :param transparent: Set background transparent
-    :return: Nothing
+    :return:
     """
 
     time_start = time.time()
