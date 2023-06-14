@@ -129,3 +129,36 @@ def get_shuffles_GLM(endog, exog, iterations):
 
     return shuffles
 
+
+def make_frames_dm(df, residuals=True, zscore=False):
+
+    # Load sounds
+    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
+    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    sounds = pd.read_csv(sounds_path)
+    n_frames = sounds.n_frames.unique()[0]
+    frames_ild = get_ild(n_frames)
+
+    # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
+    if residuals:
+        sounds_ild = sounds.ILD
+        frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
+        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+
+    filenames = df.Filename.tolist()
+
+    # Get frames per trial
+    stim_strength = frames_ild.loc[
+        [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        columns=['filename'])
+    stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+
+    # Zscore
+    if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+        if zscore:
+            stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+            # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
+
+    design_matrix = stim_strength
+
+    return design_matrix

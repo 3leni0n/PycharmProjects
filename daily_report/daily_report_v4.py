@@ -20,7 +20,7 @@ import time
 import os
 
 from my_fun.my_fun import compute_window, compute_psych_curve, slack_spam  # Or from my_fun.my_fun import my_fun
-from parse.parse_v2 import *  # Or from parse.parse_v4 import parse_v4
+from parse.parse_v2 import *
 
 
 ########################################################################################################################
@@ -174,47 +174,50 @@ def daily_report_v4(path, send_slack=False):
             f'Time: {df.SessionStart.unique()[0][0:-7]} - {df.SessionEnd.unique()[0][0:-7]}, '
             f'Subject: {df.Subject.unique()[0]}, '
             f'Box: {df.Board.unique()[0][4]}, '
-            f'Stage: {str(df.Stage.unique()[0])}, '
-            f'Fixation: {str(df.Fixation.unique()[0])},'
-            f'{new_line}'
+            # f'Stage: {str(df.Stage.unique()[0])}, '  # Legacy
+            # f'Fixation: {str(df.Fixation.unique()[0])},'  # Legacy
             f'Switch: {str(df.Switch.unique()[0])}, '
             f'Timeout: {str(df.Timeout.unique()[0])}, '
-            f'Motor: {str(df.Motor.unique()[0])}, '
-            f'REC: {str(df.REC.unique()[0])}, '
+            f'{new_line}'
+            # f'Motor: {str(df.Motor.unique()[0])}, '  # Legacy
+            # f'REC: {str(df.REC.unique()[0])}, '  # Always 1, useless
             f'CB: {str(df.CB.unique()[0])}, '
             f'Warm up: {str(df.WarmUp.unique()[0])}, '
             f'Progression: {str(df.Progression.unique()[0])}, '
             f'P: {str(round(df.P.iloc[1], 2))}, '
-            f'P right:'
-            f'{new_line}'
-            f'{str(round(df.PRight.iloc[1], 2))}, '
+            f'P right: {str(round(df.PRight.iloc[1], 2))}, '
             f'ITI: {df.ITI.unique()[0]}, '
             f'Recovery: {df.RecoveryMode.unique()[0]}, '
             f'Blocks: {df.Blocks.unique()[0]}, '
-            f'Block length: {int(df.BlockLen.unique()[0])}, '
+            f'Block '
+            f'{new_line}'
+            f'length: {int(df.BlockLen.unique()[0])}, '
             f'Response window: {df.RespWin.unique()[0]}s, '
-            f'Stimulus duration:'
-            f'{new_line}'
-            f'{df.StimDur.unique()[0]}s, '
-            # f'Delay: {df.Delay.unique()[0]}s, '
+            f'Stimulus duration: {df.StimDur.unique()[0]}s, '
             f'Delay: {round(df.VarDelay.mean(), 1)}s, '
+            # f'Delay: {df.Delay.unique()[0]}s, '
             f'Task: {df.Task.unique()[0]}, '
-            f'Trials: {str(trials)} ({str(trials_left)} L, {str(trials_right)} R), '
-            f'Performance: {str(int(round(performance * 100)))}% ({str(int(round(performance_left * 100)))}% L, {str(int(round(performance_right * 100)))}% R), '
-            f'Accuracy:'
+            f'Trials: {str(trials)} '
             f'{new_line}'
-            f'{str(int(round(accuracy * 100)))}% '
-            f'({str(int(round(accuracy_left * 100)))}% L, {str(int(round(accuracy_right * 100)))}% R), '
-            f'Accuracy blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, {str(int(round(accuracy_blocks_right * 100)))}% R), '
+            f'({str(trials_left)} L, {str(trials_right)} R), '
+            f'Performance: {str(int(round(performance * 100)))}% ({str(int(round(performance_left * 100)))}% L, '
+            f'{str(int(round(performance_right * 100)))}% R), '
+            f'Accuracy: {str(int(round(accuracy * 100)))}% ({str(int(round(accuracy_left * 100)))}% L, '
+            f'{str(int(round(accuracy_right * 100)))}% R), '
+            f'Accuracy '
+            f'{new_line}'
+            f'blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, '
+            f'{str(int(round(accuracy_blocks_right * 100)))}% R),'
             f'Responses: {str(responses)} ({str(responses_left)} L, {str(responses_right)} R), '
-            f'{new_line}'
             f'Hits: {str(hits)} ({str(hits_left)} L, {str(hits_right)} R), '
-            f'Errors: {str(errors)} ({str(errors_left)} L, {str(errors_right)} R), '
+            f'Errors: '
+            f'{new_line}'
+            f'{str(errors)} ({str(errors_left)} L, {str(errors_right)} R), '
             f'Misses: {str(misses)} ({str(misses_left)} L, {str(misses_right)} R), '
             f'Miss rate: {str(int(round(miss_rate * 100)))}% ' 
-            f'{new_line}'
             f'({str(int(round(miss_rate_left * 100)))}% L, {str(int(round(miss_rate_right * 100)))}% R), '
             f'Sound errors: {str(sound_errors)} ({str(round((sound_errors / trials) * 100, 1))}%), '
+            f'{new_line}'
             f'AW: {str(df.AW.unique()[0])} trials, '
             f'Water: {str(water)} μL ({str(water_left)}μL L {str(water_right)}μL R)'
             f'{new_line}'
@@ -275,14 +278,14 @@ def daily_report_v4(path, send_slack=False):
                     # ax1.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='->', color='green'))
                     ax1.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:green', ha='center')
                 elif change_p[change_p.index[i]] < 0:
                     # ax1.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='<-', color='red'))
                     ax1.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:red', ha='center')
 
@@ -349,14 +352,14 @@ def daily_report_v4(path, send_slack=False):
                     # ax2.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='->', color='green'))
                     ax2.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:green', ha='center')
                 elif change_p[change_p.index[i]] < 0:
                     # ax2.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='<-', color='red'))
                     ax2.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:red', ha='center')
 
@@ -421,14 +424,14 @@ def daily_report_v4(path, send_slack=False):
                     # ax3.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='->', color='green'))
                     ax3.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:green', ha='center')
                 elif change_p[change_p.index[i]] < 0:
                     # ax3.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='<-', color='red'))
                     ax3.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2)),
+                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:red', ha='center')
 
@@ -508,24 +511,15 @@ def daily_report_v4(path, send_slack=False):
             yticklabels = list(ilds)
             ax4.set_yticks(ilds)
             ax4.set_yticklabels(yticklabels)
-            # ax4.set_ylim(-1.1, 1.1)  # Evidences
-            # ax4.set_ylim(0, 1)  # Coherences
-            # ax4.set_yticks(np.sort(df.ILD.unique()))
-            # ax4.set_yticklabels(['-70', '-8', '-4', '-2', '0', '2', '4', '8', '70'])  # ILDs
-            # ax4.set_yticklabels(['Left', '', '', '', '0.5', '', '',  '', 'Right'])  # Coherences
             ax4.set_ylabel('ILD')
-            # ax4.set_ylabel('Coherence')
 
             # Instantiate a second axes that shares the same x-axis
             ax4_twin = ax4.twinx()
             ax4_twin.set_yscale('symlog', linthresh=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax4_twin.minorticks_off()  # Remove minor ticks
-            # ax4_twin.set_ylim(-1.1, 1.1)  # Evidences
             ax4_twin.set_ylim(ax4.get_ylim())
             ax4_twin.set_yticks(ilds)
-            # ax4.set_yticklabels(yticklabels)
-            # ax4.set_yticks(np.sort(df.ILD.unique()))
-            # ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])  # ILDs
+
             ax4_twin.spines['top'].set_visible(False)
 
         ax4.set_xlim([1, len(df)])  # 1 to not plot trial 0
@@ -554,9 +548,8 @@ def daily_report_v4(path, send_slack=False):
             # Psychometric curve of the whole session (all trials)
             ax11 = plt.subplot2grid((16, 4), (10, 0), rowspan=6, colspan=2)
 
-            # Compute psychometric curves
+            # Compute prob. right psychometric curve
             psych_curve = compute_psych_curve(df.ILD, df.Choice)  # No need to filter out the misses
-            psych_curve_rep = compute_psych_curve(df.ILDRep, df.RepChoice)
 
             # Plot horizontal and vertical lines
             ax11.axhline(0.5, color='tab:gray', ls='--')
@@ -565,39 +558,31 @@ def daily_report_v4(path, send_slack=False):
             # Plot left-right psychometric curve and errorbars
             ax11.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve.fit,
                       color='tab:orange', label='L-R')
+
+            # Move extreme datapoints closer to the center to zoom in
+            psych_curve.xdata[0] = -20
+            psych_curve.xdata[-1] = 20
+
             ax11.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange', fmt='o',
                           markerfacecolor='none')
 
-            # Plot alt-rep psychometric curve and errorbars
-            # ax11.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve_rep.fit, color='tab:brown', label='Alt-Rep')
-            # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
-            #               color='tab:brown', fmt='o', markerfacecolor='none')
+            # ax11.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
 
-            ax11.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+            plt.xlim([-21, 21])  # To chop the extreme values
+            ilds[0] = -20
+            ilds[-1] = 20
+            plt.xticks(ilds)
+            plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
+            plt.ylim([-0.025, 1.025])
+            plt.yticks([0, 0.5, 1])
+
             ax11.minorticks_off()  # Remove minor ticks
             ax11.set_xlabel('ILD')
-            # ax11.set_xlim([min(np.sort(df.ILD.unique())), max(np.sort(df.ILD.unique()))])  # Include min and max ILDs
-            # ax11.set_xlim(np.sort(df.ILD.unique())[1] - 1, np.sort(df.ILD.unique())[-2] + 1)  # Exclude min and max ILDs
-            ilds = np.sort(df.ILD.unique().astype('int'))
-            xticklabels = list(ilds)
-            # ax11.set_xticks(np.sort(df.ILD.unique()).astype('int'))  # Include min and max ILDs
-            # ax11.set_xticks(np.sort(df.ILD.unique())[1:-1].astype('int'))  # Exclude min and max ILDs
-            ax11.set_xticks(ilds)
-            ax11.set_xticklabels(xticklabels)
             ax11.set_ylabel('Prob. right')
             ax11.set_ylim([-0.025, 1.025])
-            # ax11.set_yticks(np.arange(0, 1.1, step=0.1))
-            # ax11.legend(loc="lower right", frameon=False)
-
-            # ax11_right_yaxis = ax11.twinx()  # instantiate a second axes that shares the same x-axis
-            # # ax11_right_yaxis.set_ylabel('Prob. right')
-            # ax11.set_yticklabels([])  # Remove left yticklabels
-            # ax11.set_yticks([])  # Remove left yticks
 
             ax11.spines['top'].set_visible(False)
             ax11.spines['right'].set_visible(False)
-            # ax11_right_yaxis.spines['top'].set_visible(False)
-            # ax11_right_yaxis.spines['left'].set_visible(False)
 
             # Annotate min and max
             ax11.annotate(str(round(psych_curve.ydata[0], 2)), xy=(psych_curve.xdata[0], psych_curve.ydata[0]),
@@ -607,17 +592,6 @@ def daily_report_v4(path, send_slack=False):
                           xytext=(psych_curve.xdata[-1], psych_curve.ydata[-1]), color='tab:orange', va='top',
                           ha='right', fontsize='medium')
 
-            # # Annotate 2nd min and 2nd max
-            # ax11.annotate(str(round(psych_curve.ydata[1], 2)), xy=(psych_curve.xdata[1], psych_curve.ydata[1]),
-            #               # 2nd min
-            #               xytext=(psych_curve.xdata[1], psych_curve.ydata[1]), color='tab:orange', va='bottom',
-            #               ha='left', fontsize='medium')
-            #
-            # ax11.annotate(str(round(psych_curve.ydata[-2], 2)), xy=(psych_curve.xdata[-2], psych_curve.ydata[-2]),
-            #               # 2nd max
-            #               xytext=(psych_curve.xdata[-2], psych_curve.ydata[-2]), color='tab:orange', va='top',
-            #               ha='right', fontsize='medium')
-
             sensitivity, bias, lr_left, lr_right = psych_curve.params  # Extract psychometric curve parameters
 
             # Annotate parameters
@@ -625,16 +599,7 @@ def daily_report_v4(path, send_slack=False):
                           "B=" + str(round(bias, 2)) + "\n" +  # Bias
                           "LR_L=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
                           "LR_R=" + str(round(lr_right, 2)),
-                          xy=(np.min(df.ILD), ax11.get_ylim()[1]), xytext=(np.min(df.ILD), ax11.get_ylim()[1]),
-                          color='tab:orange', va='top', ha='left', fontsize='medium')
-
-            # # Annotate parameters for 2nd min and 2nd max
-            # ax11.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-            #               "B=" + str(round(bias, 2)) + "\n" +  # Bias
-            #               "LR_R=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-            #               "LR_L=" + str(round(lr_right, 2)),  # Right lapse rate
-            #               xy=(np.sort(df.ILD.unique())[1], 1), xytext=(np.sort(df.ILD.unique())[1], 1), color='tab:orange',
-            #               va='top', ha='left', fontsize='medium')
+                          xy=(-20, 1), xytext=(-20, 1), color='tab:orange', va='top', ha='left', fontsize='medium')
 
         ################################################################################################################
 
@@ -650,42 +615,37 @@ def daily_report_v4(path, send_slack=False):
             # Psychometric curve of the whole session (all trials)
             ax13 = plt.subplot2grid((16, 4), (10, 2), rowspan=6, colspan=2)
 
-            # Compute psychometric curves
-            # psych_curve = compute_psych_curve(df.ILD, df.Choice)  # No need to filter out the misses
+            # Compute prob. rep psychometric curve
             psych_curve_rep = compute_psych_curve(df.ILDRep, df.RepChoice)
 
             # Plot horizontal and vertical lines
             ax13.axhline(0.5, color='tab:gray', ls='--')
             ax13.axvline(0., color='tab:gray', ls='--')
 
-            # Plot left-right psychometric curve and errorbars
-            # ax13.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve.fit,
-            #           color='tab:orange', label='L-R')
-            # ax13.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:orange',
-            #               fmt='o',
-            #               markerfacecolor='none')
-
             # Plot alt-rep psychometric curve and errorbars
             ax13.plot(np.linspace(np.min(df.ILD), np.max(df.ILD), len(psych_curve.fit)), psych_curve_rep.fit,
                       color='tab:brown', label='Alt-Rep')
+
+            # Move extreme datapoints closer to the center to zoom in
+            psych_curve_rep.xdata[0] = -20
+            psych_curve_rep.xdata[-1] = 20
+
             ax13.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
                           color='tab:brown', fmt='o', markerfacecolor='none')
 
-            ax13.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+            # ax13.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+
+            plt.xlim([-21, 21])  # To chop the extreme values
+            ilds[0] = -20
+            ilds[-1] = 20
+            plt.xticks(ilds)
+            plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
+            plt.ylim([-0.025, 1.025])
+            plt.yticks([0, 0.5, 1])
+
             ax13.minorticks_off()  # Remove minor ticks
             ax13.set_xlabel('ILD')
-            # ax13.set_xlim([min(np.sort(df.ILD.unique())), max(np.sort(df.ILD.unique()))])  # Include min and max ILDs
-            # ax13.set_xlim(np.sort(df.ILD.unique())[1] - 1, np.sort(df.ILD.unique())[-2] + 1)  # Exclude min and max ILDs
-            ilds = np.sort(df.ILD.unique().astype('int'))
-            xticklabels = list(ilds)
-            # ax13.set_xticks(np.sort(df.ILD.unique()).astype('int'))  # Include min and max ILDs
-            # ax13.set_xticks(np.sort(df.ILD.unique())[1:-1].astype('int'))  # Exclude min and max ILDs
-            ax13.set_xticks(ilds)
-            ax13.set_xticklabels(xticklabels)
-            # ax13.set_ylabel('Prob. repeat')
             ax13.set_ylim([-0.025, 1.025])
-            # ax13.set_yticks(np.arange(0, 1.1, step=0.1))
-            # ax13.legend(loc="lower right", frameon=False)
 
             ax13_right_yaxis = ax13.twinx()  # instantiate a second axes that shares the same x-axis
             ax13_right_yaxis.set_ylabel('Prob. repeat')
@@ -707,17 +667,6 @@ def daily_report_v4(path, send_slack=False):
                           xytext=(psych_curve_rep.xdata[-1], psych_curve_rep.ydata[-1]), color='tab:brown', va='top',
                           ha='right', fontsize='medium')
 
-            # # Annotate 2nd min and 2nd max
-            # ax13.annotate(str(round(psych_curve_rep.ydata[1], 2)), xy=(psych_curve_rep.xdata[1], psych_curve_rep.ydata[1]),
-            #               # 2nd min
-            #               xytext=(psych_curve_rep.xdata[1], psych_curve_rep.ydata[1]), color='tab:brown', va='bottom',
-            #               ha='left', fontsize='medium')
-            #
-            # ax13.annotate(str(round(psych_curve_rep.ydata[-2], 2)), xy=(psych_curve_rep.xdata[-2], psych_curve_rep.ydata[-2]),
-            #               # 2nd max
-            #               xytext=(psych_curve_rep.xdata[-2], psych_curve_rep.ydata[-2]), color='tab:brown', va='top',
-            #               ha='right', fontsize='medium')
-
             sensitivity, bias, lr_left, lr_right = psych_curve_rep.params  # Extract psychometric curve parameters
 
             # Annotate parameters
@@ -725,16 +674,7 @@ def daily_report_v4(path, send_slack=False):
                           "B=" + str(round(bias, 2)) + "\n" +  # Bias
                           "LR_Rep=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
                           "LR_Alt=" + str(round(lr_right, 2)),
-                          xy=(np.min(df.ILD), ax13.get_ylim()[1]), xytext=(np.min(df.ILD), ax13.get_ylim()[1]),
-                          color='tab:brown', va='top', ha='left', fontsize='medium')
-
-            # # Annotate parameters for 2nd min and 2nd max
-            # ax13.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-            #               "B=" + str(round(bias, 2)) + "\n" +  # Bias
-            #               "LR_R=" + str(round(lr_left, 2)) + "\n" +  # Left lapse rate
-            #               "LR_L=" + str(round(lr_right, 2)),  # Right lapse rate
-            #               xy=(np.sort(df.ILD.unique())[1], 1), xytext=(np.sort(df.ILD.unique())[1], 1), color='tab:brown',
-            #               va='top', ha='left', fontsize='medium')
+                          xy=(-20, 1), xytext=(-20, 1), color='tab:brown', va='top', ha='left', fontsize='medium')
 
         ################################################################################################################
 
