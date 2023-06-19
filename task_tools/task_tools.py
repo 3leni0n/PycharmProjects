@@ -68,7 +68,7 @@ def getWaterCalib(board, ports):
             return [float(results[i - 1]) for i in ports]
 
 
-def do_sounds_dict(start, stop, num, n_decimals):
+def make_sounds_dict(start, stop, num, n_decimals):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")

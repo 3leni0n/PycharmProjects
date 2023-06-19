@@ -133,11 +133,6 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     hue = ['Error' if i == 0 else 'Hit' if i == 1 else 'Miss' for i in df.Hit]
     hue_order = ['Error', 'Hit', 'Miss']
 
-    # Plot horizontal lines
-    ax3.axhline(0, color='tab:gray', linestyle='--')  # Chance level
-    # ax3.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
-    # ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
-
     # if df.Stage.unique()[0] <= 3:  # No coherences, plot sides
     if df.P.unique()[0] == 0:  # No coherences, plot sides
         scatter = sns.scatterplot(x=df.Trial, y=df.Side, hue=hue, palette=palette,
@@ -147,6 +142,11 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         ax3.set_yticklabels(['L', 'R'])
 
     else:  # Plot coherences
+
+        # Plot horizontal lines
+        ax3.axhline(0, color='tab:gray', linestyle='--')  # Chance level
+        # ax3.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+        # ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Replace extreme evidences for closer ones to zoom in
         df.ILD.replace(-70, -16, inplace=True)
@@ -265,9 +265,9 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
     p = round(df.P.iloc[-1], 2)
 
     ax4.text(1, 1,
-             "Acc=" + str(accuracy) + "\n" +  # Accuracy
-             "Acc. left=" + str(accuracy_left) + "\n" +  # Accuracy left
-             "Acc. right=" + str(accuracy_right) + "\n" +  # Accuracy right
-             "Water=" + str(water) + "\n" +  # Water,
-             "P=" + str(p) + "\n",  # Probabilities difficult trials
+             " Acc=" + str(accuracy) + "\n" +  # Accuracy
+             " Acc. left=" + str(accuracy_left) + "\n" +  # Accuracy left
+             " Acc. right=" + str(accuracy_right) + "\n" +  # Accuracy right
+             " Water=" + str(water) + "\n" +  # Water,
+             " P=" + str(p) + "\n",  # Probabilities difficult trials
              transform=ax4.transAxes, color='k', va='top', ha='left', fontsize='small')
