@@ -8,6 +8,9 @@
 
 ########################################################################################################################
 
+import time
+from pathlib import Path
+import os
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # For inset plot
 from matplotlib.patches import Patch  # For custom legend
@@ -16,8 +19,6 @@ from matplotlib.backends.backend_pdf import PdfPages  # For saving figure as pdf
 import seaborn as sns
 import numpy as np
 import pandas as pd
-import time
-import os
 
 from my_fun.my_fun import compute_window, compute_psych_curve, slack_spam  # Or from my_fun.my_fun import my_fun
 from parse.parse_v2 import *
@@ -32,6 +33,7 @@ from parse.parse_v2 import *
 
 # Define function
 def daily_report_v4(path, send_slack=False):
+
     # Register time
     time_start_total = time.time()
 
@@ -44,13 +46,15 @@ def daily_report_v4(path, send_slack=False):
 
     # Select the folder and create it if it doesn't exist
     experiment = df.Experiment.unique()[0]  # Batch ID
-    folder = '/home/alexis/Documentos/daily reports/' + experiment + '/'
-    # folder = '/home/setup2/Documents/daily reports/' + experiment + '/'
+    # folder = '/home/alexis/Documentos/daily reports/' + experiment + '/'
+    folder = Path.home() / 'Documentos' / 'daily reports' / experiment
     if not os.path.exists(folder):
-        os.mkdir(folder)
+        # os.mkdir(folder)
+        folder.mkdir(parents=True, exist_ok=True)
     os.chdir(folder)
     setup = df.Setup.unique()[0]  # Animal ID
-    folder = folder + setup
+    # folder = folder + setup
+    folder = Path(folder / setup)
     if not os.path.exists(folder):
         os.mkdir(folder)
     os.chdir(folder)
@@ -793,7 +797,7 @@ def daily_report_v4(path, send_slack=False):
             for j in range(len(df_side)):  # n trials
 
                 # Plot stimulus length
-                ax.barh(df_side.index.array[j],
+                ax.barh(df_side.index.values[j],
                         df_side.StimLen[j],
                         left=df_side.StimStart[j] -
                              df_side.StimStart[j],
@@ -1119,11 +1123,13 @@ def daily_report_v4(path, send_slack=False):
 
     # This block needs to be the last otherwise it sends the file too soon and corrupted
     if send_slack:
-        with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token
+        # with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token
+        with open(Path.home() / 'slack_bot_token', 'r') as f:  # Get slack bot token
             slack_bot_token = f.read().replace('\n', '')
 
         os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
-        filepath = folder + '/' + df.Session.unique()[0]
+        # filepath = folder + '/' + df.Session.unique()[0]
+        filepath = Path(folder/df.Session.unique()[0])
         slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
     ####################################################################################################################
@@ -1132,6 +1138,12 @@ def daily_report_v4(path, send_slack=False):
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
 
+# For debugging:
+# path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_4/setups/820/sessions/820_stage_training_v4_20230616-150207/820_stage_training_v4_20230616-150207.csv'
+# from daily_report.daily_report_v4 import *
+# daily_report_v4(path, send_slack=True)
+
 
 # if __name__ == "__main__":
 #     daily_report()
+
