@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 import os
 from daily_report.daily_report import *
 from daily_report.daily_report_v2 import *
@@ -12,7 +13,9 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
 
     if experiment is None:
 
-        folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        folder_in = Path.home()/'pv_nmdar_eranet'/'experiments'  # Where the data for all animals is
+
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
 
@@ -26,13 +29,16 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+    folder_in = Path(Path.home() /'pv_nmdar_eranet'/'experiments' / experiment / 'setups')  # Where the data for all animals is
 
     # Select the output folder for the corrupted sessions and create it if it doesn't exist
     # In case 'glue_sessions.py' hasn't been run yet for this experiment
-    folder_out_corrupted_sessions = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
+    # folder_out_corrupted_sessions = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
+    folder_out_corrupted_sessions = Path(Path.home()/'PycharmProjects'/'glue_sessions' / experiment)
     if not os.path.exists(folder_out_corrupted_sessions):
-        os.mkdir(folder_out_corrupted_sessions)
+        # os.mkdir(folder_out_corrupted_sessions)
+        folder_out_corrupted_sessions.mkdir(parents=True, exist_ok=True)
 
     animals = os.listdir(folder_in)
     animals.sort()
@@ -53,7 +59,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     for i in range(len(animals)):
 
         corrupted_sessions = []
-        folder2 = folder_in + animals[i] + '/sessions/'
+        # folder2 = folder_in + animals[i] + '/sessions/'
+        folder2 = Path(folder_in / animals[i] / 'sessions')
         sessions = os.listdir(folder2)
         sessions.sort()  # Sort them by date
         sessions = [s for s in sessions if 'stage_training' in s]  # Ignore lick_teaching sessions
@@ -62,10 +69,9 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
         if index == 'all':
             for k in range(len(sessions)):
                 session = sessions[k]  # Add scenario in which there are several sessions per day
-                date_session = session[
-                                 -15:-7]  # Indexing from the end because length of date + time won't change, opposite to
+                date_session = session[-15:-7]  # Indexing from the end because length of date + time won't change
                 split_sessions = [s for s in sessions if date_session in s]
-                path = folder2 + session + '/' + session + '.csv'  # Get csv file path to input parse/parse_v2.py
+                path = Path(folder2/session/session).with_suffix('.csv')  # Get csv file path to input parse/parse_v2.py
                 print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found on the date ', date_session, "", sep='')
                 try:
@@ -100,7 +106,7 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
             if len(split_sessions) > 1:
                 for j in range(len(split_sessions)):
                     session = split_sessions[j]
-                    path = folder2 + session + '/' + session + '.csv'  # Get csv file path to input parse/parse_vX.py
+                    path = Path(folder2/session/session).with_suffix('.csv')  # Get csv file path to input parse/parse_vX.py
                     print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                           ' sessions found on the date ', date_session, ' (session ', j + 1, '/', len(split_sessions),
                           ')', "", sep='')
@@ -123,7 +129,7 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                             f"with next session...")
                         corrupted_sessions.append(session)
             else:
-                path = folder2 + session + '/' + session + '.csv'  # Get csv file path to input parse/parse_v2.py
+                path = Path(folder2/session/session).with_suffix('.csv')  # Get csv file path to input parse/parse_v2.py
                 print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found on the date ', date_session, "", sep='')
                 try:
@@ -147,7 +153,7 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
 
         if corrupted_sessions:  # If corrupted sessions isn't empty, save them in a .csv file
             # Save corrupted sessions in a separate csv file
-            with open(folder_out_corrupted_sessions + animals[i] + '_corrupted_sessions.csv',
+            with open(Path(folder_out_corrupted_sessions/animals[i]/'_corrupted_sessions').with_suffix('.csv'),
                       'w', newline='') as f:
                 wr = csv.writer(f)
                 wr.writerow(corrupted_sessions)
