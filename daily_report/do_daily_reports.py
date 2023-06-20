@@ -44,8 +44,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     animals.sort()
 
     # Remove animals not training
-    animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8', '.idea', '562',
-                         '791', '802', '804', '807', '808']
+    animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8', '.idea', '561',
+                         '562', '791', '802', '804', '807', '808']
     # Usually I don't want to do the daily reports of the 'Test' subject
     # '.idea' is a Pycharm's hidden file
     for i in range(len(animals_to_remove)):
