@@ -1130,6 +1130,8 @@ def daily_report_v4(path, send_slack=False):
         os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
         # filepath = folder + '/' + df.Session.unique()[0]
         filepath = Path(folder/df.Session.unique()[0])
+        filepath = str(filepath)  # filepath, input to slack api method files.upload, used by function slack_spam,
+        # requires the file path as a str
         slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
     ####################################################################################################################

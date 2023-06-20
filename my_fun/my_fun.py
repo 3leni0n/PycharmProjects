@@ -757,7 +757,6 @@ def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapte
         'alexis': 'U01DDHH7LLX',
         'jaime': 'U7UTKNN0P',
         'carles': 'UPZPM32UC',
-        'jordi': 'U8J8YA66S',
         'my_channel': '#pv_nmdar_eranet',
         'reports': '#pv_nmdar_eranet_reports'
     }
