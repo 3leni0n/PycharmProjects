@@ -43,9 +43,30 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     animals = os.listdir(folder_in)
     animals.sort()
 
-    # Remove animals not training
-    animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8', '.idea', '561',
-                         '562', '791', '802', '804', '807', '808']
+    # Remove test setups and animals not training
+
+    # Remove setups
+    test_setups = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8']
+
+    # Remove Pycharm folder
+    Pycharm_folder = ['.idea']
+
+    # Switched to training in setup2, remove from setup1 to avoid doing reports from old sessions
+    if os.getlogin() == 'setup1':
+        remove_from_setup1 = ['876']
+    else:
+        remove_from_setup1 = []
+
+    # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
+    if os.getlogin() == 'setup2':
+        remove_from_setup2 = []
+    else:
+        remove_from_setup2 = []
+
+    # Animals that died or that didn't learn the task and were retired from training
+    not_training = ['561', '562', '791', '802', '804', '807', '808']
+
+    animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + not_training
     # Usually I don't want to do the daily reports of the 'Test' subject
     # '.idea' is a Pycharm's hidden file
     for i in range(len(animals_to_remove)):
