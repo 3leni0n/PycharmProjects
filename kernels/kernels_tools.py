@@ -116,7 +116,7 @@ def get_shuffles_GLM(endog, exog, iterations):
     shuffles = []
 
     for _ in range(iterations):
-        # print(f'Iteration {_}/{iterations}')
+        # print(f'Iteration {_}/{iterations}')  # Prints make it slower
         endog_shuffled = endog.sample(frac=1).reset_index(drop=True)
         # exog_shuffled = exog.sample(frac=1).reset_index(drop=True)
         model_shuffled = sm.GLM(endog_shuffled, exog,  # Shuffled choices
