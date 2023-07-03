@@ -305,23 +305,17 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         # Get shuffles
         shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)
 
-        ################################################################################################################
-        # WORK IN PROGRESS
-        session_index_params = params[10:-4]
-        stim_params = params[-4:]
-        ################################################################################################################
-
         # Remove session index and stimulus constants
-        params = params.iloc[:n_frames]  # From params
-        shuffles = [shuffles[i].iloc[:n_frames] for i in range(len(shuffles))]  # From shuffles
-        beta_std_err = beta_std_err.iloc[:n_frames]  # From beta_std_err
-        p_values = p_values.iloc[:n_frames]  # From p_values
+        # params = params.iloc[:n_frames]  # From params
+        # shuffles = [shuffles[i].iloc[:n_frames] for i in range(len(shuffles))]  # From shuffles
+        # beta_std_err = beta_std_err.iloc[:n_frames]  # From beta_std_err
+        # p_values = p_values.iloc[:n_frames]  # From p_values
 
         # Store results in a namedtuple
-        PK = namedtuple('PK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
+        PK = namedtuple('PK', ['params', 'session_index_params', 'stim_params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
                                'animal', 'target_ilds', 'drug', 'residuals', 'zscore', 'control', 'n_mean_frames',
                                'iterations'])
-        pk = PK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
+        pk = PK(params=params, session_index_params=session_index_params, stim_params=stim_params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
                 n_frames=n_frames, experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
@@ -487,6 +481,8 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
     experiments_across_batches = []
     animals_across_batches = []
     params_across_animals = []
+    session_index_params_across_animals = []
+    stim_params_across_animals = []
     shuffles_across_animals = []
     n_trials_across_animals = []
     pks = []
@@ -512,6 +508,8 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
                         iterations=iterations)
             animals_across_batches.append(pk.animal)
             params_across_animals.append(pk.params)
+            session_index_params_across_animals.append(pk.session_index_params)
+            stim_params_across_animals.append(pk.stim_params)
             shuffles_across_animals.append(pk.shuffles)
             n_trials_across_animals.append(pk.n_trials)
             pks.append(pk)
@@ -560,6 +558,16 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
     # return pks
 
 
+################################################################################################################
+# # WORK IN PROGRESS
+ilds = sounds.ILD.abs().unique()
+session_index_params = params[n_frames:-len(ilds) + 1]
+stim_params = params[-len(ilds) + 1:]
+
+
+
+
+
 ########################################################################################################################
 
 # From 'Flexible categorization in perceptual decision making'
@@ -571,7 +579,7 @@ def normalized_pi_pk_area(pk):
     """
     Compute the PK area normalized by the area of a PI
     :param pk: Psychophysical kernel as namedtuple
-    :return: 
+    :return:
     """
     if pk.n_mean_frames is not None:
         n_frames = pk.n_mean_frames

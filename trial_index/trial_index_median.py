@@ -84,16 +84,15 @@ def get_RTs_subject(experiment=None, animal=None, hit=None, bin_size=100):
 
     bins = range(0, df.Trial.max() + bin_size, 100)
     df['TrialBins'] = pd.cut(df['Trial'], bins=bins)
-    RTs_bin_mean = df.groupby(['TrialBins'])['RespWinLen'].mean()
     RTs_bin_median = df.groupby(['TrialBins'])['RespWinLen'].median()
     RTs_bin_sem = df.groupby(['TrialBins'])['RespWinLen'].sem().values
-    bin_indexes = [int(interval.right) for interval in RTs_bin_mean.index]
+    bin_indexes = [int(interval.right) for interval in RTs_bin_median.index]
 
     time_end = time.time()
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
-    return RTs_bin_mean, RTs_bin_sem, bin_indexes, n_trials
+    return RTs_bin_median, RTs_bin_sem, bin_indexes, n_trials
 
 
 def get_RTs_experiment(experiment=None, hit=None, bin_size=100):
@@ -114,42 +113,42 @@ def get_RTs_experiment(experiment=None, hit=None, bin_size=100):
     elif experiment == '2AFC_3':
         animals = ['419', '420', '422', '616', '619', '623']
 
-    RT_mean = []
+    RT_median = []
     RT_sem = []
     bin_indexes_max = []
     n_trials_sum = []
     # plt.figure(constrained_layout=True)
     for animal in animals:
         print(animal)
-        RTs_bin_mean, RTs_bin_sem, bin_indexes, n_trials = get_RTs_subject(experiment=experiment,
+        RTs_bin_median, RTs_bin_sem, bin_indexes, n_trials = get_RTs_subject(experiment=experiment,
                                                                                            animal=animal, hit=hit,
                                                                                            bin_size=bin_size)
-        RT_mean.append(RTs_bin_mean)
+        RT_median.append(RTs_bin_median)
         RT_sem.append(RTs_bin_sem)
         bin_indexes_max.append(bin_indexes)
         n_trials_sum.append(n_trials)
 
-    RT_mean = pd.DataFrame(RT_mean)
-    RT_sem = pd.DataFrame(RT_mean)
+    RT_median = pd.DataFrame(RT_median)
+    RT_sem = pd.DataFrame(RT_median)
     bin_indexes_max = pd.DataFrame(bin_indexes_max)
     n_trials_sum = sum(n_trials_sum)
 
-    return RT_mean, RT_sem, bin_indexes_max, n_trials_sum
+    return RT_median, RT_sem, bin_indexes_max, n_trials_sum
 
 
-def get_RTs_mean(experiments=['2AFC_2', '2AFC_3'], hit=None, bin_size=100):
+def get_RTs_median(experiments=['2AFC_2', '2AFC_3'], hit=None, bin_size=100):
 
-    RTs_mean = pd.DataFrame()
+    RTs_median = pd.DataFrame()
     n_trials_sum_sum = []
     for experiment in experiments:
         print(experiment)
-        RT_mean, RT_sem, bin_indexes_max, n_trials_sum = get_RTs_experiment(experiment=experiment, hit=hit, bin_size=bin_size)
-        RTs_mean = pd.concat([RTs_mean, RT_mean])
+        RT_median, RT_sem, bin_indexes_max, n_trials_sum = get_RTs_experiment(experiment=experiment, hit=hit, bin_size=bin_size)
+        RTs_median = pd.concat([RTs_median, RT_median])
         n_trials_sum_sum.append(n_trials_sum)
 
     n_trials_sum_sum = sum(n_trials_sum_sum)
 
-    return RTs_mean, n_trials_sum_sum
+    return RTs_median, n_trials_sum_sum
 
 
 def plot_RTs(experiments=['2AFC_2', '2AFC_3'], hit=None, bin_size=100, save=False):
@@ -157,21 +156,21 @@ def plot_RTs(experiments=['2AFC_2', '2AFC_3'], hit=None, bin_size=100, save=Fals
     plt.figure(constrained_layout=True)
 
     if hit is None:
-        RTs_mean, n_trials_sum_sum = get_RTs_mean(experiments=['2AFC_2', '2AFC_3'], hit=hit, bin_size=100)
+        RTs_median, n_trials_sum_sum = get_RTs_median(experiments=['2AFC_2', '2AFC_3'], hit=hit, bin_size=100)
         color = 'k'
         label = ''
-        filename = f'mean_RTs_experiments_{experiments}_{bin_size}_trials_bins'
-        for _ in range(len(RTs_mean)):
+        filename = f'median_RTs_experiments_{experiments}_{bin_size}_trials_bins'
+        for _ in range(len(RTs_median)):
             print()
-            x = RTs_mean.iloc[_].index.right
-            plt.plot(x, RTs_mean.iloc[_], marker='o', color='tab:gray', alpha=0.25)
+            x = RTs_median.iloc[_].index.right
+            plt.plot(x, RTs_median.iloc[_], marker='o', color='tab:gray', alpha=0.25)
 
-        RTs_mean = RTs_mean.iloc[:, :-1]  # Remove last column as there's only one value
-        RTs_mean_mean = RTs_mean.mean()
-        x = RTs_mean_mean.index.right
-        RTs_mean_sem = RTs_mean.sem()
-        plt.plot(x, RTs_mean_mean, marker='o', color=color, label=label)
-        plt.errorbar(x, RTs_mean_mean, RTs_mean_sem, color=color, marker='o', fmt='none', mec='none', ms=0)
+        RTs_median = RTs_median.iloc[:, :-1]  # Remove last column as there's only one value
+        RTs_median_median = RTs_median.median()
+        x = RTs_median_median.index.right
+        RTs_median_sem = RTs_median.sem()
+        plt.plot(x, RTs_median_median, marker='o', color=color, label=label)
+        plt.errorbar(x, RTs_median_median, RTs_median_sem, color=color, marker='o', fmt='none', mec='none', ms=0)
         n_trials = n_trials_sum_sum
 
     else:
@@ -180,37 +179,36 @@ def plot_RTs(experiments=['2AFC_2', '2AFC_3'], hit=None, bin_size=100, save=Fals
             if i == 0:
                 color = 'tab:red'
                 label = 'error'
-                filename = f'mean_RTs_error_experiments_{experiments}_{bin_size}_trials_bins'
+                filename = f'median_RTs_error_experiments_{experiments}_{bin_size}_trials_bins'
             elif i == 1:
                 color = 'tab:green'
                 label = 'correct'
-                filename = f'mean_RTs_correct_experiments_{experiments}_{bin_size}_trials_bins'
+                filename = f'median_RTs_correct_experiments_{experiments}_{bin_size}_trials_bins'
 
 
-            RTs_mean, n_trials_sum_sum = get_RTs_mean(experiments=['2AFC_2', '2AFC_3'], hit=i, bin_size=100)
+            RTs_median, n_trials_sum_sum = get_RTs_median(experiments=['2AFC_2', '2AFC_3'], hit=i, bin_size=100)
             n_trials.append(n_trials_sum_sum)
-            RTs_mean = RTs_mean.iloc[:, :-1]  # Remove last column as there's only one value
-            RTs_mean_mean = RTs_mean.mean()
-            x = RTs_mean_mean.index.right
-            RTs_mean_sem = RTs_mean.sem()
-            plt.plot(x, RTs_mean_mean, marker='o', color=color, label=label)
-            plt.errorbar(x, RTs_mean_mean, RTs_mean_sem, color=color, marker='o', fmt='none', mec='none', ms=0)
+            RTs_median = RTs_median.iloc[:, :-1]  # Remove last column as there's only one value
+            RTs_median_median = RTs_median.median()
+            x = RTs_median_median.index.right
+            RTs_median_sem = RTs_median.sem()
+            plt.plot(x, RTs_median_median, marker='o', color=color, label=label)
+            plt.errorbar(x, RTs_median_median, RTs_median_sem, color=color, marker='o', fmt='none', mec='none', ms=0)
         n_trials = sum(n_trials)
 
     plt.xlabel('Trial')
     plt.ylabel('RT (s)')
-    plt.title(f'N={len(RTs_mean)}, {n_trials} trials')
+    plt.title(f'N={len(RTs_median)}, {n_trials} trials')
     plt.legend(frameon=False)
     sns.despine(trim=True)  # Despine axes triming the 0
 
     if save:
-        folder_out = Path.home() / 'Documentos' / 'trial index' / 'RTs' / 'mean'
+        folder_out = Path.home() / 'Documentos' / 'trial index' / 'RTs' / 'median'
         save_fig(folder_out, filename)
 
 
 
 # Debugging
-experiment = '2AFC_2'
+# experiment = '2AFC_2'
 # animal = '333'
-# get_RTs_mean(experiments=['2AFC_2'], bin_size=100, save=True)
-get_RTs_mean(experiments=['2AFC_2', '2AFC_3'], bin_size=100, save=True)
+plot_RTs(experiments=['2AFC_2', '2AFC_3'], hit=None, bin_size=100, save=True)
