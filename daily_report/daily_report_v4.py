@@ -284,14 +284,14 @@ def daily_report_v4(path, send_slack=False):
                     # ax1.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='->', color='green'))
                     ax1.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
+                    ax1.annotate(str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:green', ha='center')
                 elif change_p[change_p.index[i]] < 0:
                     # ax1.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='<-', color='red'))
                     ax1.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax1.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
+                    ax1.annotate(str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:red', ha='center')
 
@@ -358,14 +358,14 @@ def daily_report_v4(path, send_slack=False):
                     # ax2.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='->', color='green'))
                     ax2.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
+                    ax2.annotate(str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:green', ha='center')
                 elif change_p[change_p.index[i]] < 0:
                     # ax2.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='<-', color='red'))
                     ax2.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax2.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
+                    ax2.annotate(str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:red', ha='center')
 
@@ -430,14 +430,14 @@ def daily_report_v4(path, send_slack=False):
                     # ax3.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='->', color='green'))
                     ax3.plot(change_p.index[i], 0.1, marker='^', ms=ms, lw=lw, color='tab:green')
-                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
+                    ax3.annotate(str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:green', ha='center')
                 elif change_p[change_p.index[i]] < 0:
                     # ax3.annotate(s='', xy=(change_p.index[i], 1), xytext=(change_p.index[i], 0),
                     #              arrowprops=dict(arrowstyle='<-', color='red'))
                     ax3.plot(change_p.index[i], 0.1, marker='v', ms=ms, lw=lw, color='tab:red')
-                    ax3.annotate(s=str(round(df.P[change_p.index[i]], 2))[1:],
+                    ax3.annotate(str(round(df.P[change_p.index[i]], 2))[1:],
                                  xy=(change_p.index[i], 0.1), xytext=(change_p.index[i], 0.2),
                                  color='tab:red', ha='center')
 
