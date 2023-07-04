@@ -305,12 +305,6 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         # Get shuffles
         shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)
 
-        ################################################################################################################
-        # WORK IN PROGRESS
-        session_index_params = params[10:-4]
-        stim_params = params[-4:]
-        ################################################################################################################
-
         # Remove session index and stimulus constants
         params = params.iloc[:n_frames]  # From params
         shuffles = [shuffles[i].iloc[:n_frames] for i in range(len(shuffles))]  # From shuffles

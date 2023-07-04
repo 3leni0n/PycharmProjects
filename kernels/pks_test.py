@@ -303,21 +303,50 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         print(summary)
 
         # Get shuffles
-        shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)
+        # shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)  # Only frames
+
+        ################################################################################################################
+
+        # WORK IN PROGRESS
+        net_ilds = list(df.ILD.abs().unique())
+        net_ilds.sort()
+        net_ilds = net_ilds[1:]  # Remove 0
+
+        shuffles = get_shuffles_GLM(endog, exog, iterations=iterations, kind='pk_session_index')
+        session_index_params = params[n_frames:-len(net_ilds)]
+        session_index_std_error = beta_std_err[n_frames:-len(net_ilds)]
+        session_index_p_values = p_values[n_frames:-len(net_ilds)]
+        shuffles_session_index = [shuffles[i].iloc[n_frames:-len(net_ilds)] for i in range(len(shuffles))]  # From shuffles
+
+        shuffles = get_shuffles_GLM(endog, exog, iterations=iterations, kind='pk_net_stim')
+        net_stim_params = params[-len(net_ilds):]
+        net_stim_std_err = beta_std_err[-len(net_ilds):]
+        net_stim_p_values = p_values[-len(net_ilds):]
+        net_stim_shuffles = [shuffles[i].iloc[-len(net_ilds):] for i in range(len(shuffles))]  # From shuffles
+
+        ################################################################################################################
+
+        shuffles = get_shuffles_GLM(endog, exog, iterations=iterations, kind='pk_frames')
 
         # Remove session index and stimulus constants
-        # params = params.iloc[:n_frames]  # From params
-        # shuffles = [shuffles[i].iloc[:n_frames] for i in range(len(shuffles))]  # From shuffles
-        # beta_std_err = beta_std_err.iloc[:n_frames]  # From beta_std_err
-        # p_values = p_values.iloc[:n_frames]  # From p_values
+        params = params.iloc[:n_frames]  # From params
+        shuffles = [shuffles[i].iloc[:n_frames] for i in range(len(shuffles))]  # From shuffles
+        beta_std_err = beta_std_err.iloc[:n_frames]  # From beta_std_err
+        p_values = p_values.iloc[:n_frames]  # From p_values
 
         # Store results in a namedtuple
-        PK = namedtuple('PK', ['params', 'session_index_params', 'stim_params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
+        PK = namedtuple('PK', ['params', 'session_index_params', 'net_stim_params', 'std_err', 'session_index_std_error',
+                               'net_stim_std_err', 'p_values', 'session_index_p_values', 'net_stim_p_values', 'shuffles',
+                               'shuffles_session_index', 'net_stim_shuffles', 'n_trials', 'n_frames', 'experiment',
                                'animal', 'target_ilds', 'drug', 'residuals', 'zscore', 'control', 'n_mean_frames',
                                'iterations'])
-        pk = PK(params=params, session_index_params=session_index_params, stim_params=stim_params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-                n_frames=n_frames, experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
-                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+        pk = PK(params=params, session_index_params=session_index_params, net_stim_params=net_stim_params,
+                std_err=beta_std_err, session_index_std_error=session_index_std_error, net_stim_std_err=net_stim_std_err,
+                p_values=p_values, session_index_p_values=session_index_p_values, net_stim_p_values=net_stim_p_values,
+                shuffles=shuffles, shuffles_session_index=shuffles_session_index, net_stim_shuffles=net_stim_shuffles,
+                n_trials=n_trials, n_frames=n_frames, experiment=experiment, animal=animal, target_ilds=target_ilds,
+                drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                iterations=iterations)
 
         time_end = time.time()
         runtime = time_end - time_start
@@ -327,21 +356,30 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
 
 
 def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
-            control=None, n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+            control=None, n_mean_frames=None, iterations=1000, save=False):
 
     time_start = time.time()
 
     if type(experiment) == list:
-        pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2, 0, 2], drug=None,
-                         residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=1)
+        pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=target_ilds, drug=None,
+                         residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=iterations)
         title = f'N={len(pk.animal)}, {pk.n_trials} trials'
-        filename = f'{pk.animal}mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
+        filename_prefix = 'mean_'
     else:
         pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
         title = f'Mouse {pk.animal}, {pk.n_trials} trials'
-        filename = f'{pk.animal}_PK_ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
+        filename_prefix = ''
+
+    # Default plotting parameters
+    color = 'k'
+    color_upper_shuffle = 'tab:red'
+    label = ''
+
+    ####################################################################################################################
+
+    # PLOT FRAMES KERNEL
 
     # Residuals
     if residuals:
@@ -351,13 +389,6 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
             ylabel = 'GLM weight (z-scored)'
         else:
             ylabel = 'GLM weight'
-
-    # Default plotting parameters
-    color = 'k'
-    color_upper_shuffle = 'tab:red'
-    label = ''
-
-    ###################################################################################################################
 
     plt.figure(constrained_layout=True)
     n_frames = pk.n_frames
@@ -370,8 +401,6 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
     plt.xlabel('Stimulus frame')
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
-
-    ####################################################################################################################
 
     # Annotate significance
     if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
@@ -391,7 +420,6 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
     percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
     plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
     plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
-
     xticks = np.arange(1, n_frames + 1, 2)
     xticklabels = xticks + 1
     plt.xticks(xticks, xticklabels)
@@ -401,14 +429,70 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
         plt.xticks([1, 2])  # Readjust xticks
 
     if save:
-        folder_out = Path.home() / 'Documentos' / 'kernels' / experiment
-        # if not os.path.exists(folder_out):
-        #     os.mkdir(folder_out)
-        if not folder_out.exists():
-            folder_out.mkdir(parents=True, exist_ok=True)
-        os.chdir(folder_out)
-        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
+        filename = f'{pk.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+        save_fig(folder_out, filename)
         plt.close()
+
+    ####################################################################################################################
+
+    # PLOT NET STIMULUS KERNEL
+
+    plt.figure(constrained_layout=True)
+    x = pk.net_stim_params.index.values
+    x[-1] = 16  # Trick to zoom in
+    y = pk.net_stim_params
+    yerr = pk.net_stim_std_err
+    plt.plot(x, y, color=color, marker='o')
+    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+    plt.title(title)
+    plt.xlabel('Net stimuli')
+    plt.ylabel('GLM weight')
+    # plt.legend(frameon=False)
+    plt.xticks(x, ['2', '4', '8', '70'])
+
+    shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
+    percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+    sns.despine(trim=True)
+
+    if save:
+        filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT SESSION INDEX KERNEL
+
+    if type(experiment) == str:  # Don't do it for the mean kernel
+
+        plt.figure(constrained_layout=True)
+        x = pk.session_index_params.index.values
+        y = pk.session_index_params
+        yerr = pk.session_index_std_error
+        plt.plot(x, y, color=color, marker='o')
+        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xlabel('Session index')
+        plt.ylabel('GLM weight')
+        # plt.legend(frameon=False)
+        # plt.xticks(x, ['2', '4', '8', '70'])
+        shuffles_mean = np.mean(pk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
+        percentiles95 = np.percentile(pk.shuffles_session_index, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+        sns.despine(trim=True)
+
+        if save:
+            filename = f'{pk.animal}_PK_session_index_{target_ilds}, {n_mean_frames} averaged frames'
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+            save_fig(folder_out, filename)
+            plt.close()
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -416,8 +500,8 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
 
 
 def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-             target_ilds=None, drug=None, residuals=False, zscore=True, control=None,
-             n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
+             target_ilds=None, drug=None, residuals=True, zscore=False, control=None,
+             n_mean_frames=None, iterations=1000, save=False):
     """
     Do the kernels for all animals of a given batch (experiment)
     :param experiment: Batch of animals, needed to specify where the root folder with the data is
@@ -448,8 +532,7 @@ def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
         print(path)
         print(f'Plotting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
         plot_pk(experiment=experiment, animal=animals[i], target_ilds=target_ilds, drug=drug, residuals=residuals,
-                zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations, save=save,
-                format=format, transparent=transparent)
+                zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations, save=save)
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -482,8 +565,10 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
     animals_across_batches = []
     params_across_animals = []
     session_index_params_across_animals = []
-    stim_params_across_animals = []
+    net_stim_params_across_animals = []
     shuffles_across_animals = []
+    shuffles_session_index_across_animals = []
+    net_stim_shuffles_across_animals = []
     n_trials_across_animals = []
     pks = []
 
@@ -509,8 +594,10 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
             animals_across_batches.append(pk.animal)
             params_across_animals.append(pk.params)
             session_index_params_across_animals.append(pk.session_index_params)
-            stim_params_across_animals.append(pk.stim_params)
+            net_stim_params_across_animals.append(pk.net_stim_params)
             shuffles_across_animals.append(pk.shuffles)
+            shuffles_session_index_across_animals.append(pk.shuffles_session_index)
+            net_stim_shuffles_across_animals.append(pk.net_stim_shuffles)
             n_trials_across_animals.append(pk.n_trials)
             pks.append(pk)
         experiments_across_batches.append(experiment)
@@ -523,31 +610,47 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
     params_mean_across_animals = np.mean(params_across_animals, 0)
     params_sem_across_animals = stats.sem(params_across_animals, 0)
 
-    # Get the mean and percentile 95 of the shuffles across animals
+    # Get mean and sem of the net stimuli parameters across animals
+    net_stim_params_across_animals = np.array(net_stim_params_across_animals)
+    net_stim_params_mean_across_animals = np.mean(net_stim_params_across_animals, 0)
+    net_stim_params_sem_across_animals = stats.sem(net_stim_params_across_animals, 0)
+
+    # Get the mean of the shuffles across animals
     shuffles_across_animals = np.array(shuffles_across_animals)  # Convert list of lists to 3 dim array (animal x
     # iterations x params)
     shuffles_means_across_animals = np.mean(shuffles_across_animals, 0)
 
+    # Get the mean of the net stimuli shuffles across animals
+    net_stim_shuffles_across_animals = np.array(net_stim_shuffles_across_animals)  # Convert list of lists to 3 dim array (animal x
+    # iterations x params)
+    net_stim_shuffles_across_animals = np.mean(net_stim_shuffles_across_animals, 0)
+
     # Store results in a namedtuple
     params_mean_across_animals = pd.Series(params_mean_across_animals)
     params_sem_across_animals = pd.Series(params_sem_across_animals)
+    net_stim_params_mean_across_animals = pd.Series(net_stim_params_mean_across_animals)
+    net_stim_params_sem_across_animals = pd.Series(net_stim_params_sem_across_animals)
 
     # Transform suffles_means_across_animals into a list of pd.Series
     shuffles_means_across_animals = [pd.Series(shuffles_means_across_animals[i, :]) for i in
                                      range(len(shuffles_means_across_animals))]
+    # Transform suffles_means_across_animals into a list of pd.Series
+    net_stim_shuffles_across_animals = [pd.Series(net_stim_shuffles_across_animals[i, :]) for i in
+                                     range(len(net_stim_shuffles_across_animals))]
     # Rename the first element of each pd.Series as 'const' instead of '0'
     # shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
     #                                  range(len(shuffles_means_across_animals))]
 
     # Store results in a namedtuple
-    MeanPK = namedtuple('MeanPK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
-                                   'animal', 'target_ilds', 'drug', 'residuals', 'zscore', 'control',
-                                   'n_mean_frames', 'iterations'])
+    MeanPK = namedtuple('MeanPK', ['params', 'net_stim_params', 'std_err', 'net_stim_std_err',
+                                   'p_values', 'shuffles', 'net_stim_shuffles', 'n_trials', 'n_frames', 'experiment', 'animal', 'target_ilds',
+                                   'drug', 'residuals', 'zscore', 'control', 'n_mean_frames', 'iterations'])
 
-    mean_pk = MeanPK(params=params_mean_across_animals, std_err=params_sem_across_animals, p_values=None,
-                     shuffles=shuffles_means_across_animals, n_trials=n_trials, n_frames=n_frames,
-                     experiment=experiments_across_batches, animal=animals_across_batches, target_ilds=target_ilds,
-                     drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+    mean_pk = MeanPK(params=params_mean_across_animals, net_stim_params=net_stim_params_mean_across_animals,
+                     std_err=params_sem_across_animals, net_stim_std_err=net_stim_params_sem_across_animals,
+                     p_values=None, shuffles=shuffles_means_across_animals, net_stim_shuffles=net_stim_shuffles_across_animals,
+                     n_trials=n_trials, n_frames=n_frames, experiment=experiments_across_batches, animal=animals_across_batches,
+                     target_ilds=target_ilds, drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                      iterations=iterations)
 
     time_end = time.time()
@@ -556,16 +659,6 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
 
     return mean_pk
     # return pks
-
-
-################################################################################################################
-# # WORK IN PROGRESS
-ilds = sounds.ILD.abs().unique()
-session_index_params = params[n_frames:-len(ilds) + 1]
-stim_params = params[-len(ilds) + 1:]
-
-
-
 
 
 ########################################################################################################################
@@ -638,11 +731,12 @@ def primacy_recency_index(pk):
 ########################################################################################################################
 
 # Debugging
-experiment = '2AFC_2'
-experiments = ['2AFC_2', '2AFC_3']
+experiment = '2AFC_3'
+# experiment = ['2AFC_2', '2AFC_3']
+# experiments = ['2AFC_2']
 animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
-# animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
+animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
 target_ilds = None
 drug = None
@@ -650,26 +744,25 @@ residuals = True
 zscore = False
 control = None
 n_mean_frames = None
-iterations = 1000
-save = False
-format = 'svg'
-transparent = True
+iterations = 10
+save = True
+
 
 # Get PK
 # pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
 #                 residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
 
 # Get mean PK
-mean_pk = get_mean_pk(experiments=experiments, animals=None, target_ilds=target_ilds, drug=drug,
-                      residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                      iterations=iterations)
+# mean_pk = get_mean_pk(experiments=experiments, animals=None, target_ilds=target_ilds, drug=drug,
+#                       residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+#                       iterations=iterations)
 
 # Plot individual PKs
-# plot_pks(experiment=experiment, animals=animals, target_ilds=target_ilds, drug=drug,
-#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-#             save=save, format=format, transparent=transparent)
+plot_pks(experiment=experiment, animals=animals, target_ilds=target_ilds, drug=drug,
+            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+            save=save)
 
 # Plot  mean PK
 # plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
 #             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-#             save=save, format=format, transparent=transparent)
+#             save=save)
