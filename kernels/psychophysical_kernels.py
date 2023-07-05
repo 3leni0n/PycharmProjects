@@ -284,7 +284,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         endog = choices
         dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
         if residuals:
-            dm_ild = make_ild_dm(df)
+            dm_ild = make_net_ild_dm(df)
             exog = pd.concat([stim_strength, dm_session_index, dm_ild], axis=1)
         else:
             exog = pd.concat([stim_strength, dm_session_index], axis=1)

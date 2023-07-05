@@ -1,6 +1,9 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
+from pathlib import Path
+from scipy import stats
+from my_fun.my_fun import get_ild
 
 
 # Define functions to make design matrices
@@ -75,7 +78,7 @@ def make_session_index_dm(df, column='Date'):
     return design_matrix
 
 
-def make_ild_dm(df):
+def make_net_ild_dm(df):
     """
     Make a design matrix with the net ILDs. There is a column for each absolute, unique ILD value (except 0). It
     transforms the nominal ILD into ILD net magnitude (2, 4, 8 , 70 dB) that take values +1, 0 or -1. In each trial,
@@ -99,56 +102,6 @@ def make_ild_dm(df):
         if ild != 0:
             design_matrix.loc[i, abs(ild)] = np.sign(ild)
     return design_matrix
-
-
-def get_shuffles_GLM(endog, exog, iterations, kind):
-    """
-    Permutation test. Shuffling the endog or exog indexes is the same, so it doesn't matter. Shuffling along the columns
-    of stim_strength is wrong because it breaks the temporal structure of the data. Shuffling the frames within trial
-    could be an interesting test, as it preserves the overall weight of the stimulus for each trial but breaks the frame
-    structure
-    :param endog:
-    :param exog:
-    :param iterations:
-    :return: shuffles (list)
-    """
-
-    shuffles = []
-
-    for _ in range(iterations):
-
-        # print(f'Iteration {_}/{iterations}')  # Prints make it slower
-
-        # Shuffling the endog or the exog doesn't matter if there's only one regressor. When there's more, shuffling
-        # needs regressor precission
-        # endog_shuffled = endog.sample(frac=1).reset_index(drop=True)  # Shuffle endog
-        # exog_shuffled = exog.sample(frac=1).reset_index(drop=True)  # Shuffle exog
-
-        if kind == 'pk_frames':
-            frames_shuffled = exog.iloc[:, 0:10].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, 0:10] = frames_shuffled
-        elif kind == 'pk_net_stim':
-            net_stim_shuffled = exog.iloc[:, -4:].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, -4:] = net_stim_shuffled
-        elif kind == 'pk_session_index':
-            session_indexes_shuffled = exog.iloc[:, 10:-4].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, 10:-4] = session_indexes_shuffled
-
-        elif kind == 'hk':
-            pass
-
-        # model_shuffled = sm.GLM(endog_shuffled, exog,  # Shuffled choices
-        #                         family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
-        model_shuffled = sm.GLM(endog, exog_shuffled,  # Shuffled stim_strength
-                                family=sm.families.Binomial())  # GLM with Binomial family and Logit link
-        results_shuffled = model_shuffled.fit()
-        params_shuffled = results_shuffled.params
-        shuffles.append(params_shuffled)
-
-    return shuffles
 
 
 def make_frames_dm(df, residuals=True, zscore=False):
@@ -182,4 +135,70 @@ def make_frames_dm(df, residuals=True, zscore=False):
 
     design_matrix = stim_strength
 
-    return design_matrix
+    return design_matrix, n_frames
+
+
+def get_shuffles_GLM(endog, exog, iterations, kind):
+    """
+    Permutation test. Shuffling the endog or exog indexes is the same, so it doesn't matter. Shuffling along the columns
+    of stim_strength is wrong because it breaks the temporal structure of the data. Shuffling the frames within trial
+    could be an interesting test, as it preserves the overall weight of the stimulus for each trial but breaks the frame
+    structure
+    :param endog:
+    :param exog:
+    :param iterations:
+    :return: shuffles (list)
+    """
+
+    shuffles = []
+
+    for _ in range(iterations):
+
+        # print(f'Iteration {_}/{iterations}')  # Prints make it slower
+
+        # Shuffling the endog or the exog doesn't matter if there's only one regressor. When there's more, shuffling
+        # needs regressor precission
+        # endog_shuffled = endog.sample(frac=1).reset_index(drop=True)  # Shuffle endog
+        # exog_shuffled = exog.sample(frac=1).reset_index(drop=True)  # Shuffle exog
+
+        # Pshychophysical kernels
+        if kind == 'pk_frames':
+            frames_shuffled = exog.iloc[:, 0:10].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, 0:10] = frames_shuffled
+        elif kind == 'pk_session_index':
+            session_indexes_shuffled = exog.iloc[:, 10:-4].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, 10:-4] = session_indexes_shuffled
+        elif kind == 'pk_net_stim':
+            net_stim_shuffled = exog.iloc[:, -4:].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, -4:] = net_stim_shuffled
+
+        # History kernels
+        elif kind == 'hk_rminus':
+            prev_resp_shuffled = exog.iloc[:, 0:10].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, 0:10] = prev_resp_shuffled
+        elif kind == 'hk_rplus':
+            prev_resp_shuffled = exog.iloc[:, 10:20].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, 10:20] = prev_resp_shuffled
+        elif kind == 'hk_session_index':
+            session_indexes_shuffled = exog.iloc[:, 20:-4].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, 20:-4] = session_indexes_shuffled
+        elif kind == 'hk_net_stim':
+            net_stim_shuffled = exog.iloc[:, -4:].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, -4:] = net_stim_shuffled
+
+        # model_shuffled = sm.GLM(endog_shuffled, exog,  # Shuffled choices
+        #                         family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link
+        model_shuffled = sm.GLM(endog, exog_shuffled,  # Shuffled stim_strength
+                                family=sm.families.Binomial())  # GLM with Binomial family and Logit link
+        results_shuffled = model_shuffled.fit()
+        params_shuffled = results_shuffled.params
+        shuffles.append(params_shuffled)
+
+    return shuffles

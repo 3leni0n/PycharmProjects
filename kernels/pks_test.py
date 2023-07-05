@@ -85,20 +85,20 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
 
     ####################################################################################################################
 
-    # Load sounds
-    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    sounds = pd.read_csv(sounds_path)
-    n_frames = sounds.n_frames.unique()[0]
-    frames_ild = get_ild(n_frames)
+    # # Load sounds
+    # # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
+    # sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    # sounds = pd.read_csv(sounds_path)
+    # n_frames = sounds.n_frames.unique()[0]
+    # frames_ild = get_ild(n_frames)
 
     ####################################################################################################################
 
-    # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
-    if residuals:
-        sounds_ild = sounds.ILD
-        frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+    # # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
+    # if residuals:
+    #     sounds_ild = sounds.ILD
+    #     frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
+    #     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
     ####################################################################################################################
 
@@ -186,7 +186,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     ####################################################################################################################
 
     n_trials = len(df)
-    filenames = df.Filename.tolist()
+    # filenames = df.Filename.tolist()
 
     # Control
     if control is not None:
@@ -198,17 +198,19 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
 
         # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
         choices = df.Choice.reset_index(drop=True)  # Indices must match for modeling
-        stim_strength = frames_ild.loc[
-            [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
-            columns=['filename'])
-        stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+        # stim_strength = frames_ild.loc[
+        #     [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        #     columns=['filename'])
+        # stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+        #
+        # # Zscore
+        # if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+        #     if zscore:
+        #         stim_strength = pd.DataFrame(
+        #             stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+        #         # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
 
-        # Zscore
-        if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
-            if zscore:
-                stim_strength = pd.DataFrame(
-                    stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
-                # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
+        stim_strength, n_frames = make_frames_dm(df)
 
         # Average frames (to have more trials per regressor)
         if n_mean_frames is not None:
@@ -284,8 +286,8 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         endog = choices
         dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
         if residuals:
-            dm_ild = make_ild_dm(df)
-            exog = pd.concat([stim_strength, dm_session_index, dm_ild], axis=1)
+            dm_net_ild = make_net_ild_dm(df)
+            exog = pd.concat([stim_strength, dm_session_index, dm_net_ild], axis=1)
         else:
             exog = pd.concat([stim_strength, dm_session_index], axis=1)
 
@@ -483,9 +485,11 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
         # plt.legend(frameon=False)
         # plt.xticks(x, ['2', '4', '8', '70'])
         shuffles_mean = np.mean(pk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
-        percentiles95 = np.percentile(pk.shuffles_session_index, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles2dot5 = np.percentile(pk.shuffles_session_index, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97dot5 = np.percentile(pk.shuffles_session_index, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
         plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-        plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+        plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
+        plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
         sns.despine(trim=True)
 
         if save:
@@ -731,7 +735,7 @@ def primacy_recency_index(pk):
 ########################################################################################################################
 
 # Debugging
-experiment = '2AFC_3'
+experiment = '2AFC_2'
 # experiment = ['2AFC_2', '2AFC_3']
 # experiments = ['2AFC_2']
 animal = '333'
@@ -758,11 +762,11 @@ save = True
 #                       iterations=iterations)
 
 # Plot individual PKs
-plot_pks(experiment=experiment, animals=animals, target_ilds=target_ilds, drug=drug,
-            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-            save=save)
-
-# Plot  mean PK
-# plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
+# plot_pks(experiment=experiment, animals=animals, target_ilds=target_ilds, drug=drug,
 #             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
 #             save=save)
+
+# Plot  mean PK
+plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
+            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+            save=save)

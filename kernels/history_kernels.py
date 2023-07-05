@@ -139,7 +139,7 @@ def get_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=100
     n_trials = len(df)
     dm_choice_history = make_choice_history_dm(df, trial_lag)
     dm_session_index = make_session_index_dm(df)
-    dm_ild = make_ild_dm(df)
+    dm_ild = make_net_ild_dm(df)
     exog = pd.concat([dm_choice_history, dm_session_index, dm_ild], axis=1)
 
     ####################################################################################################################
