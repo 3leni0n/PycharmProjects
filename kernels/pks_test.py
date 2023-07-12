@@ -357,14 +357,14 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     return pk
 
 
-def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
+def plot_pk(experiment=None, animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
             control=None, n_mean_frames=None, iterations=1000, save=False):
 
     time_start = time.time()
 
     if type(experiment) == list:
-        pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=target_ilds, drug=None,
-                         residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=iterations)
+        pk = get_mean_pk(experiments=experiments, animals=None, target_ilds=target_ilds, drug=drug,
+                         residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
         title = f'N={len(pk.animal)}, {pk.n_trials} trials'
         filename_prefix = 'mean_'
     else:
@@ -582,7 +582,8 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
         print(experiment)
 
         if experiments[j] == '2AFC_2':
-            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            # animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            animals = ['332', '333', '337']  # Drug experiments
         elif experiments[j] == '2AFC_3':
             animals = ['419', '420', '422', '616', '619', '623']
 
@@ -737,19 +738,19 @@ def primacy_recency_index(pk):
 # Debugging
 experiment = '2AFC_2'
 # experiment = ['2AFC_2', '2AFC_3']
-# experiments = ['2AFC_2']
-animal = '333'
+experiments = ['2AFC_2']
+# animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
-animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
-# animals = ['332', '333', '337']  # Drug experiments
+# animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
+animals = ['332', '333', '337']  # Drug experiments
 target_ilds = None
-drug = None
+drug = 'MK801'
 residuals = True
 zscore = False
 control = None
 n_mean_frames = None
 iterations = 10
-save = True
+save = False
 
 
 # Get PK
@@ -767,6 +768,125 @@ save = True
 #             save=save)
 
 # Plot  mean PK
-plot_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
-            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
-            save=save)
+# plot_pk(experiment=experiments, animal=animals, target_ilds=target_ilds, drug=drug,
+#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+#             save=save)
+
+# plot_pks(experiment=experiment, animals=animals, target_ilds=target_ilds, drug=drug,
+#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+#             save=save)
+# plot_pks(experiment='2AFC_3', animals=['419', '420', '422', '616', '619', '623'], target_ilds=target_ilds, drug=drug,
+#             residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations,
+#             save=save)
+
+def plot_drug_pk():
+    mean_pk_saline = get_mean_pk(experiments=['2AFC_2'], animals=None, target_ilds=None, drug='saline', residuals=True,
+                                 zscore=False, control=None, n_mean_frames=2, iterations=10)
+    mean_pk_mk801 = get_mean_pk(experiments=['2AFC_2'], animals=None, target_ilds=None, drug='MK801', residuals=True,
+                                 zscore=False, control=None, n_mean_frames=2, iterations=10)
+
+    title = f'N={3}, {mean_pk_saline.n_trials + mean_pk_mk801.n_trials} trials'
+    filename_prefix = 'drug_'
+    color_saline = 'tab:gray'
+    color_drug = 'tab:pink'
+
+    ####################################################################################################################
+
+    # PLOT FRAMES KERNEL
+
+    # Residuals
+    if residuals:
+        ylabel = 'GLM weight (residuals)'
+    else:
+        if zscore:  # To not do both (otherwise I'd be subtracting the mean twice)
+            ylabel = 'GLM weight (z-scored)'
+        else:
+            ylabel = 'GLM weight'
+
+
+    plt.figure(constrained_layout=True)
+    n_frames = mean_pk_saline.n_frames
+    x = np.arange(n_frames)
+    y_saline = mean_pk_saline.params
+    y_drug = mean_pk_mk801.params
+    yerr = mean_pk_saline.std_err
+    plt.plot(x, y_saline, color=color_saline, marker='o', label='saline')
+    plt.errorbar(x, y_saline, yerr=yerr, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
+
+    plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
+    plt.errorbar(x, y_drug, yerr=yerr, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+
+
+    plt.title(title)
+    plt.xlabel('Stimulus frame')
+    plt.ylabel(ylabel)
+    plt.legend(frameon=False)
+
+    # Annotate significance
+    if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
+        n_frames = n_mean_frames
+
+    # if pk.p_values is not None:
+    #     for i in range(n_frames):
+    #         if pk.p_values[i] <= 0.05:
+    #             text = '*'
+    #         else:
+    #             # text = 'ns'
+    #             text = ''
+    #         plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+    #                      color=color, va='center', ha='center', fontsize='medium')
+
+    # shuffles_mean = np.mean(pk.shuffles, axis=0)  # Get the mean of all the shuffles
+    # percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    # plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
+    xticks = np.arange(1, n_frames + 1, 2)
+    xticklabels = xticks + 1
+    plt.xticks(xticks, xticklabels)
+    sns.despine(trim=True)  # Despine axes triming the 0
+
+    if n_mean_frames == 2:
+        plt.xticks([1, 2])  # Readjust xticks
+
+    if save:
+        filename = f'{mean_pk_saline.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / 'drug'
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT NET STIMULUS KERNEL
+
+    plt.figure(constrained_layout=True)
+    x = mean_pk_saline.net_stim_params.index.values
+    x[-1] = 16  # Trick to zoom in
+    x = [2, 4, 8, 16]
+    y_saline = mean_pk_saline.net_stim_params
+    yerr_saline = mean_pk_saline.net_stim_std_err
+    plt.plot(x, y_saline, color=color_saline, marker='o', label='saline')
+    plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
+
+    y_drug = mean_pk_mk801.net_stim_params
+    yerr_drug = mean_pk_mk801.net_stim_std_err
+    plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
+    plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+    plt.title(title)
+    plt.xlabel('Net stimuli')
+    plt.ylabel('GLM weight')
+    plt.legend(frameon=False)
+    plt.xticks(x, ['2', '4', '8', '70'])
+
+    # shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
+    # percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+    sns.despine(trim=True)
+
+    if save:
+        filename = f'{mean_pk_saline.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / 'drug'
+        save_fig(folder_out, filename)
+        plt.close()

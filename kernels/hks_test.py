@@ -469,6 +469,7 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
 
         if experiments[j] == '2AFC_2':
             animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            # animals = ['332', '333', '337']  # Drug experiments
         elif experiments[j] == '2AFC_3':
             animals = ['419', '420', '422', '616', '619', '623']
 
@@ -597,21 +598,143 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
 ########################################################################################################################
 
 # Debugging
-experiment = '2AFC_2'
+# experiment = '2AFC_2'
 experiments = ['2AFC_2', '2AFC_3']
-animal = '333'
+# experiments = ['2AFC_2']
+# animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
-animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
+# animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
-target_ilds = None
 drug = None
-residuals = True
-iterations = 10
-save = False
 trial_lag = 10
+iterations = 1000
 save = False
 
 # hk = get_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
 # plot_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations, save=save)
 # plot_hks(experiment=experiment, animals=animals, drug=drug, trial_lag=trial_lag, iterations=iterations, save=save)
 hk = get_mean_hk(experiments=experiments, animals=None, drug=None, trial_lag=trial_lag, iterations=iterations)
+
+# plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], drug=None,
+#              trial_lag=trial_lag, iterations=iterations, save=save)
+# plot_hks(experiment='2AFC_3', animals=['419', '420', '422', '616', '619', '623'], drug=None,
+#              trial_lag=trial_lag, iterations=iterations, save=save)
+
+
+# Drug analyses
+def plot_hk_drug():
+    mean_hk_saline = get_mean_hk(experiments=experiments, animals=None, drug='saline', trial_lag=trial_lag, iterations=iterations)
+    mean_hk_drug = get_mean_hk(experiments=experiments, animals=None, drug='MK801', trial_lag=trial_lag, iterations=iterations)
+
+    title = f'N={len(mean_hk_drug.animal)}, {mean_hk_drug.n_trials + mean_hk_saline.n_trials} trials'
+
+    # Default plotting parameters
+    filename_prefix = 'drug_'
+    color_saline = 'tab:gray'
+    color_drug = 'tab:pink'
+
+    trial_lag = mean_hk_saline.trial_lag
+
+    for _ in range(1, 3):
+
+        if _ == 1:  # R+
+            xlabel = 'Trial lag (' + '$r^{-}$)'
+            # params_indexes = np.arange(trial_lag * _)
+            filename = f'{mean_hk_saline.animal} r- HK, trial lag {mean_hk_saline.trial_lag}'
+            filename = filename_prefix + filename
+            y_saline = mean_hk_saline.params_rminus
+            yerr_saline = mean_hk_saline.std_err_rminus
+            y_drug = mean_hk_drug.params_rminus
+            yerr_drug = mean_hk_drug.std_err_rminus
+            # shuffles = hk.shuffles_rminus
+        elif _ == 2:  # R-
+            xlabel = 'Trial lag (' + '$r^{+}$)'
+            # params_indexes = np.arange(trial_lag, trial_lag * _)
+            filename = f'{mean_hk_drug.animal} r+ HK, trial lag {mean_hk_drug.trial_lag}'
+            filename = filename_prefix + filename
+            y_saline = mean_hk_saline.params_rplus
+            yerr_saline = mean_hk_saline.std_err_rplus
+            y_drug = mean_hk_drug.params_rplus
+            yerr_drug = mean_hk_drug.std_err_rplus
+            # shuffles = mean_hk_drug.shuffles_rplus
+
+        ################################################################################################################
+
+        # PLOT HISTORY KERNEL
+
+        plt.figure(constrained_layout=True)
+        x = np.arange(1, trial_lag + 1)
+        # y = hk.params.iloc[params_indexes]
+        # yerr = hk.std_err.iloc[params_indexes]
+        plt.plot(x, y_saline, color=color_saline, marker='o', label='saline')
+        plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
+        plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
+        plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xticks(x, x[::-1])
+        plt.xlabel(xlabel)
+        ylabel = 'GLM weight'
+        plt.ylabel(ylabel)
+        plt.legend(frameon=False)
+        # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+        # if hk.p_values is not None:
+        #     for i in range(n_trials_lag):
+        #         if hk.p_values[i] <= 0.05:
+        #             text = '*'
+        #         else:
+        #             # text = 'ns'
+        #             text = ''
+        #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+        #                      color=color, va='center', ha='center', fontsize='medium')
+
+        # shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
+        # percentiles2dot5 = np.percentile(shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # percentiles97dot5 = np.percentile(shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        # plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':', zorder=1.9)
+        # plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':', zorder=2)
+
+        sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
+
+        if save:
+            filename = filename_prefix + 'prev_resp' + filename
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / 'drug'
+            save_fig(folder_out, filename)
+            plt.close()
+
+        ################################################################################################################
+
+        # PLOT NET STIMULUS KERNEL
+
+        plt.figure(constrained_layout=True)
+        x = mean_hk_saline.params_net_stim.index.values
+        x[-1] = 16  # Trick to zoom in
+        x = [2, 4, 8, 16]
+        y_saline = mean_hk_saline.params_net_stim
+        yerr_saline = mean_hk_saline.std_err_net_stim
+        y_drug = mean_hk_drug.params_net_stim
+        yerr_drug = mean_hk_drug.std_err_net_stim
+
+        plt.plot(x, y_saline, color=color_saline, marker='o', label='saline')
+        plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
+
+        plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
+        plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xlabel('Net stimuli')
+        plt.ylabel('GLM weight')
+        plt.legend(frameon=False)
+        plt.xticks(x, ['2', '4', '8', '70'])
+
+        # shuffles_mean = np.mean(hk.shuffles_net_stim, axis=0)  # Get the mean of all the shuffles
+        # percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+        sns.despine(trim=True)
+
+        if save:
+            filename = filename_prefix + 'net_stim' + filename
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / 'drug'
+            save_fig(folder_out, filename)
+            plt.close()
