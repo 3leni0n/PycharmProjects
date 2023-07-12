@@ -46,6 +46,12 @@ def daily_report_v4(path, send_slack=False):
 
     ####################################################################################################################
 
+    # Import session to be parsed
+    sounds = pd.read_csv(Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv')
+    ilds = list(sounds.ILD.unique())
+
+    ####################################################################################################################
+
     # Select the folder and create it if it doesn't exist
     experiment = df.Experiment.unique()[0]  # Batch ID
     # folder = '/home/alexis/Documentos/daily reports/' + experiment + '/'
@@ -513,7 +519,7 @@ def daily_report_v4(path, send_slack=False):
             ax4.set_yscale('symlog', linthresh=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax4.set_ylim(-100, 100)
             ax4.minorticks_off()  # Remove minor ticks
-            ilds = np.sort(df.ILD.unique().astype('int'))
+            # ilds = np.sort(df.ILD.unique().astype('int'))
             yticklabels = list(ilds)
             ax4.set_yticks(ilds)
             ax4.set_yticklabels(yticklabels)
