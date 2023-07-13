@@ -5,12 +5,13 @@ from scipy.stats import beta  # Important! If using this, can't call any variabl
 import pandas as pd
 from string import ascii_lowercase
 from matplotlib import pyplot as plt
-from sympy import symbols, Eq, log, nsolve
+# from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
 import slack
 import os
 import csv
 import random
 from matplotlib import pyplot as plt
+from pathlib import Path
 
 # For compute_psych_curve
 from scipy import stats
@@ -376,21 +377,6 @@ def select_ilds(ilds, p, side):
     return selected_ild
 
 
-"""
-n_trials = 10000
-trial_types = [0, 1]  # 0 (rewarded left) or 1 (rewarded right)
-# trial_list = np.random.choice(trial_types, n_trials).tolist()  # Generate random trial vector of length n_trials
-trial_list = np.random.choice(trial_types, n_trials).tolist() 
-ilds = np.array([-70, -8, -4, -2, 0, 2, 4, 8, 70])
-p = 0.5
-ild = []
-for i in range(n_trials):
-    ild.append(select_ilds(ilds, p, trial_list[i]))
-plt.hist(ild, bins=100)
-plt.title(f'p={p}')
-"""
-
-
 def enterthematrix(filepath):
     """Create sounds matrix"""
     # Import sounds DataFrame but only the filenames
@@ -423,7 +409,7 @@ def enterthematrix(filepath):
     return df
 
 
-def sounds_dict(start, stop, num, n_decimals):
+def do_sounds_dict(start, stop, num, n_decimals):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")
@@ -595,7 +581,7 @@ def get_dBs_and_amps_from_diff(diff, max_vol):
 
 def ild():
     """Get the inter aural level difference (ild) of a sound given its evidence (-1=left, 1=right).
-    The input should be a csv file to convert to DataFrame
+    The input should be a csv file to convert to DataFrame. Only for sounds.csv (batch 1)
     """
     path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'  # My laptop
     df = pd.read_csv(path)
@@ -624,35 +610,26 @@ def ild():
     return df_ild
 
 
-"""
-dB_cal = 73  # Calibration value of the speakers in dB
-ambient_noise = 33  # Ambient noise in the behavioral box measured with the microphone
-emp_left_dB = np.array([33, 43.3, 53.9, 56.9, 59.2, 62.2, 64.5, 64.9, 65.4, 66.4,
-                        68.6, 69.8, 70.7, 70.5, 70.85, 70.35, 70.7, 71.0, 71.0, 71.0, 71.0])  # Registered values in dB
-# recorded with micro from left speaker of box 8 with Rafa on March 3rd 2021
-exp_right_dB = np.flip(emp_left_dB)
+def get_ild(n_frames):
+    # Load sounds
+    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    sounds = pd.read_csv(sounds_path)
+    # n_frames = 10
 
-theor_left_dB = power_dB(coherences)
-error = theor_left_dB - emp_left_dB
-error = np.mean(error[1:])  # Exclude -Inf
+    # Left frames
+    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
+    frames_left = sounds[left_frames_column_names].values
 
-# Plot left
-x = np.linspace(0, 1, 1000)
-y = power_dB(x) - error
-plt.plot(x, y, 'g', label='theoretical left')
-plt.plot(coherences, emp_left_dB, 'go', markerfacecolor='None', label='empirical left')
+    # Right frames
+    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
+    frames_right = sounds[right_frames_column_names].values
 
-# Plot right
-plt.plot(np.flip(x), y, 'm', label='theoretical right')
-plt.plot(coherences, exp_right_dB, 'mo', markerfacecolor='None', label='expected right')
+    # Frames ILD (elementwise substraction)
+    frames_ild = frames_right - frames_left
+    frames_ild = pd.DataFrame(frames_ild)
+    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
 
-plt.xlabel('Amplitude')
-plt.ylabel('dB')
-plt.legend()
-plt.title('SPL')
-plt.savefig('SPL.png')
-# From datahandler's utils.py
-"""
+    return frames_ild
 
 
 def compute_window(data, runningwindow):
@@ -670,19 +647,18 @@ def compute_window(data, runningwindow):
 
 def compute_psych_curve(x, y, n_points=100):
     """Computes a psychometric function."""
+
     # https://psychology.stackexchange.com/questions/13347/how-can-i-fit-a-psychometric-function-such-that-the-minimum-is-50-chance-level
 
     def sigmoid_mme(fit_params: tuple):
         k, x0, b, p = fit_params
 
-        # k = weight (pendiente)
+        # k = weight (slope)
         # x0 = bias
         # b, p = lapses
 
         # Function to fit:
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
-
-        # If take x0 out of parenthesis
 
         # Calculate negative log likelihood:
         ll = - np.sum(stats.norm.logpdf(ydata, loc=y_pred))
@@ -781,7 +757,6 @@ def slack_spam(msg='Hey buddy!', filepath=None, userid='U01DDHH7LLX'):  # Adapte
         'alexis': 'U01DDHH7LLX',
         'jaime': 'U7UTKNN0P',
         'carles': 'UPZPM32UC',
-        'jordi': 'U8J8YA66S',
         'my_channel': '#pv_nmdar_eranet',
         'reports': '#pv_nmdar_eranet_reports'
     }
@@ -839,3 +814,71 @@ def check_date_exist(date, dates):
         else:
             print(f'Date {date} doesnt exist')
             return False
+
+
+# The following 2 functions are under testing were developed for kernels. Will need to adapt to make them work for
+# other cases
+def get_experiment(experiment=None):
+    """
+    Get experiment
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :return: experiment
+    """
+
+    if experiment is None:
+
+        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
+        experiments = os.listdir(folder_in)  # List experiments
+        experiments.sort()  # Sort them by name
+        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's file
+        except ValueError:
+            pass
+
+        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+
+    return experiment
+
+
+def get_animal(experiment, animal=None):
+    """
+    Get animal
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :param animal: If not None, animal=animal. Else, show possible animals and ask for user input.
+    :return: animal
+    """
+
+    if experiment is None:
+        experiment = get_experiment(experiment)
+
+    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+
+    if animal is None:
+        animals = os.listdir(folder_in)  # List animals
+        animals.sort()  # Sort them by name
+        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
+        animals = [i for i in animals if '_corrupted_sessions' not in i]  # Remove '_corrupted_sessions'.csv files
+
+        print('Animals: ' + str(animals))  # Remove square brackets
+        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
+
+    return animal
+
+
+def save_fig(folder_out, filename):
+    """
+    Save figure twice, one in png with white background and another one in svg with transparent background.
+    :param folder_out: Folder where to save the figures
+    :param filename: Name of the figure
+    :return:
+    """
+    if not folder_out.exists():
+        folder_out.mkdir(parents=True, exist_ok=True)
+    os.chdir(folder_out)
+    plt.savefig(Path(folder_out / (filename + '.' + 'png')), format='png', transparent=False)
+    plt.savefig(Path(folder_out / (filename + '.' + 'svg')), format='svg', transparent=True)

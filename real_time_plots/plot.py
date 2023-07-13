@@ -6,6 +6,8 @@ from real_time_plot import real_time_plot
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
+username = os.getlogin()
+
 
 class File:
     def __init__(self, path):
@@ -61,13 +63,13 @@ def get_paths(parameters):
             for index, file in enumerate(files):
 
                 print(file.box)
-                if file.box == "Bpod5":
+                if file.box == "Bpod1" or file.box == "Bpod5":
                     j = 0
-                elif file.box == "Bpod6":
+                elif file.box == "Bpod2" or file.box == "Bpod6":
                     j = 1
-                elif file.box == "Bpod7":
+                elif file.box == "Bpod3" or file.box == "Bpod7":
                     j = 2
-                elif file.box == "Bpod8":
+                elif file.box == "Bpod4" or file.box == "Bpod8":
                     j = 3
                 else:
                     j = -1
@@ -106,9 +108,7 @@ def animate(i, parameters, trials):
 
 
 def main():
-
-    data_path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_2/setups'
-    # data_path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups'
+    data_path = '/home/' + username + '/pv_nmdar_eranet/experiments/2AFC_4/setups'
     minutes_ago = 1  # How much time back look for sessions
     max_sessions = 4  # Max number of boxes at the same time
     interval = 5000  # in ms, the larger the name the less demanding
@@ -126,8 +126,27 @@ def main():
     fig = plt.figure()
     axis = []
 
-    for i in range(sessions_number * 4):
-        axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
+    # This is without raster
+    # for i in range(sessions_number * 4):
+    #     axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
+
+    # This is with raster
+    axis.append(plt.subplot2grid((12, 2), (0, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (1, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (2, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (0, 1), rowspan=3, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (3, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (4, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (5, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (3, 1), rowspan=3, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (6, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (7, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (8, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (6, 1), rowspan=3, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (9, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (10, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (11, 0), rowspan=1, colspan=1))
+    axis.append(plt.subplot2grid((12, 2), (9, 1), rowspan=3, colspan=1))
 
     parameters = Parameters(axis, minutes_ago, sessions_number, data_path)
 

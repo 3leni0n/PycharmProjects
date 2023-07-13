@@ -64,6 +64,7 @@ def mini_parse(file):
     # rec = [int(df[df.MSG == 'VAR_REC']['+INFO'].iloc[0])] * n_trials
     # progression = [int(df[df.MSG == 'VAR_PROGRESSION']['+INFO'].iloc[0])] * n_trials
     # cb = [int(df[df.MSG == 'VAR_CB']['+INFO'].iloc[0])] * n_trials
+    task = [str(df[(df.TYPE == 'VAL') & (df.MSG == 'TASK')]['+INFO'].iloc[0])] * n_trials
 
     # Registered values (out of loop)
     # reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
@@ -105,7 +106,7 @@ def mini_parse(file):
     trial_len = []
     stim_start = []
     stim_end = []
-    stim_len = []  # Adddddddd
+    stim_len = []
     resp_win_start = []
     resp_win_end = []
     resp_win_len = []
@@ -128,10 +129,7 @@ def mini_parse(file):
     sound_left = []
     sound_right = []
     sound = []
-
     message = []
-
-
 
     ####################################################################################################################
 
@@ -143,7 +141,7 @@ def mini_parse(file):
         try:
             message_str = float(band[band['MSG'] == 'MESSAGE']['+INFO'].iloc[0])
         except:
-            message_str = 1
+            message_str = np.nan
 
         message.append(message_str)
 
@@ -159,11 +157,11 @@ def mini_parse(file):
             filename2.append(np.nan)
 
         if filename[i] == filename2[i]:
-            files_match.append(1)
+            files_match.append(np.nan)
         elif filename2[i] is np.nan:
-            files_match.append(0)
+            files_match.append(1)
         else:
-            files_match.append(0)
+            files_match.append(1)
 
         # Sound detected with Albert's card?
         # Sound from left
@@ -178,10 +176,12 @@ def mini_parse(file):
         else:
             sound_right.append(0)
 
-        sound.append(sound_left[i] + sound_right[i])
+        if sound_left[-1] == 0 and sound_right[-1] == 0:
+            sound.append(0)
+        else:
+            sound.append(np.nan)
 
-
-
+        # sound.append(sound_left[i] + sound_right[i])
 
 
         if pd.isnull(band[(band.TYPE == 'STATE') & (band.MSG == 'Reward')]['+INFO'].iloc[0]) == False:
@@ -230,13 +230,23 @@ def mini_parse(file):
         stim_start.append(float(
             band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
+        p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
+
         # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
-        if miss[i] == 1:
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
-        elif punish[i] == 1:
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
-        else:  # Reward or WrongLick
-            stim_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+        # if stage[i] <= 3:  # Legacy
+        if p[i] == 0 and task[i] == 'RT':
+            if miss[i] == 1:
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
+            elif punish[i] == 1:
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Punish')]['BPOD-FINAL-TIME'].iloc[0]))
+            else:  # Reward or WrongLick
+                stim_end.append(
+                    float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+        else:  # Leads to erroneous stimulus length in stage 4, but probably was there for stage 1. Readjust if needed
+            stim_end.append(
+                float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
         stim_len.append(stim_end[i] - stim_start[i])
 
@@ -261,7 +271,7 @@ def mini_parse(file):
         except:
             ild.append(reward_side[i])
 
-        p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
+        # p.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'P')]['+INFO'].iloc[0]))
 
         # Sound filename + sound2 filename + coherence/evidence + presented coherences/evidences
         # Stage, motor, substage for tracking changes within session when running a single script
@@ -319,13 +329,13 @@ def mini_parse(file):
                'RepChoice', 'Response', 'TrialStart', 'TrialEnd', 'TrialLen', 'StimStart', 'StimEnd', 'StimLen',
                'RespWinStart', 'RespWinEnd', 'RespWinLen', 'Filename', 'Filename2', 'FilesMatch', 'ILD', 'ILDRep',
                'Port1In', 'Port1Out', 'Port2In', 'Port2Out', 'SoundLeft', 'SoundRight', 'Sound',
-               'Stage', 'Message', 'P']
+               'Stage', 'Message', 'P', 'Task']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice,
                     rep_choice, response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len,
                     resp_win_start, resp_win_end, resp_win_len, filename, filename2, files_match, ild, ild_rep,
                     port1in, port1out, port2in, port2out, sound_left, sound_right, sound, stage,
-                    message, p))
+                    message, p, task))
 
 
 
@@ -336,13 +346,7 @@ def mini_parse(file):
     else:
         trials = file.df.shape[0]
         new_df.Trial = new_df.Trial + trials
-        # print("old")
-        # print(file.df.index)
-        # print("new")
-        # print(new_df.index)
         file.df = pd.concat([file.df, new_df])
         file.df = file.df.reset_index(drop=True)
-        # print("final")
-        # print(file.df.index)
 
     file.skip += index[-1]
