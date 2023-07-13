@@ -2,10 +2,12 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
+username = os.getlogin()
+
 # parameters
-data_folder = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_2/setups'
-plot_folder = '/home/setup2/pv_nmdar_eranet/sound_plots'
-csv_path = '/home/setup2/pv_nmdar_eranet/sound_plots.csv'
+data_folder = '/home/' + username + 'setup2/pv_nmdar_eranet/experiments/2AFC_3/setups'
+plot_folder = '/home/' + username + '/pv_nmdar_eranet/sound_plots'
+csv_path = '/home/' + username + '/pv_nmdar_eranet/sound_plots.csv'
 tasks = ['stage_training_v2']
 first_day = '20220101'
 

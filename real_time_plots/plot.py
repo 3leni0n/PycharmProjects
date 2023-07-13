@@ -1,13 +1,21 @@
 import sys
 import os
+import getpass
 import time
 from mini_parse import mini_parse
 from real_time_plot import real_time_plot
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-username = os.getlogin()
 
+# username = os.getlogin()  # Get username
+username = getpass.getuser()  # Get usernameif username == 'setup1' or username == 'setup2':  # Training boxes 1-8
+if username == 'setup1' or username == 'setup2':  # Training boxes 1-8
+    experiment = '2AFC_4'
+    max_sessions = 4
+elif username == 'delarocha3':  # Ephys box 0
+    experiment = 'Ephys'
+    max_sessions = 1
 
 class File:
     def __init__(self, path):
@@ -63,7 +71,7 @@ def get_paths(parameters):
             for index, file in enumerate(files):
 
                 print(file.box)
-                if file.box == "Bpod1" or file.box == "Bpod5":
+                if file.box == "Bpod1" or file.box == "Bpod5" or file.box == "Bpod0":
                     j = 0
                 elif file.box == "Bpod2" or file.box == "Bpod6":
                     j = 1
@@ -108,9 +116,9 @@ def animate(i, parameters, trials):
 
 
 def main():
-    data_path = '/home/' + username + '/pv_nmdar_eranet/experiments/2AFC_4/setups'
+    data_path = '/home/' + username + '/pv_nmdar_eranet/experiments/' + experiment + '/setups'
     minutes_ago = 1  # How much time back look for sessions
-    max_sessions = 4  # Max number of boxes at the same time
+    # max_sessions = 1  # Max number of boxes at the same time
     interval = 5000  # in ms, the larger the name the less demanding
     trials = 100  # How many trials to show
 
@@ -131,22 +139,28 @@ def main():
     #     axis.append(fig.add_subplot(sessions_number * 2, 2, i + 1))
 
     # This is with raster
-    axis.append(plt.subplot2grid((12, 2), (0, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (1, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (2, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (0, 1), rowspan=3, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (3, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (4, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (5, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (3, 1), rowspan=3, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (6, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (7, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (8, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (6, 1), rowspan=3, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (9, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (10, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (11, 0), rowspan=1, colspan=1))
-    axis.append(plt.subplot2grid((12, 2), (9, 1), rowspan=3, colspan=1))
+    if username == 'setup1' or username == 'setup2':
+        axis.append(plt.subplot2grid((12, 2), (0, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (1, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (2, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (0, 1), rowspan=3, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (3, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (4, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (5, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (3, 1), rowspan=3, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (6, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (7, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (8, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (6, 1), rowspan=3, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (9, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (10, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (11, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((12, 2), (9, 1), rowspan=3, colspan=1))
+    elif username == 'delarocha3':  # Ephys box 0
+        axis.append(plt.subplot2grid((3, 2), (0, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((3, 2), (1, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((3, 2), (2, 0), rowspan=1, colspan=1))
+        axis.append(plt.subplot2grid((3, 2), (0, 1), rowspan=3, colspan=1))
 
     parameters = Parameters(axis, minutes_ago, sessions_number, data_path)
 
