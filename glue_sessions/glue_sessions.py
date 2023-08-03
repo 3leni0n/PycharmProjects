@@ -1,4 +1,5 @@
 import time
+from pathlib import Path
 import os
 import numpy as np
 import pandas as pd
@@ -25,21 +26,23 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
 
     if experiment is None:
 
-        folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        folder_in = Path.home() / 'pv_nmdar_eranet' / 'experiments'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
 
-        try:
-            experiments.remove('.idea')  # Pycharm's file
-            experiments.remove('Daily check')
-            experiments.remove('WaterCalibration')
-        except ValueError:
-            pass
+        experiments_to_remove = ['.idea', 'Daily check', 'WaterCalibration']
+        for _ in range(len(experiments_to_remove)):
+            try:
+                experiments.remove(experiments_to_remove[_])
+            except ValueError:
+                pass
 
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+    # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+    folder_in = Path.home() / 'pv_nmdar_eranet' / 'experiments' / experiment / 'setups'  # Where the data for all animals is
 
     if animal is None:
 
@@ -63,21 +66,25 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
     glued_sessions = []  # Initialize empty list so if it's the first time glue all sessions
 
     # Select the output folder and create it if it doesn't exist
-    folder_out = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
+    # folder_out = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
+    folder_out = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
     if not os.path.exists(folder_out):
-        os.mkdir(folder_out)
+        # os.mkdir(folder_out)
+        folder_out.mkdir(parents=True, exist_ok=True)
 
     glued_animals = os.listdir(folder_out)
     glued_animals.sort()
     glued_animals = [x for x in glued_animals if x.endswith('.csv')]  # Get rid of non csv files
 
     if animal + '.csv' in glued_animals:
-        df = pd.read_csv('/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '.csv')
+        # df = pd.read_csv('/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '.csv')
+        df = pd.read_csv(Path(Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment / animal).with_suffix('.csv'))
         glued_sessions = df.Session.unique().tolist()
     else:
         df = pd.DataFrame()  # Create empty DataFrame if there's no csv yet for that animal
 
-    folder_in = folder_in + animal + '/sessions/'  # Update folder_in with selected animal
+    # folder_in = folder_in + animal + '/sessions/'  # Update folder_in with selected animal
+    folder_in = Path(folder_in / animal / 'sessions')  # Update folder_in with selected animal
     sessions = os.listdir(folder_in)  # List sessions
     sessions.sort()  # Sort them by date
 
@@ -105,14 +112,15 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
 
         # Loop only over sessions with the selected protocol that aren't glued yet
         if protocol in sessions[i] and sessions[i] not in glued_sessions:
-            path = folder_in + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse.py
+            # path = folder_in + sessions[i] + '/' + sessions[i] + '.csv'  # Get csv file path to input parse.py
+            path = Path(folder_in / sessions[i] / sessions[i]).with_suffix('.csv')  # Get csv file path to input parse.py
             print('Parsing session ' + "'" + sessions[i] + "'" + '...', sep='')
 
             try:
                 if protocol == 'stage_training':
                     df_session = parse(path)  # Parse session
-                elif protocol == 'stage_training_v2' or 'stage_training_v3':
-                    df_session = parse_v2(path)  # Parse session
+                elif protocol == 'stage_training_v2' or 'stage_training_v3' or 'stage_training_v4':
+                    df_session = parse_v2(path)  # Parse session v2
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
             except (IndexError, ValueError, FileNotFoundError, ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                 print(
@@ -124,13 +132,14 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
             pass
 
     if to_csv:
-        df.to_csv(folder_out + animal + '.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+        # df.to_csv(folder_out + animal + '.csv', index=False)  # index=False to avoid the 'Unmmaed: 0' column
+        df.to_csv(Path(folder_out / animal).with_suffix('.csv'), index=False)  # index=False to avoid the 'Unmmaed: 0' column
 
     print('The corrupted sessions are:', *corrupted_sessions, '\n', sep='\n')
 
     if corrupted_sessions:  # If corrupted sessions isn't empty, save them in a .csv file
         # Save corrupted sessions in a separate csv file
-        with open('/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '_corrupted_sessions.csv',
+        with open(Path(Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment / '_corrupted_sessions.csv'),
                   'w', newline='') as f:
             wr = csv.writer(f)
             wr.writerow(corrupted_sessions)
@@ -154,21 +163,23 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
 
     if experiment is None:
 
-        folder = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        # folder = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
+        folder = Path.home() / 'pv_nmdar_eranet' / 'experiments'  # Where the data for all animals is
         experiments = os.listdir(folder)  # List experiments
         experiments.sort()  # Sort them by name
 
-        try:
-            experiments.remove('.idea')  # Pycharm's archive
-            experiments.remove('Daily check')
-            experiments.remove('WaterCalibration')
-        except ValueError:
-            pass
+        experiments_to_remove = ['.idea', 'Daily check', 'WaterCalibration']
+        for _ in range(len(experiments_to_remove)):
+            try:
+                experiments.remove(experiments_to_remove[_])
+            except ValueError:
+                pass
 
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    folder = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+    # folder = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
+    folder = Path.home() / 'pv_nmdar_eranet' / 'experiments' / experiment / 'setups'  # Where the data for all animals is
     animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
 
