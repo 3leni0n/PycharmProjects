@@ -64,7 +64,7 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
         remove_from_setup2 = []
 
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['561', '562', '791', '801', '802', '804', '807', '808']
+    not_training = ['561', '562', '791', '801', '802', '804', '807', '808', '876', '909']
 
     animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + not_training
     # Usually I don't want to do the daily reports of the 'Test' subject
