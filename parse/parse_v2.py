@@ -96,6 +96,11 @@ def parse_v2(path):
     except IndexError:
         task = [np.nan] * n_trials
 
+    try:
+        ephys = [str(df[df.MSG == 'VAR_EPHYS']['+INFO'].iloc[0])] * n_trials  # Added on 05-09-2023
+    except IndexError:
+        ephys = [np.nan] * n_trials
+
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
@@ -405,21 +410,20 @@ def parse_v2(path):
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In', 'Port1Out', 'Port2In',
                'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'AWTrials', 'Switch', 'Timeout', 'Fixation', 'Stage',
                'Motor', 'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks',
-               'BlockLen', 'Task', 'StimDur', 'Delay', 'VarDelay', 'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment',
-               'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
+               'BlockLen', 'Task', 'Ephys', 'StimDur', 'Delay', 'VarDelay', 'SerialPort', 'Protocol', 'Creator',
+               'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date',
+               'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice, rep_choice,
                     response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len, resp_win_start,
                     resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found, sound_left,
                     sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw,
                     aw_trials, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up,
-                    recovery_mode, p, p_right, blocks, block_len, task, stim_dur, delay, var_delay, serial_port, protocol, creator,
-                    project, experiment, board, setup, net_port, subject, bpod_api_version, session, date,
-                    time_session_started, time_session_ended))
+                    recovery_mode, p, p_right, blocks, block_len, task, ephys,  stim_dur, delay, var_delay, serial_port,
+                    protocol, creator, project, experiment, board, setup, net_port, subject, bpod_api_version, session,
+                    date, time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
-
-    # df_session.to_csv(str('parsed_') + path.split('/')[-1])  # Save df_session as csv file
 
     return df_session
 
