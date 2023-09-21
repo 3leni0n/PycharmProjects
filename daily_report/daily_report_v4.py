@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 import os
 import matplotlib.pyplot as plt
-plt.switch_backend('agg')  # To prevent RuntimeError: Invalid DISPLAY variable when running the script within a bash
+# plt.switch_backend('agg')  # To prevent RuntimeError: Invalid DISPLAY variable when running the script within a bash
 # through crontab
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # For inset plot
 from matplotlib.patches import Patch  # For custom legend

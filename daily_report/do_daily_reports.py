@@ -8,13 +8,12 @@ from daily_report.daily_report_v4 import *
 
 
 def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False):
-
     time_start = time.time()
 
     if experiment is None:
 
         # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
-        folder_in = Path.home()/'pv_nmdar_eranet'/'experiments'  # Where the data for all animals is
+        folder_in = Path.home() / 'pv_nmdar_eranet' / 'experiments'  # Where the data for all animals is
 
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
@@ -30,12 +29,13 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
         experiment = input('Enter experiment name')
 
     # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
-    folder_in = Path(Path.home() /'pv_nmdar_eranet'/'experiments' / experiment / 'setups')  # Where the data for all animals is
+    folder_in = Path(
+        Path.home() / 'pv_nmdar_eranet' / 'experiments' / experiment / 'setups')  # Where the data for all animals is
 
     # Select the output folder for the corrupted sessions and create it if it doesn't exist
     # In case 'glue_sessions.py' hasn't been run yet for this experiment
     # folder_out_corrupted_sessions = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
-    folder_out_corrupted_sessions = Path(Path.home()/'PycharmProjects'/'glue_sessions' / experiment)
+    folder_out_corrupted_sessions = Path(Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment)
     if not os.path.exists(folder_out_corrupted_sessions):
         # os.mkdir(folder_out_corrupted_sessions)
         folder_out_corrupted_sessions.mkdir(parents=True, exist_ok=True)
@@ -59,20 +59,21 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
     if os.getlogin() == 'setup2':
-        remove_from_setup2 = ['873', '875']
+        remove_from_setup2 = ['873', '875', '909', '911']
     else:
         remove_from_setup2 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
-    if os.getlogin() == 'delarocha3':
-        remove_from_setup2 = ['420', '422', '619', '623', '876']
+    if os.getlogin() == 'delarocha3':  # Ephys PC
+        remove_from_setup_ephys = ['420', '422', '619', '623', '876']
     else:
-        remove_from_setup2 = []
+        remove_from_setup_ephys = []
 
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['561', '562', '791', '801', '802', '804', '807', '808']
+    not_training = ['561', '562', '791', '801', '802', '804', '807', '808', '876']
 
-    animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + not_training
+    animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + remove_from_setup_ephys \
+                        + not_training
     # Usually I don't want to do the daily reports of the 'Test' subject
     # '.idea' is a Pycharm's hidden file
     for i in range(len(animals_to_remove)):
@@ -98,7 +99,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                 session = sessions[k]  # Add scenario in which there are several sessions per day
                 date_session = session[-15:-7]  # Indexing from the end because length of date + time won't change
                 split_sessions = [s for s in sessions if date_session in s]
-                path = Path(folder2/session/session).with_suffix('.csv')  # Get csv file path to input parse/parse_v2.py
+                path = Path(folder2 / session / session).with_suffix(
+                    '.csv')  # Get csv file path to input parse/parse_v2.py
                 print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found on the date ', date_session, "", sep='')
                 try:
@@ -114,7 +116,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                     elif version == 4:
                         daily_report_v4(path, send_slack=send_slack)
                         pass
-                except (IndexError, ValueError, FileNotFoundError, KeyError, ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
+                except (IndexError, ValueError, FileNotFoundError, KeyError,
+                        ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                     print(
                         f"The session '{session}' is corrupted. Adding to corrupted sessions log and continuing "
                         f"with next session...")
@@ -125,7 +128,7 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
             # index = -1  # last session
             session = sessions[index]
             date_session = session[
-                             -15:-7]  # Indexing from the end because length of date + time won't change, opposite to
+                           -15:-7]  # Indexing from the end because length of date + time won't change, opposite to
             # mice and protocol names
             split_sessions = [s for s in sessions if date_session in s]
 
@@ -133,7 +136,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
             if len(split_sessions) > 1:
                 for j in range(len(split_sessions)):
                     session = split_sessions[j]
-                    path = Path(folder2/session/session).with_suffix('.csv')  # Get csv file path to input parse/parse_vX.py
+                    path = Path(folder2 / session / session).with_suffix(
+                        '.csv')  # Get csv file path to input parse/parse_vX.py
                     print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                           ' sessions found on the date ', date_session, ' (session ', j + 1, '/', len(split_sessions),
                           ')', "", sep='')
@@ -150,13 +154,15 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                         elif version == 4:
                             daily_report_v4(path, send_slack=send_slack)
                             pass
-                    except (IndexError, ValueError, FileNotFoundError, KeyError, ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
+                    except (IndexError, ValueError, FileNotFoundError, KeyError,
+                            ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                         print(
                             f"The session '{session}' is corrupted. Adding to corrupted sessions log and continuing "
                             f"with next session...")
                         corrupted_sessions.append(session)
             else:
-                path = Path(folder2/session/session).with_suffix('.csv')  # Get csv file path to input parse/parse_v2.py
+                path = Path(folder2 / session / session).with_suffix(
+                    '.csv')  # Get csv file path to input parse/parse_v2.py
                 print(""'Doing the daily reports of animal ', animals[i], ': ', len(split_sessions),
                       ' sessions found on the date ', date_session, "", sep='')
                 try:
@@ -172,7 +178,8 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
                     elif version == 4:
                         daily_report_v4(path, send_slack=send_slack)
                         pass
-                except (IndexError, ValueError, FileNotFoundError, KeyError, ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
+                except (IndexError, ValueError, FileNotFoundError, KeyError,
+                        ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                     print(
                         f"The session '{sessions}' is corrupted. Adding to corrupted sessions log and continuing "
                         f"with next session...")
