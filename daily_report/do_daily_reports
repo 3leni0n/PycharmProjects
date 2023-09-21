@@ -2,6 +2,8 @@
 # source activate pybpod-environment  # Not needed as the env must be in crontab
 cd ~/PycharmProjects/
 python3 - <<END
+import matplotlib
+matplotlib.use('Agg')
 from daily_report.do_daily_reports import *
 do_daily_reports(send_slack=True)
 END
