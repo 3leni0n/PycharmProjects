@@ -63,8 +63,14 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     else:
         remove_from_setup2 = []
 
+    # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
+    if os.getlogin() == 'delarocha3':
+        remove_from_setup2 = ['420', '422', '619', '623', '876']
+    else:
+        remove_from_setup2 = []
+
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['561', '562', '791', '801', '802', '804', '807', '808', '876', '909']
+    not_training = ['561', '562', '791', '801', '802', '804', '807', '808']
 
     animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + not_training
     # Usually I don't want to do the daily reports of the 'Test' subject
@@ -174,7 +180,9 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
 
         if corrupted_sessions:  # If corrupted sessions isn't empty, save them in a .csv file
             # Save corrupted sessions in a separate csv file
-            with open(Path(folder_out_corrupted_sessions/animals[i]/'_corrupted_sessions').with_suffix('.csv'),
+            # with open(Path(folder_out_corrupted_sessions/animals[i]/'_corrupted_sessions').with_suffix('.csv'),
+            #           'w', newline='') as f:
+            with open(Path(folder_out_corrupted_sessions / (animals[i] + '_corrupted_sessions')).with_suffix('.csv'),
                       'w', newline='') as f:
                 wr = csv.writer(f)
                 wr.writerow(corrupted_sessions)
