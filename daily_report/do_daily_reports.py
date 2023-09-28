@@ -52,20 +52,24 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     Pycharm_folder = ['.idea']
 
     # Switched to training in setup2, remove from setup1 to avoid doing reports from old sessions
-    if os.getlogin() == 'setup1':
+    # username = os.getlogin()  # 'OSError: [Errno 25] Inappropriate ioctl for device' in ephys PC
+    # username = os.environ['USER']
+    username = os.path.split(os.path.expanduser('~'))[-1]
+
+    if username == 'setup1':
         remove_from_setup1 = ['876']
     else:
         remove_from_setup1 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
-    if os.getlogin() == 'setup2':
+    if username == 'setup2':
         remove_from_setup2 = ['873', '875', '909', '911']
     else:
         remove_from_setup2 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
-    if os.getlogin() == 'delarocha3':  # Ephys PC
-        remove_from_setup_ephys = ['420', '422', '619', '623', '876']
+    if username == 'delarocha3':
+        remove_from_setup_ephys = ['420', '422', '619', '623', '876', '907']
     else:
         remove_from_setup_ephys = []
 

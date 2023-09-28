@@ -2,8 +2,14 @@
 # source activate pybpod-environment  # Not needed as the env must be in crontab
 cd ~/PycharmProjects/
 python3 - <<END
+import os
 import matplotlib
 matplotlib.use('Agg')
+username = os.path.split(os.path.expanduser('~'))[-1]
+if username == 'delarocha3':
+    experiment = 'Ephys'
+else:
+    experiment = '2AFC_4'
 from daily_report.do_daily_reports import *
-do_daily_reports(send_slack=True)
+do_daily_reports(experiment=experiment, send_slack=True)
 END
