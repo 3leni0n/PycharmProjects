@@ -57,13 +57,13 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     username = os.path.split(os.path.expanduser('~'))[-1]
 
     if username == 'setup1':
-        remove_from_setup1 = ['876']
+        remove_from_setup1 = ['876', '973', '975']
     else:
         remove_from_setup1 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
     if username == 'setup2':
-        remove_from_setup2 = ['873', '875', '907', '911']
+        remove_from_setup2 = ['907', '911']
     else:
         remove_from_setup2 = []
 
