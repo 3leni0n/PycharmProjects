@@ -40,7 +40,10 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     # df_grouped = df.groupby('Date')  # Group by date instead of session
     dates_indexes = df.groupby('Date').ngroup().unique()  # Array with number of dates: x axis
     n_dates = dates_indexes.max()
-    dates = df.Date.unique()
+
+    dates = df.Date.dropna().unique()  # Dropna because there's some corrupted trials in which the date is nan
+    dates_indexes = np.arange(len(dates))
+    n_dates = max(dates)
     dow = [datetime.datetime.strptime(dates[i], "%Y-%m-%d").date().weekday() for i in range(len(dates))]  # Date of the
     # week, Monday is 0 and Sunday is 6
 
@@ -1082,6 +1085,8 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', to_csv=T
     animals = os.listdir(folder)
     animals = [animals for animals in animals if animals.endswith('.csv') and len(animals) == 7]
     animals.sort()
+
+    animals.remove('876.csv')
 
     for i in range(len(animals)):
         # path = folder + animals[i]
