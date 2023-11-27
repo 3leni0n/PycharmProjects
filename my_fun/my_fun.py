@@ -818,17 +818,18 @@ def check_date_exist(date, dates):
 
 # The following 2 functions are under testing were developed for kernels. Will need to adapt to make them work for
 # other cases
-def get_experiment(experiment=None):
+def get_experiment(experiment=None, session='glue_sessions'):
     """
     Get experiment
     :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :param session: if glue_sessions look for individual sessions, elif intersession look for intersessions
     :return: experiment
     """
 
     if experiment is None:
 
         # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions'  # Where the data for all animals is
+        folder_in = Path.home() / 'PycharmProjects' / session  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
         # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
@@ -845,18 +846,19 @@ def get_experiment(experiment=None):
     return experiment
 
 
-def get_animal(experiment, animal=None):
+def get_animal(experiment, session='glue_sessions', animal=None):
     """
     Get animal
     :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :param session: if glue_sessions look for individual sessions, elif intersession look for intersessions
     :param animal: If not None, animal=animal. Else, show possible animals and ask for user input.
     :return: animal
     """
 
     if experiment is None:
-        experiment = get_experiment(experiment)
+        experiment = get_experiment(experiment, session)
 
-    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+    folder_in = Path.home() / 'PycharmProjects' / session / experiment
 
     if animal is None:
         animals = os.listdir(folder_in)  # List animals

@@ -7,7 +7,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from glue_sessions.glue_sessions import update_glued_sessions
-from my_fun.my_fun import compute_psych_curve, slack_spam
+from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig
 
 
 ########################################################################################################################
@@ -20,7 +20,8 @@ from my_fun.my_fun import compute_psych_curve, slack_spam
 
 ########################################################################################################################
 
-def intersession_within_animal(path, to_csv=False, send_slack=False):
+
+def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_slack=False):
     """Do intersession report per animal, where the x axis is the number of training days (not sessions) and y axis
     the variable of interest
     """
@@ -31,24 +32,47 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
     # Import dates_indexes
     # Group by date (not session as animals sometimes do several dates_indexes within a day)
     # df = glue_sessions()
-    # path = '/home/alexis/PycharmProjects/glue_sessions/' + str(animal) + '.csv'  # Where the data for all animals is
+    # path = '/home/alexis/PycharmProjects//' + str(animal) + '.csv'  # Where the data for all animals is
+    # path = Path.home() / 'PycharmProjects' / 'glue_sessions' / '2AFC_X' / str(animal).csv  # Where the data for all animals is
     df = pd.read_csv(path)
     experiment = df.Experiment.unique()[0]
-    setup = str(df.Setup.unique()[0])  # Animal ID
+    # setup = str(df.Setup.unique()[0])  # Animal ID  # This returns an array in the case that I trained the wrong mouse
+    # by mistake in another box
+    setup = str(df.Setup.mode()[0])  # Animal ID
+    df = df[df.Setup == int(setup)]  # Exclude those sessions with other mice by mistake
     print(f'Doing the intersession of animal {setup} from experiment {experiment}...')
     # df.reset_index(drop=True, inplace=True)  # Don't create index column and modify it on the go
     # df_grouped = df.groupby('Date')  # Group by date instead of session
-    dates_indexes = df.groupby('Date').ngroup().unique()  # Array with number of dates: x axis
-    n_dates = dates_indexes.max()
+
+    # dates_indexes = df.groupby('Date').ngroup().unique()  # Array with number of dates: x-axis
+    # n_dates = dates_indexes.max()
 
     dates = df.Date.dropna().unique()  # Dropna because there's some corrupted trials in which the date is nan
     dates_indexes = np.arange(len(dates))
     n_dates = max(dates)
     dow = [datetime.datetime.strptime(dates[i], "%Y-%m-%d").date().weekday() for i in range(len(dates))]  # Date of the
     # week, Monday is 0 and Sunday is 6
+    dates_datetime = [datetime.datetime.strptime(dates[i], "%Y-%m-%d") for i in range(len(dates))]
+
+    # Import date of birth (to align plots to DOB if desired)
+    dob = pd.read_csv(Path.home() / 'PycharmProjects' / 'intersession' / 'DOB.csv')  # From Mice's - Overview Google
+    # Sheets (https://docs.google.com/spreadsheets/d/1hNnBMbe4se3VPOn5FeS1ViTVfXVZ7YLJCiFRWFPYMoU/edit#gid=551555314)
+    dob_datetime = []
+    for i in range(len(dob)):
+        try:
+            dob_datetime.append(datetime.datetime.strptime(dob.DOB[i], "%d/%m/%Y"))
+        except ValueError:  # time data 'Sep/Aug 2020' does not match format '%d/%m/%Y'
+            dob_datetime.append(np.nan)
+        except TypeError:  # strptime() argument 1 must be str, not float
+            dob_datetime.append(np.nan)
+    dob['DOB_datetime'] = dob_datetime
+    dob_current_mouse = dob[dob.ID == setup]['DOB_datetime'].iloc[-1]
+    age = [(dates_datetime[i] - dob_current_mouse).days for i in range(len(dates_datetime))]
+    aoi = np.arange(0, 365, 30)
+    aoi[(aoi > age[0]) & (aoi < age[-1])]
+    # aoi = np.arange(age[0], age[-1], 30)  # Age of interest (every 30 days)
 
     # doi = 'yyyy-mm-dd'  # Select a date of interest to plot a vertical line
-
     # For 2AFC_2 (batch 2)
     doi_0 = '2021-05-26'  # Filename2 start being recorded
     # df.Date[df.Filename2.first_valid_index()] should return '2021-05-27'
@@ -71,13 +95,13 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
     # For 2AFC_4 (batch 4)
     doi_12 = '2023-03-08'  # Introduction of blocks
-    doi_13 = '2023-03-13'  # Removal ob blocks
+    doi_13 = '2023-03-13'  # Removal of blocks
     doi_14 = '2023-03-20'  # Fixed motor coming after StimulusDuration and not at the end of Delay
     doi_15 = '2023-03-24'  # Removed motor in AW
     doi_16 = '2023-03-30'  # Reintroduction of blocks
     doi_17 = '2023-03-31'  # Added task parameter to choose from a reaction time (RT) or a fixed duration (FD)
     doi_18 = '2023-05-09'  # Added variable delay
-    doi_19 = '2023-05-10'  # Installation of SAI on pcs and of industrial quality SDs
+    doi_19 = '2023-05-10'  # Installation of SAI on setup PCs and of industrial quality SD cards
     doi_20 = '2023-05-15'  # Installation of powered USB hubs
     doi_21 = '2023-07-10'  # First session after ERANET meeting 2023
 
@@ -92,6 +116,16 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         except IndexError:
             print(f'No data from this animal on {dois[i]}')
             dois_indexes.append(np.nan)
+
+    # Alignment (x-axis)
+    if alignment == 'n_sessions':  # Number of training sessions. Starts at 0
+        x = dates_indexes
+        xlim = [0, len(x)]
+        xlabel = 'N sessions'
+    elif alignment == 'age':  # Age of the animal in days. Doesn't start at 0
+        x = age
+        xlim = [min(age), max(age)]
+        xlabel = 'Age (days)'
 
     ####################################################################################################################
 
@@ -350,7 +384,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
     ####################################################################################################################
 
-    with PdfPages(setup + '_intersession') as pdf:
+    with PdfPages(f'{setup}_intersession_({alignment}_aligned).pdf') as pdf:
 
         # PAGE 1
 
@@ -383,18 +417,22 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # Plot sides accuracy per session
-        ax.plot(dates_indexes, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax.plot(dates_indexes, accuracy_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax.plot(dates_indexes, accuracy_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        ax.plot(x, accuracy, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax.plot(x, accuracy_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax.plot(x, accuracy_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
-        ax.set_xlim([0, len(dates_indexes)])
+        ax.set_xlim(xlim)
         ax.set_xticklabels([])
         ax.set_ylabel('Acc.\nL/R (%)')
         ax.set_ylim([0, 1.1])
@@ -432,16 +470,20 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax1.axhline(0.5, color='tab:gray', linestyle=':')  # Bias to the right
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax1.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax1.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax1.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # Plot lateral bias per session
-        ax1.plot(dates_indexes, lateral_bias, marker='o', ms=ms, lw=lw, color='black')
+        ax1.plot(x, lateral_bias, marker='o', ms=ms, lw=lw, color='black')
 
-        ax1.set_xlim([0, len(dates_indexes)])
+        ax1.set_xlim(xlim)
         ax1.set_xticklabels([])
         ax1.set_ylabel('Lateral\nBias (%)')
         ax1.set_ylim([-1, 1])
@@ -479,17 +521,21 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax2.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax2.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax2.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax2.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # Plot rep/alt accuracy per session
-        ax2.plot(dates_indexes, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
-        ax2.plot(dates_indexes, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
+        ax2.plot(x, accuracy_alt, marker='o', ms=ms, lw=lw, color='tab:purple', label='Alt')
+        ax2.plot(x, accuracy_rep, marker='o', ms=ms, lw=lw, color='tab:brown', label='Rep')
 
-        ax2.set_xlim([0, len(dates_indexes)])
+        ax2.set_xlim(xlim)
         ax2.set_xticklabels([])
         ax2.set_ylabel('Acc.\nAlt/Rep (%)')
         ax2.set_ylim([0, 1.1])
@@ -527,22 +573,26 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax3.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax3.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax3.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax3.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # Blocks were introduced in batch 4, so this won't work for the first 3 batches
         try:
             # Plot block accuracy per session
-            ax3.plot(dates_indexes, accuracy_blocks, marker='o', ms=ms, lw=lw, color='black', label='Total')
-            ax3.plot(dates_indexes, accuracy_blocks_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-            ax3.plot(dates_indexes, accuracy_blocks_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+            ax3.plot(x, accuracy_blocks, marker='o', ms=ms, lw=lw, color='black', label='Total')
+            ax3.plot(x, accuracy_blocks_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+            ax3.plot(x, accuracy_blocks_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
         except UnboundLocalError:
             pass
 
-        ax3.set_xlim([0, len(dates_indexes)])
+        ax3.set_xlim(xlim)
         ax3.set_xticklabels([])
         ax3.set_ylabel('Acc.\nblocks (%)')
         ax3.set_ylim([0, 1.1])
@@ -575,21 +625,25 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax4 = plt.subplot2grid((9, 1), (4, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax4.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax4.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax4.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # Blocks were introduced in batch 4, so this won't work for the first 3 batches
         try:
             # Plot block_length per session
-            ax4.plot(dates_indexes, block_change_dist_mode, marker='o', ms=ms, lw=lw, color='black')
+            ax4.plot(x, block_change_dist_mode, marker='o', ms=ms, lw=lw, color='black')
         except UnboundLocalError:
             pass
 
         # ax4.set_xlabel('Days')
-        ax4.set_xlim([0, len(dates_indexes)])
+        ax4.set_xlim(xlim)
         ax4.set_xticklabels([])
         # ax4.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax4.set_ylabel('Block length')
@@ -623,18 +677,22 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax5.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax5.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # Plot misses per session
-        ax5.plot(dates_indexes, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        ax5.plot(dates_indexes, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        ax5.plot(dates_indexes, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        ax5.plot(x, miss_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        ax5.plot(x, miss_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        ax5.plot(x, miss_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
 
-        ax5.set_xlim([0, len(dates_indexes)])
+        ax5.set_xlim(xlim)
         ax5.set_xticklabels([])
         ax5.set_ylim([0, 1.1])
         ax5.set_ylabel('Miss rate\nL/R (%)')
@@ -687,17 +745,21 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         # ax5.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
         #
         # # Plot vertical line for date of interest
-        # for i in range(len(dois)):
-        #     try:
-        #         ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-        #     except IndexError:
-        #         pass
+        # if alignment == 'n_sessions':
+        #     for i in range(len(dois)):
+        #         try:
+        #             ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+        #         except IndexError:
+        #             pass
+        # elif alignment == 'age':
+        #     for i in range(len(aoi)):
+        #         ax5.axvline(aoi[i], color='tab:red', linestyle='--')
         #
         # # Plot misses per session
-        # ax5.plot(dates_indexes, sensitivity_pc_right, marker='o', ms=ms, lw=lw, color='pink', label='Total')
-        # ax5.plot(dates_indexes, bias, marker='o', ms=ms, lw=lw, color='olive', label='Total')
-        # ax5.plot(dates_indexes, lapse_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Lapse Left')
-        # ax5.plot(dates_indexes, lapse_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Lapse Right')
+        # ax5.plot(x, sensitivity_pc_right, marker='o', ms=ms, lw=lw, color='pink', label='Total')
+        # ax5.plot(x, bias, marker='o', ms=ms, lw=lw, color='olive', label='Total')
+        # ax5.plot(x, lapse_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Lapse Left')
+        # ax5.plot(x, lapse_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Lapse Right')
         #
         # sensitivity_pc_right = pd.Series(sensitivity_pc_right, dates)
         # bias = pd.Series(bias, dates)
@@ -713,19 +775,23 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax6 = plt.subplot2grid((9, 1), (6, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax6.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax6.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax6.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
-        ax6.plot(dates_indexes, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
-        ax6.plot(dates_indexes, message_count, marker='o', ms=ms, lw=lw, color='tab:purple', label='Message count')
-        ax6.plot(dates_indexes, no_sound, marker='o', ms=ms, lw=lw, color='tab:red', label='No sound')
+        ax6.plot(x, sounds_mismatch, marker='o', ms=ms, lw=lw, color='tab:pink', label='Sounds mismatch')
+        ax6.plot(x, message_count, marker='o', ms=ms, lw=lw, color='tab:purple', label='Message count')
+        ax6.plot(x, no_sound, marker='o', ms=ms, lw=lw, color='tab:red', label='No sound')
 
         # ax6.set_xlabel('Days')
-        ax6.set_xlim([0, len(dates_indexes)])
+        ax6.set_xlim(xlim)
         ax6.set_xticklabels([])
         # ax6.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax6.set_ylabel('Sound checks')
@@ -754,30 +820,34 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax7 = plt.subplot2grid((9, 1), (7, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax7.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax7.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax7.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
-        ax7.plot(dates_indexes, p, marker='o', ms=ms, lw=lw, color='k')
+        ax7.plot(x, p, marker='o', ms=ms, lw=lw, color='k')
 
-        ax7.set_xlabel('Days')
-        ax7.set_xlim([0, len(dates_indexes)])
-        # ax7.set_xticklabels([])
+        # ax7.set_xlabel('Days')
+        ax7.set_xlim(xlim)
+        ax7.set_xticklabels([])
         # ax7.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax7.set_ylabel('P')
         ax7.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax7.spines['top'].set_visible(False)
-        # ax7.spines['bottom'].set_visible(False)
+        ax7.spines['bottom'].set_visible(False)
         # ax7.spines['right'].set_visible(False)
 
         # Instantiate a second axes that shares the same x-axis
         ax7_twin = ax7.twinx()
         ax7_twin.set_yticklabels([])
         ax7_twin.spines['top'].set_visible(False)
-        # ax7_twin.spines['bottom'].set_visible(False)
+        ax7_twin.spines['bottom'].set_visible(False)
 
         time_end = time.time()
         runtime = time_end - time_start
@@ -792,17 +862,21 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ax8 = plt.subplot2grid((9, 1), (8, 0), rowspan=1, colspan=1)
 
         # Plot vertical line for date of interest
-        for i in range(len(dois)):
-            try:
-                ax7.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-            except IndexError:
-                pass
+        if alignment == 'n_sessions':
+            for i in range(len(dois)):
+                try:
+                    ax8.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+                except IndexError:
+                    pass
+        elif alignment == 'age':
+            for i in range(len(aoi)):
+                ax8.axvline(aoi[i], color='tab:red', linestyle='--')
 
         # # Plot sound issues per session
-        ax8.plot(dates_indexes, var_delay, marker='o', ms=ms, lw=lw, color='k')
+        ax8.plot(x, var_delay, marker='o', ms=ms, lw=lw, color='k')
 
-        ax8.set_xlabel('Days')
-        ax8.set_xlim([0, len(dates_indexes)])
+        ax8.set_xlabel(xlabel)
+        ax8.set_xlim(xlim)
         # ax8.set_xticklabels([])
         # ax8.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax8.set_ylabel('Delay')
@@ -824,7 +898,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ################################################################################################################
 
         # Plot text
-        ax.text(0, ax.get_ylim()[1], sum_text)
+        ax.text(xlim[0], ax.get_ylim()[1], sum_text)
 
         ################################################################################################################
         # LEGACY PLOTS
@@ -842,18 +916,22 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         # ax.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
         #
         # # Plot vertical line for date of interest
-        # for i in range(len(dois)):
-        #     try:
-        #         ax.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-        #     except IndexError:
-        #         pass
+        # if alignment == 'n_sessions':
+        #     for i in range(len(dois)):
+        #         try:
+        #             ax9.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+        #         except IndexError:
+        #             pass
+        # elif alignment == 'age':
+        #     for i in range(len(aoi)):
+        #         ax9.axvline(aoi[i], color='tab:red', linestyle='--')
         #
         # # Plot response rate per session
-        # ax.plot(dates_indexes, response_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        # ax.plot(dates_indexes, response_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        # ax.plot(dates_indexes, response_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        # ax.plot(x, response_rate, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        # ax.plot(x, response_rate_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        # ax.plot(x, response_rate_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
         #
-        # ax.set_xlim([0, len(dates_indexes)])
+        # ax.set_xlim(xlim)
         # ax.set_xticklabels([])
         # ax.set_ylabel('Response\n(%)')
         # ax.set_ylim([0, 1.1])
@@ -886,18 +964,22 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         # ax1 = plt.subplot2grid((8, 1), (1, 0), rowspan=1, colspan=1)
         #
         # # Plot vertical line for date of interest
-        # for i in range(len(dois)):
-        #     try:
-        #         ax1.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-        #     except IndexError:
-        #         pass
+        # if alignment == 'n_sessions':
+        #     for i in range(len(dois)):
+        #         try:
+        #             ax1.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+        #         except IndexError:
+        #             pass
+        # elif alignment == 'age':
+        #     for i in range(len(aoi)):
+        #         ax1.axvline(aoi[i], color='tab:red', linestyle='--')
         #
         # # Plot water per session
-        # ax1.plot(dates_indexes, water, marker='o', ms=ms, lw=lw, color='black', label='Total')
-        # ax1.plot(dates_indexes, water_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
-        # ax1.plot(dates_indexes, water_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
+        # ax1.plot(x, water, marker='o', ms=ms, lw=lw, color='black', label='Total')
+        # ax1.plot(x, water_left, marker='o', ms=ms, lw=lw, color='tab:blue', label='Left')
+        # ax1.plot(x, water_right, marker='o', ms=ms, lw=lw, color='tab:orange', label='Right')
         #
-        # ax1.set_xlim([0, len(dates_indexes)])
+        # ax1.set_xlim(xlim)
         # ax1.set_xticklabels([])
         # ax1.set_ylabel('Water')
         # ax1.set_ylim([0, water.max() + 100])
@@ -933,20 +1015,24 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         # # ax5.axhline(9, color='tab:gray', linestyle=':')  # Accuracy 0.75
         #
         # # Plot vertical line for date of interest
-        # for i in range(len(dois)):
-        #     try:
-        #         ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
-        #     except IndexError:
-        #         pass
+        # if alignment == 'n_sessions':
+        #     for i in range(len(dois)):
+        #         try:
+        #             ax5.axvline(dois_indexes[i], color='tab:red', linestyle='--')
+        #         except IndexError:
+        #             pass
+        # elif alignment == 'age':
+        #     for i in range(len(aoi)):
+        #         ax5.axvline(aoi[i], color='tab:red', linestyle='--')
         #
         # # Plot stage/substage/motor per session
-        # ax5.plot(dates_indexes, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
-        # # ax5.plot(dates_indexes, substage, marker='o', ms=ms, lw=lw, color='black', label='Substage')
+        # ax5.plot(x, stage, marker='o', ms=ms, lw=lw, color='black', label='Stage')
+        # # ax5.plot(x, substage, marker='o', ms=ms, lw=lw, color='black', label='Substage')
         # ax5_twin = ax5.twinx()  # Instantiate a second axes that shares the same x-axis
-        # ax5_twin.plot(dates_indexes, motor, marker='o', ms=ms, lw=lw, color='tab:gray', label='Motor')
+        # ax5_twin.plot(x, motor, marker='o', ms=ms, lw=lw, color='tab:gray', label='Motor')
         #
         # # ax5.set_xlabel('Days')
-        # ax5.set_xlim([0, len(dates_indexes)])
+        # ax5.set_xlim(xlim)
         # ax5.set_xticklabels([])
         # ax5.set_ylim()
         # ax5.set_ylabel('Stage')
@@ -993,7 +1079,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
         ################################################################################################################
 
         # Construct DataFrame
-        columns = ['Dates', 'DoW', 'Subject', 'Board', 'Trials', 'TrialsLeft', 'TrialsRight', 'ChoseLeft', 'ChoseRight',
+        columns = ['Dates', 'DoW', 'Age', 'Subject', 'Board', 'Trials', 'TrialsLeft', 'TrialsRight', 'ChoseLeft', 'ChoseRight',
                    'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt', 'Errors', 'ErrorsLeft', 'ErrorsRight',
                    'Performance', 'PerformanceLeft', 'PerformanceRight', 'Responses', 'ResponsesLeft', 'ResponsesRight',
                    'Repetitions', 'RepsLeft', 'RepsRight', 'RepRateLeft', 'RepRateRight', 'Alternations', 'AltsLeft',
@@ -1006,7 +1092,7 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
                    'yPCRep', 'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep', 'BiasPCRep', 'LapseRep',
                    'LapseAlt']
 
-        data = list(zip(dates, dow, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
+        data = list(zip(dates, dow, age, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
                         hits_left, hits_right, hits_rep, hits_alt, errors, errors_left, errors_right, performance,
                         performance_left, performance_right, responses, responses_left, responses_right, repetitions,
                         reps_left, reps_right, rep_rate_left, rep_rate_right, alternations, alts_left, alts_right,
@@ -1052,7 +1138,8 @@ def intersession_within_animal(path, to_csv=False, send_slack=False):
 
 ########################################################################################################################
 
-def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', to_csv=True, send_slack=False):
+def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignment='n_sessions', to_csv=True,
+                     send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     time_start = time.time()
@@ -1091,7 +1178,10 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', to_csv=T
     for i in range(len(animals)):
         # path = folder + animals[i]
         path = Path(folder / animals[i])
-        intersession_within_animal(path, to_csv=to_csv, send_slack=send_slack)
+        try:
+            intersession_within_animal(path, alignment=alignment, to_csv=to_csv, send_slack=send_slack)
+        except:
+            print(f'Could not do intersession report of animal {i}')
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -1100,55 +1190,80 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', to_csv=T
 
 ########################################################################################################################
 
-def learning_trajectories(experiment=None):
+def learning_curves(experiment=None, alignment='n_sessions', save=True):
+    """
+    Plot the learning trajectories (accuracy vs time) of all animals of a given batch
+    """
 
     time_start = time.time()
 
-    if experiment is None:
-        folder = '/home/alexis/Documentos/intersession reports/'  # Where the data for all animals is
-        experiments = os.listdir(folder)  # List experiments
-        experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder + x)]  # Get rid of non folders
-        # experiments = next(os.walk(folder))[1]  # Same but with another method
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
+    # Get the path to the data
+    experiment = get_experiment(experiment, session='intersession')
+    folder_in = Path.home() / 'PycharmProjects' / 'intersession' / experiment
 
-    folder = folder = '/home/alexis/Documentos/intersession reports/' + experiment + '/'
-
-    animals = os.listdir(folder)
+    animals = os.listdir(folder_in)
     animals = [animals for animals in animals if animals.endswith('.csv')]
     animals.sort()
+
+    # Alignment (x-axis)
+    if alignment == 'n_sessions':  # Number of training sessions. Starts at 0
+        x = 'SessionNumber'
+        xlabel = 'N sessions'
+    elif alignment == 'age':  # Age of the animal in days. Doesn't start at 0
+        x = 'Age'
+        xlabel = 'Age (days)'
+    filename = f'_learning_trajectories_({x}_aligned)'
 
     df_all_intersessions = pd.DataFrame()  # Create empty DataFrame
     plt.figure()
 
-    for i in range(len(animals)):
-        path = folder + animals[i]
+    for _ in range(len(animals)):
+        path = folder_in / animals[_]
         df = pd.read_csv(path)
+        session_number = df.index.to_list()  # Get session numbers
+        df.insert(1, 'SessionNumber', session_number)  # Insert session number in column 1 of df
+        # if df.SessionNumber.max() < 60:
+        #     continue
+        print(f'Subject {str(df.Subject.unique())[1:-1]}: {len(df)} sessions')
         df_all_intersessions = pd.concat([df_all_intersessions, df])
-        plt.plot(df.index, df.Accuracy, color='tab:gray', alpha=0.5)
+        plt.plot(df[x], df.Accuracy, color='tab:gray', alpha=0.5)
 
     # Hits
-    hits = df_all_intersessions.groupby('Dates').Hits.sum().astype('int')
-    hits_left = df_all_intersessions.groupby('Dates').HitsLeft.sum().astype('int')
-    hits_right = df_all_intersessions.groupby('Dates').HitsRight.sum().astype('int')
+    hits = df_all_intersessions.groupby(x).Hits.sum().astype('int')
+    # hits_left = df_all_intersessions.groupby(x).HitsLeft.sum().astype('int')
+    # hits_right = df_all_intersessions.groupby(x).HitsRight.sum().astype('int')
 
     # Responses (valid trials)
-    responses = df_all_intersessions.groupby('Dates').Responses.sum()
-    responses_left = df_all_intersessions.groupby('Dates').ResponsesLeft.sum()
-    responses_right = df_all_intersessions.groupby('Dates').ResponsesRight.sum()
+    responses = df_all_intersessions.groupby(x).Responses.sum()
+    # responses_left = df_all_intersessions.groupby(x).ResponsesLeft.sum()
+    # responses_right = df_all_intersessions.groupby(x).ResponsesRight.sum()
 
     # Accuracy (hit rate)
     accuracy = hits / responses
-    accuracy_left = hits_left / responses_left
-    accuracy_right = hits_right / responses_right
+    # accuracy_left = hits_left / responses_left
+    # accuracy_right = hits_right / responses_right
 
-    plt.plot(np.arange(0, len(accuracy)), accuracy, color='k', linewidth=3)
-
-    plt.title('Learning trajectories')
-    plt.xlabel('Days')
+    # Plot mean accuracy
+    plt.plot(accuracy, color='k', linewidth=3)
+    plt.title(f'Learning trajectories ({experiment}, N={len(animals)})')
+    plt.xlabel(xlabel)
     plt.ylabel('Accuracy')
 
-    plt.savefig(folder + experiment + '_learning_trajectories.png')
+    if save:
+        folder_out = Path.home() / 'Documentos' / 'learning curves' / experiment
+        save_fig(folder_out, filename)
+        plt.close()
 
     time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+########################################################################################################################
+
+# For debugging
+# path = Path.home() / 'PycharmProjects' / 'glue_sessions' / '2AFC_4' / '911.csv'  # Where the data for all animals is
+# alignment = 'age'
+# to_csv = False
+# send_slack = False
+# intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_slack=False)
+# do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignment='age', to_csv=True, send_slack=False)
