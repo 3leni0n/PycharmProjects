@@ -342,8 +342,11 @@ def parse_v2(path):
             p.append(np.nan)
 
         # Variable delay
-        # var_delay.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'DELAY')]['+INFO'].iloc[0]))  # More precission
-        var_delay.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Delay')]['+INFO'].iloc[0]))  # Less precission
+        try:
+            # var_delay.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'DELAY')]['+INFO'].iloc[0]))  # More precission
+            var_delay.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Delay')]['+INFO'].iloc[0]))  # Less precission
+        except IndexError:
+            var_delay.append(np.nan)
 
         if i == 0:
             after_hit.append(np.nan)

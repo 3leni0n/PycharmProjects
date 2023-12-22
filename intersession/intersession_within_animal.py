@@ -8,6 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig
+import statsmodels.formula.api as smf
 
 
 ########################################################################################################################
@@ -49,7 +50,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     dates = df.Date.dropna().unique()  # Dropna because there's some corrupted trials in which the date is nan
     dates_indexes = np.arange(len(dates))
-    n_dates = max(dates)
+    n_dates = len(dates)
     dow = [datetime.datetime.strptime(dates[i], "%Y-%m-%d").date().weekday() for i in range(len(dates))]  # Date of the
     # week, Monday is 0 and Sunday is 6
     dates_datetime = [datetime.datetime.strptime(dates[i], "%Y-%m-%d") for i in range(len(dates))]
@@ -105,9 +106,14 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     doi_20 = '2023-05-15'  # Installation of powered USB hubs
     doi_21 = '2023-07-10'  # First session after ERANET meeting 2023
 
+    # For testing specific events
+    # doi_test = '2023-06-09'
+    # dois = [doi_test]
+
     dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8,  # Batch 2
             doi_9, doi_10, doi_11,  # Batch 3
-            doi_14, doi_15, doi_17, doi_18, doi_19, doi_20, doi_21]  # Batch 4  (skipped doi_12, doi_13, doi_16 for clarity)
+            doi_14, doi_15, doi_17, doi_18, doi_19, doi_20,
+            doi_21]  # , doi_test]  # Batch 4  (skipped doi_12, doi_13, doi_16 for clarity)
     dois_indexes = []
 
     for i in range(len(dois)):
@@ -399,7 +405,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         sum_text = (f'Dates: {df.Date.unique()[0]} - {df.Date.unique()[-1]}, '
                     f'Subject: {df.Subject.unique()[0].astype(str)}, '
                     f'Box: {df.Board.mode()[0][4]}, '
-                    f'Days: {str(n_dates)},'
+                    f'Days: {str(n_dates)}'
                     f'{new_line}'
                     f'{new_line}')
 
@@ -1079,7 +1085,8 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         ################################################################################################################
 
         # Construct DataFrame
-        columns = ['Dates', 'DoW', 'Age', 'Subject', 'Board', 'Trials', 'TrialsLeft', 'TrialsRight', 'ChoseLeft', 'ChoseRight',
+        columns = ['Dates', 'DoW', 'Age', 'Subject', 'Board', 'Trials', 'TrialsLeft', 'TrialsRight', 'ChoseLeft',
+                   'ChoseRight',
                    'Hits', 'HitsLeft', 'HitsRight', 'HitsRep', 'HitsAlt', 'Errors', 'ErrorsLeft', 'ErrorsRight',
                    'Performance', 'PerformanceLeft', 'PerformanceRight', 'Responses', 'ResponsesLeft', 'ResponsesRight',
                    'Repetitions', 'RepsLeft', 'RepsRight', 'RepRateLeft', 'RepRateRight', 'Alternations', 'AltsLeft',
@@ -1087,22 +1094,23 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
                    'LateralBias', 'AccuracyRep', 'AccuracyAlt', 'RepBias', 'CorrRepBias', 'CorrAltBias', 'Misses',
                    'MissesLeft', 'MissesRight', 'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards', 'RewardsLeft',
                    'RewardsRight', 'Water', 'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch', 'NoSound',
-                   'MessageCount', 'VarDelay', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight', 'FitErrorPCRight',
+                   'MessageCount', 'P', 'VarDelay', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight', 'FitErrorPCRight',
                    'ParamsPCRight', 'SensitivityPCRight', 'BiasPCRight', 'LapseRight', 'LapseLeft', 'PCRep', 'xPCRep',
                    'yPCRep', 'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep', 'BiasPCRep', 'LapseRep',
                    'LapseAlt']
 
-        data = list(zip(dates, dow, age, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
-                        hits_left, hits_right, hits_rep, hits_alt, errors, errors_left, errors_right, performance,
-                        performance_left, performance_right, responses, responses_left, responses_right, repetitions,
-                        reps_left, reps_right, rep_rate_left, rep_rate_right, alternations, alts_left, alts_right,
-                        alt_rate_left, alt_rate_right, accuracy, accuracy_left, accuracy_right, accuracy_max_evi,
-                        lateral_bias, accuracy_rep, accuracy_alt, rep_bias, corr_rep_bias, corr_alt_bias, misses,
-                        misses_left, misses_right, miss_rate, miss_rate_left, miss_rate_right, rewards, rewards_left,
-                        rewards_right, water, water_left, water_right, stage, sounds_mismatch, no_sound, message_count,
-                        var_delay, pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
-                        sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep, ydata_pc_rep,
-                        fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt))
+        data = list(
+            zip(dates, dow, age, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
+                hits_left, hits_right, hits_rep, hits_alt, errors, errors_left, errors_right, performance,
+                performance_left, performance_right, responses, responses_left, responses_right, repetitions,
+                reps_left, reps_right, rep_rate_left, rep_rate_right, alternations, alts_left, alts_right,
+                alt_rate_left, alt_rate_right, accuracy, accuracy_left, accuracy_right, accuracy_max_evi,
+                lateral_bias, accuracy_rep, accuracy_alt, rep_bias, corr_rep_bias, corr_alt_bias, misses,
+                misses_left, misses_right, miss_rate, miss_rate_left, miss_rate_right, rewards, rewards_left,
+                rewards_right, water, water_left, water_right, stage, sounds_mismatch, no_sound, message_count, p,
+                var_delay, pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
+                sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep, ydata_pc_rep,
+                fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt))
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
@@ -1115,7 +1123,8 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     if to_csv:
         # df_intersession.to_csv(folder_csv_out + setup + '_intersession.csv', index=False)  # index=False to avoid the
-        df_intersession.to_csv(Path(folder_csv_out / (setup + '_intersession.csv')), index=False)  # index=False to avoid the
+        df_intersession.to_csv(Path(folder_csv_out / (setup + '_intersession.csv')),
+                               index=False)  # index=False to avoid the
         # 'Unmmaed: 0' column
 
     # Register time again and compute the total run time of the script
@@ -1168,12 +1177,9 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignmen
     # print('Doing intersession reports of: ' + animal)
     # folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
     folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    # animal = input('Enter animal')
     animals = os.listdir(folder)
     animals = [animals for animals in animals if animals.endswith('.csv') and len(animals) == 7]
     animals.sort()
-
-    animals.remove('876.csv')
 
     for i in range(len(animals)):
         # path = folder + animals[i]
@@ -1190,7 +1196,7 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignmen
 
 ########################################################################################################################
 
-def learning_curves(experiment=None, alignment='n_sessions', save=True):
+def learning_curves(experiment='2AFC_4', alignment='n_sessions', offset=None, save=False):
     """
     Plot the learning trajectories (accuracy vs time) of all animals of a given batch
     """
@@ -1198,8 +1204,8 @@ def learning_curves(experiment=None, alignment='n_sessions', save=True):
     time_start = time.time()
 
     # Get the path to the data
-    experiment = get_experiment(experiment, session='intersession')
-    folder_in = Path.home() / 'PycharmProjects' / 'intersession' / experiment
+    experiment, folder_in = get_experiment(experiment, session='intersession')
+    # folder_in = Path.home() / 'PycharmProjects' / 'intersession' / experiment
 
     animals = os.listdir(folder_in)
     animals = [animals for animals in animals if animals.endswith('.csv')]
@@ -1215,38 +1221,78 @@ def learning_curves(experiment=None, alignment='n_sessions', save=True):
     filename = f'_learning_trajectories_({x}_aligned)'
 
     df_all_intersessions = pd.DataFrame()  # Create empty DataFrame
+    first_p_session_indexes = []
+    animals_discarded = 0
     plt.figure()
 
     for _ in range(len(animals)):
         path = folder_in / animals[_]
         df = pd.read_csv(path)
+        # df = df[df.P == 0]  # Only sessions without evidences
+        # df = df[df.P > 0]  # Only sessions with evidences
+
+        # Get the first session in which the evidences were introduced
+        try:
+            first_p_session_index = np.where(df.P > 0)[0][0]
+        except IndexError:  # index 0 is out of bounds for axis 0 with size 0 (no sessions with p > 0)
+            animals_discarded += 1
+            continue  # Skip iteration if animal didn't make it until evidences
+            # first_p_session_index = np.nan
+        first_p_session_indexes.append(first_p_session_index)
+
+        # Offset
+        if offset == 'first_p':
+            df = df[first_p_session_indexes[-1]:].reset_index()
+
         session_number = df.index.to_list()  # Get session numbers
         df.insert(1, 'SessionNumber', session_number)  # Insert session number in column 1 of df
-        # if df.SessionNumber.max() < 60:
-        #     continue
         print(f'Subject {str(df.Subject.unique())[1:-1]}: {len(df)} sessions')
         df_all_intersessions = pd.concat([df_all_intersessions, df])
-        plt.plot(df[x], df.Accuracy, color='tab:gray', alpha=0.5)
+        # plt.plot(df[x], df.Accuracy, color='tab:gray', alpha=0.5)  # Plot individual animals
+
+    df_all_intersessions.VarDelay.fillna(0, inplace=True)  # Set the nan of delay to 0
 
     # Hits
     hits = df_all_intersessions.groupby(x).Hits.sum().astype('int')
-    # hits_left = df_all_intersessions.groupby(x).HitsLeft.sum().astype('int')
-    # hits_right = df_all_intersessions.groupby(x).HitsRight.sum().astype('int')
+    hits_left = df_all_intersessions.groupby(x).HitsLeft.sum().astype('int')
+    hits_right = df_all_intersessions.groupby(x).HitsRight.sum().astype('int')
 
     # Responses (valid trials)
     responses = df_all_intersessions.groupby(x).Responses.sum()
-    # responses_left = df_all_intersessions.groupby(x).ResponsesLeft.sum()
-    # responses_right = df_all_intersessions.groupby(x).ResponsesRight.sum()
+    responses_left = df_all_intersessions.groupby(x).ResponsesLeft.sum()
+    responses_right = df_all_intersessions.groupby(x).ResponsesRight.sum()
 
     # Accuracy (hit rate)
     accuracy = hits / responses
-    # accuracy_left = hits_left / responses_left
-    # accuracy_right = hits_right / responses_right
+    accuracy_left = hits_left / responses_left
+    accuracy_right = hits_right / responses_right
 
     # Plot mean accuracy
-    plt.plot(accuracy, color='k', linewidth=3)
-    plt.title(f'Learning trajectories ({experiment}, N={len(animals)})')
+    label = f'({experiment}, N={len(animals) - animals_discarded}/{len(animals)})'
+    # plt.plot(accuracy_left, color='tab:blue', linewidth=3, alpha=0.25)
+    # plt.plot(accuracy_right, color='tab:orange', linewidth=3, alpha=0.25)
+    # plt.plot(df_all_intersessions.groupby(x).LateralBias.mean() + 0.5, color='tab:red', linestyle='--', linewidth=3, alpha=0.25)
+    # plt.plot(accuracy, color='k', linewidth=3)
+    plt.plot(df_all_intersessions.groupby(x).Accuracy.mean(), color='k', linewidth=3,
+             label='Acc')  # Almost the same, but not
+    plt.plot(df_all_intersessions.groupby(x).AccMaxEvi.mean(), color='tab:green', linewidth=3, alpha=0.75,
+             label='Acc. Max. Evi.')  # Mean accuracy at max evidence
+    # plt.plot(df_all_intersessions.groupby(x).P.mean() + 0.5, color='r', linewidth=3, alpha=0.75, label='P (+0.5)')  # Mean P (difficulty)
+    plt.plot(df_all_intersessions.groupby(x).P.mean(), color='tab:red', linewidth=3, alpha=0.75,
+             label='P')  # Mean P (difficulty)
+    # plt.plot(df_all_intersessions.groupby(x).VarDelay.mean(), color='tab:pink', linewidth=3, alpha=0.75, label='Delay')  # Mean P (difficulty)
+
+    # plt.axvline(np.mean(first_p_session_indexes), color='r')
+    # label = f'({experiment}, N={len(animals) - animals_discarded}/{len(animals)})'
+    plt.title(f'Learning trajectories ({experiment}, N={len(animals) - animals_discarded}/{len(animals)})')
+
+    if offset == 'first_p':
+        xlabel = xlabel + ', ' + offset + ' ' + 'offset'
+        filename = filename + '_' + offset + '_offset'
+
     plt.xlabel(xlabel)
+    plt.ylim([-0.05, 1])
+    # plt.ylim([0.4, 1])
     plt.ylabel('Accuracy')
 
     if save:
@@ -1258,7 +1304,45 @@ def learning_curves(experiment=None, alignment='n_sessions', save=True):
     runtime = time_end - time_start
     print('The script took', round(runtime, 2), 'seconds to run')
 
+
 ########################################################################################################################
+
+def glue_animals_intersessions(protocol='stage_training_v4', experiment='2AFC_4', update=False, to_csv=False):
+    """
+    Concatenate all intersession .csv files from each animal into a single .csv file
+    :param protocol: task code version
+    :param update: If True update first the glued sessions
+    :param to_csv: True for saving the output DataFrame, default is False (do not save)
+    :return: DataFrame with all the intersession concatenated
+    """
+
+    # Update first the glued sessions
+    if update:
+        update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
+
+    # Get the path to the data
+    experiment, folder = get_experiment(experiment, session='intersession')
+    # folder_in = Path.home() / 'PycharmProjects' / 'intersession' / experiment
+
+    # path = '/home/alexis/PycharmProjects/intersession/' + experiment + '/'
+    intersessions = os.listdir(folder)  # Get list of
+    intersessions.sort()
+    intersessions = [x for x in intersessions if x.endswith('.csv')]  # Get rid of non csv files
+
+    df = pd.DataFrame()
+
+    for i in range(len(intersessions)):
+        df_intersession = pd.read_csv(folder / intersessions[i])
+        df = pd.concat([df, df_intersession])
+
+    if to_csv:
+        df.to_csv(Path(folder / (experiment + '_intersessions' + '.csv')), index=False)
+        # index=False to avoid the 'Unnamed: 0' column
+
+    return df
+
+########################################################################################################################
+
 
 # For debugging
 # path = Path.home() / 'PycharmProjects' / 'glue_sessions' / '2AFC_4' / '911.csv'  # Where the data for all animals is
@@ -1267,3 +1351,23 @@ def learning_curves(experiment=None, alignment='n_sessions', save=True):
 # send_slack = False
 # intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_slack=False)
 # do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignment='age', to_csv=True, send_slack=False)
+
+# learning_curves(experiment='2AFC_2', alignment='n_sessions', offset=None, save=True)
+# learning_curves(experiment='2AFC_2', alignment='n_sessions', offset='first_p', save=True)
+# learning_curves(experiment='2AFC_2', alignment='age', offset=None, save=True)
+# learning_curves(experiment='2AFC_2', alignment='age', offset='first_p', save=True)
+# learning_curves(experiment='2AFC_3', alignment='n_sessions', offset=None, save=True)
+# learning_curves(experiment='2AFC_3', alignment='n_sessions', offset='first_p', save=True)
+# learning_curves(experiment='2AFC_3', alignment='age', offset=None, save=True)
+# learning_curves(experiment='2AFC_3', alignment='age', offset='first_p', save=True)
+# learning_curves(experiment='2AFC_4', alignment='n_sessions', offset=None, save=True)
+# learning_curves(experiment='2AFC_4', alignment='n_sessions', offset='first_p', save=True)
+# learning_curves(experiment='2AFC_4', alignment='age', offset=None, save=True)
+# learning_curves(experiment='2AFC_4', alignment='age', offset='first_p', save=True)
+
+# M = smf.mixedlm("AccMaxEvi ~ SessionNumber + Age + DoW + P", data=df_all_intersessions, groups=df_all_intersessions.Subject).fit()
+# M.summary()
+#
+# # Delay only in batch 2AFC_4
+# M = smf.mixedlm("AccMaxEvi ~ SessionNumber + Age + DoW + P + VarDelay", data=df_all_intersessions, groups=df_all_intersessions.Subject).fit()
+# M.summary()

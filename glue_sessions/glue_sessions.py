@@ -6,6 +6,7 @@ import pandas as pd
 from parse.parse import parse
 from parse.parse_v2 import parse_v2
 import csv
+from my_fun.my_fun import get_experiment
 
 # To do:
 # Add training day index column to df
@@ -186,7 +187,6 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
     # Usually I don't want Test subject(s)
     animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
                          '.idea']  # Pycharm's file
-
     for i in range(len(animals_to_remove)):
         try:
             animals.remove(animals_to_remove[i])
@@ -202,49 +202,43 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
     print('The script took', round(runtime, 2), 'seconds to run')
 
 
-def glue_animals(protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
+def glue_animals(protocol='stage_training_v4', experiment='2AFC_4', update=False, to_csv=False):
     """
     Glue all the sessions from all the animals of a given batch.
     :param protocol: task code version
     :param experiment: batch of animals
+    :param update: If True update first the glued sessions
     :param to_csv: if True save data as .csv file
     :return: pandas DataFrame with the data
     """
 
     time_start = time.time()
 
-    if experiment is None:
+    # Get the path to the data
+    experiment, folder = get_experiment(experiment, session='glue_sessions')
 
-        folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        experiments = os.listdir(folder_in)  # List experiments
-        experiments.sort()  # Sort them by name
-        experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
+    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
+    # folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment  # Where the data for all animals is
 
-        try:
-            experiments.remove('__pycache__')  # Pycharm's file
-        except ValueError:
-            pass
+    # Update first the glued sessions
+    if update:
+        update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
 
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
-
-    folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
-
-    update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
-
-    animals = os.listdir(folder_in)  # List animals
+    animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
+    animals = [x for x in animals if not 'corrupted_sessions' in x]  # Get rid of the corrupted sessions csv files
 
     df = pd.DataFrame()  # Create empty dataframe
 
     for i in range(len(animals)):
-        df_animal = pd.read_csv(folder_in + animals[i])
+        df_animal = pd.read_csv(Path(folder / animals[i]))
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
-
-    folder_out = folder_in
+    df.reset_index(drop=True, inplace=True)
 
     if to_csv:
-        df.to_csv(folder_out + 'all' + '.csv', index=False)  # index=False to avoid the 'Unnamed: 0' column
+        filename = experiment + '_all_sessions'
+        # df.to_csv(folder + 'all' + '.csv', index=False)  # index=False to avoid the 'Unnamed: 0' column
+        df.to_csv(Path(folder / filename).with_suffix('.csv'), index=False)  # index=False to avoid the 'Unnamed: 0' column
 
     time_end = time.time()
     runtime = time_end - time_start
@@ -253,8 +247,24 @@ def glue_animals(protocol='stage_training_v4', experiment='2AFC_4', to_csv=False
     return df
 
 
-def glue_batches():
+def glue_batches(batches=['2AFC_2', '2AFC_3', '2AFC_4']):
     """
     Glue all sessions from all animals from all batches.
-    :return: padas Dataframe with the data
+    :param batches: Batches of animals to glue together
+    :return: pandas Dataframe with the data
     """
+
+    time_start = time.time()
+
+    df = pd.DataFrame()
+
+    for i in range(len(batches)):
+        df_batch = glue_animals(experiment=batches[i], to_csv=False)
+        df = pd.concat([df, df_batch])  # Add parsed session to the bottom of the DataFrame
+    df.reset_index(drop=True, inplace=True)
+
+    time_end = time.time()
+    runtime = time_end - time_start
+    print('The script took', round(runtime, 2), 'seconds to run')
+
+    return df

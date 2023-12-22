@@ -829,11 +829,11 @@ def get_experiment(experiment=None, session='glue_sessions'):
     if experiment is None:
 
         # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder_in = Path.home() / 'PycharmProjects' / session  # Where the data for all animals is
-        experiments = os.listdir(folder_in)  # List experiments
+        folder = Path.home() / 'PycharmProjects' / session  # Where the data for all animals is
+        experiments = os.listdir(folder)  # List experiments
         experiments.sort()  # Sort them by name
         # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
-        experiments = [x for x in experiments if Path(folder_in / x).is_dir()]  # Get rid of non folders
+        experiments = [x for x in experiments if Path(folder / x).is_dir()]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's file
@@ -842,8 +842,10 @@ def get_experiment(experiment=None, session='glue_sessions'):
 
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
+    else:
+        folder = Path.home() / 'PycharmProjects' / session / experiment
 
-    return experiment
+    return experiment, folder
 
 
 def get_animal(experiment, session='glue_sessions', animal=None):
