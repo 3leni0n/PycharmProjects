@@ -6,6 +6,9 @@ import os
 import csv
 from string import ascii_lowercase
 import numpy as np
+print(os.getcwd())
+from toolsR import VideoR
+import user_settings as conf
 
 
 # Arduino reader
@@ -54,7 +57,7 @@ class ArduinoReader:
 
 # Get calibration of the valves (from UtilsR)
 def getWaterCalib(board, ports):
-    log_name = os.path.expanduser("~/pluginsr-for-pybpod/water-calibration-plugin/DATA/water_calibration.csv")
+    log_name = os.path.expanduser("~/pybpod_plugins/water-calibration-plugin/DATA/water_calibration.csv")
     with open(log_name, 'r') as log:
         calibration_data = csv.DictReader(log, delimiter=';')
         latest_row = None
@@ -97,3 +100,51 @@ def select_ilds(ilds, p, side):
     # selected_ild = random.choice(options)
     selected_ild = np.random.choice(options)
     return selected_ild
+
+
+def open_cam():
+    """
+    This function is a wrapper for the code block opening the camera and recording the video. Its main function is to
+    avoid copying the same code across tasks.
+    """
+    # Check if video directory already exist, else create it
+    video_folder = os.path.expanduser('~/Videos/' + conf.PYBPOD_SUBJECTS[0][2:5] + '/')
+    if not os.path.exists(os.path.expanduser(video_folder)):
+        os.makedirs(os.path.expanduser(video_folder))
+
+    # Start  video
+    no_cam = False
+
+    username = os.getlogin()
+    if username == 'setup0':
+        indx_or_path = '/dev/video-cam01'  # Front cam
+        # indx_or_path = '/dev/video-cam02'  #  Side cam
+    elif username == 'setup1' or username == 'setup2':
+        indx_or_path = 'cam' + conf.PYBPOD_BOARD[-1]
+
+    try:
+        cam = VideoR(indx_or_path=indx_or_path,
+                     name_video=conf.PYBPOD_SESSION + '.avi',
+                     path=video_folder,
+                     title=conf.PYBPOD_BOARD,
+                     fps=60,
+                     # codec_cam='MJPG',  # Commented for video compression
+                     # codec_video='MJPG'  # Commented for video compression
+                     )
+        cam_OK = False
+        cam.play()
+        if int(conf.VAR_REC) > 0:
+            cam.record()
+    except:
+        print(
+            "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
+        no_cam = True
+
+
+def close_cam():
+    """
+    This function is a wrapper for the code block opening the camera and recording the video. Its main function is to
+    avoid copying the same code across tasks.
+    """
+    if not no_cam:
+        cam.stop()
