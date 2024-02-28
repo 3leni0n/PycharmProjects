@@ -7,7 +7,7 @@ import csv
 from string import ascii_lowercase
 import numpy as np
 print(os.getcwd())
-from toolsR import VideoR
+from toolsR import VideoR  # For video streaming and/or recording
 import user_settings as conf
 
 
@@ -102,19 +102,21 @@ def select_ilds(ilds, p, side):
     return selected_ild
 
 
-def open_cam():
+def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
     """
-    This function is a wrapper for the code block opening the camera and recording the video. Its main function is to
+    This function is a wrapper for the code block opening the camera(s) and recording the video. Its main function is to
     avoid copying the same code across tasks.
     """
+
     # Check if video directory already exist, else create it
     video_folder = os.path.expanduser('~/Videos/' + conf.PYBPOD_SUBJECTS[0][2:5] + '/')
     if not os.path.exists(os.path.expanduser(video_folder)):
         os.makedirs(os.path.expanduser(video_folder))
 
     # Start  video
-    no_cam = False
+    nocam = False  # So the code doesn't open the cam twice, probably it will work without it, try
 
+    # Select automatically the cam depending on the PC (only for n_cams=1)
     username = os.getlogin()
     if username == 'setup0':
         indx_or_path = '/dev/video-cam01'  # Front cam
@@ -122,29 +124,75 @@ def open_cam():
     elif username == 'setup1' or username == 'setup2':
         indx_or_path = 'cam' + conf.PYBPOD_BOARD[-1]
 
-    try:
-        cam = VideoR(indx_or_path=indx_or_path,
-                     name_video=conf.PYBPOD_SESSION + '.avi',
-                     path=video_folder,
-                     title=conf.PYBPOD_BOARD,
-                     fps=60,
-                     # codec_cam='MJPG',  # Commented for video compression
-                     # codec_video='MJPG'  # Commented for video compression
-                     )
-        cam_OK = False
-        cam.play()
-        if int(conf.VAR_REC) > 0:
-            cam.record()
-    except:
-        print(
-            "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
-        no_cam = True
+    if n_cams == 1:  # For when a 1 cam is needed (all the test tasks, boxes 1-8)
+        try:
+            cam = VideoR(indx_or_path=indx_or_path,
+                         name_video=conf.PYBPOD_SESSION + '.avi',
+                         path=video_folder,
+                         fps=60,
+                         # codec_cam='MJPG',  # Commented for video compression
+                         # codec_video='MJPG',  # Commented for video compression
+                         title=conf.PYBPOD_BOARD,
+                         cam_sync=cam_sync,
+                         states_on_sync=states_on_sync,
+                         mask=mask
+                         )
+            cam_OK = False   # Needed???? Commented on 01/03/2023
+            cam.play()
+            if int(conf.VAR_REC) > 0:
+                cam.record()
+        except:
+            print(
+                "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
+            no_cam = True
+
+    elif n_cams == 2:  # For when 2 cams are needed (ephys box only, 'cam_double' and 'stage_training' tasks)
+        try:
+            cam1 = VideoR(indx_or_path='/dev/video-cam01',
+                          name_video=conf.PYBPOD_SESSION + '_cam01.avi',  # Different file names to not overwrite each other
+                          path=video_folder,
+                          fps=60,
+                          # codec_cam='MJPG',  # Commented for video compression
+                          # codec_video='MJPG'  # Commented for video compression
+                          title=conf.PYBPOD_BOARD,
+                          cam_sync=cam_sync,
+                          states_on_sync=states_on_sync,
+                          mask=mask
+                          )
+            cam2 = VideoR(indx_or_path='/dev/video-cam02',
+                          name_video=conf.PYBPOD_SESSION + '_cam02.avi',  # Different file names to not overwrite each other
+                          path=video_folder,
+                          fps=60,
+                          # codec_cam='MJPG',  # Commented for video compression
+                          # codec_video='MJPG'  # Commented for video compression
+                          title=conf.PYBPOD_BOARD,
+                          cam_sync=cam_sync,
+                          states_on_sync=states_on_sync,
+                          mask=mask
+                          )
+            cam_OK = False  # Needed???? Commented on 01/03/2023
+            cam1.play()
+            cam2.play()
+            if int(conf.VAR_REC) > 0:
+                cam1.record()
+                cam2.record()
+        except:
+            print(
+                "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
+            no_cam = True
 
 
-def close_cam():
+def close_cam(n_cams=1):
     """
-    This function is a wrapper for the code block opening the camera and recording the video. Its main function is to
+    This function is a wrapper for the code block closing the camera(s) and recording the video. Its main function is to
     avoid copying the same code across tasks.
     """
-    if not no_cam:
-        cam.stop()
+
+    if n_cams == 1:  # For when a 1 cam is needed (all the test tasks, boxes 1-8)
+        if not no_cam:
+            cam.stop()
+
+    elif n_cams == 2:  # For when 2 cams are needed (ephys box only, 'cam_double' and 'stage_training' tasks)
+        if not no_cam:
+            cam1.stop()
+            cam2.stop()
