@@ -156,7 +156,7 @@ def main():
         axis.append(plt.subplot2grid((12, 2), (10, 0), rowspan=1, colspan=1))
         axis.append(plt.subplot2grid((12, 2), (11, 0), rowspan=1, colspan=1))
         axis.append(plt.subplot2grid((12, 2), (9, 1), rowspan=3, colspan=1))
-    elif username == 'delarocha3':  # Ephys box 0
+    elif username == 'setup0':  # Ephys box 0
         axis.append(plt.subplot2grid((3, 2), (0, 0), rowspan=1, colspan=1))
         axis.append(plt.subplot2grid((3, 2), (1, 0), rowspan=1, colspan=1))
         axis.append(plt.subplot2grid((3, 2), (2, 0), rowspan=1, colspan=1))
