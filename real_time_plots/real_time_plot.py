@@ -75,10 +75,9 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
              label='Right')
 
     try:
-        scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax1, color='purple')
-        scatter = sns.scatterplot(x=df.Trial, y=df.Sound + 0.5, ax=ax1,
-                                  color='red')  # +0.5 so it's centered in the y axis
-        scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch, ax=ax1, color='pink')
+        scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax1, color='purple')  # -1 so it's centered
+        scatter = sns.scatterplot(x=df.Trial, y=df.Sound + 0.5, ax=ax1, color='red')  # + 0.5 so it's centered
+        scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch - 0.5, ax=ax1, color='pink')  # - 0.5 so it's centered
         scatter.get_legend().remove()
     except:
         pass
@@ -113,9 +112,9 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
              label='Right')
 
     try:
-        scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax2, color='purple')
-        scatter = sns.scatterplot(x=df.Trial, y=df.Sound + 0.5, ax=ax2, color='red')  # +0.5 so it's centered in the y axis
-        scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch, ax=ax2, color='pink')
+        scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax2, color='purple')  # -1 so it's centered
+        scatter = sns.scatterplot(x=df.Trial, y=df.Sound + 0.5, ax=ax2, color='red')  # + 0.5 so it's centered
+        scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch - 0.5, ax=ax2, color='pink')  # - 0.5 so it's centered
         scatter.get_legend().remove()
     except:
         pass
@@ -158,9 +157,9 @@ def real_time_plot(df, box, path, ax1, ax2, ax3, ax4, trials):
         # ax3.set_yticklabels(['-70', '', '', '', '0', '', '', '', '70'])
 
     try:
-        scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax3, color='purple')
-        scatter = sns.scatterplot(x=df.Trial, y=df.Sound + 0.5, ax=ax3, color='red')  # +0.5 so it's centered in the y axis
-        scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch, ax=ax3, color='pink')
+        scatter = sns.scatterplot(x=df.Trial, y=df.Message - 1, ax=ax3, color='purple')  # -1 so it's centered
+        scatter = sns.scatterplot(x=df.Trial, y=df.Sound + 0.5, ax=ax3, color='red')  # + 0.5 so it's centered
+        scatter = sns.scatterplot(x=df.Trial, y=df.FilesMatch * 0, ax=ax3, color='pink')  # + 0 so it's centered
         scatter.get_legend().remove()
     except:
         pass

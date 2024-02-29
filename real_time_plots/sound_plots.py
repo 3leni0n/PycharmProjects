@@ -2,7 +2,9 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-username = os.getlogin()
+
+username = os.getlogin()  # Get username
+# username = getpass.getuser()  # Get username
 
 # parameters
 data_folder = '/home/' + username + 'setup2/pv_nmdar_eranet/experiments/2AFC_3/setups'

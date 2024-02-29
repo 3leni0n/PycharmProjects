@@ -8,12 +8,12 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
 
-# username = os.getlogin()  # Get username
-username = getpass.getuser()  # Get usernameif username == 'setup1' or username == 'setup2':  # Training boxes 1-8
+username = os.getlogin()  # Get username
+# username = getpass.getuser()  # Get username
 if username == 'setup1' or username == 'setup2':  # Training boxes 1-8
-    experiment = '2AFC_4'
+    experiment = '2AFC_5'
     max_sessions = 4
-elif username == 'delarocha3':  # Ephys box 0
+elif username == 'setup0':  # Ephys box 0
     experiment = 'Ephys'
     max_sessions = 1
 
