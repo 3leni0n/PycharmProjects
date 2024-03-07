@@ -5,9 +5,10 @@ from daily_report.daily_report import *
 from daily_report.daily_report_v2 import *
 from daily_report.daily_report_v3 import *
 from daily_report.daily_report_v4 import *
+from daily_report.daily_report_v5 import *
 
 
-def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False):
+def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False):
     time_start = time.time()
 
     if experiment is None:
@@ -57,24 +58,24 @@ def do_daily_reports(version=4, experiment='2AFC_4', index=-1, send_slack=False)
     username = os.path.split(os.path.expanduser('~'))[-1]
 
     if username == 'setup1':
-        remove_from_setup1 = ['873']
+        remove_from_setup1 = []
     else:
         remove_from_setup1 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
     if username == 'setup2':
-        remove_from_setup2 = ['875', '907', '911']
+        remove_from_setup2 = []
     else:
         remove_from_setup2 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
-    if username == 'delarocha3':
-        remove_from_setup_ephys = ['420', '422', '619', '623', '876', '909']
+    if username == 'setup0':
+        remove_from_setup_ephys = []
     else:
         remove_from_setup_ephys = []
 
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['561', '562', '791', '801', '802', '804', '807', '808', '820', '821', '873', '875', '876', '909', '911']
+    not_training = []
 
     animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + remove_from_setup_ephys \
                         + not_training
