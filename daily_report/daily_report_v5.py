@@ -54,8 +54,7 @@ def daily_report_v5(path, send_slack=False):
 
     # Select the folder and create it if it doesn't exist
     experiment = df.Experiment.unique()[0]  # Batch ID
-    # folder = '/home/alexis/Documentos/daily reports/' + experiment + '/'
-    folder = Path.home() / 'Documentos' / 'daily reports' / experiment
+    folder = Path.home() / 'Documents' / 'daily reports' / experiment
     if not os.path.exists(folder):
         # os.mkdir(folder)
         folder.mkdir(parents=True, exist_ok=True)
@@ -1149,9 +1148,8 @@ def daily_report_v5(path, send_slack=False):
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
 
 # For debugging:
-# path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/820/sessions/820_stage_training_v4_20230616-150207/820_stage_training_v4_20230616-150207.csv'
-# from daily_report.daily_report_v4 import *
-# daily_report_v4(path, send_slack=True)
+# path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/003/sessions/003_stage_training_v5_20240306-173209/003_stage_training_v5_20240306-173209.csv'
+# daily_report_v5(path, send_slack=True)
 
 
 # if __name__ == "__main__":

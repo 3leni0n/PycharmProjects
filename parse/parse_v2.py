@@ -16,7 +16,6 @@ def parse_v2(path):
 
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
     df = pd.read_csv(path, skiprows=6, sep=';')
-    # sounds_2 = pd.read_csv('/home/alexis/PycharmProjects/create_sounds/sounds_2.csv')
     sounds_2 = pd.read_csv(Path.home()/'PycharmProjects'/'create_sounds'/'sounds_2.csv')
 
     ####################################################################################################################
@@ -234,8 +233,8 @@ def parse_v2(path):
             aw_trials.append(1)  # Else AW was given
 
         # Trial timestamps
-        trial_start.append(band[band.TYPE == 'INFO']['BPOD-INITIAL-TIME'].iloc[0])
-        trial_end.append(band[band.TYPE == 'INFO']['BPOD-FINAL-TIME'].iloc[0])
+        trial_start.append(float(band[band.TYPE == 'INFO']['BPOD-INITIAL-TIME'].iloc[0]))
+        trial_end.append(float(band[band.TYPE == 'INFO']['BPOD-FINAL-TIME'].iloc[0]))
         trial_len.append(float(band[band.TYPE == 'INFO']['+INFO'].iloc[0]))
 
         # Stimulus timestamps (take BPOD-FINAL-TIME as the real timestamp of the TTL = BPOD-INITIAL-TIME + TTL duration)
@@ -266,10 +265,8 @@ def parse_v2(path):
         stim_len.append(stim_end[i] - stim_start[i])
 
         # Response window
-        resp_win_start.append(
-            band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'ResponseWindow')]['BPOD-INITIAL-TIME'].iloc[0])
-        resp_win_end.append(
-            band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'ResponseWindow')]['BPOD-FINAL-TIME'].iloc[0])
+        resp_win_start.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'ResponseWindow')]['BPOD-INITIAL-TIME'].iloc[0]))
+        resp_win_end.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'ResponseWindow')]['BPOD-FINAL-TIME'].iloc[0]))
         resp_win_len.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'ResponseWindow')]['+INFO'].iloc[0]))
 
         # Licks timestamps
@@ -434,6 +431,5 @@ def parse_v2(path):
 #     parse()
 
 # Debug
-# path = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_4/setups/561/sessions/561_stage_training_v4_20230329-110651' \
-#        '/561_stage_training_v4_20230329-110651.csv'
-# df = parse_v2(path)
+path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/002/sessions/002_stage_training_v5_20240306-172621/002_stage_training_v5_20240306-172621.csv'
+df = parse_v2(path)

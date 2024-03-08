@@ -110,17 +110,15 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
                       ' sessions found on the date ', date_session, "", sep='')
                 try:
                     if version == 1:
-                        # daily_report(path, send_slack=send_slack)
-                        pass
+                        daily_report(path, send_slack=send_slack)
                     elif version == 2:
-                        # daily_report_v2(path, send_slack=send_slack)
-                        pass
+                        daily_report_v2(path, send_slack=send_slack)
                     elif version == 3:
-                        # daily_report_v3(path, send_slack=send_slack)
-                        pass
+                        daily_report_v3(path, send_slack=send_slack)
                     elif version == 4:
                         daily_report_v4(path, send_slack=send_slack)
-                        pass
+                    elif version == 5:
+                        daily_report_v5(path, send_slack=send_slack)
                 except (IndexError, ValueError, FileNotFoundError, KeyError,
                         ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                     print(
@@ -148,17 +146,15 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
                           ')', "", sep='')
                     try:
                         if version == 1:
-                            # daily_report(path, send_slack=send_slack)
-                            pass
+                            daily_report(path, send_slack=send_slack)
                         elif version == 2:
-                            # daily_report_v2(path, send_slack=send_slack)
-                            pass
+                            daily_report_v2(path, send_slack=send_slack)
                         elif version == 3:
-                            # daily_report_v3(path, send_slack=send_slack)
-                            pass
+                            daily_report_v3(path, send_slack=send_slack)
                         elif version == 4:
                             daily_report_v4(path, send_slack=send_slack)
-                            pass
+                        elif version == 5:
+                            daily_report_v5(path, send_slack=send_slack)
                     except (IndexError, ValueError, FileNotFoundError, KeyError,
                             ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                         print(
@@ -172,17 +168,15 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
                       ' sessions found on the date ', date_session, "", sep='')
                 try:
                     if version == 1:
-                        # daily_report(path, send_slack=send_slack)
-                        pass
+                        daily_report(path, send_slack=send_slack)
                     elif version == 2:
-                        # daily_report_v2(path, send_slack=send_slack)
-                        pass
+                        daily_report_v2(path, send_slack=send_slack)
                     elif version == 3:
-                        # daily_report_v3(path, send_slack=send_slack)
-                        pass
+                        daily_report_v3(path, send_slack=send_slack)
                     elif version == 4:
                         daily_report_v4(path, send_slack=send_slack)
-                        pass
+                    elif version == 5:
+                        daily_report_v5(path, send_slack=send_slack)
                 except (IndexError, ValueError, FileNotFoundError, KeyError,
                         ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                     print(
