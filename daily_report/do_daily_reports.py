@@ -47,7 +47,7 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
     # Remove test setups and animals not training
 
     # Remove setups
-    test_setups = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8']
+    test_setups = ['Test', 'Test0', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8']
 
     # Remove Pycharm folder
     Pycharm_folder = ['.idea']
@@ -68,9 +68,9 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
     else:
         remove_from_setup2 = []
 
-    # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
+    # Switched to training in setup0, remove from setup2 to avoid doing reports from old sessions
     if username == 'setup0':
-        remove_from_setup_ephys = []
+        remove_from_setup_ephys = ['420', '422', '619', '623', '876', '907', '909', '911']
     else:
         remove_from_setup_ephys = []
 
