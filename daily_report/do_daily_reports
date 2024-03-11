@@ -1,7 +1,16 @@
 #!/bin/bash
-# source activate pybpod-environment  # Not needed as the env must be in crontab
+
+# Source Miniconda initialization script
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Activate Miniconda environment
+conda activate pybpod-environment
+
+# Change directory to where the Python script is located
 cd ~/PycharmProjects/
-python3 - <<END
+
+# Execute Python script and capture output and errors in log file
+~/miniconda3/envs/pybpod-environment/bin/python3 - <<END
 import os
 import matplotlib
 matplotlib.use('Agg')
