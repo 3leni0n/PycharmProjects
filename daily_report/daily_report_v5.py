@@ -306,7 +306,6 @@ def daily_report_v5(path, send_slack=False):
         ax1.set_ylim([0, 1.1])
         ax1.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax1.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # ax1.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax1.legend(loc='lower right', fontsize='xx-small', frameon=False)
         ax1.spines['top'].set_visible(False)
         ax1.spines['bottom'].set_visible(False)
@@ -380,7 +379,6 @@ def daily_report_v5(path, send_slack=False):
         ax2.set_ylim([0, 1.1])
         ax2.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax2.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # ax2.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax2.legend(loc='lower right', fontsize='xx-small', frameon=False)
         ax2.spines['top'].set_visible(False)
         ax2.spines['bottom'].set_visible(False)
@@ -452,7 +450,6 @@ def daily_report_v5(path, send_slack=False):
         ax3.set_ylabel('Miss\n(%)')
         ax3.set_yticks(list(np.arange(0, 1.1, 0.1)))
         ax3.set_yticklabels(['0', '', '', '', '', '50', '', '', '', '', '100'])
-        # ax3.set_yticklabels(['', '', '', '', '', '', '', '', '', '', ''])
         ax3.legend(loc='upper right', fontsize='xx-small', frameon=False)
         ax3.spines['top'].set_visible(False)
         ax3.spines['bottom'].set_visible(False)
@@ -507,7 +504,7 @@ def daily_report_v5(path, send_slack=False):
             ax4_twin = ax4.twinx()
             ax4_twin.set_ylim(-0.8, 1.8)  # Evidences
             ax4_twin.set_yticks([0, 1])
-            ax4_twin.set_yticklabels(['L', 'R'])
+            ax4_twin.set_yticklabels(['', ''])
             ax4_twin.spines['top'].set_visible(False)
 
         else:  # Plot coherences
@@ -774,6 +771,7 @@ def daily_report_v5(path, send_slack=False):
 
         # fig = plt.figure()
         xlim = [[], []]  # Initialize empty list to store left and right xlim
+        ylim = [[], []]  # Initialize empty list to store left and right ylim
 
         for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
 
@@ -781,7 +779,7 @@ def daily_report_v5(path, send_slack=False):
                 # ax = plt.subplot2grid((1, 2), (0, 0))
                 ax = plt.subplot2grid((16, 4), (0, 0), rowspan=12, colspan=2)
                 stim_color = 'tab:blue'
-                ax.set_title('Left trials')
+                ax.set_title('Left')
                 # ax.set_xlabel('Time (s)')
                 ax.set_xticklabels([])
                 ax.set_ylabel('Trial')
@@ -792,12 +790,14 @@ def daily_report_v5(path, send_slack=False):
                 # ax = plt.subplot2grid((1, 2), (0, 1))
                 ax = plt.subplot2grid((16, 4), (0, 2), rowspan=12, colspan=2)
                 stim_color = 'tab:orange'
-                ax.set_title('Right trials')
+                ax.set_title('Right')
                 # ax.set_xlabel('Time (s)')
                 ax.set_xticklabels([])
                 ax.spines['top'].set_visible(False)
                 ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
                 ax.spines['right'].set_visible(False)
+                ax.set_yticklabels([])
 
             df_side = df[df.Side == k].reset_index()
 
@@ -915,9 +915,11 @@ def daily_report_v5(path, send_slack=False):
                         # markersize=200 / len(df.Side == 1))
                         # markersize = ax.containers[1][0].get_height()
 
-            xlim[k] = [ax.get_xlim()]  # Store xlim from left and right psychometric_curves
+            xlim[k] = [ax.get_xlim()]  # Store xlim from left and right lick rasters
             # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+            ylim[k] = [ax.get_ylim()]  # Store upper ylim from left and right lick rasters
             ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+            ax.set_ylim([0, max(trials_left, trials_right)])
 
         # Custom legend
         legend_elements = [Patch(facecolor='tab:blue', label='Stim. left'),
@@ -926,10 +928,7 @@ def daily_report_v5(path, send_slack=False):
                            Patch(facecolor='lightgray', label='Delay'),
                            Patch(facecolor='tab:green', label='Reward'),
                            Patch(facecolor='tab:red', label='Timeout'),
-                           # Patch(facecolor='tab:green', label='Correct'),
-                           # Patch(facecolor='tab:red', label='Error'),
-                           # Patch(facecolor='tab:pink', label='WrongLick'),
-                           # Patch(facecolor='tab:gray', label='Miss'),
+                           Patch(facecolor='tab:pink', label='WrongLick'),
                            Line2D([0], [0], marker='o', color='w', label='Left licks', markerfacecolor='tab:blue'),
                            Line2D([0], [0], marker='o', color='w', label='Right licks', markerfacecolor='tab:orange')]
 
@@ -949,30 +948,42 @@ def daily_report_v5(path, send_slack=False):
 
         bin_size = 0.1
 
+        axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
+        ylim = [[], []]  # Initialize empty list to store left and right ylim
+
         for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
 
             histcounts_L = []
             histcounts_R = []
 
+            left_licks_per_trial = []
+            right_licks_per_trial = []
+
             if k == 0:  # Left subplot: left trials
                 # ax = plt.subplot2grid((1, 2), (0, 0))
                 ax = plt.subplot2grid((16, 4), (12, 0), rowspan=2, colspan=2)
+                axes_handles.append(ax)
                 # ax.set_title('Left trials')
                 # ax.set_xlabel('Time (s)')
                 ax.set_xlim(xlim[k][0])  # Use the same xlim that left raster
-                # ax.set_xticklabels([])
+                ax.set_xticklabels([])
                 ax.set_ylabel('All licks\n(licks/s)')
                 ax.spines['top'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
                 ax.spines['right'].set_visible(False)
             else:  # Right subplot: right trials
                 # ax = plt.subplot2grid((1, 2), (0, 1))
                 ax = plt.subplot2grid((16, 4), (12, 2), rowspan=2, colspan=2)
+                axes_handles.append(ax)
                 # ax.set_title('Right trials')
                 # ax.set_xlabel('Time (s)')
                 ax.set_xlim(xlim[k][0])  # Use the same xlim that right raster
-                # ax.set_xticklabels([])
+                ax.set_xticklabels([])
                 ax.spines['top'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
                 ax.spines['right'].set_visible(False)
+                ax.set_yticklabels([])
 
             df_side = df[df.Side == k].reset_index()
 
@@ -980,6 +991,7 @@ def daily_report_v5(path, send_slack=False):
 
                 # Left licks
                 for i in range(len(df_side.Port1In[j])):  # n licks
+                    left_licks_per_trial.append(len(df_side.Port1In[j]))
                     if df_side.Port1In[j] == []:
                         # if not df.Port1In[j]:  # Equivalent
                         pass
@@ -989,6 +1001,7 @@ def daily_report_v5(path, send_slack=False):
 
                 # Right licks
                 for i in range(len(df_side.Port2In[j])):  # n licks
+                    right_licks_per_trial.append(len(df_side.Port2In[j]))
                     if df_side.Port2In[j] == []:
                         # if not df.Port1In[j]:  # Equivalent
                         pass
@@ -998,6 +1011,8 @@ def daily_report_v5(path, send_slack=False):
 
             # ax.hist(histcounts_L, density=True, histtype='step', color='tab:blue', label='Left licks')
             # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
+
+            ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
 
             ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
                     bins=np.linspace(-2, xlim[k][0][1]),
@@ -1010,6 +1025,13 @@ def daily_report_v5(path, send_slack=False):
 
             # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
             ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+
+        # Find the maximum y-axis limit across all handles
+        max_ylim = max(ax.get_ylim()[1] for ax in axes_handles)
+
+        # Set the same maximum y-axis limit for all handles
+        for ax in axes_handles:
+            ax.set_ylim([0, max_ylim])
 
         ax.legend(loc='upper right', fontsize='xx-small', frameon=False)
 
@@ -1025,6 +1047,9 @@ def daily_report_v5(path, send_slack=False):
 
         # fig = plt.figure()
 
+        axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
+        ylim = [[], []]  # Initialize empty list to store left and right ylim
+
         for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
 
             first_lick_L = []
@@ -1033,6 +1058,7 @@ def daily_report_v5(path, send_slack=False):
             if k == 0:  # Left subplot: left trials
                 # ax = plt.subplot2grid((1, 2), (0, 0))
                 ax = plt.subplot2grid((16, 4), (15, 0), rowspan=1, colspan=2)
+                axes_handles.append(ax)
                 # ax.set_title('Left trials')
                 ax.set_xlim([0, 2])  # Only interested in what happens during the first 2s
                 ax.set_xlabel('Time (s)')
@@ -1043,12 +1069,15 @@ def daily_report_v5(path, send_slack=False):
             else:  # Right subplot: right trials
                 # ax = plt.subplot2grid((1, 2), (0, 1))
                 ax = plt.subplot2grid((16, 4), (15, 2), rowspan=1, colspan=2)
+                axes_handles.append(ax)
                 # ax.set_title('Right trials')
                 ax.set_xlim([0, 2])
                 ax.set_xlabel('Time (s)')
                 ax.spines['top'].set_visible(False)
+                ax.spines['left'].set_visible(False)
                 ax.spines['right'].set_visible(False)
                 # ax.patch.set_facecolor('none')
+                ax.set_yticklabels([])
 
             df_side = df[df.Side == k].reset_index()
 
@@ -1093,6 +1122,8 @@ def daily_report_v5(path, send_slack=False):
             # ax.hist(first_lick_L, density=True, histtype='step', color='tab:blue', label='Left')
             # ax.hist(first_lick_R, density=True, histtype='step', color='tab:orange', label='Right')
 
+            ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
+
             ax.hist(first_lick_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
                     bins=np.linspace(0, 2),
                     weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
@@ -1105,6 +1136,13 @@ def daily_report_v5(path, send_slack=False):
             ax.patch.set_facecolor('none')  # Make axes transparent so the xaxes labels from the upper plot are visible
             # ax.set_xlim([-1, xlim[k][0][1]])  # Set xlim from -1 to trial end to zoom in and cut the fixation
             ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+
+        # Find the maximum y-axis limit across all handles
+        max_ylim = max(ax.get_ylim()[1] for ax in axes_handles)
+
+        # Set the same maximum y-axis limit for all handles
+        for ax in axes_handles:
+            ax.set_ylim([0, max_ylim])
 
         # ax.legend(loc='upper right')
 
