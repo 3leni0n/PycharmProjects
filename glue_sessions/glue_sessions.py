@@ -13,7 +13,7 @@ from my_fun.my_fun import get_experiment
 
 
 # Define functions
-def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4', to_csv=False):
+def glue_sessions(animal=None, protocol='stage_training_v5', experiment='2AFC_5', to_csv=False):
     """
     Glue all the sessions of a given animal.
     :param animal: ID number of the animal
@@ -42,7 +42,6 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
     folder_in = Path.home() / 'pv_nmdar_eranet' / 'experiments' / experiment / 'setups'  # Where the data for all animals is
 
     if animal is None:
@@ -51,7 +50,7 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
         animals.sort()  # Sort them by name
 
         # Usually I don't want Test subject(s)
-        animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
+        animals_to_remove = ['Test', 'Test0', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
                              '.idea']  # Pycharm's file
 
         for i in range(len(animals_to_remove)):
@@ -152,7 +151,7 @@ def glue_sessions(animal=None, protocol='stage_training_v4', experiment='2AFC_4'
     return df, corrupted_sessions
 
 
-def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
+def update_glued_sessions(protocol='stage_training_v5', experiment='2AFC_5'):
     """
     Update the glued_sessions .csv files for all animals with the non yet included sessions.
     :param protocol: task code version
@@ -184,7 +183,7 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
     animals.sort()  # Sort them by name
 
     # Usually I don't want Test subject(s)
-    animals_to_remove = ['Test', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
+    animals_to_remove = ['Test', 'Test0', 'Test1', 'Test2', 'Test3', 'Test4', 'Test5', 'Test6', 'Test7', 'Test8',
                          '.idea']  # Pycharm's file
     for i in range(len(animals_to_remove)):
         try:

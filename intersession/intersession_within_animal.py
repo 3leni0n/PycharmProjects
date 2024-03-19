@@ -8,8 +8,6 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig
-
-
 # import statsmodels.formula.api as smf
 
 
@@ -1191,7 +1189,6 @@ def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignmen
         experiment = input('Enter experiment name')
 
     # print('Doing intersession reports of: ' + animal)
-    # folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
     folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
     animals = os.listdir(folder)
     animals = [animals for animals in animals if animals.endswith('.csv') and len(animals) == 7]
@@ -1216,6 +1213,10 @@ def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignmen
         elif username == 'setup2':
             if box > 4:
                 flag = True
+
+        if df.Protocol.unique()[0] != 'stage_training_v5':  # In Ephys PC (setup0) there is only one experiment (Ephys)
+            # instead of the 2AFC_X nomenclature followed in the other PCs
+            flag = False
 
         if flag:
             try:
