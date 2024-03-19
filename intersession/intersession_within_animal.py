@@ -8,7 +8,7 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig
-import statsmodels.formula.api as smf
+# import statsmodels.formula.api as smf
 
 
 ########################################################################################################################
@@ -55,25 +55,34 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     # week, Monday is 0 and Sunday is 6
     dates_datetime = [datetime.datetime.strptime(dates[i], "%Y-%m-%d") for i in range(len(dates))]
 
-    # Import date of birth (to align plots to DOB if desired)
-    dob = pd.read_csv(Path.home() / 'PycharmProjects' / 'intersession' / 'DOB.csv')  # From Mice's - Overview Google
-    # Sheets (https://docs.google.com/spreadsheets/d/1hNnBMbe4se3VPOn5FeS1ViTVfXVZ7YLJCiFRWFPYMoU/edit#gid=551555314)
-    dob_datetime = []
-    for i in range(len(dob)):
-        try:
-            dob_datetime.append(datetime.datetime.strptime(dob.DOB[i], "%d/%m/%Y"))
-        except ValueError:  # time data 'Sep/Aug 2020' does not match format '%d/%m/%Y'
-            dob_datetime.append(np.nan)
-        except TypeError:  # strptime() argument 1 must be str, not float
-            dob_datetime.append(np.nan)
-    dob['DOB_datetime'] = dob_datetime
-    dob_current_mouse = dob[dob.ID == setup]['DOB_datetime'].iloc[-1]
-    age = [(dates_datetime[i] - dob_current_mouse).days for i in range(len(dates_datetime))]
-    aoi = np.arange(0, 365, 30)
-    aoi[(aoi > age[0]) & (aoi < age[-1])]
-    # aoi = np.arange(age[0], age[-1], 30)  # Age of interest (every 30 days)
+    ####################################################################################################################
 
+    # Import date of birth (to align plots to DOB if desired)
+    try:
+        dob = pd.read_csv(Path.home() / 'PycharmProjects' / 'intersession' / 'DOB.csv')  # From Mice's - Overview Google
+        # Sheets (https://docs.google.com/spreadsheets/d/1hNnBMbe4se3VPOn5FeS1ViTVfXVZ7YLJCiFRWFPYMoU/edit#gid=551555314)
+        dob_datetime = []
+        for i in range(len(dob)):
+            try:
+                dob_datetime.append(datetime.datetime.strptime(dob.DOB[i], "%d/%m/%Y"))
+            except ValueError:  # time data 'Sep/Aug 2020' does not match format '%d/%m/%Y'
+                dob_datetime.append(np.nan)
+            except TypeError:  # strptime() argument 1 must be str, not float
+                dob_datetime.append(np.nan)
+        dob['DOB_datetime'] = dob_datetime
+        dob_current_mouse = dob[dob.ID == setup]['DOB_datetime'].iloc[-1]
+        age = [(dates_datetime[i] - dob_current_mouse).days for i in range(len(dates_datetime))]
+        aoi = np.arange(0, 365, 30)
+        aoi[(aoi > age[0]) & (aoi < age[-1])]
+        # aoi = np.arange(age[0], age[-1], 30)  # Age of interest (every 30 days)
+    except IndexError:
+        print('Could not recover DOB data, filling with NaNs instead')
+        age = n_dates * [np.nan]
+    ####################################################################################################################
+
+    # Dates of interest
     # doi = 'yyyy-mm-dd'  # Select a date of interest to plot a vertical line
+
     # For 2AFC_2 (batch 2)
     doi_0 = '2021-05-26'  # Filename2 start being recorded
     # df.Date[df.Filename2.first_valid_index()] should return '2021-05-27'
@@ -106,6 +115,8 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     doi_20 = '2023-05-15'  # Installation of powered USB hubs
     doi_21 = '2023-07-10'  # First session after ERANET meeting 2023
 
+    # For 2AFC_5 (batch 5)
+
     # For testing specific events
     # doi_test = '2023-06-09'
     # dois = [doi_test]
@@ -123,6 +134,8 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
             print(f'No data from this animal on {dois[i]}')
             dois_indexes.append(np.nan)
 
+    ####################################################################################################################
+
     # Alignment (x-axis)
     if alignment == 'n_sessions':  # Number of training sessions. Starts at 0
         x = dates_indexes
@@ -136,8 +149,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     ####################################################################################################################
 
     # Select the folder where to save the PDF or create it if it doesn't exist
-    # folder_pdf_out = '/home/alexis/Documentos/intersession reports/' + experiment
-    folder_pdf_out = Path.home() / 'Documentos' / 'intersession reports' / experiment
+    folder_pdf_out = Path.home() / 'Documents' / 'intersession reports' / experiment
 
     if not os.path.exists(folder_pdf_out):
         # os.mkdir(folder_pdf_out)
@@ -390,7 +402,9 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     ####################################################################################################################
 
-    with PdfPages(f'{setup}_intersession_({alignment}_aligned).pdf') as pdf:
+    filename = f'{setup}_intersession_({alignment}_aligned).pdf'
+
+    with PdfPages(filename) as pdf:
 
         # PAGE 1
 
@@ -653,7 +667,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         ax4.set_xticklabels([])
         # ax4.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax4.set_ylabel('Block length')
-        ax4.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        # ax4.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax4.spines['top'].set_visible(False)
         ax4.spines['bottom'].set_visible(False)
         # ax4.spines['right'].set_visible(False)
@@ -844,7 +858,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         ax7.set_xticklabels([])
         # ax7.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax7.set_ylabel('P')
-        ax7.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        # ax7.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax7.spines['top'].set_visible(False)
         ax7.spines['bottom'].set_visible(False)
         # ax7.spines['right'].set_visible(False)
@@ -861,7 +875,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
         ################################################################################################################
 
-        # PLOT 8: DELAYS
+        # PLOT 8: DELAY
 
         time_start = time.time()
 
@@ -886,7 +900,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         # ax8.set_xticklabels([])
         # ax8.xaxis.get_major_locator().set_params(integer=True)  # Force integers only in x ticks
         ax8.set_ylabel('Delay')
-        ax8.legend(loc='upper right', fontsize='xx-small', frameon=True)
+        # ax8.legend(loc='upper right', fontsize='xx-small', frameon=True)
         ax8.spines['top'].set_visible(False)
         # ax8.spines['bottom'].set_visible(False)
         # ax8.spines['right'].set_visible(False)
@@ -1115,17 +1129,14 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
     # Select the output folder for the .csv file and create it if it doesn't exist
-    # folder_csv_out = '/home/alexis/PycharmProjects/intersession/' + experiment + '/'
     folder_csv_out = Path.home() / 'PycharmProjects' / 'intersession' / experiment
     if not os.path.exists(folder_csv_out):
         # os.mkdir(folder_csv_out)
         folder_csv_out.mkdir(parents=True, exist_ok=True)
 
     if to_csv:
-        # df_intersession.to_csv(folder_csv_out + setup + '_intersession.csv', index=False)  # index=False to avoid the
         df_intersession.to_csv(Path(folder_csv_out / (setup + '_intersession.csv')),
-                               index=False)  # index=False to avoid the
-        # 'Unmmaed: 0' column
+                               index=False)  # index=False to avoid the 'Unmmaed: 0' column
 
     # Register time again and compute the total run time of the script
     time_end_total = time.time()
@@ -1134,12 +1145,15 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     # This block needs to be the last otherwise it sends the file too soon and corrupted
     if send_slack:
-        with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token
+        # with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token Alexis personal laptop
+        with open(Path.home() / 'slack_bot_token', 'r') as f:  # Get slack bot token
             slack_bot_token = f.read().replace('\n', '')
 
         os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
         # filepath = folder_pdf_out + '/' + df.Session.unique()[0]
-        filepath = folder_pdf_out + '/' + setup + '_intersession'
+        filepath = Path(folder_pdf_out / filename)
+        filepath = str(filepath)  # filepath, input to slack api method files.upload, used by function slack_spam,
+        # requires the file path as a str
         slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
     return df_intersession
@@ -1147,7 +1161,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
 ########################################################################################################################
 
-def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignment='n_sessions', to_csv=True,
+def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignment='n_sessions', to_csv=True,
                      send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
@@ -1182,7 +1196,6 @@ def do_intersessions(protocol='stage_training_v4', experiment='2AFC_4', alignmen
     animals.sort()
 
     for i in range(len(animals)):
-        # path = folder + animals[i]
         path = Path(folder / animals[i])
         try:
             intersession_within_animal(path, alignment=alignment, to_csv=to_csv, send_slack=send_slack)

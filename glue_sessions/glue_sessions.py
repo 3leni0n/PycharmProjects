@@ -164,7 +164,6 @@ def update_glued_sessions(protocol='stage_training_v4', experiment='2AFC_4'):
 
     if experiment is None:
 
-        # folder = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
         folder = Path.home() / 'pv_nmdar_eranet' / 'experiments'  # Where the data for all animals is
         experiments = os.listdir(folder)  # List experiments
         experiments.sort()  # Sort them by name
