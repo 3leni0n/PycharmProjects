@@ -8,6 +8,8 @@ from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig
+
+
 # import statsmodels.formula.api as smf
 
 
@@ -1195,12 +1197,31 @@ def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignmen
     animals = [animals for animals in animals if animals.endswith('.csv') and len(animals) == 7]
     animals.sort()
 
+    username = os.getlogin()
+
     for i in range(len(animals)):
         path = Path(folder / animals[i])
-        try:
-            intersession_within_animal(path, alignment=alignment, to_csv=to_csv, send_slack=send_slack)
-        except:
-            print(f'Could not do intersession report of animal {i}')
+        df = pd.read_csv(path)
+        board = df.Board.unique()[0]  # Bpod (box)
+        box = int(board[-1])
+        flag = False  # flag always needs to be initialized as False
+
+        # Only do the intersession reports of the animals training in that PC (so the data is stored locally)
+        if username == 'setup0':
+            if box == 0:
+                flag = True
+        elif username == 'setup1':
+            if 0 < box < 5:
+                flag = True
+        elif username == 'setup2':
+            if box > 4:
+                flag = True
+
+        if flag:
+            try:
+                intersession_within_animal(path, alignment=alignment, to_csv=to_csv, send_slack=send_slack)
+            except:
+                print(f'Could not do intersession report of animal {i}')
 
     time_end = time.time()
     runtime = time_end - time_start
