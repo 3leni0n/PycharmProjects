@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Source Miniconda initialization script
+source ~/miniconda3/etc/profile.d/conda.sh
+
+# Activate Miniconda environment
+conda activate pybpod-environment
+
+# Change directory to where the Python script is located
+cd ~/PycharmProjects/
+
+# Execute Python script and capture output and errors in log file
+~/miniconda3/envs/pybpod-environment/bin/python3 - <<END
+import os
+import matplotlib
+matplotlib.use('Agg')
+username = os.path.split(os.path.expanduser('~'))[-1]
+if username == 'setup0':
+    experiment = 'Ephys'
+else:
+    experiment = '2AFC_5'
+from intersession.intersession_within_animal import *
+do_intersessions(experiment=experiment, send_slack=True)
+END
