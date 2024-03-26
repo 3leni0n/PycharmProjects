@@ -33,7 +33,6 @@ from parse.parse_v2 import *
 
 ########################################################################################################################
 
-# Define function
 def daily_report_v5(path, send_slack=False):
 
     # Register time
@@ -220,7 +219,7 @@ def daily_report_v5(path, send_slack=False):
             f'Accuracy '
             f'{new_line}'
             f'blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, '
-            f'{str(int(round(accuracy_blocks_right * 100)))}% R),'
+            f'{str(int(round(accuracy_blocks_right * 100)))}% R), '
             f'Responses: {str(responses)} ({str(responses_left)} L, {str(responses_right)} R), '
             f'Hits: {str(hits)} ({str(hits_left)} L, {str(hits_right)} R), '
             f'Errors: '
@@ -244,6 +243,8 @@ def daily_report_v5(path, send_slack=False):
 
         change_p = df.P.diff()  # Find trials in which substage/p changes
         change_p = change_p[change_p != 0].dropna()  # Omit 0s and drop first nan
+
+        ################################################################################################################
 
         # PLOT 1: ACCURACY PER SIDE
 
@@ -546,7 +547,7 @@ def daily_report_v5(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 8: P RIGHT PSYCHOMETRIC CURVE
+        # PLOT 8: PROB. RIGHT PSYCHOMETRIC CURVE
 
         # To do:
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
@@ -613,7 +614,7 @@ def daily_report_v5(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 9: P REPEAT PSYCHOMETRIC CURVE
+        # PLOT 9: PROB. REPEAT PSYCHOMETRIC CURVE
 
         # To do:
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
@@ -688,7 +689,7 @@ def daily_report_v5(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 8: ILDS DISTRIBUTION
+        # PLOT 10: ILDS DISTRIBUTION (INSET)
 
         # Only draw ILDs distribution if evidences are introduced (stage 4)
         if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
@@ -949,6 +950,12 @@ def daily_report_v5(path, send_slack=False):
         # fig = plt.figure(figsize=(11.69, 8.27))  # A4 size in inches landscape
 
         # PLOT X: TOTAL NUMBER OF LICKS
+
+        time_start_total_licks = time.time()
+
+        # fig = plt.figure()
+
+        bin_size = 0.1
 
 
 
@@ -1215,4 +1222,5 @@ daily_report_v5(path, send_slack=True)
 
 # if __name__ == "__main__":
 #     daily_report()
+# Define function
 

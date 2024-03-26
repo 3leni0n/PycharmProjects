@@ -4,8 +4,8 @@ from scipy.signal import firwin, lfilter  # For white_noise
 from scipy.stats import beta  # Important! If using this, can't call any variable 'beta'!
 import pandas as pd
 from string import ascii_lowercase
-from matplotlib import pyplot as plt
-# from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
+# from matplotlib import pyplot as plt
+from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
 import slack
 import os
 import csv
@@ -26,39 +26,45 @@ def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000,
                 normalize=True):  # Adapted from UtilsR's 'whiteNoiseGen'
     """Create 'white noise' (between quotes as the signal is actually being band pass filtered).
     Note: if it takes too long try reducing the sampling rate or the filter length.
+    :param fs: Sampling frequency
+    :param cutoff: Low and high frequency band edges. Should be positive and monotonically increasing
+    :param amp: Amplitude
+    :param dur: Duration in seconds
+    :param fn: Filter length
+    :param normalized: If True normalize signal
     """
     mean = 0
     std = 1
-    # fs = 44100  # Sampling frequency
-    # cutoff = [2000, 20000]  # Low and high frequency band edges. Should be positive and monotonically increasing
-    # between 0 and fs/2 (not included)
     nyq = fs / 2  # Nyquist frequency (also found as fs * 0.5)
     normalized_cutoff = [cutoff[0] / nyq, cutoff[1] / nyq]  # Normalize by Nyquist frequency
-    # amp = 1  # Amplitude
-    # dur = 1  # Duration in seconds
-    noise = amp * np.random.normal(mean, std, (fs * (dur + 1)))  # +1 to make the length double and then chop the
-    # the first half
-    # fn = 10000  # Filter length
+    noise = amp * np.random.normal(mean, std, int(fs * dur * 2))  # * 2 as there is an artifact at the beginning of the
+    # signal when applying the filter. So create double length and then later trim out the beginning
     band_pass = firwin(fn, normalized_cutoff, pass_zero=False)  # FIR filter with window method
     band_noise = lfilter(band_pass, 1, noise)  # Filter data with the FIR filter
-    signal = band_noise[fs:int(fs * (dur + 1))]  # Indexing from fs to fs * 2, taking the second half of band_noise
-    # (plot to understand)
+
+    # Remove the first part as there is an artifact from the filter (resulting in 1 less frame than intended)
+    # Plot to understand
+    trim_length = int(fs * dur)
+    band_noise = band_noise[-trim_length:]
+
     if normalize:
-        signal = signal / np.max(abs(signal))
-    return signal
+        band_noise = band_noise / np.max(abs(band_noise))
+    return band_noise
 
 
 def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=False):
-    """Function that returns a sine wave (https://en.wikipedia.org/wiki/Sine_wave)."""
-    # length = 1  # In seconds
-    # fs = 44100  # Sampling frequency
-    # cycles = 10  # Number of oscillations
+    """Function that returns a sine wave (https://en.wikipedia.org/wiki/Sine_wave).
+    :param length: In seconds
+    :param fs: Sampling frequency
+    :param cycles: Number of oscillations
+    :param amp: Amplitude (peak deviation of the function from 0)
+    :param phase: Phase (φ -phi-) or horizontal shift (where in its cycle the oscillation is at t = 0 in rad/s)
+    :param v_shift: Vertical shift
+    """
+
     x = np.arange(0, length, 1 / fs)  # Time vector of 'length' seconds and 'fs' points
-    # amp = 1  # Amplitude: peak deviation of the function from 0
     f = cycles / length  # Ordinary frequency: number of oscillations (cycles) that occur each second of time (Hz)
     ang_freq = 2 * np.pi * f  # Angular frequency (ω -omega-): rate of change of the function in rad/s
-    # phase = 0  # Phase (φ -phi-) or horizontal shift: where in its cycle the oscillation is at t = 0 in rad/s
-    # v_shift = 0  # Vertical shift
     y = amp * np.sin(ang_freq * x + phase) + v_shift  # Sine wave function
 
     if plot:
@@ -73,7 +79,7 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
 
 def envelope(noise, coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=False):
     """
-    Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
+    Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence.
     :param noise: white noise vector
     :param coh: coherence [0=left, 1=right]
     :param fs: sampling frequency (needs to match the fs of white noise and sine wave)

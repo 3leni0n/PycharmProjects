@@ -2,6 +2,7 @@
 import time
 import numpy as np
 import sys
+from pathlib import Path
 import os
 import itertools
 import wavio
@@ -14,7 +15,7 @@ from my_fun.my_fun import *
 ########################################################################################################################
 
 
-def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=10,
+def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=10,
                      sigma=1, save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
     amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
@@ -29,7 +30,7 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
     time_start = time.time()
 
-    ILDs_dB = np.array([-70, -8, -4, -2, 0, 2, 4, 8, 70])
+    ILDs_dB = np.array([-max_vol, -8, -4, -2, 0, 2, 4, 8, max_vol])
 
     dBs = []
     for i in ILDs_dB:
@@ -50,8 +51,7 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     ####################################################################################################################
 
     # Select the folder and create it if it doesn't exist
-    folder = '/home/alexis/Música/sounds_2/'
-    # folder = '/home/alexis/Música/test/'
+    folder = Path.home()/'Music'/'sounds_5'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -60,12 +60,11 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     chars = list(string.ascii_lowercase)  # Make a list of all the lowercase letters as long as ilds
 
     # Create DataFrame column labels
-    columns = ['filename', 'ILD',
-               'EL0', 'EL1', 'EL2', 'EL3', 'EL4', 'EL5', 'EL6', 'EL7', 'EL8', 'EL9',  # Envelope Left * 10 frames
-               'ER0', 'ER1', 'ER2', 'ER3', 'ER4', 'ER5', 'ER6', 'ER7', 'ER8', 'ER9',  # Envelope Right * 10 frames
-               'max_vol', 'fs', 'cutoff', 'amp', 'dur', 'fn', 'normalize', 'n_frames', 'sigma', 'save']
-
-    # [f'EL{n:02}' for n in range(n_frames)]  # To iterate
+    left_frames = [f'EL{n:01}' for n in range(n_frames)]  # Envelope Left * 10 frames
+    right_frames = [f'ER{n:01}' for n in range(n_frames)]  # Envelope Right * 10 frames
+    columns = (['filename', 'ILD'] +
+               left_frames + right_frames +
+               ['max_vol', 'fs', 'cutoff', 'amp', 'dur', 'fn', 'normalize', 'n_frames', 'sigma', 'save'])
 
     sound_number = 0  # Initialize counter
     data = []
@@ -78,14 +77,17 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
         for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
             # Sound number (name) from 1 (aaa) to 9261 (uuu)
             sound_number += 1
-            name = folder + chars[k] + i + j
+            # name = folder + chars[k] + i + j
+            name = Path(folder / (chars[k] + i + j))
+
 
             filename = chars[k] + i + j  # For the csv file
 
-            path_wav = name + '.wav'
+            path_wav = Path(name).with_suffix('.wav')
+            print(path_wav)
             # path_mp3 = name + '.mp3'
             # path_ogg = name + '.ogg'
-            print(sound_number, name)
+            # print(sound_number, name)
 
             SL, SR, EL, ER = do_envelope_dB_normal(noise, dB_left, dB_right, max_vol,
                                                    fs=fs, amp=amp, dur=dur, n_frames=n_frames, sigma=sigma)
@@ -96,7 +98,8 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
             if save:  # Save sounds only if specified (don't wanna for simulation purposes)
                 # sound = np.column_stack((filename, SL, SR))
                 sound = np.column_stack((SL, SR))
-                wavio.write(path_wav, sound, fs, sampwidth=1)  # Write the array sound to a wav file
+                # wavio.write(path_wav, sound, fs, sampwidth=1)  # Write the array sound to a wav file
+                wavio.write(path_wav.absolute().as_posix(), sound, fs, sampwidth=1)  # Write the array sound to a wav file
                 # sound_wav = AudioSegment.from_wav(path_wav)  # Read the wav file to a wav sound
                 # sound_wav.export(path_mp3, format='mp3')  # Export the wav sound to a mp3 file
                 # sound_wav.export(path_ogg, format='ogg')  # Export the wav sound to a ogg file
@@ -107,7 +110,8 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     df = pd.DataFrame(data=data, index=None, columns=columns)
 
     if save:
-        df.to_csv(folder + 'sounds_2.csv', index=False)  # index=False to avoid writing the 'Unnamed:' column
+        df.to_csv(Path(folder / 'sounds_5').with_suffix('.csv'), index=False)
+        # index=False to avoid writing the 'Unnamed:' column
 
     time_end = time.time()
     runtime = time_end - time_start
