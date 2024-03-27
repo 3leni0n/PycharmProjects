@@ -51,7 +51,7 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     ####################################################################################################################
 
     # Select the folder and create it if it doesn't exist
-    folder = Path.home()/'Music'/'sounds_5'
+    folder = Path.home()/'Music'/'sounds_test'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -110,7 +110,7 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     df = pd.DataFrame(data=data, index=None, columns=columns)
 
     if save:
-        df.to_csv(Path(folder / 'sounds_5').with_suffix('.csv'), index=False)
+        df.to_csv(Path(folder / 'sounds_test').with_suffix('.csv'), index=False)
         # index=False to avoid writing the 'Unnamed:' column
 
     time_end = time.time()

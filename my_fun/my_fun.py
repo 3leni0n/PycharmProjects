@@ -5,7 +5,7 @@ from scipy.stats import beta  # Important! If using this, can't call any variabl
 import pandas as pd
 from string import ascii_lowercase
 # from matplotlib import pyplot as plt
-from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
+# from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
 import slack
 import os
 import csv
