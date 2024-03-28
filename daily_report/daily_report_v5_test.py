@@ -34,7 +34,6 @@ from parse.parse_v2 import *
 ########################################################################################################################
 
 def daily_report_v5(path, send_slack=False):
-
     # Register time
     time_start_total = time.time()
 
@@ -114,14 +113,14 @@ def daily_report_v5(path, send_slack=False):
     if not pd.isnull(df.Blocks.unique()[0]) or int(df.Blocks.unique()[0]) != 0:  # If blocks isn't NaN or 0
         block_change_index = [i for i in range(1, len(df.Side)) if df.Side[i - 1] != df.Side[i]]
         # if not pd.isnull(df.BlockLen.unique()[0]) and float(df.BlockLen.unique()[0]) != 0:
-            # BlockLen wasn't there from the beginning of blocks (block length = running window in the task = 20 trials),
-            # so the previous method is a way to detect blocks regardless of the BlockLen. Nevertheless, in sessions
-            # where there was block length, it should match with the previous method
-            # Assertion not valid if transitioning from blocks to random trials. Need to include Warming up blocks
-            # assert block_change_index == df.Side[
-            #                              int(df.BlockLen.unique()[0])::int(
-            #                                  df.BlockLen.unique()[0])].index.values.tolist()
-            # pass
+        # BlockLen wasn't there from the beginning of blocks (block length = running window in the task = 20 trials),
+        # so the previous method is a way to detect blocks regardless of the BlockLen. Nevertheless, in sessions
+        # where there was block length, it should match with the previous method
+        # Assertion not valid if transitioning from blocks to random trials. Need to include Warming up blocks
+        # assert block_change_index == df.Side[
+        #                              int(df.BlockLen.unique()[0])::int(
+        #                                  df.BlockLen.unique()[0])].index.values.tolist()
+        # pass
 
         hits_blocks = df.Hit[block_change_index].sum().astype(int)
         responses_blocks = df.Response[block_change_index].sum()
@@ -182,7 +181,7 @@ def daily_report_v5(path, send_slack=False):
         # https://towardsdatascience.com/how-to-add-new-line-in-python-f-strings-7b4ccc605f4a
         sum_text = (
             f'Date: {df.Date.unique()[0]}, '
-             # [0:-7] to get rid of the floating numbers in the seconds
+            # [0:-7] to get rid of the floating numbers in the seconds
             f'Time: {df.SessionStart.unique()[0][0:-7]} - {df.SessionEnd.unique()[0][0:-7]}, '
             f'Subject: {df.Subject.unique()[0]}, '
             f'Box: {df.Board.unique()[0][4]}, '
@@ -226,7 +225,7 @@ def daily_report_v5(path, send_slack=False):
             f'{new_line}'
             f'{str(errors)} ({str(errors_left)} L, {str(errors_right)} R), '
             f'Misses: {str(misses)} ({str(misses_left)} L, {str(misses_right)} R), '
-            f'Miss rate: {str(int(round(miss_rate * 100)))}% ' 
+            f'Miss rate: {str(int(round(miss_rate * 100)))}% '
             f'({str(int(round(miss_rate_left * 100)))}% L, {str(int(round(miss_rate_right * 100)))}% R), '
             f'Sound errors: {str(sound_errors)} ({str(round((sound_errors / trials) * 100, 1))}%), '
             f'{new_line}'
@@ -881,8 +880,7 @@ def daily_report_v5(path, send_slack=False):
                         mec = 'tab:blue'
                         mew = None
 
-                    if df_side.Port1In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port1In[j]:
                         pass
                     else:
                         ax.plot(df_side.Port1In[j][i] -
@@ -908,8 +906,7 @@ def daily_report_v5(path, send_slack=False):
                         mec = 'tab:orange'
                         mew = None
 
-                    if df_side.Port2In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port2In[j]:
                         pass
                     else:
                         ax.plot(df_side.Port2In[j][i] -
@@ -942,6 +939,21 @@ def daily_report_v5(path, send_slack=False):
         runtime_raster = time_end_raster - time_start_raster
         print("'Plot 5: peristimulus lick raster' took", round(runtime_raster, 2), 'seconds to run')
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         ################################################################################################################
         ################################################################################################################
 
@@ -958,16 +970,7 @@ def daily_report_v5(path, send_slack=False):
 
         bin_size = 0.1
 
-
-
-
-
-
-
-
-
-
-
+        ################################################################################################################
 
         # PLOT 6: PERISTIMULUS ALL LICKS HISTOGRAM
 
@@ -1022,8 +1025,7 @@ def daily_report_v5(path, send_slack=False):
                 # Left licks
                 for i in range(len(df_side.Port1In[j])):  # n licks
                     left_licks_per_trial.append(len(df_side.Port1In[j]))
-                    if df_side.Port1In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port1In[j]:
                         pass
                     else:
                         histcounts_L.append(df_side.Port1In[j][i] -
@@ -1032,8 +1034,7 @@ def daily_report_v5(path, send_slack=False):
                 # Right licks
                 for i in range(len(df_side.Port2In[j])):  # n licks
                     right_licks_per_trial.append(len(df_side.Port2In[j]))
-                    if df_side.Port2In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port2In[j]:
                         pass
                     else:
                         histcounts_R.append(df_side.Port2In[j][i] -
@@ -1069,6 +1070,169 @@ def daily_report_v5(path, send_slack=False):
         time_end_psth_all = time.time()
         runtime_psth_all = time_end_psth_all - time_start_psth_all
         print("'Plot 6: peristimulus lick histogram (all licks)' took", round(runtime_psth_all, 2), 'seconds to run')
+
+        ################################################################################################################
+
+
+        # PLOT 6: PERISTIMULUS CORRECT VS ERROR LICKS HISTOGRAM
+
+        time_start_psth_all = time.time()
+
+        # fig = plt.figure()
+
+        bin_size = 0.1
+
+        axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
+        ylim = [[], []]  # Initialize empty list to store left and right ylim
+        licks = [[], []]  # List of lists: left [0], right [1] trials with left [0] and right [1] licks
+
+        index_test = [[1, 0], [0, 1]]  # For debugging
+
+        for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
+
+            histcounts_L = []
+            histcounts_R = []
+
+            left_licks_per_trial = []
+            right_licks_per_trial = []
+
+            index = index_test[k]
+            print(index)
+
+            if k == 0:  # Left subplot: left trials
+                # ax = plt.subplot2grid((1, 2), (0, 0))
+                ax = plt.subplot2grid((16, 4), (10, 0), rowspan=2, colspan=2)
+                axes_handles.append(ax)
+                # ax.set_title('Left trials')
+                # ax.set_xlabel('Time (s)')
+                ax.set_xlim(xlim[k][0])  # Use the same xlim that left raster
+                ax.set_xticklabels([])
+                ax.set_ylabel('All licks\n(licks/s)')
+                ax.spines['top'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+            else:  # Right subplot: right trials
+                # ax = plt.subplot2grid((1, 2), (0, 1))
+                ax = plt.subplot2grid((16, 4), (10, 2), rowspan=2, colspan=2)
+                axes_handles.append(ax)
+                # ax.set_title('Right trials')
+                # ax.set_xlabel('Time (s)')
+                ax.set_xlim(xlim[k][0])  # Use the same xlim that right raster
+                ax.set_xticklabels([])
+                ax.spines['top'].set_visible(False)
+                ax.spines['bottom'].set_visible(False)
+                ax.spines['left'].set_visible(False)
+                ax.spines['right'].set_visible(False)
+                ax.set_yticklabels([])
+
+            df_side = df[df.Side == k].reset_index()
+
+            for j in range(len(df_side)):  # n trials
+
+                # Left licks
+                for i in range(len(df_side.Port1In[j])):  # n licks
+                    left_licks_per_trial.append(len(df_side.Port1In[j]))
+                    if not df_side.Port1In[j]:
+                        pass
+                    else:
+                        histcounts_L.append(df_side.Port1In[j][i] -
+                                            df_side.StimStart[j])
+
+                # Right licks
+                for i in range(len(df_side.Port2In[j])):  # n licks
+                    right_licks_per_trial.append(len(df_side.Port2In[j]))
+                    if not df_side.Port2In[j]:
+                        pass
+                    else:
+                        histcounts_R.append(df_side.Port2In[j][i] -
+                                            df_side.StimStart[j])
+
+            # ax.hist(histcounts_L, density=True, histtype='step', color='tab:blue', label='Left licks')
+            # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
+
+            ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
+            licks[k] = [left_licks_per_trial, right_licks_per_trial]
+
+            ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
+                    bins=np.linspace(-2, xlim[k][0][1]),
+                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0) & (df.Hit == index[0])])) / bin_size,
+                                      len(histcounts_L)))
+            ax.hist(histcounts_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
+                    bins=np.linspace(-2, xlim[k][0][1]),
+                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1) & (df.Hit == index[1])])) / bin_size,
+                                      len(histcounts_R)))
+
+            # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+            ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+
+        # Find the maximum y-axis limit across all handles
+        max_ylim = max(ax.get_ylim()[1] for ax in axes_handles)
+
+        # Set the same maximum y-axis limit for all handles
+        for ax in axes_handles:
+            ax.set_ylim([0, max_ylim])
+
+        ax.legend(loc='upper right', fontsize='xx-small', frameon=False)
+
+        time_end_psth_all = time.time()
+        runtime_psth_all = time_end_psth_all - time_start_psth_all
+        print("'Plot 6: peristimulus lick histogram (all licks)' took", round(runtime_psth_all, 2), 'seconds to run')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
         ################################################################################################################
 
@@ -1116,13 +1280,10 @@ def daily_report_v5(path, send_slack=False):
 
                 # Left licks
                 for i in range(len(df_side.Port1In[j])):  # n licks
-                    if df_side.Port1In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port1In[j]:
                         pass
                     else:
-                        if df_side.Port1In[j][i] - \
-                                df_side.StimStart[j] < df.RespWinStart[
-                            j] - df_side.StimStart[j]:
+                        if df_side.Port1In[j][i] - df_side.StimStart[j] < df.RespWinStart[j] - df_side.StimStart[j]:
                             first_lick_L.append(df_side.Port1In[j][i] -
                                                 df_side.StimStart[j])
                         elif df_side.Port1In[j][i] - \
@@ -1134,13 +1295,10 @@ def daily_report_v5(path, send_slack=False):
 
                 # Right licks
                 for i in range(len(df_side.Port2In[j])):  # n licks
-                    if df_side.Port2In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port2In[j]:
                         pass
                     else:
-                        if df_side.Port2In[j][i] - \
-                                df_side.StimStart[j] < df.RespWinStart[
-                            j] - df_side.StimStart[j]:
+                        if df_side.Port2In[j][i] - df_side.StimStart[j] < df.RespWinStart[j] - df_side.StimStart[j]:
                             first_lick_R.append(df_side.Port2In[j][i] -
                                                 df_side.StimStart[j])
                         elif df_side.Port2In[j][i] - \
@@ -1205,12 +1363,13 @@ def daily_report_v5(path, send_slack=False):
 
         os.environ['SLACK_BOT_TOKEN'] = slack_bot_token
         # filepath = folder + '/' + df.Session.unique()[0]
-        filepath = Path(folder/df.Session.unique()[0])
+        filepath = Path(folder / df.Session.unique()[0])
         filepath = str(filepath)  # filepath, input to slack api method files.upload, used by function slack_spam,
         # requires the file path as a str
         slack_spam(msg='Hey buddy!', filepath=filepath, userid='#pv_nmdar_eranet_reports')  # Alexis: 'U01DDHH7LLX'
 
     ####################################################################################################################
+
 
 # Line of bash code to sync the cluster data with the local machine:
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/
@@ -1220,8 +1379,6 @@ def daily_report_v5(path, send_slack=False):
 path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/002/sessions/002_stage_training_v5_20240320-113613/002_stage_training_v5_20240320-113613.csv'
 daily_report_v5(path, send_slack=True)
 
-
 # if __name__ == "__main__":
 #     daily_report()
 # Define function
-
