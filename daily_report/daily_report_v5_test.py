@@ -530,6 +530,7 @@ def daily_report_v5(path, send_slack=False):
             ax4_twin.minorticks_off()  # Remove minor ticks
             ax4_twin.set_ylim(ax4.get_ylim())
             ax4_twin.set_yticks(ilds)
+            ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
 
             ax4_twin.spines['top'].set_visible(False)
 

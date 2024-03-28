@@ -6,6 +6,8 @@
 # Choose between plotting together sessions from the same day (with maybe a vertical red line) to separate them, or
 # in separate reports
 
+# If no blocks, accuracy blocks = None/nan
+
 ########################################################################################################################
 
 import time
@@ -230,7 +232,8 @@ def daily_report_v5(path, send_slack=False):
             f'Sound errors: {str(sound_errors)} ({str(round((sound_errors / trials) * 100, 1))}%), '
             f'{new_line}'
             f'AW: {str(df.AW.unique()[0])} trials, '
-            f'Water: {str(water)} μL ({str(water_left)}μL L {str(water_right)}μL R)'
+            f'Water: {str(water)} μL ({str(water_left)}μL L {str(water_right)}μL R), '
+            f'Wait: {df.Wait.unique()[0]} min.'
             f'{new_line}'
             f'{new_line}')
 
@@ -527,6 +530,7 @@ def daily_report_v5(path, send_slack=False):
             ax4_twin.minorticks_off()  # Remove minor ticks
             ax4_twin.set_ylim(ax4.get_ylim())
             ax4_twin.set_yticks(ilds)
+            ax4_twin.set_yticklabels(['', '', '', '', '', '', '', '', ''])
 
             ax4_twin.spines['top'].set_visible(False)
 
