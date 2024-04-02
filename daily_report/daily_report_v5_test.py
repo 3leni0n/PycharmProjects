@@ -969,6 +969,7 @@ def daily_report_v5(path, send_slack=False):
         # fig = plt.figure()
 
         bin_size = 0.1
+        # n_bins = 50
 
         ################################################################################################################
 
@@ -977,8 +978,6 @@ def daily_report_v5(path, send_slack=False):
         time_start_psth_all = time.time()
 
         # fig = plt.figure()
-
-        bin_size = 0.1
 
         axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
         ylim = [[], []]  # Initialize empty list to store left and right ylim
@@ -1046,14 +1045,15 @@ def daily_report_v5(path, send_slack=False):
             ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
             licks[k] = [left_licks_per_trial, right_licks_per_trial]
 
+            # Calculate the number of bins
+            n_bins = int((xlim[k][0][1] - (-2)) / bin_size)
+
             ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
-                    bins=np.linspace(-2, xlim[k][0][1]),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
-                                      len(histcounts_L)))
+                    bins=np.linspace(-2, xlim[k][0][1], n_bins),
+                    weights=np.repeat((1 / len((df_side.Miss == 0))) / bin_size, len(histcounts_L)))
             ax.hist(histcounts_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
-                    bins=np.linspace(-2, xlim[k][0][1]),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1)])) / bin_size,
-                                      len(histcounts_R)))
+                    bins=np.linspace(-2, xlim[k][0][1], n_bins),
+                    weights=np.repeat((1 / len((df_side.Miss == 0))) / bin_size, len(histcounts_R)))
 
             # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
             ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
@@ -1080,13 +1080,11 @@ def daily_report_v5(path, send_slack=False):
 
         # fig = plt.figure()
 
-        bin_size = 0.1
-
         axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
         ylim = [[], []]  # Initialize empty list to store left and right ylim
         licks = [[], []]  # List of lists: left [0], right [1] trials with left [0] and right [1] licks
 
-        index_test = [[1, 0], [0, 1]]  # For debugging
+        index_test = [[1, 0], [0, 1]]  # For debugging. [left trials[correct, error], right trials[error, correct]]
 
         for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
 
@@ -1107,7 +1105,7 @@ def daily_report_v5(path, send_slack=False):
                 # ax.set_xlabel('Time (s)')
                 ax.set_xlim(xlim[k][0])  # Use the same xlim that left raster
                 ax.set_xticklabels([])
-                ax.set_ylabel('All licks\n(licks/s)')
+                ax.set_ylabel('Correct vs error\n(licks/s)')
                 ax.spines['top'].set_visible(False)
                 ax.spines['bottom'].set_visible(False)
                 ax.spines['right'].set_visible(False)
@@ -1135,8 +1133,11 @@ def daily_report_v5(path, send_slack=False):
                     if not df_side.Port1In[j]:
                         pass
                     else:
-                        histcounts_L.append(df_side.Port1In[j][i] -
-                                            df_side.StimStart[j])
+                        # This is for all licks
+                        # histcounts_L.append(df_side.Port1In[j][i] -
+                        #                     df_side.StimStart[j])
+                        if df_side.Hit[j] == index[0]:
+                            histcounts_L.append(df_side.Port1In[j][i] - df_side.StimStart[j])
 
                 # Right licks
                 for i in range(len(df_side.Port2In[j])):  # n licks
@@ -1144,8 +1145,11 @@ def daily_report_v5(path, send_slack=False):
                     if not df_side.Port2In[j]:
                         pass
                     else:
-                        histcounts_R.append(df_side.Port2In[j][i] -
-                                            df_side.StimStart[j])
+                        # This is for all licks
+                        # histcounts_R.append(df_side.Port2In[j][i] -
+                        #                     df_side.StimStart[j])
+                        if df_side.Hit[j] == index[1]:
+                            histcounts_R.append(df_side.Port2In[j][i] - df_side.StimStart[j])
 
             # ax.hist(histcounts_L, density=True, histtype='step', color='tab:blue', label='Left licks')
             # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
@@ -1153,13 +1157,16 @@ def daily_report_v5(path, send_slack=False):
             ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
             licks[k] = [left_licks_per_trial, right_licks_per_trial]
 
+            # Calculate the number of bins
+            n_bins = int((xlim[k][0][1] - (-2)) / bin_size)
+
             ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
-                    bins=np.linspace(-2, xlim[k][0][1]),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0) & (df.Hit == index[0])])) / bin_size,
+                    bins=np.linspace(-2, xlim[k][0][1], n_bins),
+                    weights=np.repeat((1 / len(df_side[(df_side.Miss == 0) & (df_side.Hit == index[0])])) / bin_size,
                                       len(histcounts_L)))
             ax.hist(histcounts_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
-                    bins=np.linspace(-2, xlim[k][0][1]),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1) & (df.Hit == index[1])])) / bin_size,
+                    bins=np.linspace(-2, xlim[k][0][1], n_bins),
+                    weights=np.repeat((1 / len(df_side[(df_side.Miss == 0) & (df_side.Hit == index[1])])) / bin_size,
                                       len(histcounts_R)))
 
             # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
@@ -1313,14 +1320,15 @@ def daily_report_v5(path, send_slack=False):
 
             ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
 
+            # Calculate the number of bins
+            n_bins = int((xlim[k][0][1] - (-2)) / bin_size)
+
             ax.hist(first_lick_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
-                    bins=np.linspace(0, 2),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
-                                      len(first_lick_L)))
+                    bins=np.linspace(0, 2, n_bins),
+                    weights=np.repeat((1 / len((df_side.Miss == 0))) / bin_size, len(first_lick_L)))
             ax.hist(first_lick_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
-                    bins=np.linspace(0, 2),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1)])) / bin_size,
-                                      len(first_lick_R)))
+                    bins=np.linspace(0, 2, n_bins),
+                    weights=np.repeat((1 / len((df_side.Miss == 0))) / bin_size, len(first_lick_R)))
 
             ax.patch.set_facecolor('none')  # Make axes transparent so the xaxes labels from the upper plot are visible
             # ax.set_xlim([-1, xlim[k][0][1]])  # Set xlim from -1 to trial end to zoom in and cut the fixation
@@ -1376,8 +1384,8 @@ def daily_report_v5(path, send_slack=False):
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
 
 # For debugging:
-path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/002/sessions/002_stage_training_v5_20240320-113613/002_stage_training_v5_20240320-113613.csv'
-daily_report_v5(path, send_slack=True)
+path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/006/sessions/006_stage_training_v5_20240327-122939/006_stage_training_v5_20240327-122939.csv'
+daily_report_v5(path, send_slack=False)
 
 # if __name__ == "__main__":
 #     daily_report()

@@ -1190,8 +1190,8 @@ def daily_report_v5(path, send_slack=False):
 # rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pv_nmdar_eranet* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pluginsr-for-pybpod* ~/ && rsync -avzP -e 'ssh -p 4022' mouse@neurocomp.fcrb.es:/archive/mouse/pybpod_changes* ~/
 
 # For debugging:
-# path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/003/sessions/003_stage_training_v5_20240306-173209/003_stage_training_v5_20240306-173209.csv'
-# daily_report_v5(path, send_slack=True)
+path = '/home/setup2/pv_nmdar_eranet/experiments/2AFC_5/setups/006/sessions/006_stage_training_v5_20240327-122939/006_stage_training_v5_20240327-122939.csv'
+daily_report_v5(path, send_slack=False)
 
 
 # if __name__ == "__main__":
