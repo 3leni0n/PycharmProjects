@@ -116,6 +116,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     doi_21 = '2023-07-10'  # First session after ERANET meeting 2023
 
     # For 2AFC_5 (batch 5)
+    doi_22 = '2024-04-02'  # First session after Easter Break (3 days without training with 0% ad lib. water)
 
     # For testing specific events
     # doi_test = '2023-06-09'
@@ -123,8 +124,9 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     dois = [doi_0, doi_1, doi_2, doi_3, doi_4, doi_5, doi_6, doi_7, doi_8,  # Batch 2
             doi_9, doi_10, doi_11,  # Batch 3
-            doi_14, doi_15, doi_17, doi_18, doi_19, doi_20,
-            doi_21]  # , doi_test]  # Batch 4  (skipped doi_12, doi_13, doi_16 for clarity)
+            doi_14, doi_15, doi_17, doi_18, doi_19, doi_20, doi_21,
+            # Batch 4  (skipped doi_12, doi_13, doi_16 for clarity)
+            doi_22]  # Batch 5
     dois_indexes = []
 
     for i in range(len(dois)):
