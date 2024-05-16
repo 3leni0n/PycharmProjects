@@ -114,7 +114,7 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
         os.makedirs(os.path.expanduser(video_folder))
 
     # Start  video
-    nocam = False  # So the code doesn't open the cam twice, probably it will work without it, try
+    no_cam = False  # So the code doesn't open the cam twice, probably it will work without it, try
 
     # Select automatically the cam depending on the PC (only for n_cams=1)
     username = os.getlogin()
