@@ -105,6 +105,17 @@ def parse_v2(path):
     except IndexError:
         wait = [np.nan] * n_trials
 
+    # Closed loop reward size. Added on 06-06-2024
+    try:
+        trial_lag = [str(df[df.MSG == 'VAR_TRIAL_LAG']['+INFO'].iloc[0])] * n_trials  # Added on 06-06-2024
+    except IndexError:
+        trial_lag = [np.nan] * n_trials
+
+    try:
+        k = [str(df[df.MSG == 'VAR_K']['+INFO'].iloc[0])] * n_trials  # Added on 06-06-2024
+    except IndexError:
+        k = [np.nan] * n_trials
+
 
     # Registered values (out of loop)
     reward_side = df[df.MSG == 'REWARD_SIDE']['+INFO'].iloc[-1]  # [-1] to take the last one in case CB was on
@@ -180,6 +191,7 @@ def parse_v2(path):
     # substage = []
     p = []
     var_delay = []  # Added on 09-05-2023
+    reward_size = []  # Added on 06-06-2024
 
     # Added on 02.04.2023, but it should have 100% backwards compatibility
     aw_trials = []  # Trials in which AW was given. Should capture the initial AW trials plus the ones as CB measure
@@ -345,10 +357,16 @@ def parse_v2(path):
 
         # Variable delay
         try:
-            # var_delay.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'DELAY')]['+INFO'].iloc[0]))  # More precission
-            var_delay.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Delay')]['+INFO'].iloc[0]))  # Less precission
+            # var_delay.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'DELAY')]['+INFO'].iloc[0]))  # More precision
+            var_delay.append(float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Delay')]['+INFO'].iloc[0]))  # Less precision
         except IndexError:
             var_delay.append(np.nan)
+
+        # Closed loop reward size (added 06-06-2024)
+        try:
+            reward_size.append(float(band[(band['TYPE'] == 'VAL') & (band['MSG'] == 'REWARD_SIZE')]['+INFO'].iloc[0]))
+        except IndexError:
+            reward_size.append(np.nan)
 
         if i == 0:
             after_hit.append(np.nan)
@@ -415,18 +433,18 @@ def parse_v2(path):
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In', 'Port1Out', 'Port2In',
                'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'AWTrials', 'Switch', 'Timeout', 'Fixation', 'Stage',
                'Motor', 'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks',
-               'BlockLen', 'Task', 'Ephys', 'Wait', 'StimDur', 'Delay', 'VarDelay', 'SerialPort', 'Protocol', 'Creator',
-               'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject', 'BpodApiVersion', 'Session', 'Date',
-               'SessionStart', 'SessionEnd']
+               'BlockLen', 'Task', 'Ephys', 'Wait', 'TrialLag', 'K', 'StimDur', 'Delay', 'VarDelay', 'RewardSize',
+               'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject',
+               'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
     data = list(zip(trial, reward_side, rep_trial, reward, punish, miss, wrong_lick, hit, after_hit, choice, rep_choice,
                     response, trial_start, trial_end, trial_len, stim_start, stim_end, stim_len, resp_win_start,
                     resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found, sound_left,
                     sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw,
                     aw_trials, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up,
-                    recovery_mode, p, p_right, blocks, block_len, task, ephys, wait, stim_dur, delay, var_delay, serial_port,
-                    protocol, creator, project, experiment, board, setup, net_port, subject, bpod_api_version, session,
-                    date, time_session_started, time_session_ended))
+                    recovery_mode, p, p_right, blocks, block_len, task, ephys, wait, trial_lag, k, stim_dur, delay,
+                    var_delay, reward_size, serial_port, protocol, creator, project, experiment, board, setup, net_port,
+                    subject, bpod_api_version, session, date, time_session_started, time_session_ended))
 
     df_session = pd.DataFrame(data=data, columns=columns)
 
