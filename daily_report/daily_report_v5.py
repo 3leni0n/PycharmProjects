@@ -113,6 +113,20 @@ def daily_report_v5(path, send_slack=False):
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
 
+    # Accuracy (hit rate) by reward size (added 07-06-2024)
+    accuracy_reward_size = df.groupby(['Side', 'RewardSize'])['Hit'].mean()
+    accuracy_reward_size_left = accuracy_reward_size[0]  # Unpack left
+    accuracy_reward_size_right = accuracy_reward_size[1]  # Unpack right
+    accuracy_half_reward_left = accuracy_reward_size_left.iloc[0]  # R*- left
+    accuracy_simple_reward_left = accuracy_reward_size_left.iloc[1]  # R-+ left
+    accuracy_double_reward_left = accuracy_reward_size_left.iloc[2]  # R++ left
+    accuracy_half_reward_right = accuracy_reward_size_right.iloc[0]  # R*- right
+    accuracy_simple_reward_right = accuracy_reward_size_right.iloc[1]  # R-+ right
+    accuracy_double_reward_right = accuracy_reward_size_right.iloc[2]  # R++ right
+    accuracy_half_reward = np.mean([accuracy_half_reward_left, accuracy_half_reward_right])
+    accuracy_simple_reward = np.mean([accuracy_simple_reward_left, accuracy_simple_reward_right])
+    accuracy_double_reward = np.mean([accuracy_double_reward_left, accuracy_double_reward_right])
+
     # Block accuracy (accuracy of first trial of each block)
     if not pd.isnull(df.Blocks.unique()[0]) or int(df.Blocks.unique()[0]) != 0:  # If blocks isn't NaN or 0
         block_change_index = [i for i in range(1, len(df.Side)) if df.Side[i - 1] != df.Side[i]]
@@ -154,11 +168,19 @@ def daily_report_v5(path, send_slack=False):
     rewards_left = df.Reward[df.Side == 0].sum()
     rewards_right = df.Reward[df.Side == 1].sum()
 
+    # Reward size
+    reward_sizes = df.RewardSize[df.Reward == 1].sum()  # Only rewarded trials
+    reward_sizes_left = df.RewardSize[(df.Reward == 1) & (df.Side == 0)].sum()
+    reward_sizes_right = df.RewardSize[(df.Reward == 1) & (df.Side == 1)].sum()
+
     # Water
-    reward_size = 2.5  # μL
-    water = rewards * reward_size
-    water_left = rewards_left * reward_size
-    water_right = rewards_right * reward_size
+    drop_size = 2.5  # μL
+    # water = rewards * drop_size
+    water = reward_sizes * drop_size
+    # water_left = rewards_left * drop_size
+    water_left = reward_sizes_left * drop_size
+    # water_right = rewards_right * drop_size
+    water_right = reward_sizes_right * drop_size
 
     # Sound
     sounds_mismatch = len(np.where(df.Filename != df.Filename2)[0])
@@ -233,7 +255,14 @@ def daily_report_v5(path, send_slack=False):
             f'{new_line}'
             f'AW: {str(df.AW.unique()[0])} trials, '
             f'Water: {str(water)} μL ({str(water_left)}μL L {str(water_right)}μL R), '
-            f'Wait: {df.Wait.unique()[0]} min.'
+            f'Wait: {df.Wait.unique()[0]} min., '
+            f'R*-: {str(round(accuracy_half_reward * 100))}% ({str(round(accuracy_half_reward_left * 100))}% L, ' 
+            f' {str(round(accuracy_half_reward_right * 100))}% R),  '
+            f'{new_line}'
+            f'R-+: {str(round(accuracy_simple_reward * 100))}% ({str(round(accuracy_simple_reward_left * 100))}% L, '
+            f' {str(round(accuracy_simple_reward_right * 100))}% R),  '
+            f'R++: {str(round(accuracy_double_reward * 100))}% ({str(round(accuracy_double_reward_left * 100))}% L, '
+            f' {str(round(accuracy_double_reward_right * 100))}% R),  '
             f'{new_line}'
             f'{new_line}')
 

@@ -71,7 +71,7 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
     # Switched to training in setup0, remove from setup2 to avoid doing reports from old sessions
     if username == 'setup0':
         remove_from_setup_ephys = ['420', '422', '619', '623', '876', '907', '909', '911',
-                                   '009', '008', '002', '004']  # Batch 5
+                                   '009', '008', '002', '004', '001']  # Batch 5
     else:
         remove_from_setup_ephys = []
 
