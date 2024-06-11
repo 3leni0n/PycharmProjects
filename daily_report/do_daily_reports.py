@@ -58,7 +58,7 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
     username = os.path.split(os.path.expanduser('~'))[-1]
 
     if username == 'setup1':
-        remove_from_setup1 = ['000', '005', '008']
+        remove_from_setup1 = ['000', '001', '005', '008']
     else:
         remove_from_setup1 = []
 
@@ -76,7 +76,7 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
         remove_from_setup_ephys = []
 
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['002', '003', '005', '006', '008', '009']
+    not_training = ['001', '002', '003', '005', '006', '008', '009']
 
     animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + remove_from_setup_ephys \
                         + not_training
