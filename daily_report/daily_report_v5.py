@@ -113,19 +113,32 @@ def daily_report_v5(path, send_slack=False):
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
 
-    # Accuracy (hit rate) by reward size (added 07-06-2024)
-    accuracy_reward_size = df.groupby(['Side', 'RewardSize'])['Hit'].mean()
-    accuracy_reward_size_left = accuracy_reward_size[0]  # Unpack left
-    accuracy_reward_size_right = accuracy_reward_size[1]  # Unpack right
-    accuracy_half_reward_left = accuracy_reward_size_left.iloc[0]  # R*- left
-    accuracy_simple_reward_left = accuracy_reward_size_left.iloc[1]  # R-+ left
-    accuracy_double_reward_left = accuracy_reward_size_left.iloc[2]  # R++ left
-    accuracy_half_reward_right = accuracy_reward_size_right.iloc[0]  # R*- right
-    accuracy_simple_reward_right = accuracy_reward_size_right.iloc[1]  # R-+ right
-    accuracy_double_reward_right = accuracy_reward_size_right.iloc[2]  # R++ right
-    accuracy_half_reward = np.mean([accuracy_half_reward_left, accuracy_half_reward_right])
-    accuracy_simple_reward = np.mean([accuracy_simple_reward_left, accuracy_simple_reward_right])
-    accuracy_double_reward = np.mean([accuracy_double_reward_left, accuracy_double_reward_right])
+    if int(df.TrialLag.unique()[0]) > 0 and int(df.K.unique()[0]) > 1:
+        # Accuracy (hit rate) by reward size (added 07-06-2024)
+        accuracy_reward_size = df.groupby(['Side', 'RewardSize'])['Hit'].mean()
+        accuracy_reward_size_left = accuracy_reward_size[0]  # Unpack left
+        accuracy_reward_size_right = accuracy_reward_size[1]  # Unpack right
+        accuracy_half_reward_left = accuracy_reward_size_left.iloc[0]  # R*- left
+        accuracy_simple_reward_left = accuracy_reward_size_left.iloc[1]  # R-+ left
+        accuracy_double_reward_left = accuracy_reward_size_left.iloc[2]  # R++ left
+        accuracy_half_reward_right = accuracy_reward_size_right.iloc[0]  # R*- right
+        accuracy_simple_reward_right = accuracy_reward_size_right.iloc[1]  # R-+ right
+        accuracy_double_reward_right = accuracy_reward_size_right.iloc[2]  # R++ right
+        accuracy_half_reward = np.mean([accuracy_half_reward_left, accuracy_half_reward_right])
+        accuracy_simple_reward = np.mean([accuracy_simple_reward_left, accuracy_simple_reward_right])
+        accuracy_double_reward = np.mean([accuracy_double_reward_left, accuracy_double_reward_right])
+    else:
+        accuracy_reward_size_left = 0  # Unpack left
+        accuracy_reward_size_right = 0  # Unpack right
+        accuracy_half_reward_left = 0  # R*- left
+        accuracy_simple_reward_left = 0  # R-+ left
+        accuracy_double_reward_left = 0  # R++ left
+        accuracy_half_reward_right = 0  # R*- right
+        accuracy_simple_reward_right = 0  # R-+ right
+        accuracy_double_reward_right = 0  # R++ right
+        accuracy_half_reward = 0
+        accuracy_simple_reward = 0
+        accuracy_double_reward = 0
 
     # Block accuracy (accuracy of first trial of each block)
     if not pd.isnull(df.Blocks.unique()[0]) or int(df.Blocks.unique()[0]) != 0:  # If blocks isn't NaN or 0
