@@ -272,7 +272,14 @@ events_stream['Trial'] = np.arange(1, len(events_stream) + 1)  # Add Trial colum
 
 
 # Start timestamps at 0
-df_ttl['timestamps'] = df_ttl['timestamps'] - df_ttl['timestamps'].iloc[0]
+first_timestamp = continuous_AP.timestamps[0]
+first_event =
+
+df_ttl.timestamps = df_ttl.timestamps - first_timestamp
+
+
+
+
 
 df_ttl.loc[df_ttl['samples'] == 1, 'Delay_ON'] = df_ttl['timestamps']  # Mark onset of delays
 df_ttl.loc[df_ttl['samples'] == 0, 'Delay_OFF_next'] = df_ttl['timestamps']  # Mark offset of delay
@@ -285,7 +292,7 @@ df_ttl.drop('Delay_OFF_next',axis='columns', inplace=True)
 # Round Delay length to the desired precision
 df_ttl['Delay_length'] = df_ttl['Delay_length'].round(ttl_precision)
 
-# Keep only rows of DataFrame df_ttl with Delay-length == 0.009
+# Keep only rows of DataFrame df_ttl with Delay-length == 0.009 (play)
 df_ttl = df_ttl[df_ttl['Delay_length'] == 0.009]
 
 # Prepare a column with trial index. start in 1 because trial 0 doesn't have a delay and is not there.
