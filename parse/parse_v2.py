@@ -258,8 +258,12 @@ def parse_v2(path):
         stim_start.append(
             float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusTrigger')]['BPOD-FINAL-TIME'].iloc[0]))
 
-        # This if block is because the finite state machine only goes over 'StimulusStop' after a Hit
-        if stage[i] <= 3:
+        if stage[i] == 4 or type(task[i] == str):
+            # In stage 4 (batches 1-3) or stage_training_v4/v5 (batches 4-5) StimulusStop always follows StimulusDuration
+            stim_end.append(
+                float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
+        # In stages 1-3 the finite state machine only goes over 'StimulusStop' after a Hit
+        elif stage[i] <= 3:
             if miss[i] == 1:
                 stim_end.append(
                     float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'Miss')]['BPOD-FINAL-TIME'].iloc[0]))
@@ -269,9 +273,6 @@ def parse_v2(path):
             else:  # Reward or WrongLick
                 stim_end.append(
                     float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
-        else:  # Leads to erroneous stimulus length in stage 4, but probably was there for stage 1. Readjust if needed
-            stim_end.append(
-                float(band[(band['TYPE'] == 'STATE') & (band['MSG'] == 'StimulusStop')]['BPOD-FINAL-TIME'].iloc[0]))
 
         # # Because all sounds in batches 1-3 (sounds.csv/sounds_2.csv) are 1 s
         # if stim_end[i] - stim_start[i] > 1:
