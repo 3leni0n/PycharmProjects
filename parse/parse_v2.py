@@ -20,7 +20,7 @@ def parse_v2(path):
 
     ####################################################################################################################
 
-    # index = filenames[filenames['TYPE'] == 'END-TRIAL'].index
+    # index = behavior_filenames[behavior_filenames['TYPE'] == 'END-TRIAL'].index
     index = df[df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous
     # one
     n_trials = len(index) - 1  # Number of trials (= i + 1)

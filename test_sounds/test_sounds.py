@@ -29,7 +29,7 @@ frames_ild = pd.DataFrame(
 # if zscore:
 #     frames_ild = pd.DataFrame(stats.zscore(frames_ild, axis=None))  # Z-score the ILDs (along axis 0 or None
 # returns same result, but not axis 1)
-frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
 
 # Split sounds set by ilds
 ilds = sounds.ILD.unique()
@@ -139,7 +139,7 @@ def sounds_per_ild(experiment='2AFC_2', animal=None, save=True):
 
             print(ild)
 
-            # Index filenames by ILD
+            # Index behavior_filenames by ILD
             filenames = df.Filename[df.ILD == ild].sort_values()  # So xticklabels (filename) are in order
 
             if i == 0:
@@ -158,7 +158,7 @@ def sounds_per_ild(experiment='2AFC_2', animal=None, save=True):
                     n_sounds_right = len(df[(df.ILD == ild) & (df.Side == i)])
 
             # With plt.hist
-            # n, bins, patches = plt.hist(filenames, bins=len(np.unique(filenames)), color=color, label=label)  # n = counts
+            # n, bins, patches = plt.hist(behavior_filenames, bins=len(np.unique(behavior_filenames)), color=color, label=label)  # n = counts
             axs[j].hist(filenames, bins=len(np.unique(filenames)), color=color, label=label)  # n = counts
             axs[j].set_xticks([])
             axs[j].set_ylabel('Counts')
@@ -176,7 +176,7 @@ def sounds_per_ild(experiment='2AFC_2', animal=None, save=True):
                 axs[j].spines['bottom'].set_visible(True)
 
             # # With np.unique + plt.bar
-            # values, counts = np.unique(filenames, return_counts=True)  # counts = n
+            # values, counts = np.unique(behavior_filenames, return_counts=True)  # counts = n
             # plt.bar(values, counts, align='center', width=1, color=color, label=label)
             # plt.gca().set_xticks(values)
             # plt.xticks(ticks=plt.gca().get_xticks(), labels=[])

@@ -98,7 +98,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     # if residuals:
     #     sounds_ild = sounds.ILD
     #     frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-    #     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+    #     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
 
     ####################################################################################################################
 
@@ -186,7 +186,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     ####################################################################################################################
 
     n_trials = len(df)
-    # filenames = df.Filename.tolist()
+    # behavior_filenames = df.Filename.tolist()
 
     # Control
     if control is not None:
@@ -199,7 +199,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
         choices = df.Choice.reset_index(drop=True)  # Indices must match for modeling
         # stim_strength = frames_ild.loc[
-        #     [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        #     [np.where(sounds.filename == np.array(behavior_filenames[i]))[0][0] for i in range(len(behavior_filenames))]].drop(
         #     columns=['filename'])
         # stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
         #

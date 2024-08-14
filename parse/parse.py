@@ -21,7 +21,7 @@ def parse(path):
     ####################################################################################################################
 
     index = df[df['TYPE'] == 'TRIAL'].index  # Use this one because after END-TRIAL it comes the summary of the previous
-    # one index = filenames[filenames['TYPE'] == 'END-TRIAL'].index
+    # one index = behavior_filenames[behavior_filenames['TYPE'] == 'END-TRIAL'].index
     n_trials = len(index) - 1  # Number of trials (= i +1)
 
     # METADATA (multiply by n_trials)
@@ -43,7 +43,7 @@ def parse(path):
     try:
         session_ended = df[df.MSG == 'SESSION-ENDED']['+INFO'].iloc[0]
     except IndexError:
-        # session_ended = filenames['PC-TIME'].iloc[-1]
+        # session_ended = behavior_filenames['PC-TIME'].iloc[-1]
         session_ended = df[df.TYPE == 'EVENT']['PC-TIME'].iloc[-1]
         # print('The session ended abruptly, probably due to Bpod crashed. Using last PC_TIME timestamp instead')
         print(f"The session '{np.unique(session)[0]}' ended abruptly, probably due to Bpod crashed. Using last PC_TIME "
@@ -322,7 +322,7 @@ def parse(path):
 
     df_session = pd.DataFrame(data=data, columns=columns)
 
-    # df.to_csv(str('parsed_') + path.split('/')[-1])  # Save filenames as csv file
+    # df.to_csv(str('parsed_') + path.split('/')[-1])  # Save behavior_filenames as csv file
 
     return df_session
 

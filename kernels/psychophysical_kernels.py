@@ -98,7 +98,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     if residuals:
         sounds_ild = sounds.ILD
         frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
 
     ####################################################################################################################
 

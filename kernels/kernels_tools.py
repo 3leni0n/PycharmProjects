@@ -117,7 +117,7 @@ def make_frames_dm(df, residuals=True, zscore=False):
     if residuals:
         sounds_ild = sounds.ILD
         frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
 
     filenames = df.Filename.tolist()
 

@@ -98,7 +98,7 @@ if zscore:
 else:
     ylabel = 'GLM weight'
 
-frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert filenames in first column
+frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
 
 # Load behavioral data
 df = pd.read_csv(folder_in)  # Load behavioral data
