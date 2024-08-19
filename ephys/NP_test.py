@@ -271,44 +271,116 @@ events_stream['Trial'] = np.arange(1, len(events_stream) + 1)  # Add Trial colum
 
 
 
-# Start timestamps at 0
-first_timestamp = continuous_AP.timestamps[0]
-first_event =
 
+
+
+
+# Ephys recording info
+first_timestamp = continuous_AP.timestamps[0]
+last_timestamp = continuous_AP.timestamps[-1]
+first_event = events_stream.timestamp.iloc[0]
+last_event = events_stream.timestamp.iloc[-1]
+len_recording = last_timestamp - first_timestamp
+len_ephys_n_behavior = (last_event - first_event)
+print(f'The recording started after {round(first_timestamp/60)} min. of acquisition')
+print(f'The behavior first event happened after {round(first_event/60)} min. of acquisition '
+      f'({round((first_event - first_timestamp) / 60)} min. after recording started)')
+print(f'The recording lasted {round(len_recording/60)} min.')
+print(f'The behavior (from ephys data) lasted {round(len_ephys_n_behavior/60)} min.')
+
+# Behavior session info
+behavior_start = df_behavior['TrialStart'].iloc[0]  # Get the first trial start
+behavior_end = df_behavior['TrialEnd'].iloc[-1]  # Get the last trial end
+behavior_len = behavior_end - behavior_start  # Get the total behavior length
+print(f'The behavior (from behavior data) lasted {round(behavior_len/60)} min.')
+
+# Align timestamps to the first timestamp (start at 0)
 df_ttl.timestamps = df_ttl.timestamps - first_timestamp
 
+# Align timestamps to the first event (start at 0). Doesn't make sense as spike_times are aligned to the first timestamp
+# df_ttl.timestamps = df_ttl.timestamps - first_event
+
+df_ttl.loc[df_ttl['samples'] == 1, 'ON'] = df_ttl['timestamps']  # Onset of TTL
+df_ttl.loc[df_ttl['samples'] == 0, 'OFF'] = df_ttl['timestamps']  # Offset of TTL
+df_ttl.OFF = df_ttl.OFF.shift(-1)  # Shift the OFF column one row up
+df_ttl = df_ttl.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
+df_ttl['Length'] = df_ttl['OFF'] - df_ttl['ON']  # Calculate length of TTLs
+df_ttl['key'] = keys  # Add keys column to df_ttl
+df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (1 TTL per trial)
+df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
+
+df_ttl.drop('TTL', axis=1, inplace=True)  # Drop TTL column
+df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
 
 
 
 
-df_ttl.loc[df_ttl['samples'] == 1, 'Delay_ON'] = df_ttl['timestamps']  # Mark onset of delays
-df_ttl.loc[df_ttl['samples'] == 0, 'Delay_OFF_next'] = df_ttl['timestamps']  # Mark offset of delay
-
-# Create new colum with delay offset to measure the delay duration and then remove it
-df_ttl['Delay_OFF'] = df_ttl['Delay_OFF_next'].shift(-1)
-df_ttl['Delay_length'] = df_ttl['Delay_OFF']  - df_ttl['Delay_ON']
-df_ttl.drop('Delay_OFF_next',axis='columns', inplace=True)
-
-# Round Delay length to the desired precision
-df_ttl['Delay_length'] = df_ttl['Delay_length'].round(ttl_precision)
-
-# Keep only rows of DataFrame df_ttl with Delay-length == 0.009 (play)
-df_ttl = df_ttl[df_ttl['Delay_length'] == 0.009]
-
-# Prepare a column with trial index. start in 1 because trial 0 doesn't have a delay and is not there.
-df_ttl['Trial'] = np.arange(len(df_ttl))
-# df_behavior['trials'] = np.arange(len(df_behavior))+1
-
-# Merge with cluster labels, use trial to associate each one
-# df_behavior.rename(columns= {'trials': 'trial'},inplace=True)
-df2_behavior = pd.merge(df_behavior, df_ttl, on=['Trial'])
 
 
 
 
-didff = (df2_behavior['StimStart'].iloc[0] +df2_behavior['TrialStart'].iloc[0])
-df2_behavior['START'] = didff + df2_behavior.Delay_ON
-didff = (df2_behavior['StimStart'].iloc[0] +df2_behavior['TrialStart'].iloc[0])
 
 
 
+
+df_aligned = pd.merge(df_behavior, df_ttl, on=['Trial'])  # Merge behavior and TTLs dataframes
+
+# Transform FSM states from relative (0 = start of trial) to absolute (cumulative) timestamps
+transform_states = ['StimStart', 'StimEnd', 'RespWinStart', 'RespWinEnd']
+
+for state in transform_states:
+    df_aligned[state] = df_aligned[state] + df_aligned.TrialStart
+
+df_aligned['BehaviorStart'] = df_aligned.ON - df_aligned.StimStart  # When behavior session started in the ephys clock
+
+# Plot the drift start timestamp
+plt.plot(df_aligned.BehaviorStart)
+plt.xlabel('Trial')
+plt.ylabel('Time (s)')
+plt.title(f'Drift behavior starts ({round((df_aligned.BehaviorStart.max() - df_aligned.BehaviorStart.min())*1000)} ms)')
+
+assert all(round(df_behavior.TrialStart + df_aligned.BehaviorStart + df_behavior.StimStart, ttl_precision) ==
+           round(df_ttl.ON, ttl_precision))
+
+# Align FSM states to the start of the trial in the ephys clock
+aligned_states = ['TrialStart', 'TrialEnd', 'StimStart', 'StimEnd', 'RespWinStart', 'RespWinEnd']
+
+for state in aligned_states:
+    df_aligned[state] = df_aligned[state] + df_aligned.BehaviorStart
+
+# Check if the lengths of the states match after alignment
+assert all(round(df_aligned.TrialEnd - df_aligned.TrialStart, ttl_precision) == round(df_aligned.TrialLen, ttl_precision))
+assert all(round(df_aligned.StimEnd - df_aligned.StimStart, ttl_precision) == round(df_aligned.StimLen, ttl_precision))
+assert all(round(df_aligned.RespWinEnd - df_aligned.RespWinStart, ttl_precision) == round(df_aligned.RespWinLen, ttl_precision))
+
+assert all(df_aligned.StimStart == df_aligned.ON)  # Check if StimStart and ON match
+
+# Align timestamps of PortXIn/Out to the start of the behavioral session in the ephys clock
+port_states = ['Port1In', 'Port1Out', 'Port2In', 'Port2Out']
+for j in range(len(port_states)):
+    for i in range(len(df_aligned)):
+            df_aligned[port_states[j]][i] = [x + df_aligned['TrialStart'][i] for x in df_aligned[port_states[j]][i]]
+
+
+
+
+# With this we will assign the spikes to the corresponding trial
+df_spikes['Trial'] = np.nan  # Create a new column with NaN values (default trial number)
+
+for i, row in df_aligned.iterrows():
+    # create a list of our conditions
+    condlist = [(df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i]),
+                # Spike times within the trial
+                 (df_spikes.spike_times < df_aligned['TrialStart'].iloc[i]) | (df_spikes.spike_times > df_aligned['TrialEnd'].iloc[i])]
+                # Spike times outside the trial
+
+    # create a list of the values we want to assign for each condition
+    choices = [df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial']]
+
+    # create a new column and use np.select to assign values to it using our lists as arguments
+    df_spikes['Trial'] = np.select(condlist, choices)
+
+# Rewrite the previous for loop but use np.where instead, omitting the second condition
+for i, row in df_aligned.iterrows():
+    condition = (df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i])
+    df_spikes['Trial'] = np.where(condition, df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial'])
