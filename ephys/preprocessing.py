@@ -1,14 +1,23 @@
+# Python standard libraries
 from pathlib import Path
 from open_ephys.analysis import Session
 import numpy as np
-from my_fun.my_fun import do_sounds_dict
 import pandas as pd
 import matplotlib
-
 matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
-from parse.parse_v2 import parse_v2
+import warnings
+warnings.filterwarnings('ignore')
 
+# Ephys specific libraries
+from neo.core import SpikeTrain
+from quantities import ms, s, Hz
+from elephant.statistics import time_histogram, instantaneous_rate, fanofactor, mean_firing_rate
+from elephant.kernels import GaussianKernel
+
+# My own libraries
+from my_fun.my_fun import do_sounds_dict
+from parse.parse_v2 import parse_v2
 
 # Load raw ephys data
 # From https://github.com/open-ephys/open-ephys-python-tools/blob/main/src/open_ephys/analysis/README.md
@@ -136,7 +145,7 @@ ephys_filenames = pd.Series(ephys_filenames)  # Convert list to pandas Series
 orders = [key for key in keys if len(key) == 4]  # Get only the keys  with 4 elements (orders)
 orders = [orders[i:i + 3] for i in range(0, len(orders), 3)]  # Make a list of lists with 3 orders each
 
-assert len(ephys_filenames) == len(orders)  # Check if the number of filenames and orders match
+assert len(ephys_filenames) == len(orders)  # Check if the number of filenames and orders match (should be 1 per trial)
 
 ########################################################################################################################
 ########################################################################################################################
@@ -225,6 +234,7 @@ n_mua_clusters = len(cluster_group[cluster_group['group'] == 'mua'])
 n_noise_clusters = len(cluster_group[cluster_group['group'] == 'noise'])
 
 # Plot a bar graph with the number of good, mua and noise clusters
+plt.figure()
 x = ['good', 'mua', 'noise']
 height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
 labels = ['good', 'mua', 'noise']
@@ -237,8 +247,11 @@ print(f'Total number of clusters: {n_clusters}\n'
       f'Number of mua clusters: {n_mua_clusters} ({round(n_mua_clusters/n_clusters*100)}%)\n'
       f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters/n_clusters*100)}%)')
 
-# Select only clusters labelled as good or mua
+# Select only clusters labelled as good or mua  (drop noise clusters)
 df_spikes = df_spikes.loc[(df_spikes.group == 'good') | (df_spikes.group == 'mua')]
+
+# Select only good clusters (drop mua and noise)
+df_spikes = df_spikes.loc[(df_spikes.group == 'good')]
 
 # Transform spike times to seconds
 sample_rate = continuous_AP.metadata['sample_rate']
@@ -248,32 +261,16 @@ print(f'Min spike time (min): {round(min(df_spikes.spike_times / 60))}\n'
       f'Max spike time (min): {round(max(df_spikes.spike_times / 60))}')
 
 # Plot the first minute
+plt.figure()
 clusters = df_spikes.cluster.unique()
 df_spikes_60s = df_spikes[(df_spikes.spike_times < 60) & (df_spikes.group == 'good')]
 clusters_60s = df_spikes_60s.cluster.unique()
-plt.scatter(df_spikes_60s.spike_times, df_spikes_60s.cluster, color='k')
+plt.scatter(df_spikes_60s.spike_times, df_spikes_60s.cluster, marker='|', linestyle='None', color='k')
 plt.xlabel('Time (s)')
 plt.ylabel('Cluster ID')
 plt.title('First min. of recording')
 
 ########################################################################################################################
-
-events_stream = events_stream[events_stream['state'] == 0]  # Keep only length of HIGH TTLs
-events_stream['keys'] = keys  # Add keys column to events_stream
-
-# Keep only rows of DataFrame events_stream with keys == play
-events_stream_test = events_stream_test[events_stream_test['keys'] == 'play']
-events_stream['Trial'] = np.arange(1, len(events_stream) + 1)  # Add Trial column to events_stream
-
-
-
-
-
-
-
-
-
-
 
 # Ephys recording info
 first_timestamp = continuous_AP.timestamps[0]
@@ -294,34 +291,24 @@ behavior_end = df_behavior['TrialEnd'].iloc[-1]  # Get the last trial end
 behavior_len = behavior_end - behavior_start  # Get the total behavior length
 print(f'The behavior (from behavior data) lasted {round(behavior_len/60)} min.')
 
-# Align timestamps to the first timestamp (start at 0)
-df_ttl.timestamps = df_ttl.timestamps - first_timestamp
-
-# Align timestamps to the first event (start at 0). Doesn't make sense as spike_times are aligned to the first timestamp
-# df_ttl.timestamps = df_ttl.timestamps - first_event
-
 df_ttl.loc[df_ttl['samples'] == 1, 'ON'] = df_ttl['timestamps']  # Onset of TTL
 df_ttl.loc[df_ttl['samples'] == 0, 'OFF'] = df_ttl['timestamps']  # Offset of TTL
 df_ttl.OFF = df_ttl.OFF.shift(-1)  # Shift the OFF column one row up
 df_ttl = df_ttl.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
 df_ttl['Length'] = df_ttl['OFF'] - df_ttl['ON']  # Calculate length of TTLs
+keys = keys[:-1]
 df_ttl['key'] = keys  # Add keys column to df_ttl
 df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (1 TTL per trial)
 df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
-
 df_ttl.drop('TTL', axis=1, inplace=True)  # Drop TTL column
 df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
+df_ttl.reset_index(drop=True, inplace=True)  # Reset index
 
+# Align timestamps to the first timestamp (start at 0)
+df_ttl.timestamps = df_ttl.timestamps - first_timestamp
 
-
-
-
-
-
-
-
-
-
+# Align timestamps to the first event (start at 0). Doesn't make sense as spike_times are aligned to the first timestamp
+# df_ttl.timestamps = df_ttl.timestamps - first_event
 
 df_aligned = pd.merge(df_behavior, df_ttl, on=['Trial'])  # Merge behavior and TTLs dataframes
 
@@ -334,6 +321,7 @@ for state in transform_states:
 df_aligned['BehaviorStart'] = df_aligned.ON - df_aligned.StimStart  # When behavior session started in the ephys clock
 
 # Plot the drift start timestamp
+plt.figure()
 plt.plot(df_aligned.BehaviorStart)
 plt.xlabel('Trial')
 plt.ylabel('Time (s)')
@@ -361,26 +349,106 @@ for j in range(len(port_states)):
     for i in range(len(df_aligned)):
             df_aligned[port_states[j]][i] = [x + df_aligned['TrialStart'][i] for x in df_aligned[port_states[j]][i]]
 
+# Find the cluster id in df_spikes that has the most spikes
+id_max_spikes = df_spikes['cluster'].value_counts().idxmax()
+print(f'The cluster with the most spikes is {id_max_spikes}')
 
+# Select only the cluster with the most spikes (for developing the code)
+df_spikes = df_spikes.loc[df_spikes.cluster == id_max_spikes]
 
+# Select cluster with the median number of spikes
+median_spikes = df_spikes['cluster'].value_counts().median()
 
-# With this we will assign the spikes to the corresponding trial
+# Assign spikes to the corresponding trial
 df_spikes['Trial'] = np.nan  # Create a new column with NaN values (default trial number)
 
-for i, row in df_aligned.iterrows():
-    # create a list of our conditions
-    condlist = [(df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i]),
-                # Spike times within the trial
-                 (df_spikes.spike_times < df_aligned['TrialStart'].iloc[i]) | (df_spikes.spike_times > df_aligned['TrialEnd'].iloc[i])]
-                # Spike times outside the trial
+# for i, row in df_aligned.iterrows():  # With np.select (overkill as there is only one condition)
+#     # create a list of our conditions
+#     condlist = [(df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i]),
+#                 # Spike times within the trial
+#                  (df_spikes.spike_times < df_aligned['TrialStart'].iloc[i]) | (df_spikes.spike_times > df_aligned['TrialEnd'].iloc[i])]
+#                 # Spike times outside the trial
+#
+#     # create a list of the values we want to assign for each condition
+#     choices = [df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial']]
+#
+#     # create a new column and use np.select to assign values to it using our lists as arguments
+#     df_spikes['Trial'] = np.select(condlist, choices)
 
-    # create a list of the values we want to assign for each condition
-    choices = [df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial']]
-
-    # create a new column and use np.select to assign values to it using our lists as arguments
-    df_spikes['Trial'] = np.select(condlist, choices)
-
-# Rewrite the previous for loop but use np.where instead, omitting the second condition
-for i, row in df_aligned.iterrows():
+for i, row in df_aligned.iterrows():  # With np.where (more appropriate as there is only one condition)
     condition = (df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i])
     df_spikes['Trial'] = np.where(condition, df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial'])
+
+df_spikes.dropna(inplace=True)  # Drop rows with NaN values in the Trial column  (spikes outside trial times)
+
+# Check if the number of trials in behavior and spikes dataframes match
+assert len(df_spikes.Trial.unique()) == len(df_aligned)
+
+df = pd.merge(df_aligned, df_spikes, on=['Trial'])  # Merge behavior and spikes dataframes
+
+########################################################################################################################
+
+# Plot rasters
+
+# Sort clusters of df_spikes by the number of spikes (from least to most)
+clusters = df_spikes.cluster.unique()
+spikes_per_cluster = df_spikes['cluster'].value_counts()
+clusters = spikes_per_cluster.index
+spikes_per_cluster = spikes_per_cluster.values
+clusters_sorted = [x for _, x in sorted(zip(spikes_per_cluster, clusters))]
+
+cluster = 589  # Select cluster
+df_cluster = df[df.cluster == cluster]
+align = 'StimStart'
+# align = 'TrialStart'
+
+plt.figure()
+plt.plot(df_cluster.spike_times - df_cluster[align], df_cluster.Trial, marker='|', linestyle='None', color='k')
+plt.axvline(0, color='r')
+plt.xlabel('Time (s)')
+plt.ylabel('Trial')
+plt.title(f'Raster aligned to stimulus onset (cluster {cluster})')
+
+
+def calculate_firing_rate(unit_df):
+    spiketrain = SpikeTrain(unit_df.timestamps_fix.values * 1000 * ms,
+                            t_stop=unit_df.timestamps_fix.max() * 1000 * ms,
+                            t_start=unit_df.timestamps_fix.min() * 1000 * ms)
+    mfr = mean_firing_rate(spiketrain)  # in Hz
+    rounded_mfr = np.round(mfr.magnitude * 1000, 2)  # in spikes/s
+    return rounded_mfr, spiketrain
+
+
+times = df_cluster.spike_times * 1000
+t_stop = df_cluster.spike_times.max() * 1000
+t_start = df_cluster.spike_times.min() * 1000
+units = ms
+
+# Compute spike train with Neo (https://neo.readthedocs.io/en/latest/api_reference.html#neo.core.SpikeTrain)
+spiketrain = SpikeTrain(times, t_stop=t_stop, t_start=t_start, units=units)
+
+# Elephant tutorial: https://elephant.readthedocs.io/en/latest/tutorials/statistics.html
+# Compute mean firing rate with Elephant
+# https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.mean_firing_rate.html#elephant.statistics.mean_firing_rate
+mfr = mean_firing_rate(spiketrain)  # In Hz
+mfr = np.round(mfr.magnitude * 1000, ttl_precision)  # In spikes/s
+
+# Compute time histogram with Elephant
+# https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.time_histogram.html#elephant.statistics.time_histogram
+bin_size = 1  # ms
+histogram_count = time_histogram([spiketrain], bin_size*ms, output='rate')
+
+# Compute instantaneous rate with Elephant
+# https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.instantaneous_rate.html#elephant.statistics.instantaneous_rate
+sigma = 30  # In ms (from Suzuki & Gottlieb)
+inst_gauss_rate = instantaneous_rate(spiketrain, sampling_period=bin_size * ms, kernel=GaussianKernel(sigma * ms))
+conv_times = inst_gauss_rate.times.rescale(s)  # Convert to seconds
+conv_firing = inst_gauss_rate.rescale(inst_gauss_rate.dimensionality).magnitude.flatten()
+conv_firing = conv_firing * 1000  # Convert to spikes/s
+df_conv = pd.DataFrame({'conv_times': conv_times, 'conv_firing': conv_firing})
+
+# Plot df_conv
+plt.figure()
+plt.plot(df_conv.conv_times, df_conv.conv_firing)
+
+
