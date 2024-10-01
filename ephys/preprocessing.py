@@ -3,6 +3,7 @@ from pathlib import Path
 from open_ephys.analysis import Session
 import numpy as np
 import pandas as pd
+from scipy.stats import zscore
 import matplotlib
 matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
@@ -18,6 +19,8 @@ from elephant.kernels import GaussianKernel
 # My own libraries
 from my_fun.my_fun import do_sounds_dict
 from parse.parse_v2 import parse_v2
+
+########################################################################################################################
 
 # Load raw ephys data
 # From https://github.com/open-ephys/open-ephys-python-tools/blob/main/src/open_ephys/analysis/README.md
@@ -82,33 +85,56 @@ elif stream_index == 1:  # LFP stream
 
 # TTLs from event data (much faster). Default
 ttl_precision = 4  # Precision of the TTLs (in decimal places of seconds)
-events_stream['TTL'] = events_stream.timestamp.diff()  # Even indexes are LOW and odd indexes are HIGH TTL lengths (matching state)
-events_stream.TTL = events_stream.TTL.round(ttl_precision)  # Round TTLs to the desired precision
-TTLs_events = events_stream.TTL[1::2]  # Get only HIGH TTL lengths (the odd indexes)
+events_stream.loc[events_stream['state'] == 1, 'ON'] = events_stream['timestamp']  # Onset of TTL
+events_stream.loc[events_stream['state'] == 0, 'OFF'] = events_stream['timestamp']  # Offset of TTL
+events_stream.OFF = events_stream.OFF.shift(-1)  # Shift the OFF column one row up
+events_stream['Length'] = events_stream['OFF'] - events_stream['ON']  # Calculate length of TTLs
+# events_stream['Length'] = events_stream.timestamp.diff()  # Even indexes are LOW and odd indexes are HIGH TTL lengths (matching state)
+events_stream.Length = events_stream.Length.round(ttl_precision)  # Round TTLs to the desired precision
+# events_stream = events_stream.length[1::2]  # Get only HIGH TTL lengths (the odd indexes)
+# events_stream = events_stream.length[events_stream.state == 0]  # Get only HIGH TTL lengths  (alternative method)
+events_stream = events_stream.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
+events_stream.reset_index(drop=True, inplace=True)
+TTLs_events = events_stream.Length
 
 # TTLs from continuous data (much slower)
-# Only possible if the sync signal was included as a continuous channel ("+" button of Neuropix pluggin was active
-# https://open-ephys.github.io/gui-docs/User-Manual/Plugins/Neuropixels-PXI.html
-if continuous_AP.metadata['num_channels'] == 385:  # If there is a 385th channel with TTLs
-    samples = continuous_AP.samples[:, 384]  # Get the samples from channel 385 (TTLs)
-    timestamps = continuous_AP.timestamps
-    s1 = pd.Series(samples, name='samples')
-    s2 = pd.Series(timestamps, name='timestamps')
-    df_ttl = pd.concat([s1, s2], axis=1)  # Put the data in a single dataframe
-    df_ttl['diff'] = df_ttl.samples.diff()  # Look for the places where there is a change in the TTL state
-    df_ttl = df_ttl.loc[(df_ttl['diff'] == 1) | (df_ttl['diff'] == -1)]  # Remove values without a change (diff = 0)
-    df_ttl['TTL'] = df_ttl['timestamps'].diff()  # Even indexes are LOW and odd indexes are HIGH TTL lengths (matching state)
-    df_ttl.TTL = df_ttl.TTL.round(ttl_precision)  # Round TTLs to the desired precision
-    df_ttl.reset_index(drop=True, inplace=True)
-    TTLs_continuous = df_ttl.TTL[1::2]  # Get only HIGH TTL lengths (the odd indexes)
+TTLs_from_continuous = False  # Flag to use TTLs from continuous data
 
-    assert TTLs_continuous.equals(TTLs_events)  # Check if TTLs from continuous and event data match
-    if TTLs_continuous.equals(TTLs_events):
-        print('TTLs from continuous and event data match')
+if TTLs_from_continuous:
+    # Only possible if the sync signal was included as a continuous channel ("+" button of Neuropix pluggin was active
+    # https://open-ephys.github.io/gui-docs/User-Manual/Plugins/Neuropixels-PXI.html
+    if continuous_AP.metadata['num_channels'] == 385:  # If there is a 385th channel with TTLs
+        samples = continuous_AP.samples[:, 384]  # Get the samples from channel 385 (TTLs)
+        timestamps = continuous_AP.timestamps
+        s1 = pd.Series(samples, name='samples')
+        s2 = pd.Series(timestamps, name='timestamps')
+        df_ttl = pd.concat([s1, s2], axis=1)  # Put the data in a single dataframe
+        df_ttl['diff'] = df_ttl.samples.diff()  # Look for the places where there is a change in the TTL state
+        df_ttl = df_ttl.loc[(df_ttl['diff'] == 1) | (df_ttl['diff'] == -1)]  # Remove values without a change (diff = 0)
+        df_ttl.loc[df_ttl['samples'] == 1, 'ON'] = df_ttl['timestamps']  # Onset of TTL
+        df_ttl.loc[df_ttl['samples'] == 0, 'OFF'] = df_ttl['timestamps']  # Offset of TTL
+        df_ttl.OFF = df_ttl.OFF.shift(-1)  # Shift the OFF column one row up
+        df_ttl['Length'] = df_ttl['OFF'] - df_ttl['ON']  # Calculate length of TTLs
+        # df_ttl['Length'] = df_ttl['timestamps'].diff()  # Even indexes are LOW and odd indexes are HIGH TTL lengths (matching state)
+        df_ttl.Length = df_ttl.Length.round(ttl_precision)  # Round TTLs to the desired precision
+        # df_ttl.length = df_ttl.Length.shift(-1)  # Shift the TTL column one row up
+        df_ttl = df_ttl.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
+        df_ttl.reset_index(drop=True, inplace=True)
+        # TTLs_continuous = df_ttl.Length[1::2]  # Get only HIGH TTL lengths (the odd indexes)
+        # TTLs_continuous = df_ttl.Length[df_ttl.samples == 0]  # Get only HIGH TTL lengths  (alternative method)
+        TTLs_continuous = df_ttl.Length
+        TTLs = TTLs_continuous  # Use TTLs from continuous data
+
+        # Check if TTLs from continuous and event data match
+        assert TTLs_continuous.equals(TTLs_events), 'TTLs from continuous and event data do not match'
     else:
-        print('TTLs from continuous and event data do not match')
+        print('There is no 385th channel with TTLs in the continuous data. Using TTLs from event data only.')
+        TTLs = TTLs_events  # Use TTLs from event data
+else:
+    TTLs = TTLs_events  # Use TTLs from event data
 
-TTLs = TTLs_events  # Use TTLs from event data
+# Create variable called 'test' that contains the columns: 'ON', 'OFF' and 'length' from events_stream
+df_ttl = events_stream[['ON', 'OFF', 'Length']]  # Create a new DataFrame with only the columns 'ON', 'OFF' and 'Length'
 
 ########################################################################################################################
 
@@ -133,6 +159,7 @@ def do_sounds_dict_inv(TTLs):  # Move function to my_fun
 
 
 keys = TTLs.apply(do_sounds_dict_inv).dropna().to_list()  # Get sounds_dict keys given a TTL length as a value
+df_ttl['key'] = keys  # Add keys column to df_ttl
 
 # Get the sound filenames per trial
 letters = [key for key in keys if len(key) == 1]  # Get only the keys with 1 element (letters)
@@ -144,8 +171,10 @@ ephys_filenames = pd.Series(ephys_filenames)  # Convert list to pandas Series
 # Get the sound orders per trial
 orders = [key for key in keys if len(key) == 4]  # Get only the keys  with 4 elements (orders)
 orders = [orders[i:i + 3] for i in range(0, len(orders), 3)]  # Make a list of lists with 3 orders each
+orders = pd.Series(orders)
 
-assert len(ephys_filenames) == len(orders)  # Check if the number of filenames and orders match (should be 1 per trial)
+# Check if the number of filenames and orders match (should be 1 per trial)
+assert len(ephys_filenames) == len(orders), 'Number of filenames and orders do not match'
 
 ########################################################################################################################
 ########################################################################################################################
@@ -157,7 +186,7 @@ df_behavior = parse_v2(path_behavior)
 ########################################################################################################################
 ########################################################################################################################
 
-# Compare sounds filenames from behavior and ephys data
+# Compare sounds filenames from behavior and ephys data. Way to recover the trials structure from ephys data
 
 # Found sounds sent from Bpod (Filename) that does not match with those received by Arduino (Filename2) and get indexes
 index = df_behavior[df_behavior['FilesMatch'] == 0].index
@@ -176,7 +205,7 @@ n_trials_ephys = len(ephys_filenames)
 diff_n_trials = n_trials_behavior - n_trials_ephys
 
 # Check if the number of trials match with a tolerance of 1
-assert abs(diff_n_trials) <= 1
+assert abs(diff_n_trials) <= 1, 'Number of trials from behavior and ephys data do not match'
 
 # Check if the number of filenames match
 if len(behavior_filenames) != len(ephys_filenames):
@@ -192,7 +221,8 @@ n_trials = min(len(ephys_filenames), len(behavior_filenames))
 # Compare ephys_filenames and behavior_filenames
 sounds_match = [ephys_filenames[i] == behavior_filenames[i] for i in range(n_trials)]
 
-assert all(sounds_match)  # Check if all sounds from behavior and ephys match
+# Check if all sounds from behavior and ephys match
+assert all(sounds_match), 'Sounds from behavior and ephys do not match'
 
 # Check if all values of sounds_match are True
 if all(sounds_match):
@@ -221,7 +251,7 @@ df_spikes = pd.DataFrame({'spike_times': spikes_times, 'spike_clusters': spike_c
 # Merge df_spikes with cluster_group
 df_spikes = pd.merge(df_spikes, cluster_group, left_on='spike_clusters', right_on='cluster_id')
 
-# Drop clusters_id column
+# Drop clusters_id column (redundant)
 df_spikes.drop('cluster_id', axis=1, inplace=True)
 
 # Rename spike_clusters column to cluster
@@ -250,15 +280,40 @@ print(f'Total number of clusters: {n_clusters}\n'
 # Select only clusters labelled as good or mua  (drop noise clusters)
 df_spikes = df_spikes.loc[(df_spikes.group == 'good') | (df_spikes.group == 'mua')]
 
-# Select only good clusters (drop mua and noise)
-df_spikes = df_spikes.loc[(df_spikes.group == 'good')]
+# # Drop noise clusters
+# df_spikes = df_spikes.loc[(df_spikes.group != 'noise')]
+
+# # Select only good clusters (drop mua and noise)
+# df_spikes = df_spikes.loc[(df_spikes.group == 'good')]
+
+
+def sort_clusters(df_spikes):
+    """
+    Sort clusters from df by the number of spikes
+    :param df_spikes: DataFrame with spike times and clusters
+    """
+
+    # Get the number of spikes per cluster
+    n_spikes = df_spikes.groupby('cluster')['spike_times'].count()
+    n_spikes = n_spikes.sort_values(ascending=True)
+    clusters = n_spikes.index
+    df_clusters = pd.DataFrame({'cluster': clusters, 'n_spikes': n_spikes})
+    df_clusters.reset_index(drop=True, inplace=True)
+    # Add cluster_group to df_clusters_sum
+    df_clusters = pd.merge(df_clusters, cluster_group, left_on='cluster', right_on='cluster_id')
+    df_clusters.drop('cluster_id', axis=1, inplace=True)
+    return df_clusters
+
+
+# Sort clusters by the number of spikes
+df_clusters = sort_clusters(df_spikes)
 
 # Transform spike times to seconds
 sample_rate = continuous_AP.metadata['sample_rate']
 # df.insert(1, 'spike_times_s', df.spike_times / sample_rate)  # Insert spike_times_s column
 df_spikes['spike_times'] = df_spikes['spike_times'] / sample_rate  # Overwrites original spike_times column
-print(f'Min spike time (min): {round(min(df_spikes.spike_times / 60))}\n'
-      f'Max spike time (min): {round(max(df_spikes.spike_times / 60))}')
+print(f'Min spike time: {round(min(df_spikes.spike_times / 60))} min\n'
+      f'Max spike time: {round(max(df_spikes.spike_times / 60))} min')
 
 # Plot the first minute
 plt.figure()
@@ -272,71 +327,69 @@ plt.title('First min. of recording')
 
 ########################################################################################################################
 
-# Ephys recording info
+# Ephys recording + behavioral session info
 first_timestamp = continuous_AP.timestamps[0]
 last_timestamp = continuous_AP.timestamps[-1]
+len_recording = last_timestamp - first_timestamp
 first_event = events_stream.timestamp.iloc[0]
 last_event = events_stream.timestamp.iloc[-1]
-len_recording = last_timestamp - first_timestamp
 len_ephys_n_behavior = (last_event - first_event)
-print(f'The recording started after {round(first_timestamp/60)} min. of acquisition')
-print(f'The behavior first event happened after {round(first_event/60)} min. of acquisition '
+print(f'The recording started after {round(first_timestamp / 60)} min. of acquisition')
+print(f'The behavior first event happened after {round(first_event / 60)} min. of acquisition '
       f'({round((first_event - first_timestamp) / 60)} min. after recording started)')
-print(f'The recording lasted {round(len_recording/60)} min.')
-print(f'The behavior (from ephys data) lasted {round(len_ephys_n_behavior/60)} min.')
+print(f'The recording lasted {round(len_recording / 60)} min.')
+print(f'The behavior (from ephys data) lasted {round(len_ephys_n_behavior / 60)} min.')
 
 # Behavior session info
 behavior_start = df_behavior['TrialStart'].iloc[0]  # Get the first trial start
 behavior_end = df_behavior['TrialEnd'].iloc[-1]  # Get the last trial end
 behavior_len = behavior_end - behavior_start  # Get the total behavior length
-print(f'The behavior (from behavior data) lasted {round(behavior_len/60)} min.')
+print(f'The behavior (from behavior data) lasted {round(behavior_len / 60)} min.')
 
-df_ttl.loc[df_ttl['samples'] == 1, 'ON'] = df_ttl['timestamps']  # Onset of TTL
-df_ttl.loc[df_ttl['samples'] == 0, 'OFF'] = df_ttl['timestamps']  # Offset of TTL
-df_ttl.OFF = df_ttl.OFF.shift(-1)  # Shift the OFF column one row up
-df_ttl = df_ttl.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
-df_ttl['Length'] = df_ttl['OFF'] - df_ttl['ON']  # Calculate length of TTLs
-keys = keys[:-1]
-df_ttl['key'] = keys  # Add keys column to df_ttl
+# Check if the length of the behavioral session from behavioral and ephys data match
+assert round(len_ephys_n_behavior / 60) == round(behavior_len / 60), \
+    'Length of behavioral session from behavioral and ephys data do not match'
+
+########################################################################################################################
+
+# Temporal alignment of ephys and behavior data (from continuous data)
 df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (1 TTL per trial)
 df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
-df_ttl.drop('TTL', axis=1, inplace=True)  # Drop TTL column
 df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
 df_ttl.reset_index(drop=True, inplace=True)  # Reset index
 
-# Align timestamps to the first timestamp (start at 0)
-df_ttl.timestamps = df_ttl.timestamps - first_timestamp
-
-# Align timestamps to the first event (start at 0). Doesn't make sense as spike_times are aligned to the first timestamp
-# df_ttl.timestamps = df_ttl.timestamps - first_event
+# Align timestamps to the first timestamp (start at 0). Not in use
+# df_ttl.timestamps = df_ttl.timestamps - first_timestamp
 
 df_aligned = pd.merge(df_behavior, df_ttl, on=['Trial'])  # Merge behavior and TTLs dataframes
 
-# Transform FSM states from relative (0 = start of trial) to absolute (cumulative) timestamps
+# Transform behavioral FSM states from relative (0 = start of trial) to absolute (cumulative) timestamps
+# Only 'TrialStart' and 'TrialEnd' are in absolute timestamps, the rest are in relative timestamps
 transform_states = ['StimStart', 'StimEnd', 'RespWinStart', 'RespWinEnd']
 
 for state in transform_states:
     df_aligned[state] = df_aligned[state] + df_aligned.TrialStart
 
-df_aligned['BehaviorStart'] = df_aligned.ON - df_aligned.StimStart  # When behavior session started in the ephys clock
+# When did the behavioral session start in the ephys clock
+df_aligned['BehaviorStart'] = df_aligned.ON - df_aligned.StimStart
 
-# Plot the drift start timestamp
+# Plot the drift of the behavioral session start timestamps
 plt.figure()
 plt.plot(df_aligned.BehaviorStart)
 plt.xlabel('Trial')
 plt.ylabel('Time (s)')
-plt.title(f'Drift behavior starts ({round((df_aligned.BehaviorStart.max() - df_aligned.BehaviorStart.min())*1000)} ms)')
+plt.title(f'Drift behavioral session start timestamps ({round((df_aligned.BehaviorStart.max() - df_aligned.BehaviorStart.min())*1000)} ms)')
 
 assert all(round(df_behavior.TrialStart + df_aligned.BehaviorStart + df_behavior.StimStart, ttl_precision) ==
            round(df_ttl.ON, ttl_precision))
 
-# Align FSM states to the start of the trial in the ephys clock
+# Align FSM states to the start of the behavioral session in the ephys clock
 aligned_states = ['TrialStart', 'TrialEnd', 'StimStart', 'StimEnd', 'RespWinStart', 'RespWinEnd']
 
 for state in aligned_states:
     df_aligned[state] = df_aligned[state] + df_aligned.BehaviorStart
 
-# Check if the lengths of the states match after alignment
+# Check if the lengths of the states before the alignment match after the alignment
 assert all(round(df_aligned.TrialEnd - df_aligned.TrialStart, ttl_precision) == round(df_aligned.TrialLen, ttl_precision))
 assert all(round(df_aligned.StimEnd - df_aligned.StimStart, ttl_precision) == round(df_aligned.StimLen, ttl_precision))
 assert all(round(df_aligned.RespWinEnd - df_aligned.RespWinStart, ttl_precision) == round(df_aligned.RespWinLen, ttl_precision))
@@ -348,16 +401,6 @@ port_states = ['Port1In', 'Port1Out', 'Port2In', 'Port2Out']
 for j in range(len(port_states)):
     for i in range(len(df_aligned)):
             df_aligned[port_states[j]][i] = [x + df_aligned['TrialStart'][i] for x in df_aligned[port_states[j]][i]]
-
-# Find the cluster id in df_spikes that has the most spikes
-id_max_spikes = df_spikes['cluster'].value_counts().idxmax()
-print(f'The cluster with the most spikes is {id_max_spikes}')
-
-# Select only the cluster with the most spikes (for developing the code)
-df_spikes = df_spikes.loc[df_spikes.cluster == id_max_spikes]
-
-# Select cluster with the median number of spikes
-median_spikes = df_spikes['cluster'].value_counts().median()
 
 # Assign spikes to the corresponding trial
 df_spikes['Trial'] = np.nan  # Create a new column with NaN values (default trial number)
@@ -382,73 +425,312 @@ for i, row in df_aligned.iterrows():  # With np.where (more appropriate as there
 df_spikes.dropna(inplace=True)  # Drop rows with NaN values in the Trial column  (spikes outside trial times)
 
 # Check if the number of trials in behavior and spikes dataframes match
-assert len(df_spikes.Trial.unique()) == len(df_aligned)
+# assert len(df_spikes.Trial.unique()) == len(df_aligned), \
+#     'Number of trials in behavior and spikes dataframes do not match'
 
 df = pd.merge(df_aligned, df_spikes, on=['Trial'])  # Merge behavior and spikes dataframes
+
+########################################################################################################################
+########################################################################################################################
+
+# For debugging purposes
+cluster = 240
+align = 'StimStart'
 
 ########################################################################################################################
 
 # Plot rasters
 
-# Sort clusters of df_spikes by the number of spikes (from least to most)
-clusters = df_spikes.cluster.unique()
-spikes_per_cluster = df_spikes['cluster'].value_counts()
-clusters = spikes_per_cluster.index
-spikes_per_cluster = spikes_per_cluster.values
-clusters_sorted = [x for _, x in sorted(zip(spikes_per_cluster, clusters))]
+def plot_raster(cluster, align='StimStart'):
+    """
+    Plot a raster plot of a given cluster aligned to a specific event.
+    :param cluster: Cluster ID
+    :param align: Event to align the raster plot to (default: StimStart)
+    """
 
-cluster = 589  # Select cluster
-df_cluster = df[df.cluster == cluster]
-align = 'StimStart'
-# align = 'TrialStart'
+    df_cluster = df[df.cluster == cluster]
+
+    # Select only correct trials
+    # df_cluster = df_cluster[df_cluster.Hit == 1]
+
+    plt.figure()
+    plt.plot(df_cluster.spike_times - df_cluster[align], df_cluster.Trial, marker='|', linestyle='None', color='k')
+    plt.axvline(0, color='r', label='Stimulus')
+    plt.axvline(df_cluster.Delay.unique()[0], color='b', label='Delay')
+    plt.axvline(df_cluster.StimDur.unique()[0] + df_cluster.Delay.unique()[0], color='g', label='Response')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Trial')
+    plt.title(f'Raster aligned to {align} (cluster {cluster}: {df_cluster.group.unique()[0]})')
+    plt.legend(loc='upper right', frameon=False)
+
+    # Save the figure in Desktop folder called 'rasters'
+    plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'rasters' / f'cluster_{cluster}_aligned_{align}.png')
+    plt.close()
+
+
+# # Plot rasters for all clusters
+# for cluster in clusters:
+#     plot_raster(cluster, align='StimStart')
+
+########################################################################################################################
+
+# Plot PSTHs
+
+def plot_psth(cluster, align='StimStart'):
+    """
+    Plot a PSTH of a given cluster aligned to a specific event.
+    :param cluster: Cluster ID
+    :param align: Event to align the PSTH to (default: StimStart)
+    """
+
+    df_cluster = df[df.cluster == cluster]  # Slice DataFrame of given cluster
+    df_cluster['spike_times_aligned'] = df_cluster.spike_times - df_cluster[align]  # Align spike times to the event
+
+    # Get the minimum and maximum spike times of the cluster (instead of the trial)
+    # Like that all trials will have the same time window, regardless of the trial length
+    t_start = df_cluster.spike_times_aligned.min() * 1000  # In ms
+    t_stop = df_cluster.spike_times_aligned.max() * 1000  # In ms
+
+    trials = df_behavior.Trial
+
+    mfr = []
+    hist_times = []
+    hist_firing = []
+    gauss_times = []
+    gauss_firing = []
+
+    for trial in trials:
+
+        # Slice DataFrame of given cluster of given trial
+        df_cluster_trial = df_cluster[df_cluster.Trial == trial]
+
+        # In ms (much faster to work in ms since the binning and convolution will be in ms)
+        times = (df_cluster_trial.spike_times_aligned) * 1000
+        # times = (df_cluster_trial.spike_times - df_cluster_trial[align]) * 1000
+        # t_start = df_cluster_trial.spike_times.min() * 1000
+        # t_stop = df_cluster_trial.spike_times.max() * 1000
+        units = ms
+
+        # Compute spike train with Neo (https://neo.readthedocs.io/en/latest/api_reference.html#neo.core.SpikeTrain)
+        spiketrain = SpikeTrain(times, t_start=t_start, t_stop=t_stop, units=units)
+
+        # Elephant tutorial: https://elephant.readthedocs.io/en/latest/tutorials/statistics.html
+        # Compute mean firing rate with Elephant
+        # https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.mean_firing_rate.html#elephant.statistics.mean_firing_rate
+        mfr.append(np.round(mean_firing_rate(spiketrain).magnitude * 1000, ttl_precision))  # In spikes/s
+        # print(f"The mean firing rate of cluster {cluster} spiketrain is", mfr)
+
+        # Compute time histogram with Elephant
+        # https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.time_histogram.html#elephant.statistics.time_histogram
+        bin_size = 1  # ms
+        hist_rate = time_histogram(spiketrain, bin_size * ms, output='rate')
+        hist_times.append(hist_rate.times.rescale(s).magnitude)  # Convert to seconds and store as a numpy array (not a Quantity)
+        hist_firing.append(hist_rate.magnitude.flatten())
+
+        # Compute instantaneous rate with Elephant
+        # https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.instantaneous_rate.html#elephant.statistics.instantaneous_rate
+        sigma = 30  # In ms (from Suzuki & Gottlieb)
+        sampling_period = bin_size * ms
+        kernel = GaussianKernel(sigma * ms)
+        gauss_rate = instantaneous_rate(spiketrain, sampling_period=sampling_period, kernel=kernel)
+        gauss_times.append(gauss_rate.times.rescale(s).magnitude)  # Convert to seconds and store as a numpy array (not a Quantity)
+        gauss_firing.append(gauss_rate.magnitude.flatten())
+        # gauss_firing = gauss_rate.rescale(hist_rate.dimensionality).magnitude.flatten()
+        # gauss_firing = conv_firing * 1000  # Convert to spikes/s
+
+    # Create a DataFrame with the firing rates
+    df_fr = pd.DataFrame({'mfr': mfr, 'hist_times': hist_times, 'hist_firing': hist_firing, 'gauss_times': gauss_times, 'gauss_firing': gauss_firing})
+
+    test_times = pd.DataFrame(gauss_times)
+    test_firing = pd.DataFrame(gauss_firing)
+
+    # test_hist_times = pd.DataFrame(hist_times)
+    # test_hist_firing = pd.DataFrame(hist_firing)
+
+    # Plot standard error of the mean (sem) of firing rate across trials
+    plt.figure()
+    plt.plot(test_times.mean(axis=0), test_firing.mean(axis=0), color='k')
+    plt.fill_between(test_times.mean(axis=0), test_firing.mean(axis=0) - test_firing.sem(axis=0),
+                     test_firing.mean(axis=0) + test_firing.sem(axis=0), color='k', alpha=0.25)
+    plt.axvline(0, color='tab:red', label='Stimulus')
+    plt.axvline(df_cluster.Delay.unique()[0], color='tab:blue', label='Delay')
+    plt.axvline(df_cluster.StimDur.unique()[0] + df_cluster.Delay.unique()[0], color='tab:green', label='Response')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Trial')
+    plt.title(f'PSTH aligned to {align} (cluster {cluster})')
+    plt.legend(loc='upper right', frameon=False)
+
+    # Save the figure in Desktop folder called 'psths'
+    plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'psths' / f'cluster_{cluster}_aligned_{align}.png')
+    plt.close()
+
+
+# # Plot rasters for all clusters
+# for cluster in clusters:
+#     plot_psth(cluster, align='StimStart')
+
+
+# Slice a DataFrame of df from all clusters with spike_times between minute 1980 and 1990
+# df_1980_1990 = df[(df.spike_times > 1980) & (df.spike_times < 1990)]
+
+########################################################################################################################
+########################################################################################################################
+
+# POPULATION ACTIVITY ANALYSIS
+
+# PLOT RAW DATA (ft. Umberto Olcese)
+
+# # Plot all clusters PSTH for a limited time window (with Elephant)
+#
+# win_len = 1 * 60  # In seconds
+#
+# # Slice DataFrame of given time window
+# df_test = df[(df.spike_times > first_event) & (df.spike_times < first_event + win_len)]
+#
+# # Get the minimum and maximum spike times of the clusters
+# times = df_test.spike_times * 1000
+# t_start = df_test.spike_times.min() * 1000  # In ms
+# t_stop = df_test.spike_times.max() * 1000  # In ms
+# units = ms
+#
+# # Compute spike train with Neo (https://neo.readthedocs.io/en/latest/api_reference.html#neo.core.SpikeTrain)
+# spiketrain = SpikeTrain(times, t_start=t_start, t_stop=t_stop, units=units)
+#
+# # Compute time histogram with Elephant
+# # https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.time_histogram.html#elephant.statistics.time_histogram
+# bin_size = 500 # ms
+# hist_rate = time_histogram(spiketrain, bin_size * ms, output='rate')
+# hist_times = hist_rate.times.rescale(s).magnitude  # Convert to seconds and store as a numpy array (not a Quantity)
+# hist_firing = hist_rate.magnitude.flatten()
+# hist_firing = hist_firing * 1000  # Convert to spikes/s
+#
+# plt.plot(hist_times, hist_firing)
+#
+# events_win = df_ttl[(df_ttl.ON > first_event) & (df_ttl.ON < first_event + win_len)].ON
+#
+# for _ in range(len(events_win)):
+#     plt.axvline(events_win[_], color='r')
+
+########################################################################################################################
+
+# Plot raster
+# (all clusters, few trials horizontally stacked vs the usual one cluster, all trials vertically stacked)
+# The y-axis is the cluster ID sorted by number of spikes and the x-axis is the time of the spike
+
+stim_dur = df_behavior.StimDur.unique()[0]
+delay = df_behavior.Delay.unique()[0]
+go_cue = stim_dur + delay
+
+# Slice time vs slice trials
+slice = 'time'
+if slice == 'trials':
+    # Slice DataFrame of given time window after first event (behavior started)
+    win_trials = 977, 980  # Edges of trials to plot
+    print(f' Plotting trials: {np.arange(win_trials[0], win_trials[1] - 1)}')
+    win_events = df_ttl.ON.iloc[win_trials[0]:win_trials[1]]
+    df_test = df_spikes[(df_spikes.spike_times > win_events.iloc[0]) & (df_spikes.spike_times < win_events.iloc[-1] + go_cue)]
+    title = (f"Population activity of {len(df_clusters)} clusters "
+             f"({round(len(df_clusters[df_clusters.group == 'good']) / len(df_clusters) * 100)}% 'good') \n"
+             f"{len(win_events) - 1} trials ({win_trials[0]}:{win_trials[1] - 2})")
+elif slice == 'time':
+    # Slice DataFrame of given time window after first event (behavior started)
+    win_time = 2000, 2005  # Edges of time window to plot
+    print(f' Plotting time: {win_time}')
+    df_test = df_spikes[(df_spikes.spike_times > win_time[0]) & (df_spikes.spike_times < win_time[1])]
+    title = (f"Population activity of {len(df_clusters)} clusters "
+             f"({round(len(df_clusters[df_clusters.group == 'good']) / len(df_clusters) * 100)}% 'good') \n"
+             f"{len(np.arange(win_time[0], win_time[1]))} s)")
+
+# Sort clusters by number of spikes
+df_clusters = sort_clusters(df_test)
+clusters = df_clusters.cluster
 
 plt.figure()
-plt.plot(df_cluster.spike_times - df_cluster[align], df_cluster.Trial, marker='|', linestyle='None', color='k')
-plt.axvline(0, color='r')
+plt.subplot(211)
+
+# Plot rasters
+for _ in range(len(df_clusters)):
+    # print(f'Cluster {df_clusters.cluster[_]} ({df_clusters.group[_]}): {df_clusters.n_spikes[_]} spikes')
+    spikes = df_test[df_test.cluster == df_clusters.cluster[_]].spike_times
+    plt.eventplot(spikes, lineoffsets=_, color='k')
+
+# Plot events
+for _ in win_events.index.values:
+    plt.axvline(win_events[_], color='tab:red', label='Stimulus')
+    plt.axvline(win_events[_] + 1, color='tab:blue', label='Go cue')
+
+# plt.xlabel('Time (s)')
+# plt.xticks(win_events, [])
+plt.gca().set_xticklabels([])
+plt.ylabel('Cluster')
+# plt.title(f'Raster plot ({win_trials} trials)')
+
+
+# Plot PSTH
+# (all clusters, few trials horizontally stacked vs the usual one cluster, all trials vertically stacked)
+# The y-axis is the firing rate and the x-axis is the time of the spike
+
+# Make a histogram of the number of spikes per bin
+bin_size = 0.1  # In seconds
+
+if slice == 'trials':
+    bins = np.arange(win_events.iloc[0], win_events.iloc[-1] + go_cue, bin_size)
+elif slice == 'time':
+    bins = np.arange(win_time[0], win_time[1], bin_size)
+
+HIST = []
+BIN_EDGES = []
+
+for _ in range(len(df_clusters)):
+    spikes = df_test[df_test.cluster == df_clusters.cluster[_]].spike_times
+    hist, bin_edges = np.histogram(spikes, bins)
+    HIST.append(hist)
+    BIN_EDGES.append(bin_edges)
+
+HIST = np.array(HIST) / bin_size  # Convert to spikes/s
+
+# Z-score normalization across clusters
+z_score = False
+if z_score:
+    HIST = zscore(HIST, axis=1)
+    ylabel = 'FR (z-scored)'
+else:
+    ylabel = 'FR (spikes/s)'
+
+HIST = HIST.mean(axis=0)  # Average across clusters
+BIN_EDGES = np.mean(BIN_EDGES, axis=0)
+
+# Plot histogram
+# plt.figure()
+plt.subplot(212)
+
+# plt.bar(BIN_EDGES[:-1], HIST, width=bin_size, color='k')
+plt.plot(BIN_EDGES[:-1], HIST, color='k')
+
+# Plot events
+for _ in win_events.index.values:
+    plt.axvline(win_events[_], color='tab:red', label='Stimulus')
+    plt.axvline(win_events[_] + 1, color='tab:blue', label='Go cue')
+
 plt.xlabel('Time (s)')
-plt.ylabel('Trial')
-plt.title(f'Raster aligned to stimulus onset (cluster {cluster})')
+# plt.xticks(win_events, np.arange(win_trials))
+plt.ylabel(ylabel)
+# plt.title(f'Raster plot ({win_trials} trials)')
+
+plt.suptitle(title)
 
 
-def calculate_firing_rate(unit_df):
-    spiketrain = SpikeTrain(unit_df.timestamps_fix.values * 1000 * ms,
-                            t_stop=unit_df.timestamps_fix.max() * 1000 * ms,
-                            t_start=unit_df.timestamps_fix.min() * 1000 * ms)
-    mfr = mean_firing_rate(spiketrain)  # in Hz
-    rounded_mfr = np.round(mfr.magnitude * 1000, 2)  # in spikes/s
-    return rounded_mfr, spiketrain
 
 
-times = df_cluster.spike_times * 1000
-t_stop = df_cluster.spike_times.max() * 1000
-t_start = df_cluster.spike_times.min() * 1000
-units = ms
-
-# Compute spike train with Neo (https://neo.readthedocs.io/en/latest/api_reference.html#neo.core.SpikeTrain)
-spiketrain = SpikeTrain(times, t_stop=t_stop, t_start=t_start, units=units)
-
-# Elephant tutorial: https://elephant.readthedocs.io/en/latest/tutorials/statistics.html
-# Compute mean firing rate with Elephant
-# https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.mean_firing_rate.html#elephant.statistics.mean_firing_rate
-mfr = mean_firing_rate(spiketrain)  # In Hz
-mfr = np.round(mfr.magnitude * 1000, ttl_precision)  # In spikes/s
-
-# Compute time histogram with Elephant
-# https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.time_histogram.html#elephant.statistics.time_histogram
-bin_size = 1  # ms
-histogram_count = time_histogram([spiketrain], bin_size*ms, output='rate')
-
-# Compute instantaneous rate with Elephant
-# https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.instantaneous_rate.html#elephant.statistics.instantaneous_rate
-sigma = 30  # In ms (from Suzuki & Gottlieb)
-inst_gauss_rate = instantaneous_rate(spiketrain, sampling_period=bin_size * ms, kernel=GaussianKernel(sigma * ms))
-conv_times = inst_gauss_rate.times.rescale(s)  # Convert to seconds
-conv_firing = inst_gauss_rate.rescale(inst_gauss_rate.dimensionality).magnitude.flatten()
-conv_firing = conv_firing * 1000  # Convert to spikes/s
-df_conv = pd.DataFrame({'conv_times': conv_times, 'conv_firing': conv_firing})
-
-# Plot df_conv
-plt.figure()
-plt.plot(df_conv.conv_times, df_conv.conv_firing)
 
 
+
+
+
+
+#
+# plt.figure()
+# stim_len = df_behavior.StimLen.unique()[0]
+# for _ in range(n_trials):
+#     spikes = df_spikes.spike_times[(df_spikes.spike_times > df_ttl.ON[_] - stim_len) & (df_spikes.spike_times > df_ttl.ON[_] + stim_len)]
+#     plt.eventplot(spikes, lineoffsets=_, color='k')
