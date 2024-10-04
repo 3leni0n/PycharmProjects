@@ -1,33 +1,19 @@
 # Load modules and data
-import statsmodels.api as sm
-from sklearn.linear_model import LogisticRegression
 
 # Import all needed libraries
-from matplotlib.lines import Line2D
-import os
-import pandas as pd
-import numpy as np
 import seaborn as sns
-import matplotlib.pyplot as plt
-import scipy
 from matplotlib.backends.backend_pdf import PdfPages
-import matplotlib.patches as mpatches
 # from statannot import add_stat_annotation
-import itertools
-from scipy import stats
 # from datahandler import Utils
-from ast import literal_eval
-from glob import glob
 
 from open_ephys.analysis import Session
-import pyopenephys
 # import Openephys  # how Tiffany had it, although the function is called OpenEphys
 # import OpenEphys
-from ephys import Binary, Kwik, OpenEphys, SettingsXML
+from ephys import OpenEphys
 
 from neo.core import SpikeTrain
-from quantities import ms, s, Hz
-from elephant.statistics import time_histogram, instantaneous_rate, fanofactor, mean_firing_rate
+from quantities import ms
+from elephant.statistics import time_histogram, instantaneous_rate
 from elephant.kernels import GaussianKernel
 
 import warnings

@@ -415,13 +415,33 @@ def enterthematrix(filepath):
     return df
 
 
-def do_sounds_dict(start, stop, num, n_decimals):
+def do_sounds_dict(start=0.0003, stop=0.0078, num=26, n_decimals=4):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")
     chars = list(ascii_lowercase[:num])  # Make a list of all the lowercase letters as long as num
     pulses = np.around(np.linspace(start, stop, num), n_decimals)  # Make evenly spaced TTL pulses rounded to round2
     return dict(zip(chars, pulses))
+
+
+def do_sounds_dict_inv(TTLs, n_decimals=4):
+    """
+    Get the key of a dictionary given a value. The inverse of the do_sounds_dict function.
+    Requires the dictionary to be created with do_sounds_dict function.
+    """
+
+    sounds_dict = do_sounds_dict()  # Create TTL-letter mapping dictionary
+    sounds_dict.update(
+        {'load': 0.0085, 'play': 0.0090, 'stop': 0.0095, 'wait': 0.1})  # Update dictionary with sound orders
+    sounds_dict_keys = list(sounds_dict.keys())  # Get sounds_dict keys
+    sounds_dict_values = list(sounds_dict.values())  # Get sounds_dict values
+    tolerance = 0.0003 / 2  # Half of the step size between TTL lengths
+
+    for i in range(len(sounds_dict)):
+        if sounds_dict_values[i] - tolerance < TTLs < sounds_dict_values[i] + tolerance:
+            return sounds_dict_keys[i]
+        else:  # If the TTL length is not in the dictionary
+            pass  # Do nothing
 
 
 def floating_points(x):
