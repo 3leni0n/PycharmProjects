@@ -29,8 +29,8 @@ from ephys.preprocessing import *
 # Run preprocessing
 
 # Define the session ID and directory
-# id = '007_2024-06-24_17-47-22'
 id = '007_2024-06-23_12-46-55'
+# id = '007_2024-06-24_17-47-22'
 # directory = Path.home() / 'Documents' / 'Open Ephys' / id  # Ephys PC
 directory = Path() / 'D:' / 'Data' / id  # Personal laptop
 
@@ -45,8 +45,8 @@ df_ttl = get_ttls(continuous, events)
 df_keys = decode_ttls(df_ttl)
 
 # Load behavior data
-# path_behavior = r"D:\Data\007_2024-06-24_17-47-22\007_stage_training_v5_20240624-180217\007_stage_training_v5_20240624-180217.csv"
 path_behavior = r"D:\Data\007_2024-06-23_12-46-55\007_stage_training_v5_20240623-130152\007_stage_training_v5_20240623-130152.csv"
+# path_behavior = r"D:\Data\007_2024-06-24_17-47-22\007_stage_training_v5_20240624-180217\007_stage_training_v5_20240624-180217.csv"
 df_behavior = parse_v2(path_behavior)
 
 # Check if the behavior and ephys data match and get the number of trials common to both
@@ -80,53 +80,52 @@ assert len(df_ttl) == len(df_behavior), 'Number of stimulus onset TTLs and trial
 
 ########################################################################################################################
 
-# Define functions
+# Define helper functions
 
-def get_trial_indexes(df_behavior, condition='outcome', skip_miss=True):
+def get_trial_indexes(df_behavior, condition='outcome'):
     """
-    Get trial indexes given a condition.
+    Get trial indexes given a condition. Skip misses by default (hit and choice are nan in misses).
     :param df_behavior: DataFrame with behavior data
     :param condition: Condition to get the trial indexes (default: 'outcome')
-    :param skip_miss: Skip missed trials (default: True)
     :return: Indexes of trials for the given condition
     """
 
-    if skip_miss:
-        df_behavior = df_behavior[df_behavior.Miss == 0]
-
     # Get the trial indexes of condition
-    if condition == 'outcome':
-        indexes0 = df_behavior[df_behavior.Hit == 0].index.values  # Error
-        indexes1 = df_behavior[df_behavior.Hit == 1].index.values  # Correct
+    if condition == 'outcome':  # Already excludes misses
+        indexes0 = df_behavior[df_behavior.Hit == 0].Trial.values  # Error
+        indexes1 = df_behavior[df_behavior.Hit == 1].Trial.values  # Correct
 
-    elif condition == 'choice':
-        indexes0 = df_behavior[df_behavior.Choice == 0].index.values  # Choice left
-        indexes1 = df_behavior[df_behavior.Choice == 1].index.values  # Choice right
+    elif condition == 'choice':  # Already excludes misses
+        indexes0 = df_behavior[df_behavior.Choice == 0].Trial.values  # Choice left
+        indexes1 = df_behavior[df_behavior.Choice == 1].Trial.values  # Choice right
 
-    elif condition == 'stimulus':
-        indexes0 = df_behavior[df_behavior.Side == 0].index.values  # Stimulus left
-        indexes1 = df_behavior[df_behavior.Side == 1].index.values  # Stimulus right
+    elif condition == 'stimulus':  # Need exclude misses manually
+        indexes0 = df_behavior[(df_behavior.Side == 0) & (df_behavior.Miss == 0)].Trial.values  # Stimulus left
+        indexes1 = df_behavior[(df_behavior.Side == 1) & (df_behavior.Miss == 0)].Trial.values  # Stimulus right
 
     # Store indexes in a list
+    indexes0 = indexes0.tolist()
+    indexes1 = indexes1.tolist()
     indexes = [indexes0, indexes1]
 
     return indexes
 
 
-def get_peri_stim_spikes(df_cluster, time_win, df_ttl):
+def get_peri_stim_spikes(df_cluster, time_win, df_ttl, scale=0):
     """
     Get peri-stimulus spikes for a cluster.
     :param df_cluster: DataFrame with spike times of a given cluster
     :param time_win: Time window around the event (in seconds) before and after
     :param df_ttl: DataFrame with TTL events
-    :param df_spikes: DataFrame with spike times
+    :param scale: Scale of the jitter (default: 0; no jitter)
     """
 
     peri_stim_spikes = []
     # Loop over trials (timestamps of stimulus onset)
     for trial in range(len(df_ttl)):
         # print(f'Trial {trial}')
-        stim_onset = df_ttl.ON[trial]  # Get the stimulus onset timestamp
+        jitter = np.random.normal(0, scale)  # Jitter the stimulus onset timestamps
+        stim_onset = df_ttl.ON[trial] + jitter  # Get the stimulus onset timestamp
         # Select only spikes within the time window of interest around the event
         spikes_trial = df_cluster[(df_cluster.spike_times > stim_onset - time_win) &
                                   (df_cluster.spike_times < stim_onset + time_win)].spike_times
@@ -163,7 +162,7 @@ def convolve_psth(psth, sigma=1):
 ########################################################################################################################
 
 # Raster plots
-def plot_raster(peri_stim_spikes, color, ax=None):
+def plot_raster(peri_stim_spikes, colors=None, ax=None):
     """
     Plot a raster plot of a given cluster aligned to a specific event. Uses an approach completely independent of
     the behavior data. Loops over the TTL events related to stimuli registered in the ephys
@@ -174,79 +173,67 @@ def plot_raster(peri_stim_spikes, color, ax=None):
     # If no Axes is provided, create a new one
     if ax is None:
         fig, ax = plt.subplots()
-        color = 'k'
 
-    stim_dur = df_behavior.StimDur.unique()[0]
-    delay = df_behavior.Delay.unique()[0]
-    go_cue = stim_dur + delay
+    if colors is None:
+        # color = [colors] * len(peri_stim_spikes)
+        colors = ['k'] * len(peri_stim_spikes)
 
-    # Loop over trials (timestamps of stimulus onset)
-    for trial in range(len(peri_stim_spikes)):
-        # Skip missed trials
-        if df_behavior.Miss[trial] == 1:
-            continue
-        else:
-            spikes_trial = peri_stim_spikes[trial]
-            # ax.eventplot(spikes_trial, lineoffsets=trial, color='k')
-            for _ in range(len(spikes_trial)):
-                ax.plot(spikes_trial.iloc[_], trial, marker='|', linestyle=None, color=color)
+    ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
+
+    # # Loop over trials (timestamps of stimulus onset)
+    # for trial in range(len(peri_stim_spikes)):
+    #     # print(f'Trial {trial}')
+    #     # Skip misses
+    #     # Skip trials with no spikes
+    #     spikes_trial = peri_stim_spikes[trial]
+    #     if spikes_trial.empty:
+    #         # continue  # This solution requires to manually set the ylims to show the total number of trials
+    #         ax.plot(0, trial, marker='|', color='none')  # Invisible placeholder for empty trials
+    #     else:
+    #         # ax.eventplot(spikes_trial, lineoffsets=trial, color='k')
+    #         for spike in range(len(spikes_trial)):
+    #             ax.plot(spikes_trial.iloc[spike], trial, marker='|', linestyle=None, color=color[trial])
 
     ax.axvline(0, color='tab:red', label='Stimulus')
     ax.axvline(delay, color='tab:gray', label='Delay')
     ax.axvline(go_cue, color='tab:blue', label='Go cue')
     ax.set_xlabel('Time (s)')
     ax.set_ylabel('Trial')
-    ax.set_title(f'Raster plot of cluster {cluster} ({group})')
+    ax.set_title(f'Cluster {cluster} ({group})')
     ax.legend(loc='upper left', frameon=False)
-
-    # Save the figure in Desktop folder called 'rasters'
-    # plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'rasters2' / f'cluster_{cluster}.png')
-    # plt.close()
 
     return ax
 
 
-def plot_raster_split(condition='outcome'):
+def plot_raster_split(condition='outcome', ax=None):
     """
     Plot a raster plot of a given cluster aligned to a specific event split by condition.
     """
 
-    fig, ax = plt.subplots(2, 1, sharex=True)
-    indexes = get_trial_indexes(df_behavior, condition=condition, skip_miss=True)
+    # If no Axes is provided, create a new one
+    if ax is None:
+        fig, ax = plt.subplots()
 
     if condition == 'outcome':
-        color = ['tab:red', 'tab:green']
-        titles = ['Error', 'Correct']
+        colors = ['tab:red', 'tab:green']
     elif condition == 'choice':
-        color = ['tab:blue', 'tab:orange']
-        titles = ['Choice left', 'Choice right']
+        colors = ['tab:blue', 'tab:orange']
     elif condition == 'stimulus':
-        color = ['tab:blue', 'tab:orange']
-        titles = ['Stimulus left', 'Stimulus right']
+        colors = ['tab:blue', 'tab:orange']
+
+    indexes = get_trial_indexes(df_behavior, condition=condition)
+    peri_stim_spikes = []
 
     for _ in range(2):
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True))
-        plot_raster(peri_stim_spikes, color=color[_], ax=ax[_])  # Plot raster
-        ax[_].set_title(titles[_])
+        peri_stim_spikes.append(
+            get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
 
-    # ax[0].set_title('Error')
-    # ax[1].set_title('Correct')
-    ax[0].set_xlabel('')
-    ax[1].legend().remove()
-    plt.suptitle(f'Cluster {cluster} ({group})')
-    plt.tight_layout()
+    peri_stim_spikes = peri_stim_spikes[0] + peri_stim_spikes[1]  # Concatenate lists
+    colors = [colors[0]] * len(indexes[0]) + [colors[1]] * len(indexes[1])  # Concatenate colors
 
+    plot_raster(peri_stim_spikes, colors=colors, ax=ax)  # Plot raster plot split by condition
+    ax.legend().remove()
 
-########################################################################################################################
-
-# Plot a raster and PSTH for a given cluster
-cluster = 418
-df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-group = df_cluster.group.unique()[0]
-
-# Set parameters
-time_win = 2  # Time window of interest before and after the event (in seconds)
-bin_size = 0.1  # In seconds
 
 ########################################################################################################################
 
@@ -329,7 +316,7 @@ def plot_psth_elephant(cluster, align='StimStart'):
     plt.figure()
     plt.plot(test_times.mean(axis=0), test_firing.mean(axis=0), color='k')
     plt.fill_between(test_times.mean(axis=0), test_firing.mean(axis=0) - test_firing.sem(axis=0),
-                     test_firing.mean(axis=0) + test_firing.sem(axis=0), color='k', alpha=0.25)
+                     test_firing.mean(axis=0) + test_firing.sem(axis=0), color='k', alpha=0.1)
     plt.axvline(0, color='tab:red', label='Stimulus')
     plt.axvline(df_cluster.Delay.unique()[0], color='tab:blue', label='Delay')
     plt.axvline(df_cluster.StimDur.unique()[0] + df_cluster.Delay.unique()[0], color='tab:green', label='Response')
@@ -346,7 +333,7 @@ def plot_psth_elephant(cluster, align='StimStart'):
 def compute_psth(peri_stim_spikes, time_win=2, bin_size=0.1):
     """
     Compute a PSTH of a given cluster aligned to a specific event.
-    :param peri_stim_spikes: Spike times of a given cluster (output of get_ps_spikes)
+    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
     :param time_win: Time window of interest before and after the event (in seconds)
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
@@ -364,7 +351,27 @@ def compute_psth(peri_stim_spikes, time_win=2, bin_size=0.1):
     return bins, psth
 
 
-def plot_psth(bins, psth, df_behavior, bin_size, color, ax=None):
+def compute_psth_shuffles(n_shuffles=1000, scale=2):
+    """
+    Compute PSTHs for shuffled spike times.
+    :param n_shuffles: Number of shuffles (default: 1000)
+    :param scale: Scale of the jitter (default: 2)
+    """
+
+    psth_shuffles = []
+
+    for _ in range(n_shuffles):
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl, scale=scale)  # Jitter the stimulus onset
+        bins, psth = compute_psth(peri_stim_spikes)
+        psth = np.mean(psth, axis=0)  # Average across trials
+        psth_shuffles.append(psth)
+
+    psth_shuffles = np.array(psth_shuffles)  # Convert to numpy array
+
+    return bins, psth_shuffles
+
+
+def plot_psth(bins, psth, psth_shuffles, bin_size, color=None, label=None, ax=None):
     """
     Plot a PSTH of a given cluster aligned to a specific event.
     :param bins: Bins of the PSTH
@@ -377,6 +384,8 @@ def plot_psth(bins, psth, df_behavior, bin_size, color, ax=None):
     # If no Axes is provided, create a new one
     if ax is None:
         fig, ax = plt.subplots()
+
+    if color is None:
         color = 'k'
 
     # Stats across trials
@@ -387,123 +396,202 @@ def plot_psth(bins, psth, df_behavior, bin_size, color, ax=None):
     psth_mean = psth_mean / bin_size
     psth_sem = psth_sem / bin_size
 
-    # Get behavioral events
-    stim_dur = df_behavior.StimDur.unique()[0]
-    delay = df_behavior.Delay.unique()[0]
-    go_cue = stim_dur + delay
+    # Compute the 95% confidence interval of the shuffled PSTHs
+    lower_bound = np.percentile(psth_shuffles, 2.5, axis=0)
+    upper_bound = np.percentile(psth_shuffles, 97.5, axis=0)
+    psth_shuffles_mean = psth.mean(axis=0)
 
     # Plot PSTH
-    # plt.figure()
-    ax.plot(bins[:-1], psth_mean, color=color)
-    # psth_mean_smooth = gaussian_filter1d(psth_mean, sigma)  # Smoothing
-    # ax.plot(bins[:-1], psth_mean_smooth, color='tab:blue')
-    ax.fill_between(bins[:-1], psth_mean - psth_sem, psth_mean + psth_sem, color=color, alpha=0.2)
-    ax.axvline(0, color='tab:red', label='Stimulus')
-    ax.axvline(delay, color='tab:gray', label='Delay')
-    ax.axvline(go_cue, color='tab:blue', label='Go cue')
+    alpha = 0.1
+    ax.plot(bins[:-1], psth_mean, color=color, label=label)
+    ax.fill_between(bins[:-1], psth_mean - psth_sem, psth_mean + psth_sem, color=color, alpha=alpha)
+    ax.plot(bins[:-1], psth_shuffles_mean, color=color, linestyle='--')
+    ax.fill_between(bins[:-1], lower_bound, upper_bound, color=color, alpha=alpha)
+    ax.axvline(0, color='tab:red', label='Stimulus' if label is None else '')
+    ax.axvline(delay, color='tab:gray', label='Delay' if label is None else '')
+    ax.axvline(go_cue, color='tab:blue', label='Go cue' if label is None else '')
     ax.set_xlabel('Time (s)')
     ax.set_ylim(bottom=0)
     ax.set_ylabel('Firing Rate (spikes/s)')
     ax.set_title(f'PSTH for cluster {cluster} ({group})')
     ax.legend(loc='upper left', frameon=False)
 
-    # # Save the figure in Desktop folder called 'rasters'
-    # plt.savefig(
-    #     Path.home() / 'OneDrive' / 'Escritorio' / 'PSTHs_007_23.06.2024' / f'PSTH cluster {cluster} ({group}).png')
-    # plt.close()
-
     return ax
 
 
-def plot_psth_split(condition='outcome'):
+def plot_psth_split(condition='outcome', ax=None):
     """
     Plot a PSTH of a given cluster aligned to a specific event split by condition.
     """
 
-    fig, ax = plt.subplots(2, 1, sharex=True)
-    indexes = get_trial_indexes(df_behavior, condition=condition, skip_miss=True)
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    indexes = get_trial_indexes(df_behavior, condition=condition)
 
     if condition == 'outcome':
         color = ['tab:red', 'tab:green']
-        titles = ['Error', 'Correct']
+        labels = ['Error', 'Correct']
     elif condition == 'choice':
         color = ['tab:blue', 'tab:orange']
-        titles = ['Choice left', 'Choice right']
+        labels = ['Choice left', 'Choice right']
     elif condition == 'stimulus':
         color = ['tab:blue', 'tab:orange']
-        titles = ['Stimulus left', 'Stimulus right']
+        labels = ['Stimulus left', 'Stimulus right']
 
     for _ in range(2):
         peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True))
         bins, psth = compute_psth(peri_stim_spikes)
-        plot_psth(bins, psth, df_behavior.iloc[indexes[_]].reset_index(drop=True), bin_size, color=color[_], ax=ax[_])
-        ax[_].set_title(titles[_])
+        bins, psth_shuffles = compute_psth_shuffles(n_shuffles=1, scale=2)
+        plot_psth(bins, psth, psth_shuffles, bin_size, color=color[_], label=labels[_], ax=ax)
 
-    max_ylim = max(ax[0].get_ylim()[1], ax[1].get_ylim()[1])
-    ax[0].set_ylim(bottom=0, top=max_ylim)
-    ax[1].set_ylim(bottom=0, top=max_ylim)
-    ax[0].set_xlabel('')
-    ax[1].legend().remove()
-    plt.suptitle(f'Cluster {cluster} ({group})')
-    plt.tight_layout()
-
+    ax.set_title(f'Cluster {cluster} ({group})')
 
 
 ########################################################################################################################
 
 # Plot both raster and PSTH
-def plot_raster_psth():
+def plot_raster_psth(ax=[None, None]):
     """
     Plot a raster plot and PSTH of a given cluster aligned to a specific event.
     """
 
-    fig, ax = plt.subplots(2, 1, sharex=True)
+    if ax[0] is None and ax[1] is None:
+        fig, ax = plt.subplots(2, 1, sharex=True)
+
     peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl)
-    plot_raster(peri_stim_spikes, color='k', ax=ax[0])
+    plot_raster(peri_stim_spikes, colors=['k'] * len(peri_stim_spikes), ax=ax[0])
     ax[0].set_title('')
+    ax[0].set_xlabel('')
     ax[0].legend().remove()
-    plot_psth(bins, psth, df_behavior, bin_size, color='k', ax=ax[1])
+    plot_psth(bins, psth, psth_shuffles, bin_size, color='k', ax=ax[1])
     ax[1].set_title('')
     plt.suptitle(f'Cluster {cluster} ({group})')
     plt.tight_layout()
 
 
-def plot_raster_psth_split(condition='outcome'):
+def plot_raster_psth_split(condition='outcome', ax=[None, None]):
     """
+    Plot a raster and a PSTH split by a condition.
+    """
+
+    if ax[0] is None and ax[1] is None:
+        fig, ax = plt.subplots(2, 1, sharex=True)
+
+    plot_raster_split(condition=condition, ax=ax[0])
+    plot_psth_split(condition=condition, ax=ax[1])
+    ax[0].set_title('')
+    ax[1].set_title('')
+    ax[0].set_xlabel('')
+    plt.suptitle(f'Cluster {cluster} ({group})')
+    plt.tight_layout()
+
+
+def cluster_report():
+    default_figsize = plt.rcParams["figure.figsize"]
+    default_width = default_figsize[0]
+    default_heigth = default_figsize[1]
+    fig, ax = plt.subplots(2, 3, figsize=(default_width * 3, default_heigth), sharex=True)
+    # fig, ax = plt.subplots(2, 3, figsize=(11.69, 8.27), sharex=True)  # A4 size in inches landscape
+
+    plot_raster_psth_split(condition='outcome', ax=[ax[0, 0], ax[1, 0]])
+    plot_raster_psth_split(condition='choice', ax=[ax[0, 1], ax[1, 1]])
+    plot_raster_psth_split(condition='stimulus', ax=[ax[0, 2], ax[1, 2]])
+
+    # Remove y-labels
+    ax[0, 1].set_ylabel('')
+    ax[1, 1].set_ylabel('')
+    ax[0, 2].set_ylabel('')
+    ax[1, 2].set_ylabel('')
+
+    # Set same y-limits for PSTHs
+    y_max = np.max([ax[1, 0].get_ylim()[1], ax[1, 1].get_ylim()[1], ax[1, 2].get_ylim()[1]])
+    ax[1, 0].set_ylim(0, y_max)
+    ax[1, 1].set_ylim(0, y_max)
+    ax[1, 2].set_ylim(0, y_max)
+
+    # Set titles
+    ax[0, 0].set_title('Outcome')
+    ax[0, 1].set_title('Choice')
+    ax[0, 2].set_title('Stimulus')
+
+    plt.tight_layout()
+
+    # Save figure using pathlib in Desktop (Escritorio) inside a folder called '4Jaime'
+    # plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / '4Jaime' / f'cluster_{cluster}_report.png')
+
+
+def cluster_report_all():
+    """
+    Plot a raster and PSTH of a given cluster aligned to a specific event.
     """
 
     default_figsize = plt.rcParams["figure.figsize"]
-    fig, ax = plt.subplots(2, 2, figsize=(default_figsize[0]*2, default_figsize[1]), sharex=True)
-    color = ['tab:red', 'tab:green']
+    default_width = default_figsize[0]
+    default_heigth = default_figsize[1]
+    fig, ax = plt.subplots(2, 4, figsize=(default_width * 4, default_heigth), sharex=True)
+    # fig, ax = plt.subplots(2, 3, figsize=(11.69, 8.27), sharex=True)  # A4 size in inches landscape
 
-    if condition == 'outcome':
-        color = ['tab:red', 'tab:green']
-        titles = ['Error', 'Correct']
-    elif condition == 'choice':
-        color = ['tab:blue', 'tab:orange']
-        titles = ['Choice left', 'Choice right']
-    elif condition == 'stimulus':
-        color = ['tab:blue', 'tab:orange']
-        titles = ['Stimulus left', 'Stimulus right']
+    plot_raster_psth(ax=[ax[0, 0], ax[1, 0]])
+    plot_raster_psth_split(condition='outcome', ax=[ax[0, 1], ax[1, 1]])
+    plot_raster_psth_split(condition='choice', ax=[ax[0, 2], ax[1, 2]])
+    plot_raster_psth_split(condition='stimulus', ax=[ax[0, 3], ax[1, 3]])
 
-    # Loop over conditions (subplots columns)
-    # Raster on top and PSTHs on low rows
-    for _ in range(2):
-        indexes = get_trial_indexes(df_behavior, condition=condition, skip_miss=True)
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True))
-        plot_raster(peri_stim_spikes, color=color[_], ax=ax[0, _])  # Plot raster
-        bins, psth = compute_psth(peri_stim_spikes)  # Compute PSTH
-        plot_psth(bins, psth, df_behavior.iloc[indexes[_]].reset_index(drop=True), bin_size, color=color[_], ax=ax[1, _])
-        ax[0, _].set_title(titles[_])
-        ax[0, _].set_xlabel('')
-        ax[0, _].legend().remove()
-        ax[1, _].set_title('')
+    # Remove legends
+    ax[1, 0].legend().remove()
 
+    # Remove y-labels
     ax[0, 1].set_ylabel('')
     ax[1, 1].set_ylabel('')
-    ax[1, 1].legend().remove()
-    plt.suptitle(f'Cluster {cluster} ({group})')
+    ax[0, 2].set_ylabel('')
+    ax[1, 2].set_ylabel('')
+    ax[0, 3].set_ylabel('')
+    ax[1, 3].set_ylabel('')
+
+    # Set same y-limits for PSTHs
+    y_max = np.max([ax[1, 0].get_ylim()[1], ax[1, 1].get_ylim()[1], ax[1, 2].get_ylim()[1], ax[1, 3].get_ylim()[1]])
+    ax[1, 0].set_ylim(0, y_max)
+    ax[1, 1].set_ylim(0, y_max)
+    ax[1, 2].set_ylim(0, y_max)
+    ax[1, 3].set_ylim(0, y_max)
+
+    # Set titles
+    ax[0, 0].set_title('All')
+    ax[0, 1].set_title('Outcome')
+    ax[0, 2].set_title('Choice')
+    ax[0, 3].set_title('Stimulus')
+
     plt.tight_layout()
+
+    # Save figure using pathlib in Desktop (Escritorio) inside a folder called
+    plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'report' / f'cluster {cluster} .png')
+    plt.close()
+
+
+########################################################################################################################
+
+# Get behavioral events
+stim_dur = df_behavior.StimDur.unique()[0]
+delay = df_behavior.Delay.unique()[0]
+go_cue = stim_dur + delay
+
+# Set parameters
+time_win = 2  # Time window of interest before and after the event (in seconds)
+bin_size = 0.1  # In seconds
+
+for cluster in df_clusters[df_clusters.group == 'good'].cluster:
+    print(f'Cluster {cluster}')
+
+    # Plot a raster and PSTH for a given cluster
+    # cluster = 418
+    df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
+    group = df_cluster.group.unique()[0]
+
+    peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl)
+    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    bins, psth_shuffles = compute_psth_shuffles(n_shuffles=1, scale=2)
+
+    cluster_report_all()
 
 
 ########################################################################################################################
@@ -700,7 +788,7 @@ plt.figure()
 # Plot sem of HIST
 plt.plot(BIN_EDGES[:-1], HIST.mean(axis=0), color='k')
 plt.fill_between(BIN_EDGES[:-1], HIST.mean(axis=0) - sem(HIST, axis=0), HIST.mean(axis=0) + sem(HIST, axis=0),
-                 color='k', alpha=0.2)
+                 color='k', alpha=0.1)
 # Set yaxis limits to start at 0
 plt.ylim(ymin=0)
 
