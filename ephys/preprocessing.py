@@ -13,7 +13,7 @@ warnings.filterwarnings('ignore')
 from my_fun.my_fun import do_sounds_dict_inv
 
 
-def load_oe_data(id, directory, sync=True, stream='AP'):
+def load_oe_data(directory, sync=True, stream='AP'):
     """
     Load raw Open Ephys data
     From https://github.com/open-ephys/open-ephys-python-tools/blob/main/src/open_ephys/analysis/README.md
@@ -45,20 +45,16 @@ def load_oe_data(id, directory, sync=True, stream='AP'):
         # recording.events.sort_values('global_timestamp', inplace=True)  # Sort events by global timestamp
         recording.events.sort_values('timestamp', inplace=True)  # Sort events by global timestamp
 
-    # Loading continuous data
+    # Loading continuous and event data
     continuous = recording.continuous  # Get the continuous data
-    if stream == 'AP':
-        continuous = continuous[0]  # Get the continuous AP data
-    elif stream == 'LFP':
-        continuous = continuous[1]  # Get the continuous LFP data
-    # data = recording.continuous[0].get_samples(start_sample_index=0, end_sample_index=10000)
-
-    # Loading event data
     events = recording.events  # Get the event data
     if stream == 'AP':
+        continuous = continuous[0]  # Get the continuous AP data
         events = events[events.stream_index == 0]  # Action Potential (AP) stream
     elif stream == 'LFP':
+        continuous = continuous[1]  # Get the continuous LFP data
         events = events[events.stream_index == 1]  # Local Field Potential (LFP) stream
+    # data = recording.continuous[0].get_samples(start_sample_index=0, end_sample_index=10000)
     events.reset_index(drop=True, inplace=True)
 
     return continuous, events

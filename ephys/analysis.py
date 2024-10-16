@@ -35,7 +35,7 @@ id = '007_2024-06-23_12-46-55'
 directory = Path() / 'D:' / 'Data' / id  # Personal laptop
 
 # Load raw Open Ephys data
-continuous, events = load_oe_data(id, directory, sync=True, stream='AP')
+continuous, events = load_oe_data(directory, sync=True, stream='AP')
 sample_rate = continuous.metadata['sample_rate']
 
 # Get TTLs from continuous or/and event data
@@ -167,15 +167,18 @@ def plot_raster(peri_stim_spikes, colors=None, ax=None):
     Plot a raster plot of a given cluster aligned to a specific event. Uses an approach completely independent of
     the behavior data. Loops over the TTL events related to stimuli registered in the ephys
     :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    :param colors: Colors of the raster plot (default: None)
     :param ax: Axes to plot the raster (default: None)
     """
 
     # If no Axes is provided, create a new one
     if ax is None:
         fig, ax = plt.subplots()
+        responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
+        peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
+        print(len(peri_stim_spikes))
 
     if colors is None:
-        # color = [colors] * len(peri_stim_spikes)
         colors = ['k'] * len(peri_stim_spikes)
 
     ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
@@ -224,7 +227,7 @@ def plot_raster_split(condition='outcome', ax=None):
     indexes = get_trial_indexes(df_behavior, condition=condition)
     peri_stim_spikes = []
 
-    for _ in range(2):
+    for _ in range(len(indexes)):
         peri_stim_spikes.append(
             get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
 
@@ -359,13 +362,12 @@ def compute_psth_shuffles(n_shuffles=1000, scale=2):
     """
 
     psth_shuffles = []
-
     for _ in range(n_shuffles):
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl, scale=scale)  # Jitter the stimulus onset
-        bins, psth = compute_psth(peri_stim_spikes)
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl, scale=scale)  # Get jittered spikes
+        bins, psth = compute_psth(peri_stim_spikes)  # Compute the PSTH of the jittered spikes
         psth = np.mean(psth, axis=0)  # Average across trials
-        psth_shuffles.append(psth)
-
+        psth = psth / bin_size  # Convert to spikes/s
+        psth_shuffles.append(psth)  # Store the PSTH of the shuffled spikes
     psth_shuffles = np.array(psth_shuffles)  # Convert to numpy array
 
     return bins, psth_shuffles
@@ -378,6 +380,8 @@ def plot_psth(bins, psth, psth_shuffles, bin_size, color=None, label=None, ax=No
     :param psth: Histograms of the PSTH
     :param df_behavior: DataFrame with behavior data
     :param bin_size: Size of the bins when coputing the PSTH (default: 0.1 s)
+    :param color: Color of the PSTH (default: None)
+    :param label: Label of the PSTH (default: None)
     :param ax: Axes to plot the PSTH (default: None)
     """
 
@@ -399,13 +403,13 @@ def plot_psth(bins, psth, psth_shuffles, bin_size, color=None, label=None, ax=No
     # Compute the 95% confidence interval of the shuffled PSTHs
     lower_bound = np.percentile(psth_shuffles, 2.5, axis=0)
     upper_bound = np.percentile(psth_shuffles, 97.5, axis=0)
-    psth_shuffles_mean = psth.mean(axis=0)
+    psth_shuffles_mean = psth_shuffles.mean(axis=0)
 
     # Plot PSTH
     alpha = 0.1
     ax.plot(bins[:-1], psth_mean, color=color, label=label)
-    ax.fill_between(bins[:-1], psth_mean - psth_sem, psth_mean + psth_sem, color=color, alpha=alpha)
-    ax.plot(bins[:-1], psth_shuffles_mean, color=color, linestyle='--')
+    # ax.fill_between(bins[:-1], psth_mean - psth_sem, psth_mean + psth_sem, color=color, alpha=alpha)
+    # ax.plot(bins[:-1], psth_shuffles_mean, color=color, linestyle='--')
     ax.fill_between(bins[:-1], lower_bound, upper_bound, color=color, alpha=alpha)
     ax.axvline(0, color='tab:red', label='Stimulus' if label is None else '')
     ax.axvline(delay, color='tab:gray', label='Delay' if label is None else '')
@@ -439,7 +443,7 @@ def plot_psth_split(condition='outcome', ax=None):
         color = ['tab:blue', 'tab:orange']
         labels = ['Stimulus left', 'Stimulus right']
 
-    for _ in range(2):
+    for _ in range(len(indexes)):
         peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True))
         bins, psth = compute_psth(peri_stim_spikes)
         bins, psth_shuffles = compute_psth_shuffles(n_shuffles=1, scale=2)
@@ -460,6 +464,10 @@ def plot_raster_psth(ax=[None, None]):
         fig, ax = plt.subplots(2, 1, sharex=True)
 
     peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl)
+    responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
+    peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
+    print(len(peri_stim_spikes))
+
     plot_raster(peri_stim_spikes, colors=['k'] * len(peri_stim_spikes), ax=ax[0])
     ax[0].set_title('')
     ax[0].set_xlabel('')
@@ -518,7 +526,7 @@ def cluster_report():
     plt.tight_layout()
 
     # Save figure using pathlib in Desktop (Escritorio) inside a folder called '4Jaime'
-    # plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / '4Jaime' / f'cluster_{cluster}_report.png')
+    # plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster_{cluster}_report.png')
 
 
 def cluster_report_all():
@@ -564,7 +572,7 @@ def cluster_report_all():
     plt.tight_layout()
 
     # Save figure using pathlib in Desktop (Escritorio) inside a folder called
-    plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'report' / f'cluster {cluster} .png')
+    plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
     plt.close()
 
 
@@ -579,7 +587,9 @@ go_cue = stim_dur + delay
 time_win = 2  # Time window of interest before and after the event (in seconds)
 bin_size = 0.1  # In seconds
 
-for cluster in df_clusters[df_clusters.group == 'good'].cluster:
+# for cluster in df_clusters[df_clusters.group == 'good'].cluster:
+for cluster in df_clusters.cluster:
+
     print(f'Cluster {cluster}')
 
     # Plot a raster and PSTH for a given cluster
@@ -805,27 +815,36 @@ plt.title(f'Population PSTH around stimulus onset (all clusters, all trials)')
 Questions Jaime:
 
 1. Are we certain that the mouse responded to these 10 trials in this particular session? The modulation of licks will 
-be more visible than that of the stimulus response.                                                                     DONE 
+be more visible than that of the stimulus response.                                                                     DONE
+
 2. Can you look for the last 10 valid trials of the session and see if you see population synchrony? DONE
 3. Can you show the same plot for a second session?                                                                     TO DO
+
 4. I think that the stimulus should evoke little population response. I would look more for (1) preparatory activity 
 between stim onset and Go cue (port approach). (2) rate modulation associated with licking. For this, you could sort the 
 units in the raster not according to their overall firing rate, but to the firing rate computed only between stimulus 
 onset and Go cue. This is the way Tiffany did it and you can then see some modulation of the population during this 
 delay period:                                                                                                           TO DO
+
 5. In general however, the fluctuations in population activity are huge and comparable with the peaks you obtain for the
 stim response or the licking. This is particularly true, when the brain state is synchronized (towards the end of the 
 session) when the up-down-like transitions make the population rate fluctuate largely:                                  TO OBSERVE
+
 6. What you suggest about computing the stimulus-triggered average of the pop. instantaneous rate across trials is a 
 very good idea. I would only include there, valid trials though (with licking).                                         TO DO
 
+
 Comments:
 1. You may also want to show only 1-3 trials to have better temporal resolution.                                        DONE
+
 2. Very little is observed in the population firing rate (MUA FR) or in the raster. If anything, there is a bit more 
 activity during the licking but not in response to Stim onset (and this recording was in Audit Ctx!!).                  TO OBSERVE
+
 3. Ideally, high firing neurons on top of the raster.                                                                   DONE
+
 4. Another question: I thought you had a few hundred clusters per session. HEre I only see around 100 neurons. To see 
 the up-down activity, the more clusters (even MUA), the better.                                                         DONE
+
 5. Would be good to plot the licks in a separate plot below, like in the Reato et al paper I shared above.  It is not 
 the same correct (6-8 licks) than error choices (1-2 licks). When averaging the pop inst rate across trials, I would do 
 it separatly for correct (many licks) and error trials (few licks).                                                     TO DO
