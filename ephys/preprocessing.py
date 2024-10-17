@@ -254,23 +254,23 @@ def load_spike_sorted_data(path_ks4, path_phy2, sample_rate):
     n_noise_clusters = len(cluster_group[cluster_group['group'] == 'noise'])
     print(f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters/n_clusters*100)}%)')
 
-    # Plot a bar graph with the number of good, mua and noise clusters
-    plt.figure()
-    x = ['good', 'mua', 'noise']
-    height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
-    labels = ['good', 'mua', 'noise']
-    colors = ['tab:green', 'tab:orange', 'tab:gray']
-    plt.bar(x, height, label=labels, color=colors)
-    plt.legend()
-
-    # Plot the first minute
-    plt.figure()
-    plt.scatter(df_spikes[(df_spikes.spike_times < 60)].spike_times,
-                df_spikes[(df_spikes.spike_times < 60)].cluster,
-                marker='|', linestyle='None', color='k')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Cluster ID')
-    plt.title('First min. of recording')
+    # # Plot a bar graph with the number of good, mua and noise clusters
+    # plt.figure()
+    # x = ['good', 'mua', 'noise']
+    # height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
+    # labels = ['good', 'mua', 'noise']
+    # colors = ['tab:green', 'tab:orange', 'tab:gray']
+    # plt.bar(x, height, label=labels, color=colors)
+    # plt.legend()
+    #
+    # # Plot the first minute
+    # plt.figure()
+    # plt.scatter(df_spikes[(df_spikes.spike_times < 60)].spike_times,
+    #             df_spikes[(df_spikes.spike_times < 60)].cluster,
+    #             marker='|', linestyle='None', color='k')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Cluster ID')
+    # plt.title('First min. of recording')
 
     # Select only clusters labelled as good or mua  (drop noise clusters)
     df_spikes = df_spikes.loc[(df_spikes.group == 'good') | (df_spikes.group == 'mua')]

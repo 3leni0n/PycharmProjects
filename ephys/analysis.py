@@ -5,9 +5,15 @@ import pandas as pd
 from scipy.stats import zscore, sem
 from scipy.ndimage import gaussian_filter1d
 import matplotlib
-
 matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
+
+# Plotting parameters
+import seaborn as sns
+sns.set_theme()
+sns.set_style('ticks')
+# sns.set_context('poster')
+sns.despine()
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -111,7 +117,7 @@ def get_trial_indexes(df_behavior, condition='outcome'):
     return indexes
 
 
-def get_peri_stim_spikes(df_cluster, time_win, df_ttl, scale=0):
+def get_peri_stim_spikes(df_cluster,  df_ttl, time_win=2, scale=0):
     """
     Get peri-stimulus spikes for a cluster.
     :param df_cluster: DataFrame with spike times of a given cluster
@@ -176,12 +182,11 @@ def plot_raster(peri_stim_spikes, colors=None, ax=None):
         fig, ax = plt.subplots()
         responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
         peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
-        print(len(peri_stim_spikes))
 
     if colors is None:
         colors = ['k'] * len(peri_stim_spikes)
 
-    ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
+    ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors, linelengths=3)
 
     # # Loop over trials (timestamps of stimulus onset)
     # for trial in range(len(peri_stim_spikes)):
@@ -205,8 +210,6 @@ def plot_raster(peri_stim_spikes, colors=None, ax=None):
     ax.set_title(f'Cluster {cluster} ({group})')
     ax.legend(loc='upper left', frameon=False)
 
-    return ax
-
 
 def plot_raster_split(condition='outcome', ax=None):
     """
@@ -229,11 +232,10 @@ def plot_raster_split(condition='outcome', ax=None):
 
     for _ in range(len(indexes)):
         peri_stim_spikes.append(
-            get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
+            get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
 
     peri_stim_spikes = peri_stim_spikes[0] + peri_stim_spikes[1]  # Concatenate lists
     colors = [colors[0]] * len(indexes[0]) + [colors[1]] * len(indexes[1])  # Concatenate colors
-
     plot_raster(peri_stim_spikes, colors=colors, ax=ax)  # Plot raster plot split by condition
     ax.legend().remove()
 
@@ -363,7 +365,7 @@ def compute_psth_shuffles(n_shuffles=1000, scale=2):
 
     psth_shuffles = []
     for _ in range(n_shuffles):
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl, scale=scale)  # Get jittered spikes
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win, scale=scale)  # Get jittered spikes
         bins, psth = compute_psth(peri_stim_spikes)  # Compute the PSTH of the jittered spikes
         psth = np.mean(psth, axis=0)  # Average across trials
         psth = psth / bin_size  # Convert to spikes/s
@@ -385,13 +387,6 @@ def plot_psth(bins, psth, psth_shuffles, bin_size, color=None, label=None, ax=No
     :param ax: Axes to plot the PSTH (default: None)
     """
 
-    # If no Axes is provided, create a new one
-    if ax is None:
-        fig, ax = plt.subplots()
-
-    if color is None:
-        color = 'k'
-
     # Stats across trials
     psth_mean = psth.mean(axis=0)
     psth_sem = sem(psth, axis=0)
@@ -400,17 +395,27 @@ def plot_psth(bins, psth, psth_shuffles, bin_size, color=None, label=None, ax=No
     psth_mean = psth_mean / bin_size
     psth_sem = psth_sem / bin_size
 
-    # Compute the 95% confidence interval of the shuffled PSTHs
-    lower_bound = np.percentile(psth_shuffles, 2.5, axis=0)
-    upper_bound = np.percentile(psth_shuffles, 97.5, axis=0)
-    psth_shuffles_mean = psth_shuffles.mean(axis=0)
+    # If no Axes is provided, create a new one
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    if color is None:
+        color = 'k'
+
+    # Compute the 95% confidence interval
+    if color == 'k':
+        # If only one PSTH, compare to null hypothesis (shuffled spikes). Use % as sem scales with N shuffles
+        psth_shuffle_mean = psth_shuffles.mean(axis=0)
+        ax.plot(bins[:-1], psth_shuffle_mean, color='tab:gray', ls='--')
+        bound = np.percentile(psth_shuffles, [2.5, 97.5], axis=0)  # The 95% confidence interval of the shuffles
+    else:
+        # If multiple PSTHs, compare sem (sem * 1.96 is 95% CI)
+        bound = [psth_mean - psth_sem, psth_mean + psth_sem]
 
     # Plot PSTH
     alpha = 0.1
     ax.plot(bins[:-1], psth_mean, color=color, label=label)
-    # ax.fill_between(bins[:-1], psth_mean - psth_sem, psth_mean + psth_sem, color=color, alpha=alpha)
-    # ax.plot(bins[:-1], psth_shuffles_mean, color=color, linestyle='--')
-    ax.fill_between(bins[:-1], lower_bound, upper_bound, color=color, alpha=alpha)
+    ax.fill_between(bins[:-1], bound[0], bound[1], color=color, alpha=alpha)
     ax.axvline(0, color='tab:red', label='Stimulus' if label is None else '')
     ax.axvline(delay, color='tab:gray', label='Delay' if label is None else '')
     ax.axvline(go_cue, color='tab:blue', label='Go cue' if label is None else '')
@@ -444,9 +449,8 @@ def plot_psth_split(condition='outcome', ax=None):
         labels = ['Stimulus left', 'Stimulus right']
 
     for _ in range(len(indexes)):
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl.iloc[indexes[_]].reset_index(drop=True))
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), time_win)
         bins, psth = compute_psth(peri_stim_spikes)
-        bins, psth_shuffles = compute_psth_shuffles(n_shuffles=1, scale=2)
         plot_psth(bins, psth, psth_shuffles, bin_size, color=color[_], label=labels[_], ax=ax)
 
     ax.set_title(f'Cluster {cluster} ({group})')
@@ -463,16 +467,15 @@ def plot_raster_psth(ax=[None, None]):
     if ax[0] is None and ax[1] is None:
         fig, ax = plt.subplots(2, 1, sharex=True)
 
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl)
     responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
+    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
     peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
-    print(len(peri_stim_spikes))
 
     plot_raster(peri_stim_spikes, colors=['k'] * len(peri_stim_spikes), ax=ax[0])
     ax[0].set_title('')
     ax[0].set_xlabel('')
     ax[0].legend().remove()
-    plot_psth(bins, psth, psth_shuffles, bin_size, color='k', ax=ax[1])
+    plot_psth(bins, psth, psth_shuffles, bin_size, ax=ax[1])
     ax[1].set_title('')
     plt.suptitle(f'Cluster {cluster} ({group})')
     plt.tight_layout()
@@ -496,40 +499,6 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
 
 
 def cluster_report():
-    default_figsize = plt.rcParams["figure.figsize"]
-    default_width = default_figsize[0]
-    default_heigth = default_figsize[1]
-    fig, ax = plt.subplots(2, 3, figsize=(default_width * 3, default_heigth), sharex=True)
-    # fig, ax = plt.subplots(2, 3, figsize=(11.69, 8.27), sharex=True)  # A4 size in inches landscape
-
-    plot_raster_psth_split(condition='outcome', ax=[ax[0, 0], ax[1, 0]])
-    plot_raster_psth_split(condition='choice', ax=[ax[0, 1], ax[1, 1]])
-    plot_raster_psth_split(condition='stimulus', ax=[ax[0, 2], ax[1, 2]])
-
-    # Remove y-labels
-    ax[0, 1].set_ylabel('')
-    ax[1, 1].set_ylabel('')
-    ax[0, 2].set_ylabel('')
-    ax[1, 2].set_ylabel('')
-
-    # Set same y-limits for PSTHs
-    y_max = np.max([ax[1, 0].get_ylim()[1], ax[1, 1].get_ylim()[1], ax[1, 2].get_ylim()[1]])
-    ax[1, 0].set_ylim(0, y_max)
-    ax[1, 1].set_ylim(0, y_max)
-    ax[1, 2].set_ylim(0, y_max)
-
-    # Set titles
-    ax[0, 0].set_title('Outcome')
-    ax[0, 1].set_title('Choice')
-    ax[0, 2].set_title('Stimulus')
-
-    plt.tight_layout()
-
-    # Save figure using pathlib in Desktop (Escritorio) inside a folder called '4Jaime'
-    # plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster_{cluster}_report.png')
-
-
-def cluster_report_all():
     """
     Plot a raster and PSTH of a given cluster aligned to a specific event.
     """
@@ -537,7 +506,7 @@ def cluster_report_all():
     default_figsize = plt.rcParams["figure.figsize"]
     default_width = default_figsize[0]
     default_heigth = default_figsize[1]
-    fig, ax = plt.subplots(2, 4, figsize=(default_width * 4, default_heigth), sharex=True)
+    fig, ax = plt.subplots(2, 4, figsize=(default_width * 4, default_heigth * 2), height_ratios=[2, 1], sharex=True)
     # fig, ax = plt.subplots(2, 3, figsize=(11.69, 8.27), sharex=True)  # A4 size in inches landscape
 
     plot_raster_psth(ax=[ax[0, 0], ax[1, 0]])
@@ -587,21 +556,27 @@ go_cue = stim_dur + delay
 time_win = 2  # Time window of interest before and after the event (in seconds)
 bin_size = 0.1  # In seconds
 
+
 # for cluster in df_clusters[df_clusters.group == 'good'].cluster:
-for cluster in df_clusters.cluster:
+for cluster in df_clusters[df_clusters.group == 'good'].cluster:
 
     print(f'Cluster {cluster}')
 
     # Plot a raster and PSTH for a given cluster
-    # cluster = 418
+    cluster = 881
     df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
     group = df_cluster.group.unique()[0]
 
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, time_win, df_ttl)
-    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
-    bins, psth_shuffles = compute_psth_shuffles(n_shuffles=1, scale=2)
+    # DEBUGGINGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
+    # df_ttl = get_ttls(continuous, events)
+    # df_ttl.ON = df_ttl.ON - first_timestamp
+    # df_ttl.OFF = df_ttl.OFF - first_timestamp
 
-    cluster_report_all()
+    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    bins, psth_shuffles = compute_psth_shuffles(n_shuffles=10, scale=2)
+
+    cluster_report()
 
 
 ########################################################################################################################
