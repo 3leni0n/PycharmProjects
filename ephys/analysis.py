@@ -13,7 +13,6 @@ import seaborn as sns
 sns.set_theme()
 sns.set_style('ticks')
 # sns.set_context('poster')
-sns.despine()
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -42,7 +41,6 @@ directory = Path() / 'D:' / 'Data' / id  # Personal laptop
 
 # Load raw Open Ephys data
 continuous, events = load_oe_data(directory, sync=True, stream='AP')
-sample_rate = continuous.metadata['sample_rate']
 
 # Get TTLs from continuous or/and event data
 df_ttl = get_ttls(continuous, events)
@@ -63,21 +61,18 @@ path_ks4 = Path() / directory / 'Record Node 101' / 'experiment1' / 'recording1'
            'Neuropix-PXI-109.ProbeA-AP' / 'kilosort4'
 path_phy2 = Path() / directory / 'Record Node 101' / 'experiment1' / 'recording1' / 'continuous' / \
             'Neuropix-PXI-109.ProbeA-AP' / 'Phy2'
-df_spikes = load_spike_sorted_data(path_ks4, path_phy2, sample_rate)
-
-# Sort clusters by the number of spikes
-df_clusters = sort_clusters(df_spikes)
-clusters = df_clusters.cluster.unique()
-n_clusters = len(df_clusters.cluster.unique())
+df_spikes, cluster_info = load_spike_sorted_data(path_ks4, path_phy2)
+clusters = cluster_info.cluster_id.unique()
+n_clusters = len(cluster_info)
 
 # Print session info
-print_session_info(continuous, events, df_behavior, df_spikes)
+show_session_info(continuous, events, df_behavior, df_spikes, plot=False)
 
 # Temporal alignment of ephys and behavior data (skip for now)
 # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
 
 # Temporal alignment of ephys and behavior data (from continuous data)
-df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (1 TTL per trial)
+df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (stimulus onset, 1 TTL per trial)
 df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
 df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
 df_ttl.reset_index(drop=True, inplace=True)  # Reset index
@@ -131,10 +126,10 @@ def get_peri_stim_spikes(df_cluster,  df_ttl, time_win=2, scale=0):
     for trial in range(len(df_ttl)):
         # print(f'Trial {trial}')
         jitter = np.random.normal(0, scale)  # Jitter the stimulus onset timestamps
-        stim_onset = df_ttl.ON[trial] + jitter  # Get the stimulus onset timestamp
+        stim_onset = df_ttl.OFF[trial] + jitter  # Get the stimulus onset timestamp
         # Select only spikes within the time window of interest around the event
-        spikes_trial = df_cluster[(df_cluster.spike_times > stim_onset - time_win) &
-                                  (df_cluster.spike_times < stim_onset + time_win)].spike_times
+        spikes_trial = df_cluster[(df_cluster.times > stim_onset - time_win) &
+                                  (df_cluster.times < stim_onset + time_win)].times
         spikes_trial = spikes_trial - stim_onset  # Align spikes to the event
         peri_stim_spikes.append(spikes_trial)
 
@@ -186,7 +181,7 @@ def plot_raster(peri_stim_spikes, colors=None, ax=None):
     if colors is None:
         colors = ['k'] * len(peri_stim_spikes)
 
-    ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors, linelengths=3)
+    ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
 
     # # Loop over trials (timestamps of stimulus onset)
     # for trial in range(len(peri_stim_spikes)):
@@ -252,12 +247,12 @@ def plot_psth_elephant(cluster, align='StimStart'):
     """
 
     df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-    df_cluster['spike_times_aligned'] = df_cluster.spike_times - df_cluster[align]  # Align spike times to the event
+    df_cluster['times_aligned'] = df_cluster.times - df_cluster[align]  # Align spike times to the event
 
     # Get the minimum and maximum spike times of the cluster (instead of the trial)
     # Like that all trials will have the same time window, regardless of the trial length
-    t_start = df_cluster.spike_times_aligned.min() * 1000  # In ms
-    t_stop = df_cluster.spike_times_aligned.max() * 1000  # In ms
+    t_start = df_cluster.times_aligned.min() * 1000  # In ms
+    t_stop = df_cluster.times_aligned.max() * 1000  # In ms
 
     trials = df_behavior.Trial
 
@@ -272,10 +267,10 @@ def plot_psth_elephant(cluster, align='StimStart'):
         df_cluster_trial = df_cluster[df_cluster.Trial == trial]
 
         # In ms (much faster to work in ms since the binning and convolution will be in ms)
-        times = (df_cluster_trial.spike_times_aligned) * 1000
-        # times = (df_cluster_trial.spike_times - df_cluster_trial[align]) * 1000
-        # t_start = df_cluster_trial.spike_times.min() * 1000
-        # t_stop = df_cluster_trial.spike_times.max() * 1000
+        times = (df_cluster_trial.times_aligned) * 1000
+        # times = (df_cluster_trial.times - df_cluster_trial[align]) * 1000
+        # t_start = df_cluster_trial.times.min() * 1000
+        # t_stop = df_cluster_trial.times.max() * 1000
         units = ms
 
         # Compute spike train with Neo (https://neo.readthedocs.io/en/latest/api_reference.html#neo.core.SpikeTrain)
@@ -556,9 +551,7 @@ go_cue = stim_dur + delay
 time_win = 2  # Time window of interest before and after the event (in seconds)
 bin_size = 0.1  # In seconds
 
-
-# for cluster in df_clusters[df_clusters.group == 'good'].cluster:
-for cluster in df_clusters[df_clusters.group == 'good'].cluster:
+for cluster in cluster_info[cluster_info.group == 'good'].cluster:
 
     print(f'Cluster {cluster}')
 
@@ -590,12 +583,12 @@ for cluster in df_clusters[df_clusters.group == 'good'].cluster:
 # win_len = 1 * 60  # In seconds
 #
 # # Slice DataFrame of given time window
-# df_test = df[(df.spike_times > first_event) & (df.spike_times < first_event + win_len)]
+# df_test = df[(df.times > first_event) & (df.times < first_event + win_len)]
 #
 # # Get the minimum and maximum spike times of the clusters
-# times = df_test.spike_times * 1000
-# t_start = df_test.spike_times.min() * 1000  # In ms
-# t_stop = df_test.spike_times.max() * 1000  # In ms
+# times = df_test.times * 1000
+# t_start = df_test.times.min() * 1000  # In ms
+# t_stop = df_test.times.max() * 1000  # In ms
 # units = ms
 #
 # # Compute spike train with Neo (https://neo.readthedocs.io/en/latest/api_reference.html#neo.core.SpikeTrain)
@@ -611,7 +604,7 @@ for cluster in df_clusters[df_clusters.group == 'good'].cluster:
 #
 # plt.plot(hist_times, hist_firing)
 #
-# events_win = df_ttl[(df_ttl.ON > first_event) & (df_ttl.ON < first_event + win_len)].ON
+# events_win = df_ttl[(df_ttl.OFF > first_event) & (df_ttl.OFF < first_event + win_len)].ON
 #
 # for _ in range(len(events_win)):
 #     plt.axvline(events_win[_], color='r')
@@ -619,7 +612,7 @@ for cluster in df_clusters[df_clusters.group == 'good'].cluster:
 ########################################################################################################################
 
 
-def plot_pop_raw(df_spikes=df_spikes, slice='trials', bin_size=0.1):
+def plot_pop_raw(df_spikes, slice='trials', bin_size=0.1):
     """
     Plot population activity of all clusters in 2 subplots: raster (above) and PSTH (below).
     Short time window (a few trials/seconds).
@@ -627,33 +620,35 @@ def plot_pop_raw(df_spikes=df_spikes, slice='trials', bin_size=0.1):
     :param slice: Slice the data in trials or time (default: trials)
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
+
+    # Keep only good clusters fom cluster_info
+    cluster_info = cluster_info[cluster_info.group != 'noise']
+    cluster_info.sort_values('n_spikes', ascending=False, inplace=True)
+
     stim_dur = df_behavior.StimDur.unique()[0]
     delay = df_behavior.Delay.unique()[0]
     go_cue = stim_dur + delay
     # bin_size = 0.1  # In seconds
 
-    # # Slice time vs slice trials
-    # slice = 'trials'  # 'trials' or 'time
-
     if slice == 'trials':
         # Slice DataFrame of given time window after first event (behavior started)
-        win_trials = 977, 980  # Edges of trials to plot
+        win_trials = 647, 650  # Edges of trials to plot
         print(f' Plotting trials: {np.arange(win_trials[0], win_trials[1] - 1)}')
-        win_events = df_ttl.ON.iloc[win_trials[0]:win_trials[1]]
+        win_events = df_ttl.OFF.iloc[win_trials[0]:win_trials[1]]
         df_slice = df_spikes[
-            (df_spikes.spike_times > win_events.iloc[0]) & (df_spikes.spike_times < win_events.iloc[-1] + go_cue)]
-        df_clusters = sort_clusters(df_slice)  # Sort clusters by number of spikes
-        title = (f"Population activity of {len(df_clusters)} clusters "
-                 f"({round(len(df_clusters[df_clusters.group == 'good']) / len(df_clusters) * 100)}% 'good')")
+            (df_spikes.times > win_events.iloc[0]) & (df_spikes.times < win_events.iloc[-1] + go_cue)]
+        # cluster_info = df_slice.sort('n_spikes')  # Sort clusters by number of spikes
+        title = (f"Population activity of {len(cluster_info)} clusters "
+                 f"({round(len(cluster_info[cluster_info.group == 'good']) / len(cluster_info) * 100)}% 'good')")
         bins = np.arange(win_events.iloc[0], win_events.iloc[-1] + go_cue, bin_size)
     elif slice == 'time':
         # Slice DataFrame of given time window after first event (behavior started)
         win_time = 1922, 1927  # Edges of time window to plot
         print(f' Plotting time: {win_time}')
-        df_slice = df_spikes[(df_spikes.spike_times > win_time[0]) & (df_spikes.spike_times < win_time[1])]
-        df_clusters = sort_clusters(df_slice)  # Sort clusters by number of spikes
-        title = (f"Population activity of {len(df_clusters)} clusters "
-                 f"({round(len(df_clusters[df_clusters.group == 'good']) / len(df_clusters) * 100)}% 'good')")
+        df_slice = df_spikes[(df_spikes.times > win_time[0]) & (df_spikes.times < win_time[1])]
+        # cluster_info = df_slice.sort('n_spikes')  # Sort clusters by number of spikes
+        title = (f"Population activity of {len(cluster_info)} clusters "
+                 f"({round(len(cluster_info[cluster_info.group == 'good']) / len(cluster_info) * 100)}% 'good')")
         bins = np.arange(win_time[0], win_time[1], bin_size)
 
     plt.figure()
@@ -664,9 +659,9 @@ def plot_pop_raw(df_spikes=df_spikes, slice='trials', bin_size=0.1):
     # Plot raster
     # All clusters, few trials horizontally stacked (vs. the usual one cluster, all trials vertically stacked)
     # The y-axis is the cluster ID sorted by number of spikes and the x-axis is the time of the spike
-    for _ in range(len(df_clusters)):
-        # print(f'Cluster {df_clusters.cluster[_]} ({df_clusters.group[_]}): {df_clusters.n_spikes[_]} spikes')
-        spikes = df_slice[df_slice.cluster == df_clusters.cluster[_]].spike_times
+    for _ in range(len(cluster_info)):
+        # print(f'Cluster {cluster_info.cluster_id[_]} ({cluster_info.group[_]}): {cluster_info.n_spikes[_]} spikes')
+        spikes = df_slice[df_slice.cluster == cluster_info.cluster_id[_]].times
         plt.eventplot(spikes, lineoffsets=_, color='k')
 
     if slice == 'trials':
@@ -688,8 +683,8 @@ def plot_pop_raw(df_spikes=df_spikes, slice='trials', bin_size=0.1):
     # Make a histogram of the number of spikes per bin
     HIST = []
     BIN_EDGES = []
-    for _ in range(len(df_clusters)):
-        spikes = df_slice[df_slice.cluster == df_clusters.cluster[_]].spike_times
+    for _ in range(len(cluster_info)):
+        spikes = df_slice[df_slice.cluster == cluster_info.cluster_id[_]].times
         hist, bin_edges = np.histogram(spikes, bins)
         HIST.append(hist)
         BIN_EDGES.append(bin_edges)
@@ -723,68 +718,18 @@ def plot_pop_raw(df_spikes=df_spikes, slice='trials', bin_size=0.1):
     plt.suptitle(title)
 
 
-time_window = 2  # In seconds
-bin_size = 0.1  # In seconds
+def plot_pop_psth():
+    """
+    Plot population PSTH treating all the spikes as coming from a single superneuron.
+    """
+    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
+    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    plot_psth(bins, psth/len(cluster_info), psth_shuffles/len(cluster_info), bin_size)
+    plt.title('Population PSTH')
 
-# Plot PSTH for all clusters concatenaninting the trials +- 1 s around the stimulus onset
-bins = np.arange(-time_window, time_window, bin_size)
-# run through good units
-# df_good = df_spikes[df_spikes.group == 'good']
 
 
-# POP_HIST = []
-HIST = []
-BIN_EDGES = []
-# for neuron in df_good.cluster.unique()[:30]:
-#     print(neuron)
-#     df_neuron = df_good[df_good.cluster == neuron]
-#     HIST = []
-for _ in range(len(df_ttl)):
-    # if df_behavior.Miss[_] == 1:  # Skip missed trials
-    #     continue
-    # else:
-    # print(_)
-    spikes = df_spikes[(df_spikes.spike_times > df_ttl.ON[_] - time_window) & (
-            df_spikes.spike_times < df_ttl.ON[_] + time_window)].spike_times
-    spikes = spikes - df_ttl.ON[_]  # Align to stimulus onset
-    hist, bin_edges = np.histogram(spikes, bins)
-    HIST.append(hist)
-    BIN_EDGES.append(bin_edges)
-# POP_HIST.append(np.mean(HIST, axis=0)) # Average across trials (neuron x time)
 
-# POP_HIST = np.array(POP_HIST)/ bin_size
-# plt.plot(np.mean(zscore(POP_HIST,1), axis=0))
-HIST = np.array(HIST)
-BIN_EDGES = np.array(BIN_EDGES)
-
-HIST = np.array(HIST) / bin_size  # Convert to spikes/s
-
-HIST = HIST / len(df_clusters)  # Average across clusters
-
-# HIST = HIST.mean(axis=0)  # Average across clusters
-BIN_EDGES = BIN_EDGES.mean(axis=0)  # Average across clusters
-
-# Plot histogram
-plt.figure()
-# plt.subplot(212)
-
-# plt.bar(BIN_EDGES[:-1], HIST, width=bin_size, color='k')
-# plt.plot(BIN_EDGES[:-1], HIST, color='k')
-# Plot sem of HIST
-plt.plot(BIN_EDGES[:-1], HIST.mean(axis=0), color='k')
-plt.fill_between(BIN_EDGES[:-1], HIST.mean(axis=0) - sem(HIST, axis=0), HIST.mean(axis=0) + sem(HIST, axis=0),
-                 color='k', alpha=0.1)
-# Set yaxis limits to start at 0
-plt.ylim(ymin=0)
-
-plt.axvline(0, color='tab:red', label='Stimulus')
-plt.axvline(1, color='tab:blue', label='Go cue')
-plt.axvline(-0.30, color='tab:gray')
-plt.axvline(-1.30, color='tab:gray')
-plt.legend(frameon=False)
-plt.xlabel('Time (s)')
-plt.ylabel('FR (spikes/s')
-plt.title(f'Population PSTH around stimulus onset (all clusters, all trials)')
 
 """
 Questions Jaime:
@@ -826,10 +771,10 @@ it separatly for correct (many licks) and error trials (few licks).             
 """
 
 # Plot population autocorrelogram
-t_start = df_spikes.spike_times.min() * 1000 * ms  # In ms
-t_stop = df_spikes.spike_times.max() * 1000 * ms  # In ms
+t_start = df_spikes.times.min() * 1000 * ms  # In ms
+t_stop = df_spikes.times.max() * 1000 * ms  # In ms
 units = ms
-spike_train = SpikeTrain(df_spikes.spike_times, t_start=t_start, t_stop=t_stop, units=units)
+spike_train = SpikeTrain(df_spikes.times, t_start=t_start, t_stop=t_stop, units=units)
 
 bin_size = 5
 window = 10

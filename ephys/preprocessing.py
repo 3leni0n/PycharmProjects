@@ -1,9 +1,9 @@
 # Standard libraries
-from pathlib import Path
-from open_ephys.analysis import Session
+import matplotlib
 import numpy as np
 import pandas as pd
-import matplotlib
+from open_ephys.analysis import Session
+import runpy
 matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 import warnings
@@ -17,9 +17,9 @@ def load_oe_data(directory, sync=True, stream='AP'):
     """
     Load raw Open Ephys data
     From https://github.com/open-ephys/open-ephys-python-tools/blob/main/src/open_ephys/analysis/README.md
-    :param id: Session ID
     :param directory: Directory where the data is stored
     :param sync: Synchronize timestamps (default: True)
+    :param stream: Stream to load (default: 'AP')
     :return: continuous, events
     """
 
@@ -44,6 +44,7 @@ def load_oe_data(directory, sync=True, stream='AP'):
         recording.compute_global_timestamps(overwrite=True)  # Overwrite existing timestamps
         # recording.events.sort_values('global_timestamp', inplace=True)  # Sort events by global timestamp
         recording.events.sort_values('timestamp', inplace=True)  # Sort events by global timestamp
+        print('\n')
 
     # Loading continuous and event data
     continuous = recording.continuous  # Get the continuous data
@@ -75,10 +76,7 @@ def get_ttls(continuous, events, n_decimals=4, double_check=False):
     events.loc[events['state'] == 0, 'OFF'] = events['timestamp']  # Offset of TTL
     events.OFF = events.OFF.shift(-1)  # Shift the OFF column one row up
     events['Length'] = events['OFF'] - events['ON']  # Calculate length of TTLs
-    # events['Length'] = events.timestamp.diff()  # Even indexes are LOW and odd indexes are HIGH TTL lengths (matching state)
     events.Length = events.Length.round(n_decimals)  # Round TTLs to the desired n_decimals
-    # events = events.length[1::2]  # Get only HIGH TTL lengths (the odd indexes)
-    # events = events.length[events.state == 0]  # Get only HIGH TTL lengths  (alternative method)
     events = events.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
     events.reset_index(drop=True, inplace=True)
     TTLs_events = events.Length
@@ -94,18 +92,15 @@ def get_ttls(continuous, events, n_decimals=4, double_check=False):
             s2 = pd.Series(timestamps, name='timestamps')
             df_ttl = pd.concat([s1, s2], axis=1)  # Put the data in a single dataframe
             df_ttl['diff'] = df_ttl.samples.diff()  # Look for the places where there is a change in the TTL state
-            df_ttl = df_ttl.loc[(df_ttl['diff'] == 1) | (df_ttl['diff'] == -1)]  # Remove values without a change (diff = 0)
+            df_ttl = df_ttl.loc[(df_ttl['diff'] != 0)]  # Remove values without a change (diff = 0)
             df_ttl.loc[df_ttl['samples'] == 1, 'ON'] = df_ttl['timestamps']  # Onset of TTL
             df_ttl.loc[df_ttl['samples'] == 0, 'OFF'] = df_ttl['timestamps']  # Offset of TTL
             df_ttl.OFF = df_ttl.OFF.shift(-1)  # Shift the OFF column one row up
             df_ttl['Length'] = df_ttl['OFF'] - df_ttl['ON']  # Calculate length of TTLs
-            # df_ttl['Length'] = df_ttl['timestamps'].diff()  # Even indexes are LOW and odd indexes are HIGH TTL lengths (matching state)
             df_ttl.Length = df_ttl.Length.round(n_decimals)  # Round TTLs to the desired n_decimals
-            # df_ttl.length = df_ttl.Length.shift(-1)  # Shift the TTL column one row up
             df_ttl = df_ttl.dropna()  # Drop rows in which samples == 0  (ON and OFF are not NaN)
             df_ttl.reset_index(drop=True, inplace=True)
-            # TTLs_continuous = df_ttl.Length[1::2]  # Get only HIGH TTL lengths (the odd indexes)
-            # TTLs_continuous = df_ttl.Length[df_ttl.samples == 0]  # Get only HIGH TTL lengths  (alternative method)
+            df_ttl = events[['ON', 'OFF', 'Length']]  # Keep only the columns 'ON', 'OFF' and 'Length'
             TTLs_continuous = df_ttl.Length
             TTLs = TTLs_continuous  # Use TTLs from continuous data
 
@@ -120,6 +115,12 @@ def get_ttls(continuous, events, n_decimals=4, double_check=False):
     # Create a new DataFrame with only the columns 'ON', 'OFF' and 'Length'
     df_ttl = events[['ON', 'OFF', 'Length']]
 
+    # Align TTLs (do not start at 0) to the first timestamp (to start at 0)
+    # This is equivalent (but much slower) to adding the first timestamp to the spikes timestamps (that do start at 0)
+    first_timestamp = continuous.timestamps[0]
+    df_ttl.ON = df_ttl.ON - first_timestamp
+    df_ttl.OFF = df_ttl.OFF - first_timestamp
+
     # Recover sounds filenames and sounds orders from TTLs
     keys = TTLs.apply(do_sounds_dict_inv).dropna().to_list()  # Get sounds_dict keys given a TTL length as a value
     df_ttl['key'] = keys  # Add keys column to df_ttl
@@ -131,7 +132,7 @@ def decode_ttls(df_ttl):
     """
     Get the TTL code from the TTLs DataFrame. 1 TTL per trial.
     :param df_ttl: DataFrame with TTLs
-    :return: TTL code
+    :return: pd.Series with the TTL code
     """
 
     # Get the sound filenames per trial
@@ -143,7 +144,7 @@ def decode_ttls(df_ttl):
     ephys_filenames = pd.Series(ephys_filenames)  # Convert list to pandas Series
 
     # Get the sound orders per trial
-    orders = [key for key in keys if len(key) == 4]  # Get only the keys  with 4 elements (orders)
+    orders = [key for key in keys if len(key) == 4]  # Get only the keys  with 4 elements (load/play/stop)
     orders = [orders[i:i + 3] for i in range(0, len(orders), 3)]  # Make a list of lists with 3 orders each
     orders = pd.Series(orders)
 
@@ -173,7 +174,7 @@ def check_data(df_behavior, df_keys):
         behavior_filenames = df_behavior['Filename']
     else:
         print('Trials which sounds sent by Bpod do not match those received by Arduino:')
-        print(df_behavior.iloc[index])
+        print(df_behavior.iloc[index].Trial)
         behavior_filenames = df_behavior['Filename2']
 
     # Get the number of trials from behavior and ephys data
@@ -211,10 +212,12 @@ def check_data(df_behavior, df_keys):
         # Get the indexes of the sounds that do not match
         sounds_mismatch_index = [i for i, x in enumerate(sounds_match) if not x]
 
+    print('\n')
+
     return n_trials, sounds_mismatch_index
 
 
-def load_spike_sorted_data(path_ks4, path_phy2, sample_rate):
+def load_spike_sorted_data(path_ks4, path_phy2, plot=False):
     """
     Load spike data sorted with Kilosort 4 (KS4) and manually curated with Phy2.
     """
@@ -223,8 +226,16 @@ def load_spike_sorted_data(path_ks4, path_phy2, sample_rate):
     # The rest of the data files are open in read-only mode.
     # From https://phy.readthedocs.io/en/latest/visualization/
     spikes_times = np.load(path_ks4 / 'spike_times.npy')  # From KS4
-    spike_clusters = np.load(path_phy2 / 'spike_clusters.npy')  # From Phy2
-    cluster_group = pd.read_csv(path_phy2 / 'cluster_group.tsv', sep='\t')  # From Phy2
+
+    # From Phy2
+    spike_clusters = np.load(path_phy2 / 'spike_clusters.npy')
+    cluster_group = pd.read_csv(path_phy2 / 'cluster_group.tsv', sep='\t')
+    cluster_info = pd.read_csv(path_phy2 / 'cluster_info.tsv', sep='\t')
+    # cluster_Amplitude = pd.read_csv(path_phy2 / 'cluster_Amplitude.tsv', sep='\t')  # Already in cluster_info
+    # cluster_Contam_pct = pd.read_csv(path_phy2 / 'cluster_ContamPct.tsv', sep='\t')  # Already in cluster_info
+    # cluster_KSLabel = pd.read_csv(path_phy2 / 'cluster_KSLabel.tsv', sep='\t')  # Already in cluster_info
+    params = runpy.run_path(path_phy2 / 'params.py')
+    sample_rate = params['sample_rate']
 
     # Create pandas DataFrame with spike times and clusters
     df_spikes = pd.DataFrame({'spike_times': spikes_times, 'spike_clusters': spike_clusters})
@@ -235,101 +246,119 @@ def load_spike_sorted_data(path_ks4, path_phy2, sample_rate):
     # Drop clusters_id column (redundant)
     df_spikes.drop('cluster_id', axis=1, inplace=True)
 
-    # Rename spike_clusters column to cluster
+    # Rename columns
+    df_spikes.rename(columns={'spike_times': 'times'}, inplace=True)
     df_spikes.rename(columns={'spike_clusters': 'cluster'}, inplace=True)
 
     # Transform spike times to seconds
-    # df.insert(1, 'spike_times_s', df.spike_times / sample_rate)  # Insert spike_times_s column
-    df_spikes['spike_times'] = df_spikes['spike_times'] / sample_rate  # Overwrites original spike_times column
-    print(f'Min spike time: {round(min(df_spikes.spike_times / 60))} min\n'
-          f'Max spike time: {round(max(df_spikes.spike_times / 60))} min')
+    df_spikes['times'] = df_spikes['times'] / sample_rate  # Overwrites original times column
+
+    print(f'Min spike time: {round(min(df_spikes.times / 60))} min\n'
+          f'Max spike time: {round(max(df_spikes.times / 60))} min')
+    print('\n')
 
     # Get the number of good and mua clusters
     n_clusters = len(cluster_group)
     print(f'Total number of clusters: {n_clusters}')
     n_good_clusters = len(cluster_group[cluster_group['group'] == 'good'])
-    print(f'Number of good clusters: {n_good_clusters} ({round(n_good_clusters/n_clusters*100)}%')
+    print(f'Number of good clusters: {n_good_clusters} ({round(n_good_clusters / n_clusters * 100)}%)')
     n_mua_clusters = len(cluster_group[cluster_group['group'] == 'mua'])
-    print(f'Number of mua clusters: {n_mua_clusters} ({round(n_mua_clusters/n_clusters*100)}%)')
+    print(f'Number of mua clusters: {n_mua_clusters} ({round(n_mua_clusters / n_clusters * 100)}%)')
     n_noise_clusters = len(cluster_group[cluster_group['group'] == 'noise'])
-    print(f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters/n_clusters*100)}%)')
+    print(f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters / n_clusters * 100)}%)')
+    print('\n')
 
-    # # Plot a bar graph with the number of good, mua and noise clusters
-    # plt.figure()
-    # x = ['good', 'mua', 'noise']
-    # height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
-    # labels = ['good', 'mua', 'noise']
-    # colors = ['tab:green', 'tab:orange', 'tab:gray']
-    # plt.bar(x, height, label=labels, color=colors)
-    # plt.legend()
-    #
-    # # Plot the first minute
-    # plt.figure()
-    # plt.scatter(df_spikes[(df_spikes.spike_times < 60)].spike_times,
-    #             df_spikes[(df_spikes.spike_times < 60)].cluster,
-    #             marker='|', linestyle='None', color='k')
-    # plt.xlabel('Time (s)')
-    # plt.ylabel('Cluster ID')
-    # plt.title('First min. of recording')
+    if plot:
+        # Plot a bar graph with the number of good, mua and noise clusters
+        plt.figure()
+        x = ['good', 'mua', 'noise']
+        height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
+        labels = ['good', 'mua', 'noise']
+        colors = ['tab:green', 'tab:orange', 'tab:gray']
+        plt.bar(x, height, label=labels, color=colors)
+        plt.legend()
 
-    # Select only clusters labelled as good or mua  (drop noise clusters)
-    df_spikes = df_spikes.loc[(df_spikes.group == 'good') | (df_spikes.group == 'mua')]
+        # Plot the first minute
+        plt.figure()
+        plt.scatter(df_spikes[(df_spikes.times < 60)].times,
+                    df_spikes[(df_spikes.times < 60)].cluster,
+                    marker='|', linestyle='None', color='k')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Cluster ID')
+        plt.title('First min. of recording')
 
-    return df_spikes
+    # Drop noise clusters
+    df_spikes = df_spikes.loc[(df_spikes.group != 'noise')]
 
-
-def sort_clusters(df_spikes):
-    """
-    Sort clusters from df by the number of spikes
-    :param df_spikes: DataFrame with spike times and clusters
-    """
-
-    # Get the number of spikes per cluster
-    n_spikes = df_spikes.groupby('cluster')['spike_times'].count()
-    n_spikes = n_spikes.sort_values(ascending=True)
-    clusters = n_spikes.index
-    # Get subdataframe from df_spikes with unique clusters and group (replicate cluster_group from df_spikes)
-    group = df_spikes[['cluster', 'group']].drop_duplicates().sort_values(by='cluster').reset_index(drop=True)
-    df_clusters = pd.DataFrame({'cluster': clusters, 'n_spikes': n_spikes})
-    df_clusters.reset_index(drop=True, inplace=True)
-    # Add cluster_group to df_clusters_sum
-    df_clusters = pd.merge(df_clusters, group, left_on='cluster', right_on='cluster')
-    return df_clusters
+    return df_spikes, cluster_info
 
 
-def print_session_info(continuous, events, df_behavior, df_spikes):
+def show_session_info(continuous, events, df_behavior, df_spikes, plot=False):
     """
     Print information about the ephys and behavior data
     """
 
-    # Ephys recording session info
-    first_timestamp = continuous.timestamps[0]
-    last_timestamp = continuous.timestamps[-1]
+    # Ephys session info
+    start_aquisition = 0  # Press PLAY in Open Ephys GUI
+    first_timestamp = continuous.timestamps[0] / 60  # Press RECORD in Open Ephys GUI
+    last_timestamp = continuous.timestamps[-1] / 60
+    len_aquisition = last_timestamp - start_aquisition  # For clarity
     len_recording = last_timestamp - first_timestamp
-    first_event = events.timestamp.iloc[0]
-    last_event = events.timestamp.iloc[-1]
-    len_ephys_n_behavior = (last_event - first_event)
-    first_spike = df_spikes.spike_times.iloc[0]
-    last_spike = df_spikes.spike_times.iloc[-1]
+
+    first_event = events.timestamp.iloc[0] / 60
+    last_event = events.timestamp.iloc[-1] / 60
+    len_events = last_event - first_event
+
+    first_spike = df_spikes.times.iloc[0] / 60
+    last_spike = df_spikes.times.iloc[-1] / 60
     len_spikes = last_spike - first_spike
 
-    print(f'The recording started after {round(first_timestamp / 60)} min. of acquisition')
-    print(f'The behavior first event happened after {round(first_event / 60)} min. of acquisition '
-          f'({round((first_event - first_timestamp) / 60)} min. after recording started)')
-    print(f'The recording lasted {round(len_recording / 60)} min.')
-    print(f'The behavior (from ephys data) lasted {round(len_ephys_n_behavior / 60)} min.')
-    print(f'Spikes were recorded during {round(len_spikes / 60)} min. (from {round(first_spike / 60)} min. to {round(last_spike / 60)} min.)')
-
     # Behavior session info
-    behavior_start = df_behavior['TrialStart'].iloc[0]  # Get the first trial start
-    behavior_end = df_behavior['TrialEnd'].iloc[-1]  # Get the last trial end
-    behavior_len = behavior_end - behavior_start  # Get the total behavior length
+    start_behavior = df_behavior['TrialStart'].iloc[0] / 60  # Get the first trial start
+    end_behavior = df_behavior['TrialEnd'].iloc[-1] / 60  # Get the last trial end
+    len_behavior = end_behavior - start_behavior  # Get the total behavior length
 
-    print(f'The behavior (from behavior data) lasted {round(behavior_len / 60)} min.')
+    print(f'The aquisition (press PLAY in Open Ephys) started at {start_aquisition} min. '
+          f'and ended after {round(len_aquisition)} min. '
+          f'It includes the time for lowering the probe')
+
+    print(f'The recording (press REC in Open Ephys) started at {round(first_timestamp)} min. of acquisition '
+          f'and ended at {round(len_aquisition)} min. of acquisition, '
+          f'lasting {round(len_recording)} min. '
+          f'It includes the time for settling the tissue')
+
+    print(f'The first event happened at {round(first_event)} min. of acquisition '
+          f'({round((first_event - first_timestamp))} min. after recording started) '
+          f'and the last event happened at {round(last_event)} min. of acquisition '
+          f'({round((last_event - first_timestamp))} min. after recording started), '
+          f'lasting {round(len_events)} min.')
+
+    print(f'The behavior lasted {round(len_behavior)} min.')
+
+    print(f'The first spike was recorded at {round(first_spike) + round(first_timestamp)} min. of acquisition '
+          f' and the last spike was recorded at {round(last_spike) + round(first_timestamp)} min. of acquisition, '
+          f'lasting {round(len_spikes)} min.')
 
     # Check if the length of the behavioral session from behavioral and ephys data match
-    assert round(len_ephys_n_behavior / 60) == round(behavior_len / 60), \
+    assert round(len_events) == round(len_behavior), \
         'Length of behavioral session from behavioral and ephys data do not match'
+
+    print('\n')
+
+    if plot:
+        # Plot timecourse of aquisition, recording, events, behavior and spikes
+        y = ['Aquisition', 'Recording', 'Events', 'Behavior', 'Spikes']
+        width = [len_aquisition, len_recording, len_events, len_behavior, len_spikes]
+        left = [start_aquisition, first_timestamp, first_event, start_behavior + first_event, first_spike + first_timestamp]
+        color = ['tab:gray', 'tab:red', 'tab:green', 'tab:blue', 'tab:orange']
+        plt.figure()
+        plt.barh(y=y, width=width, left=left, color=color)
+        plt.axvline(x=first_timestamp, color='k', linestyle='--')
+        plt.axvline(x=last_timestamp, color='k', linestyle='--')
+        plt.axvline(x=first_event, color='k', linestyle='--')
+        plt.axvline(x=last_event, color='k', linestyle='--')
+        plt.xlabel('Time (s)')
+        plt.title('Timeline of the session')
 
 
 def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
@@ -370,7 +399,7 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
     plt.xlabel('Trial')
     plt.ylabel('Time (s)')
     plt.title(f'Drift behavioral session start timestamps '
-              f'({round((df_aligned.BehaviorStart.max() - df_aligned.BehaviorStart.min())*1000)} ms)')
+              f'({round((df_aligned.BehaviorStart.max() - df_aligned.BehaviorStart.min()) * 1000)} ms)')
 
     # Check if the sum of the timestamps of the behavioral session start and the stimulus onset TTLs match
     assert all(round(df_behavior.TrialStart + df_aligned.BehaviorStart + df_behavior.StimStart, n_decimals) ==
@@ -385,14 +414,15 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
     # Check if the lengths of the states before the alignment match after the alignment
     assert all(round(df_aligned.TrialEnd - df_aligned.TrialStart, n_decimals) == round(df_aligned.TrialLen, n_decimals))
     assert all(round(df_aligned.StimEnd - df_aligned.StimStart, n_decimals) == round(df_aligned.StimLen, n_decimals))
-    assert all(round(df_aligned.RespWinEnd - df_aligned.RespWinStart, n_decimals) == round(df_aligned.RespWinLen, n_decimals))
+    assert all(
+        round(df_aligned.RespWinEnd - df_aligned.RespWinStart, n_decimals) == round(df_aligned.RespWinLen, n_decimals))
     assert all(df_aligned.StimStart == df_aligned.ON)  # Check if StimStart and df_ttl.ON match
 
     # Align timestamps of PortXIn/Out to the start of the behavioral session in the ephys clock
     port_states = ['Port1In', 'Port1Out', 'Port2In', 'Port2Out']
     for j in range(len(port_states)):
         for i in range(len(df_aligned)):
-                df_aligned[port_states[j]][i] = [x + df_aligned['TrialStart'][i] for x in df_aligned[port_states[j]][i]]
+            df_aligned[port_states[j]][i] = [x + df_aligned['TrialStart'][i] for x in df_aligned[port_states[j]][i]]
 
     # Assign spikes to the corresponding trial
     df_spikes['Trial'] = np.nan  # Create a new column with NaN values (default trial number)
@@ -400,9 +430,9 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
     # With np.select (overkill as there is only one condition)
     # for i, row in df_aligned.iterrows():
     #     # create a list of our conditions
-    #     condlist = [(df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i]),
+    #     condlist = [(df_spikes.times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.times < df_aligned['TrialEnd'].iloc[i]),
     #                 # Spike times within the trial
-    #                  (df_spikes.spike_times < df_aligned['TrialStart'].iloc[i]) | (df_spikes.spike_times > df_aligned['TrialEnd'].iloc[i])]
+    #                  (df_spikes.times < df_aligned['TrialStart'].iloc[i]) | (df_spikes.times > df_aligned['TrialEnd'].iloc[i])]
     #                 # Spike times outside the trial
     #
     #     # create a list of the values we want to assign for each condition
@@ -413,7 +443,8 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
 
     # With np.where (more appropriate as there is only one condition)
     for i, row in df_aligned.iterrows():
-        condition = (df_spikes.spike_times > df_aligned['TrialStart'].iloc[i]) & (df_spikes.spike_times < df_aligned['TrialEnd'].iloc[i])
+        condition = (df_spikes.times > df_aligned['TrialStart'].iloc[i]) & (
+                df_spikes.times < df_aligned['TrialEnd'].iloc[i])
         df_spikes['Trial'] = np.where(condition, df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial'])
 
     # df_spikes.dropna(inplace=True)  # Drop rows with NaN values in the Trial column  (spikes outside trial times)
