@@ -289,6 +289,7 @@ def load_spike_sorted_data(path_ks4, path_phy2, plot=False):
 
     # Drop noise clusters
     df_spikes = df_spikes.loc[(df_spikes.group != 'noise')]
+    cluster_info = cluster_info.loc[(cluster_info.group != 'noise')].reset_index(drop=True)
 
     return df_spikes, cluster_info
 
