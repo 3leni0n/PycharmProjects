@@ -2,7 +2,7 @@
 from pathlib import Path
 import numpy as np
 import pandas as pd
-from scipy.stats import zscore, sem
+from scipy.stats import zscore, sem, poisson
 from scipy.ndimage import gaussian_filter1d
 import matplotlib
 matplotlib.use('Qt5Agg')
@@ -18,9 +18,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # Ephys specific libraries
-from quantities import ms, s, Hz
+from quantities import ms, s
 from neo.core import SpikeTrain
-from elephant.statistics import time_histogram, instantaneous_rate, fanofactor, mean_firing_rate
+from elephant.statistics import time_histogram, instantaneous_rate, fanofactor, mean_firing_rate, isi, cv
 from elephant.kernels import GaussianKernel
 from elephant.conversion import BinnedSpikeTrain
 from elephant.spike_train_correlation import cross_correlation_histogram
@@ -498,7 +498,7 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
     plt.tight_layout()
 
 
-def cluster_report():
+def cluster_report(save=False):
     """
     Plot a raster and PSTH of a given cluster aligned to a specific event.
     """
@@ -507,8 +507,8 @@ def cluster_report():
     default_width = default_figsize[0]
     default_heigth = default_figsize[1]
     figsize = (default_width * 4, default_heigth * 2)
-    fig, ax = plt.subplots(2, 4, height_ratios=[2, 1], sharex=True, figsize=figsize)
-    # fig, ax = plt.subplots(2, 3, figsize=(11.69, 8.27), sharex=True)  # A4 size in inches landscape
+    # fig, ax = plt.subplots(2, 4, height_ratios=[2, 1], sharex=True, figsize=figsize)
+    fig, ax = plt.subplots(2, 4, height_ratios=[2, 1], figsize=(11.69, 8.27), sharex=True)  # A4 size in inches landscape
 
     plot_raster_psth(ax=[ax[0, 0], ax[1, 0]])
     plot_raster_psth_split(condition='outcome', ax=[ax[0, 1], ax[1, 1]])
@@ -541,9 +541,68 @@ def cluster_report():
 
     plt.tight_layout()
 
-    # Save figure using pathlib in Desktop (Escritorio) inside a folder called
-    plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
-    plt.close()
+    if save:
+        # Save figure using pathlib in Desktop (Escritorio) inside a folder called
+        plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
+        plt.close()
+
+
+def cluster_report_test(save=False):
+    """
+    Plot a raster and PSTH of a given cluster aligned to a specific event.
+    """
+
+    default_figsize = plt.rcParams["figure.figsize"]
+    default_width = default_figsize[0]
+    default_heigth = default_figsize[1]
+    figsize = (default_width * 4, default_heigth * 2)
+    # fig, ax = plt.subplots(2, 4, height_ratios=[2, 1], sharex=True, figsize=figsize)
+    fig, ax = plt.subplots(3, 4, height_ratios=[1, 1, 1], figsize=(11.69, 8.27))  # A4 size in inches landscape
+
+    plot_raster_psth(ax=[ax[1, 0], ax[2, 0]])
+    plot_raster_psth_split(condition='outcome', ax=[ax[1, 1], ax[2, 1]])
+    plot_raster_psth_split(condition='choice', ax=[ax[1, 2], ax[2, 2]])
+    plot_raster_psth_split(condition='stimulus', ax=[ax[1, 3], ax[2, 3]])
+
+    # Remove legends
+    ax[2, 0].legend().remove()
+
+    # Remove y-labels
+    ax[1, 1].set_ylabel('')
+    ax[2, 1].set_ylabel('')
+    ax[1, 2].set_ylabel('')
+    ax[2, 2].set_ylabel('')
+    ax[1, 3].set_ylabel('')
+    ax[2, 3].set_ylabel('')
+
+    # Set same y-limits for PSTHs
+    y_max = np.max([ax[2, 0].get_ylim()[1], ax[2, 1].get_ylim()[1], ax[2, 2].get_ylim()[1], ax[2, 3].get_ylim()[1]])
+    ax[2, 0].set_ylim(0, y_max)
+    ax[2, 1].set_ylim(0, y_max)
+    ax[2, 2].set_ylim(0, y_max)
+    ax[2, 3].set_ylim(0, y_max)
+
+    # Set titles
+    ax[1, 0].set_title('All')
+    ax[1, 1].set_title('Outcome')
+    ax[1, 2].set_title('Choice')
+    ax[1, 3].set_title('Stimulus')
+
+    plot_mfr(psth, ax=[ax[0, 0], ax[0, 1]])
+    isis = plot_isi(peri_stim_spikes, ax=ax[0, 2])
+    plot_cv(isis, ax=ax[0, 3])
+
+
+
+
+    plt.tight_layout()
+
+    if save:
+        # Save figure using pathlib in Desktop (Escritorio) inside a folder called
+        plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
+        plt.close()
+
+
 
 
 ########################################################################################################################
@@ -557,20 +616,20 @@ go_cue = stim_dur + delay
 time_win = 2  # Time window of interest before and after the event (in seconds)
 bin_size = 0.1  # In seconds
 
-for cluster in cluster_info[cluster_info.group == 'good'].cluster:
+# for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
 
-    print(f'Cluster {cluster}')
+# print(f'Cluster {cluster}')
 
-    # Plot a raster and PSTH for a given cluster
-    cluster = 881
-    df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-    group = df_cluster.group.unique()[0]
+# Plot a raster and PSTH for a given cluster
+cluster = 881
+df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
+group = df_cluster.group.unique()[0]
 
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
-    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
-    bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=10, scale=2)
+peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
 
-    cluster_report()
+cluster_report()
 
 
 ########################################################################################################################
@@ -705,7 +764,7 @@ def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=None):
     ax.set_ylabel('Correlation')
 
 
-def get_mfr(psth, ax=[None, None]):
+def plot_mfr(psth, ax=[None, None]):
     """
     Compute the mean firing rate per trial of a PSTH.
     :param psth: PSTH
@@ -728,14 +787,16 @@ def get_mfr(psth, ax=[None, None]):
     sfr = sfr / bin_size
 
     mfr_mean = np.mean(mfr)
-    mfr_percentile = np.percentile(mfr, 20)
+    percentile = 20
+    mfr_percentile = np.percentile(mfr, percentile)
 
     ax[0].plot(mfr, color='k')
     ax[0].fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.1)
-    ax[0].axhline(mfr_mean, color='tab:red')
-    ax[0].axhline(mfr_percentile, color='tab:gray', linestyle='--')
+    ax[0].axhline(mfr_mean, color='tab:red', label='mean')
+    ax[0].axhline(mfr_percentile, color='tab:gray', linestyle='--', label=f'{percentile}th percentile')
     ax[0].set_xlabel('Trial')
     ax[0].set_ylabel('Mean Firing Rate (spikes/s)')
+    ax[0].legend(loc='upper right', frameon=False)
 
     # Plot the distribution of the mean firing rate
     sns.histplot(y=mfr, kde=True, color='k', bins='auto', ax=ax[1])
@@ -759,6 +820,89 @@ def get_baseline(psth):
     baseline = baseline.mean()  # Compute the mean firing rate across bins (per trial)
 
     return baseline
+
+
+def plot_isi(peri_stim_spikes, ax=None):
+    """
+    Plot the Inter Spike Intervals (ISI) of a given cluster.
+    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    :param ax: Axes to plot the ISI distribution (default: None)
+    return: ISI per trial
+    """
+
+    # Flatten peri_stim_spikes (concatenate all trials in a single list)
+    # times = [spike for spikes in peri_stim_spikes for spike in spikes]  # Convert to ms
+
+    isis = []
+    for trial in range(len(peri_stim_spikes)):
+        spikes = peri_stim_spikes[trial]
+        isis.append(np.diff(spikes))
+        # isis.append(isi(spikes))  # With elephant
+
+    isis_flatten = np.concatenate(isis)
+
+    # Plot distribution
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    ax.hist(isis_flatten * 1000, bins=100, range=(0, 1000), color='k')
+    ax.set_xlabel('Inter Spike Interval (ms)')
+    ax.set_ylabel('Count')
+    ax.set_title('ISI distribution')
+
+    return isis
+
+
+def plot_cv(isis, ax=None):
+    """
+    Compute the coefficient of variation (CV) of a PSTH.
+    :param isis: Interspike intervals of a given cluster (output of plot_isi)
+    return: Coefficient of variation (CV) of the Inter Spike intervals (ISI) per trial
+    """
+
+    coeff_var = []
+    for trial in range(len(isis)):
+        isis_mean = np.mean(isis[trial])
+        isis_std = np.std(isis[trial])
+        coeff_var.append(isis_std / isis_mean)
+        # coeff_var.append(cv(isis[trial]))  # With elephant
+
+    # Plot distribution
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    ax.hist(coeff_var, bins=100, color='k')
+    ax.set_xlabel('Coefficient of Variation')
+    ax.set_ylabel('Count')
+    ax.set_title('CV distribution')
+
+    # mean_isi = np.mean(isis)
+    # std_isi = np.std(isis)
+    # coefficient_variation = std_isi / mean_isi
+    # # coefficient_variation = cv(isis)  # With elephant
+
+    return coeff_var
+
+
+def fano_factor(peri_stim_spikes):
+    """
+    Compute the Fano factor of a PSTH.
+    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    return: Fano factor
+    """
+
+    spike_counts = [len(series) for series in peri_stim_spikes]
+    # spike_counts = np.sum(psth, axis=1)  # Should give the same result
+    fano = np.var(spike_counts) / np.mean(spike_counts)
+    # fano = fanofactor(peri_stim_spikes)  # With elephant
+
+    return fano
+
+
+
+
+
+
 
 
 # PLOT RAW DATA (ft. Umberto Olcese)
