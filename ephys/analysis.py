@@ -112,11 +112,11 @@ def get_trial_indexes(df_behavior, condition='outcome'):
     return indexes
 
 
-def get_peri_stim_spikes(df_cluster, df_ttl, time_win=2, scale=0):
+def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
     """
     Get peri-stimulus spikes for a cluster.
     :param df_cluster: DataFrame with spike times of a given cluster
-    :param time_win: Time window around the event (in seconds) before and after
+    :param time_win: List with the time window around the event (default: [-1, 3])
     :param df_ttl: DataFrame with TTL events
     :param scale: Scale of the jitter (default: 0; no jitter)
     """
@@ -133,8 +133,8 @@ def get_peri_stim_spikes(df_cluster, df_ttl, time_win=2, scale=0):
         jitter = np.random.normal(0, scale)  # Jitter the stimulus onset timestamps
         stim_onset = df_ttl.OFF[trial] + jitter  # Get the stimulus onset timestamp
         # Select only spikes within the time window of interest around the event
-        spikes_trial = df_cluster[(df_cluster.times > stim_onset - time_win) &
-                                  (df_cluster.times < stim_onset + time_win)].times
+        spikes_trial = df_cluster[(df_cluster.times > stim_onset - abs(time_win[0])) &
+                                  (df_cluster.times < stim_onset + abs(time_win[1]))].times
         spikes_trial = spikes_trial - stim_onset  # Align spikes to the event
         peri_stim_spikes.append(spikes_trial)
 
@@ -188,24 +188,10 @@ def plot_raster(peri_stim_spikes, colors=None, ax=None):
 
     ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
 
-    # # Loop over trials (timestamps of stimulus onset)
-    # for trial in range(len(peri_stim_spikes)):
-    #     # print(f'Trial {trial}')
-    #     # Skip misses
-    #     # Skip trials with no spikes
-    #     spikes_trial = peri_stim_spikes[trial]
-    #     if spikes_trial.empty:
-    #         # continue  # This solution requires to manually set the ylims to show the total number of trials
-    #         ax.plot(0, trial, marker='|', color='none')  # Invisible placeholder for empty trials
-    #     else:
-    #         # ax.eventplot(spikes_trial, lineoffsets=trial, color='k')
-    #         for spike in range(len(spikes_trial)):
-    #             ax.plot(spikes_trial.iloc[spike], trial, marker='|', linestyle=None, color=color[trial])
-
-    ax.axvline(0, color='tab:red', label='Stimulus')
-    ax.axvline(delay, color='tab:gray', label='Delay')
-    ax.axvline(go_cue, color='tab:blue', label='Go cue')
-    ax.set_xlabel('Time (s)')
+    ax.axvline(0, color='tab:gray', label='Stimulus')
+    ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay')
+    ax.axvline(go_cue, color='tab:gray', label='Go cue')
+    ax.set_xlabel('Time from stim. onset (s)')
     ax.set_ylabel('Trial')
     ax.set_title(f'Cluster {cluster} ({group})')
     ax.legend(loc='upper left', frameon=False)
@@ -321,7 +307,7 @@ def plot_psth_elephant(cluster, align='StimStart'):
     plt.figure()
     plt.plot(test_times.mean(axis=0), test_firing.mean(axis=0), color='k')
     plt.fill_between(test_times.mean(axis=0), test_firing.mean(axis=0) - test_firing.sem(axis=0),
-                     test_firing.mean(axis=0) + test_firing.sem(axis=0), color='k', alpha=0.1)
+                     test_firing.mean(axis=0) + test_firing.sem(axis=0), color='k', alpha=0.25)
     plt.axvline(0, color='tab:red', label='Stimulus')
     plt.axvline(df_cluster.Delay.unique()[0], color='tab:blue', label='Delay')
     plt.axvline(df_cluster.StimDur.unique()[0] + df_cluster.Delay.unique()[0], color='tab:green', label='Response')
@@ -335,16 +321,17 @@ def plot_psth_elephant(cluster, align='StimStart'):
     plt.close()
 
 
-def compute_psth(peri_stim_spikes, time_win=2, bin_size=0.1):
+def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
     """
     Compute a PSTH of a given cluster aligned to a specific event.
     :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
-    :param time_win: Time window of interest before and after the event (in seconds)
+    :param time_win: List with the time window around the event (default: [-1, 3])
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
 
-    n_bins = int((2 * time_win) / bin_size) + 1
-    bins = np.linspace(-time_win, time_win, n_bins)  # linspace is preferred over arange for PSTHs
+    # n_bins = int((2 * time_win) / bin_size) + 1
+    n_bins = int((time_win[1] - time_win[0]) / bin_size) + 1
+    bins = np.linspace(time_win[0], time_win[1], n_bins)  # linspace is preferred over arange for PSTHs
 
     psth = []
     # Loop over trials (timestamps of stimulus onset)
@@ -413,13 +400,12 @@ def plot_psth(bins, psth, psth_shuffles, bin_size, color=None, label=None, ax=No
         bound = [psth_mean - psth_sem, psth_mean + psth_sem]
 
     # Plot PSTH
-    alpha = 0.1
     ax.plot(bins[:-1], psth_mean, color=color, label=label)
-    ax.fill_between(bins[:-1], bound[0], bound[1], color=color, alpha=alpha)
-    ax.axvline(0, color='tab:red', label='Stimulus' if label is None else '')
-    ax.axvline(delay, color='tab:gray', label='Delay' if label is None else '')
-    ax.axvline(go_cue, color='tab:blue', label='Go cue' if label is None else '')
-    ax.set_xlabel('Time (s)')
+    ax.fill_between(bins[:-1], bound[0], bound[1], color=color, alpha=0.25)
+    ax.axvline(0, color='tab:gray', label='Stimulus' if label is None else '')
+    ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay' if label is None else '')
+    ax.axvline(go_cue, color='tab:gray', label='Go cue' if label is None else '')
+    ax.set_xlabel('Time from stim. onset (s)')
     ax.set_ylim(bottom=0)
     ax.set_ylabel('FR (spikes/s)')
     ax.set_title(f'PSTH for cluster {cluster} ({group})')
@@ -505,162 +491,6 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
     ax[0].set_xlabel('')
     plt.suptitle(title)
     plt.tight_layout()
-
-
-def cluster_report(save=False):
-    """
-    Plot a raster and PSTH of a given cluster aligned to a specific event.
-    """
-
-    default_figsize = plt.rcParams["figure.figsize"]
-    default_width = default_figsize[0]
-    default_heigth = default_figsize[1]
-    # figsize = (default_width * 4, default_heigth * 2)
-    figsize = (11.69, 8.27)
-    width_ratios = [1, 1, 1, 1]
-    height_ratios = [1, 2, 1]
-
-    # Set subplots layout with mosaic
-    mosaic = [['Auto', 'MFR', 'MFR', 'MFR'],  # Autocorrelogram and mean firing rate
-              ['RasterAll', 'RasterOutcome', 'RasterChoice', 'RasterStimulus'],  # Rasters
-              ['RasterAll', 'RasterOutcome', 'RasterChoice', 'RasterStimulus'],  # Rasters
-              ['PSTHAll', 'PSTHOutcome', 'PSTHChoice', 'PSTHStimulus']]  # PSTHs
-    fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
-
-    # Plot panels
-    plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=ax_dict['Auto'])
-    plot_mfr(psth, ax=ax_dict['MFR'])
-    plot_raster_psth(ax=[ax_dict['RasterAll'], ax_dict['PSTHAll']])
-    plot_raster_psth_split(condition='outcome', ax=[ax_dict['RasterOutcome'], ax_dict['PSTHOutcome']])
-    plot_raster_psth_split(condition='choice', ax=[ax_dict['RasterChoice'], ax_dict['PSTHChoice']])
-    plot_raster_psth_split(condition='stimulus', ax=[ax_dict['RasterStimulus'], ax_dict['PSTHStimulus']])
-    # isis = plot_isi(peri_stim_spikes, ax=ax[0, 2])
-    # plot_cv(isis, ax=ax[0, 3])
-
-    # Remove xticklabels
-    ax_dict['RasterAll'].set_xticklabels([])
-    ax_dict['RasterOutcome'].set_xticklabels([])
-    ax_dict['RasterChoice'].set_xticklabels([])
-    ax_dict['RasterStimulus'].set_xticklabels([])
-
-    # Remove yticklabels
-    ax_dict['RasterOutcome'].set_yticklabels([])
-    ax_dict['RasterChoice'].set_yticklabels([])
-    ax_dict['RasterStimulus'].set_yticklabels([])
-    ax_dict['PSTHOutcome'].set_yticklabels([])
-    ax_dict['PSTHChoice'].set_yticklabels([])
-    ax_dict['PSTHStimulus'].set_yticklabels([])
-
-    # Remove legends
-    ax_dict['PSTHAll'].legend().remove()
-
-    # Remove ylabels
-    ax_dict['RasterOutcome'].set_ylabel('')
-    ax_dict['RasterChoice'].set_ylabel('')
-    ax_dict['RasterStimulus'].set_ylabel('')
-    ax_dict['PSTHOutcome'].set_ylabel('')
-    ax_dict['PSTHChoice'].set_ylabel('')
-    ax_dict['PSTHStimulus'].set_ylabel('')
-
-    responses = df_behavior[df_behavior.Response == 1].Response.sum()
-    ax_dict['RasterAll'].set_ylim(0, responses)
-    ax_dict['RasterOutcome'].set_ylim(0, responses)
-    ax_dict['RasterChoice'].set_ylim(0, responses)
-    ax_dict['RasterStimulus'].set_ylim(0, responses)
-
-    # Set same ylims for PSTHs
-    y_max = np.max([ax_dict['PSTHAll'].get_ylim()[1],
-                    ax_dict['PSTHOutcome'].get_ylim()[1],
-                    ax_dict['PSTHChoice'].get_ylim()[1],
-                    ax_dict['PSTHStimulus'].get_ylim()[1]])
-    ax_dict['PSTHAll'].set_ylim(0, y_max)
-    ax_dict['PSTHOutcome'].set_ylim(0, y_max)
-    ax_dict['PSTHChoice'].set_ylim(0, y_max)
-    ax_dict['PSTHStimulus'].set_ylim(0, y_max)
-
-    # Add gridlines to the PSTHs
-    ax_dict['PSTHAll'].grid(axis='y')
-    ax_dict['PSTHOutcome'].grid(axis='y')
-    ax_dict['PSTHChoice'].grid(axis='y')
-    ax_dict['PSTHStimulus'].grid(axis='y')
-
-    # Remove axes margins
-    ax_dict['MFR'].margins(x=0)
-    ax_dict['MFR'].margins(y=0)
-    ax_dict['RasterAll'].margins(x=0)
-    ax_dict['RasterOutcome'].margins(x=0)
-    ax_dict['RasterChoice'].margins(x=0)
-    ax_dict['RasterStimulus'].margins(x=0)
-    ax_dict['PSTHAll'].margins(x=0)
-    ax_dict['PSTHOutcome'].margins(x=0)
-    ax_dict['PSTHChoice'].margins(x=0)
-    ax_dict['PSTHStimulus'].margins(x=0)
-
-    # Set titles
-    ax_dict['RasterAll'].set_title('All')
-    ax_dict['RasterOutcome'].set_title('Outcome')
-    ax_dict['RasterChoice'].set_title('Choice')
-    ax_dict['RasterStimulus'].set_title('Stimulus')
-
-    # Despine axes
-    sns.despine(ax=ax_dict['MFR'])
-    sns.despine(ax=ax_dict['Auto'])
-    sns.despine(ax=ax_dict['RasterAll'], bottom=True)
-    sns.despine(ax=ax_dict['RasterOutcome'], left=True, bottom=True)
-    sns.despine(ax=ax_dict['RasterChoice'], left=True, bottom=True)
-    sns.despine(ax=ax_dict['RasterStimulus'], left=True, bottom=True)
-    sns.despine(ax=ax_dict['PSTHAll'])
-    sns.despine(ax=ax_dict['PSTHOutcome'], left=True)
-    sns.despine(ax=ax_dict['PSTHChoice'], left=True)
-    sns.despine(ax=ax_dict['PSTHStimulus'], left=True)
-
-    # Set figure title with cluster info
-    isis = plot_isi(spikes=df_cluster, ax=None)
-    coeff_var = plot_cv(isis, ax=None)
-    fano = fano_factor(peri_stim_spikes)
-    fig.suptitle(f'Cluster {cluster} ({group}): '
-                 f'\n'
-                 f'depth={round(depth/1000, 2)} mm, '
-                 f'mean ISI={round(np.mean(isis), 2)}, '
-                 f'CV={round(coeff_var, 2)}, '
-                 f'Fano factor={round(fano, 2)}')
-
-    fig.tight_layout()
-
-    if save:
-        # Save figure using pathlib in Desktop (Escritorio) inside a folder called
-        plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
-        plt.close()
-
-
-
-
-########################################################################################################################
-
-# Get behavioral events
-stim_dur = df_behavior.StimDur.unique()[0]
-delay = df_behavior.Delay.unique()[0]
-go_cue = stim_dur + delay
-
-# Set parameters
-time_win = 2  # Time window of interest before and after the event (in seconds)
-bin_size = 0.1  # In seconds
-
-# for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
-
-# print(f'Cluster {cluster}')
-
-# Plot a raster and PSTH for a given cluster
-cluster = 881
-df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-group = cluster_info[cluster_info.cluster_id==cluster].group.iloc[0]
-depth = cluster_info[cluster_info.cluster_id==cluster].depth.iloc[0]
-
-peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
-bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
-bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
-
-cluster_report()
 
 
 ########################################################################################################################
@@ -759,6 +589,9 @@ def plot_pop_psth():
     plt.title('Population PSTH')
 
 
+########################################################################################################################
+# STATS
+########################################################################################################################
 def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=None):
     """
     Plot the autocorrelogram of a given cluster.
@@ -825,7 +658,7 @@ def plot_mfr(psth, ax=None):
     mfr_percentile = np.percentile(mfr, percentile)
 
     ax.plot(mfr, color='k')
-    ax.fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.1)
+    ax.fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.25)
     ax.axhline(mfr_mean, color='tab:red', label='mean')
     ax.axhline(mfr_percentile, color='tab:gray', linestyle='--', label=f'{percentile}th percentile')
     ax.set_xlabel('Trial')
@@ -864,7 +697,7 @@ def get_baseline(psth):
     return baseline
 
 
-def plot_isi(spikes=df_cluster, ax=None):
+def plot_isi(spikes, ax=None):
     """
     Plot the Inter Spike Intervals (ISI) of a given cluster.
     :param spikes: DataFrame with spike times of a given cluster (df_cluster) or list of spike times around an event
@@ -953,7 +786,144 @@ def fano_factor(peri_stim_spikes):
     return fano
 
 
+########################################################################################################################
+def cluster_report(save=False):
+    """
+    Plot a raster and PSTH of a given cluster aligned to a specific event.
+    """
 
+    figsize = (11.69, 8.27)
+    # Set subplots layout with mosaic
+    mosaic = [['Auto', 'MFR', 'MFR', 'MFR'],  # Autocorrelogram and mean firing rate
+              ['RasterAll', 'RasterOutcome', 'RasterChoice', 'RasterStimulus'],  # Rasters
+              ['RasterAll', 'RasterOutcome', 'RasterChoice', 'RasterStimulus'],  # Rasters
+              ['PSTHAll', 'PSTHOutcome', 'PSTHChoice', 'PSTHStimulus']]  # PSTHs
+    fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
+
+    # Plot panels
+    plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=ax_dict['Auto'])
+    plot_mfr(psth, ax=ax_dict['MFR'])
+    plot_raster_psth(ax=[ax_dict['RasterAll'], ax_dict['PSTHAll']])
+    plot_raster_psth_split(condition='outcome', ax=[ax_dict['RasterOutcome'], ax_dict['PSTHOutcome']])
+    plot_raster_psth_split(condition='choice', ax=[ax_dict['RasterChoice'], ax_dict['PSTHChoice']])
+    plot_raster_psth_split(condition='stimulus', ax=[ax_dict['RasterStimulus'], ax_dict['PSTHStimulus']])
+    # isis = plot_isi(peri_stim_spikes, ax=ax[0, 2])
+    # plot_cv(isis, ax=ax[0, 3])
+
+    # Remove xticklabels
+    ax_dict['RasterAll'].set_xticklabels([])
+    ax_dict['RasterOutcome'].set_xticklabels([])
+    ax_dict['RasterChoice'].set_xticklabels([])
+    ax_dict['RasterStimulus'].set_xticklabels([])
+
+    # Remove yticklabels
+    ax_dict['RasterOutcome'].set_yticklabels([])
+    ax_dict['RasterChoice'].set_yticklabels([])
+    ax_dict['RasterStimulus'].set_yticklabels([])
+    ax_dict['PSTHOutcome'].set_yticklabels([])
+    ax_dict['PSTHChoice'].set_yticklabels([])
+    ax_dict['PSTHStimulus'].set_yticklabels([])
+
+    # Remove legends
+    ax_dict['PSTHAll'].legend().remove()
+
+    # Remove ylabels
+    ax_dict['RasterOutcome'].set_ylabel('')
+    ax_dict['RasterChoice'].set_ylabel('')
+    ax_dict['RasterStimulus'].set_ylabel('')
+    ax_dict['PSTHOutcome'].set_ylabel('')
+    ax_dict['PSTHChoice'].set_ylabel('')
+    ax_dict['PSTHStimulus'].set_ylabel('')
+
+    responses = df_behavior[df_behavior.Response == 1].Response.sum()
+    ax_dict['RasterAll'].set_ylim(0, responses)
+    ax_dict['RasterOutcome'].set_ylim(0, responses)
+    ax_dict['RasterChoice'].set_ylim(0, responses)
+    ax_dict['RasterStimulus'].set_ylim(0, responses)
+
+    # Set same ylims for PSTHs
+    y_max = np.max([ax_dict['PSTHAll'].get_ylim()[1],
+                    ax_dict['PSTHOutcome'].get_ylim()[1],
+                    ax_dict['PSTHChoice'].get_ylim()[1],
+                    ax_dict['PSTHStimulus'].get_ylim()[1]])
+    ax_dict['PSTHAll'].set_ylim(0, y_max)
+    ax_dict['PSTHOutcome'].set_ylim(0, y_max)
+    ax_dict['PSTHChoice'].set_ylim(0, y_max)
+    ax_dict['PSTHStimulus'].set_ylim(0, y_max)
+
+    # Remove axes margins
+    ax_dict['MFR'].margins(x=0)
+    ax_dict['MFR'].margins(y=0)
+    ax_dict['RasterAll'].margins(x=0)
+    ax_dict['RasterOutcome'].margins(x=0)
+    ax_dict['RasterChoice'].margins(x=0)
+    ax_dict['RasterStimulus'].margins(x=0)
+    ax_dict['PSTHAll'].margins(x=0)
+    ax_dict['PSTHOutcome'].margins(x=0)
+    ax_dict['PSTHChoice'].margins(x=0)
+    ax_dict['PSTHStimulus'].margins(x=0)
+
+    # Set titles
+    ax_dict['RasterAll'].set_title('All')
+    ax_dict['RasterOutcome'].set_title('Outcome')
+    ax_dict['RasterChoice'].set_title('Choice')
+    ax_dict['RasterStimulus'].set_title('Stimulus')
+
+    # Despine axes
+    sns.despine(ax=ax_dict['MFR'])
+    sns.despine(ax=ax_dict['Auto'])
+    sns.despine(ax=ax_dict['RasterAll'], bottom=True)
+    sns.despine(ax=ax_dict['RasterOutcome'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['RasterChoice'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['RasterStimulus'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['PSTHAll'])
+    sns.despine(ax=ax_dict['PSTHOutcome'], left=True)
+    sns.despine(ax=ax_dict['PSTHChoice'], left=True)
+    sns.despine(ax=ax_dict['PSTHStimulus'], left=True)
+
+    # Set figure title with cluster info
+    isis = plot_isi(spikes=df_cluster, ax=None)
+    coeff_var = plot_cv(isis, ax=None)
+    fano = fano_factor(peri_stim_spikes)
+    fig.suptitle(f'Cluster {cluster} ({group}, {round(depth/1000, 2)} mm): '
+                 f'\n'
+                 f'mean FR={round(np.mean(fr), 2)}, '
+                 f'CV={round(coeff_var, 2)}, '
+                 f'Fano factor={round(fano, 2)}')
+
+    fig.tight_layout()
+
+    if save:
+        # Save figure using pathlib in Desktop (Escritorio) inside a folder called
+        plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
+        plt.close()
+
+
+# Get behavioral events
+stim_dur = df_behavior.StimDur.unique()[0]
+delay = df_behavior.Delay.unique()[0]
+go_cue = stim_dur + delay
+
+# Set parameters
+time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+bin_size = 0.1  # In seconds
+
+# for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
+
+# print(f'Cluster {cluster}')
+
+# Plot a raster and PSTH for a given cluster
+cluster = 881
+df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
+group = cluster_info[cluster_info.cluster_id==cluster].group.iloc[0]
+depth = cluster_info[cluster_info.cluster_id==cluster].depth.iloc[0]
+fr = cluster_info[cluster_info.cluster_id==cluster].fr.iloc[0]
+
+peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
+
+cluster_report()
 
 
 ########################################################################################################################
