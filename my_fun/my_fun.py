@@ -662,6 +662,7 @@ def compute_window(data, runningwindow):
     """
     Computes a rolling average with a length of runningwindow samples.
     """
+
     performance = []
     for i in range(len(data)):
         if i < runningwindow:

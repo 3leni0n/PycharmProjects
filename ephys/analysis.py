@@ -4,8 +4,8 @@ import numpy as np
 import pandas as pd
 from scipy.stats import zscore, sem, poisson
 from scipy.ndimage import gaussian_filter1d
-import matplotlib
-matplotlib.use('Qt5Agg')
+import matplotlib as mpl
+mpl.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 # Plotting parameters
@@ -27,6 +27,7 @@ from elephant.spike_train_correlation import cross_correlation_histogram
 
 # My own libraries
 from parse.parse_v2 import parse_v2
+from my_fun.my_fun import compute_window
 from ephys.preprocessing import *
 
 ########################################################################################################################
@@ -61,12 +62,12 @@ path_ks4 = Path() / directory / 'Record Node 101' / 'experiment1' / 'recording1'
            'Neuropix-PXI-109.ProbeA-AP' / 'kilosort4'
 path_phy2 = Path() / directory / 'Record Node 101' / 'experiment1' / 'recording1' / 'continuous' / \
             'Neuropix-PXI-109.ProbeA-AP' / 'Phy2'
-df_spikes, cluster_info = load_spike_sorted_data(path_ks4, path_phy2)
+df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
 clusters = cluster_info.cluster_id.unique()
 n_clusters = len(cluster_info)
 
 # Print session info
-show_session_info(continuous, events, df_behavior, df_spikes, plot=False)
+y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
 
 # Temporal alignment of ephys and behavior data (skip for now)
 # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
@@ -145,6 +146,22 @@ def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
     return peri_stim_spikes
 
 
+def get_peri_stim_licks(df_behavior):
+    """
+    Get peri-stimulus licks for a given behavioral session.
+    :param df_behavior: DataFrame with behavior data
+    :return: pd.Series with a list of peri-stimulus licks per trial
+    """
+
+    licks_left = df_behavior.Port1In.copy()
+    licks_right = df_behavior.Port2In.copy()
+    for trial in range(len(df_behavior)):
+        licks_left[trial] = [x - df_behavior.StimStart[trial] for x in licks_left[trial]]  # Left
+        licks_right[trial] = [x - df_behavior.StimStart[trial] for x in licks_right[trial]]  # Right
+    licks = licks_left + licks_right
+
+    return licks
+
 # Smoothing
 def moving_average(data, window):
     """
@@ -193,7 +210,7 @@ def plot_raster(peri_stim_spikes, colors=None, ax=None):
     ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
 
     ax.axvline(0, color='tab:gray', label='Stimulus')
-    ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay')
+    # ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay')
     ax.axvline(go_cue, color='tab:gray', label='Go cue')
     ax.set_xlabel('Time from stim. onset (s)')
     ax.set_ylabel('Trial')
@@ -349,7 +366,7 @@ def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
     return bins, psth
 
 
-def compute_psth_shuffles(df_cluster, n_shuffles=1000, scale=2):
+def compute_psth_shuffles(df_cluster, n_shuffles=1000, time_win=[-1, 3], scale=2, bin_size=0.1):
     """
     Compute PSTHs for shuffled spike times.
     :param n_shuffles: Number of shuffles (default: 1000)
@@ -359,7 +376,7 @@ def compute_psth_shuffles(df_cluster, n_shuffles=1000, scale=2):
     psth_shuffles = []
     for _ in range(n_shuffles):
         peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win, scale=scale)  # Get jittered spikes
-        bins, psth = compute_psth(peri_stim_spikes)  # Compute the PSTH of the jittered spikes
+        bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)  # Compute the PSTH of the jittered spikes
         psth = np.mean(psth, axis=0)  # Average across trials
         psth = psth / bin_size  # Convert to spikes/s
         psth_shuffles.append(psth)  # Store the PSTH of the shuffled spikes
@@ -415,13 +432,11 @@ def plot_psth(bins, psth, bin_size, color=None, label=None, ax=None):
     ax.set_xlabel('Time from stim. onset (s)')
     ax.set_ylim(bottom=0)
     ax.set_ylabel('FR (spikes/s)')
-    ax.set_title(f'PSTH for cluster {cluster} ({group})')
+    # ax.set_title(f'PSTH for cluster {cluster} ({group})')
     # ax.legend(loc='upper left', frameon=False)
 
-    return ax
 
-
-def plot_psth_split(condition='outcome', ax=None):
+def plot_psth_split(condition='outcome', over='spikes', ax=None):
     """
     Plot a PSTH of a given cluster aligned to a specific event split by condition.
     """
@@ -448,12 +463,19 @@ def plot_psth_split(condition='outcome', ax=None):
         labels = ['Alternate', 'Repeat']
 
     for _ in range(len(indexes)):
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), time_win)
-        bins, psth = compute_psth(peri_stim_spikes)
+        if over == 'spikes':
+            peri_stim = get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), time_win)
+            ylabel = 'FR (spikes/s)'
+        elif over == 'licks':
+            peri_stim = get_peri_stim_licks(df_behavior.iloc[indexes[_]].reset_index(drop=True))
+            ylabel = 'Lick rate (licks/s)'
+
+        bins, psth = compute_psth(peri_stim)
         plot_psth(bins, psth, bin_size, color=color[_], label=labels[_], ax=ax)
         # plot_psth(bins, psth, psth_shuffles, bin_size, color=color[_], label=labels[_], ax=ax)
 
     ax.set_title(title)
+    ax.set_ylabel(ylabel)
 
 
 ########################################################################################################################
@@ -525,7 +547,7 @@ def plot_pop_raw(df_spikes, cluster_info, slice='trials', sort_by='n_spikes', bi
 
     if slice == 'trials':
         # Slice DataFrame of given time window after first event (behavior started)
-        win_trials = 647, 650  # Edges of trials to plot
+        win_trials = 147, 150  # Edges of trials to plot
         print(f' Plotting trials: {np.arange(win_trials[0], win_trials[1] - 1)}')
         win_events = df_ttl.OFF.iloc[win_trials[0]:win_trials[1]]
         df_slice = df_spikes[
@@ -590,16 +612,24 @@ def plot_pop_raw(df_spikes, cluster_info, slice='trials', sort_by='n_spikes', bi
     plt.tight_layout()
 
 
-def plot_pop_psth():
+def plot_pop_psth(ax=None):
     """
     Plot population PSTH treating all the spikes as coming from a single superneuron.
     """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
     peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
     bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
     # _, psth_shuffles = compute_psth_shuffles(df_spikes, n_shuffles=10, scale=2)
-    plot_psth(bins, psth/len(cluster_info), bin_size)
+    psth = psth/len(cluster_info)
+    plot_psth(bins, psth, bin_size, ax=ax)
     # plot_psth(bins, psth / len(cluster_info), psth_shuffles / len(cluster_info), bin_size)
-    plt.title('Population PSTH')
+    ax.set_title('Population PSTH')
+    sns.despine(ax=ax)
+
+    return bins, psth
 
 
 ########################################################################################################################
@@ -669,10 +699,11 @@ def plot_mfr(psth, ax=None):
     ax.plot(mfr, color='k')
     ax.fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.25)
     ax.axhline(mfr_mean, color='tab:red', label='mean')
-    ax.axhline(mfr_percentile, color='tab:gray', linestyle='--', label=f'{percentile}th percentile')
+    # ax.axhline(mfr_percentile, color='tab:gray', linestyle='--', label=f'{percentile}th percentile')
     ax.set_xlabel('Trial')
+    ax.set_ylim(bottom=0)
     ax.set_ylabel('FR (spikes/s)')
-    ax.legend(loc='upper right', frameon=False)
+    # ax.legend(loc='upper right', frameon=False)
     ax.set_title(title)
 
     return mfr, sfr
@@ -796,6 +827,43 @@ def fano_factor(peri_stim_spikes):
     return fano
 
 
+def synch(df_spikes, time_win=[-2, 0], bin_size=0.02):
+    """
+    Compute the synchrony of a PSTH. This is a measure computed per trial.
+    """
+
+    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0)
+    bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+    psth_std = np.std(psth, axis=1)
+    psth_mean = np.mean(psth, axis=1)
+
+    synch = psth_std / np.sqrt(np.mean(psth, axis=1))
+    plt.plot(synch)
+    plt.axhline(np.mean(synch), color='tab:red')
+    plt.xlabel('Trial')
+    plt.ylabel('Synch')
+    plt.title('Synchrony')
+
+    psth_std_shuffles = []
+    for i in range(10):
+        peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0.1)
+        bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+        psth_std_shuffles.append(np.std(psth, axis=1))
+
+    psth_std_shuffles = np.array(psth_std_shuffles)
+    psth_std_shuffles = np.mean(psth_std_shuffles, axis=0)
+
+    synch = psth_std / psth_std_shuffles
+    plt.figure()
+    plt.plot(synch)
+    plt.axhline(np.mean(synch), color='tab:red')
+    plt.xlabel('Trial')
+    plt.ylabel('Synch')
+    plt.title('Synchrony')
+
+    return synch
+
+
 ########################################################################################################################
 def cluster_report(save=False):
     """
@@ -807,7 +875,8 @@ def cluster_report(save=False):
     mosaic = [['Auto', 'MFR', 'MFR', 'MFR', 'MFR'],  # Autocorrelogram and mean firing rate
               ['RasterAll', 'RasterOutcome', 'RasterChoice', 'RasterStimulus', 'RasterRepeat'],  # Rasters
               ['RasterAll', 'RasterOutcome', 'RasterChoice', 'RasterStimulus', 'RasterRepeat'],  # Rasters
-              ['PSTHAll', 'PSTHOutcome', 'PSTHChoice', 'PSTHStimulus', 'PSTHRepeat']]  # PSTHs
+              ['PSTHAll', 'PSTHOutcome', 'PSTHChoice', 'PSTHStimulus', 'PSTHRepeat'],  # PSTHs
+              ['LicksAll', 'LicksOutcome', 'LicksChoice', 'LicksStimulus', 'LicksRepeat']]  # Licks
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
     # Plot panels
@@ -818,6 +887,18 @@ def cluster_report(save=False):
     plot_raster_psth_split(condition='choice', ax=[ax_dict['RasterChoice'], ax_dict['PSTHChoice']])
     plot_raster_psth_split(condition='stimulus', ax=[ax_dict['RasterStimulus'], ax_dict['PSTHStimulus']])
     plot_raster_psth_split(condition='repeat', ax=[ax_dict['RasterRepeat'], ax_dict['PSTHRepeat']])
+    plot_psth(bins, licks_psth, bin_size, ax=ax_dict['LicksAll'])
+    plot_psth_split(condition='outcome', over='licks', ax=ax_dict['LicksOutcome'])
+    plot_psth_split(condition='choice', over='licks', ax=ax_dict['LicksChoice'])
+    plot_psth_split(condition='stimulus', over='licks', ax=ax_dict['LicksStimulus'])
+    plot_psth_split(condition='repeat', over='licks', ax=ax_dict['LicksRepeat'])
+
+    # Remove xlabels
+    ax_dict['PSTHAll'].set_xlabel('')
+    ax_dict['PSTHOutcome'].set_xlabel('')
+    ax_dict['PSTHChoice'].set_xlabel('')
+    ax_dict['PSTHStimulus'].set_xlabel('')
+    ax_dict['PSTHRepeat'].set_xlabel('')
 
     # Remove xticklabels
     ax_dict['RasterAll'].set_xticklabels([])
@@ -825,16 +906,11 @@ def cluster_report(save=False):
     ax_dict['RasterChoice'].set_xticklabels([])
     ax_dict['RasterStimulus'].set_xticklabels([])
     ax_dict['RasterRepeat'].set_xticklabels([])
-
-    # Remove yticklabels
-    ax_dict['RasterOutcome'].set_yticklabels([])
-    ax_dict['RasterChoice'].set_yticklabels([])
-    ax_dict['RasterStimulus'].set_yticklabels([])
-    ax_dict['RasterRepeat'].set_yticklabels([])
-    ax_dict['PSTHOutcome'].set_yticklabels([])
-    ax_dict['PSTHChoice'].set_yticklabels([])
-    ax_dict['PSTHStimulus'].set_yticklabels([])
-    ax_dict['PSTHRepeat'].set_yticklabels([])
+    ax_dict['PSTHAll'].set_xticklabels([])
+    ax_dict['PSTHOutcome'].set_xticklabels([])
+    ax_dict['PSTHChoice'].set_xticklabels([])
+    ax_dict['PSTHStimulus'].set_xticklabels([])
+    ax_dict['PSTHRepeat'].set_xticklabels([])
 
     # Remove ylabels
     ax_dict['RasterOutcome'].set_ylabel('')
@@ -845,7 +921,29 @@ def cluster_report(save=False):
     ax_dict['PSTHChoice'].set_ylabel('')
     ax_dict['PSTHStimulus'].set_ylabel('')
     ax_dict['PSTHRepeat'].set_ylabel('')
+    ax_dict['LicksOutcome'].set_ylabel('')
+    ax_dict['LicksChoice'].set_ylabel('')
+    ax_dict['LicksStimulus'].set_ylabel('')
+    ax_dict['LicksRepeat'].set_ylabel('')
 
+    # Set ylabels
+    ax_dict['LicksAll'].set_ylabel('Lick rate (licks/s)')
+
+    # Remove yticklabels
+    ax_dict['RasterOutcome'].set_yticklabels([])
+    ax_dict['RasterChoice'].set_yticklabels([])
+    ax_dict['RasterStimulus'].set_yticklabels([])
+    ax_dict['RasterRepeat'].set_yticklabels([])
+    ax_dict['PSTHOutcome'].set_yticklabels([])
+    ax_dict['PSTHChoice'].set_yticklabels([])
+    ax_dict['PSTHStimulus'].set_yticklabels([])
+    ax_dict['PSTHRepeat'].set_yticklabels([])
+    ax_dict['LicksOutcome'].set_yticklabels([])
+    ax_dict['LicksChoice'].set_yticklabels([])
+    ax_dict['LicksStimulus'].set_yticklabels([])
+    ax_dict['LicksRepeat'].set_yticklabels([])
+
+    # Remove white space in ylims for Rasters
     responses = df_behavior[df_behavior.Response == 1].Response.sum()
     ax_dict['RasterAll'].set_ylim(0, responses)
     ax_dict['RasterOutcome'].set_ylim(0, responses)
@@ -865,6 +963,18 @@ def cluster_report(save=False):
     ax_dict['PSTHStimulus'].set_ylim(0, y_max)
     ax_dict['PSTHRepeat'].set_ylim(0, y_max)
 
+    # Set same ylims for Licks
+    y_max = np.max([ax_dict['LicksAll'].get_ylim()[1],
+                    ax_dict['LicksOutcome'].get_ylim()[1],
+                    ax_dict['LicksChoice'].get_ylim()[1],
+                    ax_dict['LicksStimulus'].get_ylim()[1],
+                    ax_dict['LicksRepeat'].get_ylim()[1]])
+    ax_dict['LicksAll'].set_ylim(0, y_max)
+    ax_dict['LicksOutcome'].set_ylim(0, y_max)
+    ax_dict['LicksChoice'].set_ylim(0, y_max)
+    ax_dict['LicksStimulus'].set_ylim(0, y_max)
+    ax_dict['LicksRepeat'].set_ylim(0, y_max)
+
     # Remove axes margins
     ax_dict['MFR'].margins(x=0)
     ax_dict['MFR'].margins(y=0)
@@ -878,6 +988,11 @@ def cluster_report(save=False):
     ax_dict['PSTHChoice'].margins(x=0)
     ax_dict['PSTHStimulus'].margins(x=0)
     ax_dict['PSTHRepeat'].margins(x=0)
+    ax_dict['LicksAll'].margins(x=0)
+    ax_dict['LicksOutcome'].margins(x=0)
+    ax_dict['LicksChoice'].margins(x=0)
+    ax_dict['LicksStimulus'].margins(x=0)
+    ax_dict['LicksRepeat'].margins(x=0)
 
     # Set titles
     ax_dict['RasterAll'].set_title('All')
@@ -885,6 +1000,7 @@ def cluster_report(save=False):
     ax_dict['RasterChoice'].set_title('Choice')
     ax_dict['RasterStimulus'].set_title('Stimulus')
     ax_dict['RasterRepeat'].set_title('Repeat')
+    ax_dict['LicksAll'].set_title('')
 
     # Despine axes
     sns.despine(ax=ax_dict['MFR'])
@@ -894,11 +1010,16 @@ def cluster_report(save=False):
     sns.despine(ax=ax_dict['RasterChoice'], left=True, bottom=True)
     sns.despine(ax=ax_dict['RasterStimulus'], left=True, bottom=True)
     sns.despine(ax=ax_dict['RasterRepeat'], left=True, bottom=True)
-    sns.despine(ax=ax_dict['PSTHAll'])
-    sns.despine(ax=ax_dict['PSTHOutcome'], left=True)
-    sns.despine(ax=ax_dict['PSTHChoice'], left=True)
-    sns.despine(ax=ax_dict['PSTHStimulus'], left=True)
-    sns.despine(ax=ax_dict['PSTHRepeat'], left=True)
+    sns.despine(ax=ax_dict['PSTHAll'], bottom=True)
+    sns.despine(ax=ax_dict['PSTHOutcome'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['PSTHChoice'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['PSTHStimulus'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['PSTHRepeat'], left=True, bottom=True)
+    sns.despine(ax=ax_dict['LicksAll'])
+    sns.despine(ax=ax_dict['LicksOutcome'], left=True)
+    sns.despine(ax=ax_dict['LicksChoice'], left=True)
+    sns.despine(ax=ax_dict['LicksStimulus'], left=True)
+    sns.despine(ax=ax_dict['LicksRepeat'], left=True)
 
     # Set figure title with cluster info
     isis = plot_isi(spikes=df_cluster, ax=None)
@@ -914,7 +1035,7 @@ def cluster_report(save=False):
 
     if save:
         # Save figure using pathlib in Desktop (Escritorio) inside a folder called
-        plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster} .png')
+        plt.savefig(Path.home() / 'OneDrive' / 'Escritorio' / 'cluster report' / f'cluster {cluster}.png')
         plt.close()
 
 
@@ -927,22 +1048,173 @@ go_cue = stim_dur + delay
 time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
 bin_size = 0.1  # In seconds
 
-# for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
+subject = df_behavior.Subject.unique()[0]
+date = df_behavior.Date.unique()[0]
 
-# print(f'Cluster {cluster}')
+def do_cluster_reports():
+    """
+    Loop over all clusters and plot a report for each one.
+    """
+    # for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
+    for cluster in cluster_info.cluster_id:
+        print(f'Cluster {cluster}')
+        # cluster = 881
+        df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
+        group = cluster_info[cluster_info.cluster_id==cluster].group.iloc[0]
+        depth = cluster_info[cluster_info.cluster_id==cluster].depth.iloc[0]
+        fr = cluster_info[cluster_info.cluster_id==cluster].fr.iloc[0]
 
-# Plot a raster and PSTH for a given cluster
-cluster = 881
-df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-group = cluster_info[cluster_info.cluster_id==cluster].group.iloc[0]
-depth = cluster_info[cluster_info.cluster_id==cluster].depth.iloc[0]
-fr = cluster_info[cluster_info.cluster_id==cluster].fr.iloc[0]
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+        bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+        peri_stim_licks = get_peri_stim_licks(df_behavior)
+        bins, licks_psth = compute_psth(peri_stim_licks)
+        # bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
+        cluster_report(save=True)
 
-peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
-bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
-# bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
+# do_cluster_reports()
 
-cluster_report()
+
+########################################################################################################################
+# SESSION REPORT
+########################################################################################################################
+
+def plot_rolling_average(df_behavior, kind='side', ax=None):
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    win_len = 20
+
+    if kind == 'side':
+
+        color = ['black', 'tab:blue', 'tab:orange']
+        alpha = [1, 1, 1]
+        label = ['Total', 'Left', 'Right']
+        ylabel = 'Accuracy'
+
+        # Compute accuracy rolling average
+        cond_total = df_behavior.Miss == 0
+        x_total = df_behavior.Hit[cond_total].index
+        y_total = compute_window(df_behavior.Hit[cond_total], win_len)  # All responded trials
+        cond_0 = (df_behavior.Miss == 0) & (df_behavior.Side == 0)
+        x_0 = df_behavior.Hit[cond_0].index
+        y_0 = compute_window(df_behavior.Hit[cond_0], win_len)  # Left responded trials
+        cond_1 = (df_behavior.Miss == 0) & (df_behavior.Side == 1)
+        x_1 = df_behavior.Hit[cond_1].index
+        y_1 = compute_window(df_behavior.Hit[cond_1], win_len)  # Right responded trials
+
+    elif kind == 'repeat':
+
+        color = ['black', 'tab:purple', 'tab:brown']
+        alpha = [1, 1, 1]
+        label = ['Total', 'Alternate', 'Repeat']
+        ylabel = 'Accuracy'
+
+        # Compute accuracy for repeating vs alternating rolling average
+        cond_total = df_behavior.Miss == 0
+        x_total = df_behavior.Hit[cond_total].index
+        y_total = compute_window(df_behavior.Hit[cond_total], win_len)  # All responded trials
+        cond_0 = (df_behavior.Miss == 0) & (df_behavior.RepTrial == 0)
+        x_0 = df_behavior.Hit[cond_0].index
+        y_0 = compute_window(df_behavior.Hit[cond_0], win_len)  # Alternate
+        cond_1 = (df_behavior.Miss == 0) & (df_behavior.RepTrial == 1)
+        x_1 = df_behavior.Hit[cond_1].index
+        y_1 = compute_window(df_behavior.Hit[cond_1], win_len)  # Repeat
+
+    elif kind == 'rep_bias':
+
+        color = ['black', 'tab:blue', 'tab:orange']
+        alpha = [1, 0, 0]
+        label = ['Total', 'Left', 'Right']
+        ylabel = 'Repeat bias'
+
+        cond_total = df_behavior.Miss == 0
+        x_total = df_behavior.RepChoice[cond_total].index
+        y_total = compute_window(df_behavior.RepChoice[cond_total], win_len)
+
+        cond_0 = df_behavior.Choice == 0
+        x_0 = df_behavior[cond_0].index.tolist()
+        y_0 = compute_window(df_behavior.RepChoice[cond_0], win_len)  # Repeat rate left
+
+        cond_1 = df_behavior.Choice == 1
+        x_1 = df_behavior[cond_1].index.tolist()
+        y_1 = compute_window(df_behavior.RepChoice[cond_1], win_len)  # Repeat rate right
+
+    elif kind == 'miss':
+
+        color = ['black', 'tab:blue', 'tab:orange']
+        alpha = [1, 1, 1]
+        label = ['Total', 'Left', 'Right']
+        ylabel = 'Miss rate'
+
+        # Compute miss rolling average
+        x_total = df_behavior.index
+        y_total = compute_window(df_behavior.Miss, win_len)  # All responded trials
+        cond_0 = df_behavior.Side == 0
+        x_0 = df_behavior[cond_0].index
+        y_0 = compute_window(df_behavior.Miss[cond_0], win_len)  # Left responded trials
+        cond_1 = df_behavior.Side == 1
+        x_1 = df_behavior[cond_1].index
+        y_1 = compute_window(df_behavior.Miss[cond_1], win_len)  # Right responded trials
+
+    marker = 'o'
+    ms = mpl.rcParams['lines.markersize'] / 2  # Half of default
+
+    # Plot rolling averages
+    ax.plot(x_total, y_total, marker=marker, ms=ms, color=color[0], alpha=alpha[0], label=label[0])
+    ax.plot(x_0, y_0, marker=marker, ms=ms, color=color[1], alpha=alpha[1], label=label[1])
+    ax.plot(x_1, y_1, marker=marker, ms=ms, color=color[2], alpha=alpha[2], label=label[2])
+
+    # Plot horizontal lines
+    ax.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+    ax.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+    ax.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+
+    ax.set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
+    ax.set_ylabel(ylabel)
+    ax.set_yticks(list(np.arange(0, 1.25, 0.25)))
+    ax.set_yticklabels(['0', '', '0.5', '', '1'])
+    sns.despine(ax=ax, bottom=True)
+
+
+def session_report():
+
+    figsize = (11.69, 8.27)  # A4 size in inches landscape
+    figsize = (8.27, 11.69)  # A4 size in inches landscape
+    # Set subplots layout with mosaic
+    mosaic = [['Timeline', 'PopPSTH', 'PopGroupDist'],
+              ['MFR', 'MFR', 'MFR'],
+              ['AccuracySide', 'AccuracySide', 'AccuracySide'],
+              # ['AccuracyRepeat', 'AccuracyRepeat', 'AccuracyRepeat'],
+              ['RepBias', 'RepBias', 'RepBias'],
+              ['Misses', 'Misses', 'Misses']]
+    fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
+
+    # Plot panels
+    bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
+    plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
+    plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
+    plot_mfr(psth, ax=ax_dict['MFR'])
+    plot_rolling_average(df_behavior, kind='side', ax=ax_dict['AccuracySide'])
+    # plot_rolling_average(df_behavior, kind='repeat', ax=ax_dict['AccuracyRepeat'])
+    plot_rolling_average(df_behavior, kind='rep_bias', ax=ax_dict['RepBias'])
+    plot_rolling_average(df_behavior, kind='miss', ax=ax_dict['Misses'])
+
+    # Aesthetics
+    ax_dict['Timeline'].set_title('')
+    ax_dict['PopPSTH'].set_title('')
+    ax_dict['PopGroupDist'].set_xlabel('')
+    ax_dict['Misses'].spines['bottom'].set_visible(True)
+    ax_dict['Misses'].set_xlabel('Trial')
+    ax_dict['MFR'].set_xlabel('')
+    ax_dict['MFR'].set_xticklabels([])
+    ax_dict['AccuracySide'].set_xticklabels([])
+    # ax_dict['AccuracyRepeat'].set_xticklabels([])
+    ax_dict['MFR'].set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
+    sns.despine(ax=ax_dict['MFR'], bottom=True)
+
+    plt.suptitle(f'Mouse {subject}: {date}')
+    plt.tight_layout()
 
 
 ########################################################################################################################

@@ -6,6 +6,7 @@ from open_ephys.analysis import Session
 import runpy
 matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
+import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -217,7 +218,7 @@ def check_data(df_behavior, df_keys):
     return n_trials, sounds_mismatch_index
 
 
-def load_spike_sorted_data(path_ks4, path_phy2, plot=False):
+def load_spike_sorted_data(path_ks4, path_phy2):
     """
     Load spike data sorted with Kilosort 4 (KS4) and manually curated with Phy2.
     """
@@ -268,33 +269,42 @@ def load_spike_sorted_data(path_ks4, path_phy2, plot=False):
     print(f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters / n_clusters * 100)}%)')
     print('\n')
 
-    if plot:
-        # Plot a bar graph with the number of good, mua and noise clusters
-        plt.figure()
-        x = ['good', 'mua', 'noise']
-        height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
-        labels = ['good', 'mua', 'noise']
-        colors = ['tab:green', 'tab:orange', 'tab:gray']
-        plt.bar(x, height, label=labels, color=colors)
-        plt.legend()
-
-        # Plot the first minute
-        plt.figure()
-        plt.scatter(df_spikes[(df_spikes.times < 60)].times,
-                    df_spikes[(df_spikes.times < 60)].cluster,
-                    marker='|', linestyle='None', color='k')
-        plt.xlabel('Time (s)')
-        plt.ylabel('Cluster ID')
-        plt.title('First min. of recording')
-
     # Drop noise clusters
     df_spikes = df_spikes.loc[(df_spikes.group != 'noise')]
     cluster_info = cluster_info.loc[(cluster_info.group != 'noise')].reset_index(drop=True)
 
-    return df_spikes, cluster_info
+    x = ['good', 'mua', 'noise']
+    height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
+    labels = ['good', 'mua', 'noise']
+
+    # # Plot the first minute
+    # plt.figure()
+    # plt.scatter(df_spikes[(df_spikes.times < 60)].times,
+    #             df_spikes[(df_spikes.times < 60)].cluster,
+    #             marker='|', linestyle='None', color='k')
+    # plt.xlabel('Time (s)')
+    # plt.ylabel('Cluster ID')
+    # plt.title('First min. of recording')
+
+    return df_spikes, cluster_info, x, height, labels
 
 
-def show_session_info(continuous, events, df_behavior, df_spikes, plot=False):
+def plot_group_clusters_dist(x, height, labels, ax=None):
+    """
+    Plot a bar graph with the number of good, mua and noise clusters
+    """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    colors = ['tab:green', 'tab:orange', 'tab:gray']
+    ax.bar(x, height, label=labels, color=colors)
+    ax.set_xlabel('Group')
+    ax.set_ylabel('Count')
+    sns.despine(ax=ax)
+
+
+def print_timeline(continuous, events, df_behavior, df_spikes):
     """
     Print information about the ephys and behavior data
     """
@@ -346,20 +356,37 @@ def show_session_info(continuous, events, df_behavior, df_spikes, plot=False):
 
     print('\n')
 
-    if plot:
-        # Plot timecourse of aquisition, recording, events, behavior and spikes
-        y = ['Aquisition', 'Recording', 'Events', 'Behavior', 'Spikes']
-        width = [len_aquisition, len_recording, len_events, len_behavior, len_spikes]
-        left = [start_aquisition, first_timestamp, first_event, start_behavior + first_event, first_spike + first_timestamp]
-        color = ['tab:gray', 'tab:red', 'tab:green', 'tab:blue', 'tab:orange']
-        plt.figure()
-        plt.barh(y=y, width=width, left=left, color=color)
-        plt.axvline(x=first_timestamp, color='k', linestyle='--')
-        plt.axvline(x=last_timestamp, color='k', linestyle='--')
-        plt.axvline(x=first_event, color='k', linestyle='--')
-        plt.axvline(x=last_event, color='k', linestyle='--')
-        plt.xlabel('Time (s)')
-        plt.title('Timeline of the session')
+    # Plot timecourse of aquisition, recording, events, behavior and spikes
+    y = ['Aquisition', 'Recording', 'Events', 'Behavior', 'Spikes']
+    width = [len_aquisition, len_recording, len_events, len_behavior, len_spikes]
+    left = [start_aquisition, first_timestamp, first_event, start_behavior + first_event, first_spike + first_timestamp]
+
+    ts_edges = (first_timestamp, last_timestamp)
+    events_edges = (first_event, last_event)
+
+    return y, width, left, ts_edges, events_edges
+
+
+def plot_timeline(y, width, left, ts_edges, events_edges, ax=None):
+    """
+    Plot timecourse of aquisition, recording, events, behavior and spikes
+    param y: Labels of the bars
+    param width: Width of the bars representing length in time (seconds)
+    param left: Coordinates of the left side of the bars in time (seconds)
+    """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    color = ['tab:gray', 'tab:red', 'tab:green', 'tab:blue', 'tab:orange']
+    ax.barh(y=y, width=width, left=left, color=color)
+    ax.axvline(x=ts_edges[0], color='k', linestyle='--')
+    ax.axvline(x=ts_edges[1], color='k', linestyle='--')
+    ax.axvline(x=events_edges[0], color='k', linestyle='--')
+    ax.axvline(x=events_edges[1], color='k', linestyle='--')
+    ax.set_xlabel('Time (s)')
+    ax.set_title('Timeline')
+    sns.despine(ax=ax)
 
 
 def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
@@ -403,8 +430,8 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
               f'({round((df_aligned.BehaviorStart.max() - df_aligned.BehaviorStart.min()) * 1000)} ms)')
 
     # Check if the sum of the timestamps of the behavioral session start and the stimulus onset TTLs match
-    assert all(round(df_behavior.TrialStart + df_aligned.BehaviorStart + df_behavior.StimStart, n_decimals) ==
-               round(df_ttl.ON, n_decimals))
+    assert all((df_behavior.TrialStart + df_aligned.BehaviorStart + df_behavior.StimStart).round(n_decimals) ==
+               df_ttl.ON.round(n_decimals))
 
     # Align FSM states to the start of the behavioral session in the ephys clock
     aligned_states = ['TrialStart', 'TrialEnd', 'StimStart', 'StimEnd', 'RespWinStart', 'RespWinEnd']
@@ -413,10 +440,9 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
         df_aligned[state] = df_aligned[state] + df_aligned.BehaviorStart
 
     # Check if the lengths of the states before the alignment match after the alignment
-    assert all(round(df_aligned.TrialEnd - df_aligned.TrialStart, n_decimals) == round(df_aligned.TrialLen, n_decimals))
-    assert all(round(df_aligned.StimEnd - df_aligned.StimStart, n_decimals) == round(df_aligned.StimLen, n_decimals))
-    assert all(
-        round(df_aligned.RespWinEnd - df_aligned.RespWinStart, n_decimals) == round(df_aligned.RespWinLen, n_decimals))
+    assert all((df_aligned.TrialEnd - df_aligned.TrialStart).round(n_decimals) == df_aligned.TrialLen.round(n_decimals))
+    assert all((df_aligned.StimEnd - df_aligned.StimStart).round(n_decimals) == df_aligned.StimLen.round(n_decimals))
+    assert all((df_aligned.RespWinEnd - df_aligned.RespWinStart).round(n_decimals) == df_aligned.RespWinLen.round(n_decimals))
     assert all(df_aligned.StimStart == df_aligned.ON)  # Check if StimStart and df_ttl.ON match
 
     # Align timestamps of PortXIn/Out to the start of the behavioral session in the ephys clock
