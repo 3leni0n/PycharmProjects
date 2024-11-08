@@ -670,6 +670,8 @@ def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=None):
     ax.set_xlabel('Time lag (ms)')
     ax.set_ylabel('Correlation')
 
+    return cch, lags
+
 
 def plot_mfr(psth, ax=None):
     """
@@ -827,44 +829,10 @@ def fano_factor(peri_stim_spikes):
     return fano
 
 
-def synch(df_spikes, time_win=[-2, 0], bin_size=0.02):
-    """
-    Compute the synchrony of a PSTH. This is a measure computed per trial.
-    """
-
-    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0)
-    bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
-    psth_std = np.std(psth, axis=1)
-    psth_mean = np.mean(psth, axis=1)
-
-    synch = psth_std / np.sqrt(np.mean(psth, axis=1))
-    plt.plot(synch)
-    plt.axhline(np.mean(synch), color='tab:red')
-    plt.xlabel('Trial')
-    plt.ylabel('Synch')
-    plt.title('Synchrony')
-
-    psth_std_shuffles = []
-    for i in range(10):
-        peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0.1)
-        bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
-        psth_std_shuffles.append(np.std(psth, axis=1))
-
-    psth_std_shuffles = np.array(psth_std_shuffles)
-    psth_std_shuffles = np.mean(psth_std_shuffles, axis=0)
-
-    synch = psth_std / psth_std_shuffles
-    plt.figure()
-    plt.plot(synch)
-    plt.axhline(np.mean(synch), color='tab:red')
-    plt.xlabel('Trial')
-    plt.ylabel('Synch')
-    plt.title('Synchrony')
-
-    return synch
 
 
 ########################################################################################################################
+
 def cluster_report(save=False):
     """
     Plot a raster and PSTH of a given cluster aligned to a specific event.
@@ -1051,6 +1019,7 @@ bin_size = 0.1  # In seconds
 subject = df_behavior.Subject.unique()[0]
 date = df_behavior.Date.unique()[0]
 
+
 def do_cluster_reports():
     """
     Loop over all clusters and plot a report for each one.
@@ -1071,8 +1040,8 @@ def do_cluster_reports():
         # bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
         cluster_report(save=True)
 
-# do_cluster_reports()
 
+# do_cluster_reports()
 
 ########################################################################################################################
 # SESSION REPORT
@@ -1177,24 +1146,92 @@ def plot_rolling_average(df_behavior, kind='side', ax=None):
     sns.despine(ax=ax, bottom=True)
 
 
+def plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None):
+    """
+    Compute the synchrony of a PSTH. This is a measure computed per trial.
+    :param df_spikes: DataFrame with spike times of a given cluster
+    :param time_win: Time window of interest before and after the event (in seconds)
+    :param bin_size: Size of the bins in seconds for the PSTH (default: 0.02 s)
+    :param method: Method to compute synchrony. Options: 'anal' (analytical formula) or 'shuffles' (shuffles method)
+    :param ax: Axes to plot the synchrony (default: None)
+    """
+
+    # Get default figure window size
+    figsize_default = mpl.rcParams['figure.figsize']
+    figsize = (figsize_default[0] * 3, figsize_default[1])
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    # # Sort in place cluster_info by depth
+    # cluster_info.sort_values('depth', inplace=True)
+    # # Find clusters with depth minor or equal to 1500
+    # cortex_clusters = cluster_info[cluster_info.depth <= 1500].cluster_id
+    # # Slice df_spikes with cortex clusters
+    # df_spikes = df_spikes[df_spikes.cluster.isin(cortex_clusters)]
+    # # Sort in place cluster_info by Amplitude
+    # cluster_info.sort_values('Amplitude', ascending=False, inplace=True)
+    # amplitude_clusters = cluster_info[0:len(cortex_clusters)].cluster_id
+
+    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0)
+    bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+    psth_mean = np.mean(psth, axis=1)
+    psth_std = np.std(psth, axis=1)
+
+    # Analytical formula for synchrony
+    # (denominator is the std of the mean as a proxy for lambda in a Poisson process). Fast
+    if method == 'anal':
+        sync = psth_std / np.sqrt(psth_mean)
+
+    # Shuffles method for synchrony (slow and computationally expensive)
+    elif method == 'shuffles':
+        psth_std_shuffles = []
+        for i in range(10):
+            peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=2)
+            bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+            psth_std_shuffles.append(np.std(psth, axis=1))
+        psth_std_shuffles = np.array(psth_std_shuffles)
+        psth_std_shuffles = np.mean(psth_std_shuffles, axis=0)
+        synch = psth_std / psth_std_shuffles
+
+    # Normalize
+    # sync = (sync - 1) / df_spikes.cluster.nunique()  # Normalize
+
+    # Compute rolling average
+    sync = compute_window(sync, 20)
+
+    # Plot synchrony
+    ax.plot(sync, color='k')
+    ax.axhline(np.mean(sync), color='tab:red')
+    ax.set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
+    ax.set_xlabel('Trial')
+    ax.set_ylabel('Sync')
+    ax.set_title('Synchrony')
+
+    return sync
+
+
 def session_report():
 
-    figsize = (11.69, 8.27)  # A4 size in inches landscape
-    figsize = (8.27, 11.69)  # A4 size in inches landscape
+    # figsize = (11.69, 8.27)  # A4 size in inches landscape
+    figsize = (8.27, 11.69)  # A4 size in inches portrait
+
     # Set subplots layout with mosaic
     mosaic = [['Timeline', 'PopPSTH', 'PopGroupDist'],
               ['MFR', 'MFR', 'MFR'],
+              ['Sync', 'Sync', 'Sync'],
+              ['RepBias', 'RepBias', 'RepBias'],
               ['AccuracySide', 'AccuracySide', 'AccuracySide'],
               # ['AccuracyRepeat', 'AccuracyRepeat', 'AccuracyRepeat'],
-              ['RepBias', 'RepBias', 'RepBias'],
               ['Misses', 'Misses', 'Misses']]
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
     # Plot panels
-    bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
     plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
+    bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
     plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
     plot_mfr(psth, ax=ax_dict['MFR'])
+    plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=ax_dict['Sync'])
     plot_rolling_average(df_behavior, kind='side', ax=ax_dict['AccuracySide'])
     # plot_rolling_average(df_behavior, kind='repeat', ax=ax_dict['AccuracyRepeat'])
     plot_rolling_average(df_behavior, kind='rep_bias', ax=ax_dict['RepBias'])
@@ -1204,17 +1241,43 @@ def session_report():
     ax_dict['Timeline'].set_title('')
     ax_dict['PopPSTH'].set_title('')
     ax_dict['PopGroupDist'].set_xlabel('')
-    ax_dict['Misses'].spines['bottom'].set_visible(True)
-    ax_dict['Misses'].set_xlabel('Trial')
     ax_dict['MFR'].set_xlabel('')
     ax_dict['MFR'].set_xticklabels([])
+    ax_dict['Sync'].set_title('')
+    ax_dict['Sync'].set_xlabel('')
+    ax_dict['Sync'].set_xticklabels([])
     ax_dict['AccuracySide'].set_xticklabels([])
+    ax_dict['Misses'].spines['bottom'].set_visible(True)
+    ax_dict['Misses'].set_xlabel('Trial')
     # ax_dict['AccuracyRepeat'].set_xticklabels([])
     ax_dict['MFR'].set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
     sns.despine(ax=ax_dict['MFR'], bottom=True)
+    sns.despine(ax=ax_dict['Sync'], bottom=True)
 
     plt.suptitle(f'Mouse {subject}: {date}')
     plt.tight_layout()
+
+
+# Plot autocorrelogram for high vs low sync trials
+sync = plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None)
+mean_sync = np.mean(sync)
+
+# Find trials of high and low sync trials as above and below the mean
+high_sync = df_behavior[sync > mean_sync].Trial.tolist()
+low_sync = df_behavior[sync < mean_sync].Trial.tolist()
+
+high_ccg, high_lags = plot_autocorrelogram(df_spikes[df_spikes.Trial.isin(high_sync)], bin_size=0.001, window=[-1000, 1000], ax=None)
+low_ccg, low_lags = plot_autocorrelogram(df_spikes[df_spikes.Trial.isin(low_sync)], bin_size=0.001, window=[-1000, 1000], ax=None)
+
+plt.figure()
+plt.plot(high_lags, high_ccg, color='tab:purple', label='High sync')
+plt.plot(low_lags, low_ccg, color='tab:green', label='Low sync')
+plt.xlabel('Time lag (ms)')
+plt.ylabel('Correlation')
+plt.legend(frameon=False)
+sns.despine()
+
+
 
 
 ########################################################################################################################

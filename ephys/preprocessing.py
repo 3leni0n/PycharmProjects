@@ -474,13 +474,15 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
                 df_spikes.times < df_aligned['TrialEnd'].iloc[i])
         df_spikes['Trial'] = np.where(condition, df_aligned['Trial'].iloc[i].astype(int), df_spikes['Trial'])
 
-    # df_spikes.dropna(inplace=True)  # Drop rows with NaN values in the Trial column  (spikes outside trial times)
+    # Drop rows with NaN values in the Trial column  (spikes outside trial times)
+    # Would make data lighter if NOT interested in periods before and after the task
+    # df_spikes.dropna(inplace=True)
 
     # Check if the number of trials in behavior and spikes dataframes match
-    # assert len(df_spikes.Trial.unique()) == len(df_aligned), \
-    #     'Number of trials in behavior and spikes dataframes do not match'
+    assert df_spikes.Trial.nunique() == len(df_aligned), \
+        'Number of trials in behavior and spikes dataframes do not match'
 
-    # df = pd.merge(df_aligned, df_spikes, on=['Trial'])  # Merge behavior and spikes dataframes. Very heavy and redundant
+    # df = pd.merge(df_aligned, df_spikes, on=['Trial'])  # Merge behavior and spikes dataframes. Very heavy
     # Actually only need the trial column in df_spikes. No need to copy the +80 columns from df_aligned for every spike
 
     # df = pd.merge(df_aligned.Trial, df_spikes, on=['Trial'])  # Merge trials and spikes dataframes.
