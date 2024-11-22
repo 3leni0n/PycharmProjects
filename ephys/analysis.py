@@ -32,53 +32,47 @@ from ephys.preprocessing import *
 
 ########################################################################################################################
 
-# Run preprocessing
-
-# Define the session ID and directory
-id = '007_2024-06-23_12-46-55'
-# id = '007_2024-06-24_17-47-22'
-# directory = Path.home() / 'Documents' / 'Open Ephys' / id  # Ephys PC
-directory = Path() / 'D:' / 'Data' / id  # Personal laptop
-
-# Load raw Open Ephys data
-continuous, events = load_oe_data(directory, sync=True, stream='AP')
-
-# Get TTLs from continuous or/and event data
-df_ttl = get_ttls(continuous, events)
-
-# Get the sound filenames and sound orders from TTLs
-df_keys = decode_ttls(df_ttl)
-
-# Load behavior data
-path_behavior = r"D:\Data\007_2024-06-23_12-46-55\007_stage_training_v5_20240623-130152\007_stage_training_v5_20240623-130152.csv"
-# path_behavior = r"D:\Data\007_2024-06-24_17-47-22\007_stage_training_v5_20240624-180217\007_stage_training_v5_20240624-180217.csv"
-df_behavior = parse_v2(path_behavior)
-
-# Check if the behavior and ephys data match and get the number of trials common to both
-n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
-
-# Load spike sorted data (KS4)
-path_ks4 = Path() / directory / 'Record Node 101' / 'experiment1' / 'recording1' / 'continuous' / \
-           'Neuropix-PXI-109.ProbeA-AP' / 'kilosort4'
-path_phy2 = Path() / directory / 'Record Node 101' / 'experiment1' / 'recording1' / 'continuous' / \
-            'Neuropix-PXI-109.ProbeA-AP' / 'Phy2'
-df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
-clusters = cluster_info.cluster_id.unique()
-n_clusters = len(cluster_info)
-
-# Print session info
-y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
-
-# Temporal alignment of ephys and behavior data (skip for now)
-# df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
-
-# Temporal alignment of ephys and behavior data (from continuous data)
-df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (stimulus onset, 1 TTL per trial)
-df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
-df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
-df_ttl.reset_index(drop=True, inplace=True)  # Reset index
-assert len(df_ttl) == len(df_behavior), 'Number of stimulus onset TTLs and trials in behavior data do not match'
-
+# # Run preprocessing
+#
+# # Define the session ID and directory
+# # id = '007_2024-06-23_12-46-55'
+# # id = '007_2024-06-24_17-47-22'
+# id = '007_2024-06-27_15-06-28'
+# directory = Path() / 'D:' / id  # Ephys PC
+#
+# # Load raw Open Ephys data
+# continuous, events = load_oe_data(directory, sync=True, stream='AP')
+#
+# # Get TTLs from continuous or/and event data
+# df_ttl = get_ttls(continuous, events)
+#
+# # Get the sound filenames and sound orders from TTLs
+# df_keys = decode_ttls(df_ttl)
+#
+# # Load behavior data
+# # path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240623-130152.csv'
+# # path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240624-180217.csv'
+# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240627-152129.csv'
+# df_behavior = parse_v2(path_behavior)
+#
+# # Check if the behavior and ephys data match and get the number of trials common to both
+# n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
+#
+# # Load spike sorted data (KS4)
+# path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'kilosort4'
+# path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'Phy2'
+# df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
+# clusters = cluster_info.cluster_id.unique()
+# n_clusters = len(cluster_info)
+#
+# # Print session info
+# y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
+#
+# # Clean redudant TTLs (useful for check_data)
+# df_ttl = align_ttl(df_ttl, df_behavior)
+#
+# # Temporal alignment of ephys and behavior data (skip for now)
+# # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
 
 ########################################################################################################################
 
@@ -108,6 +102,10 @@ def get_trial_indexes(df_behavior, condition='outcome'):
     elif condition == 'repeat':
         indexes0 = df_behavior[df_behavior.RepTrial == 0].Trial.values
         indexes1 = df_behavior[df_behavior.RepTrial == 1].Trial.values
+
+    elif condition == 'prev_out':
+        indexes0 = df_behavior[df_behavior.AfterHit == 0].Trial.values
+        indexes1 = df_behavior[df_behavior.AfterHit == 1].Trial.values
 
     # Store indexes in a list
     indexes0 = indexes0.tolist()
@@ -146,7 +144,7 @@ def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
     return peri_stim_spikes
 
 
-def get_peri_stim_licks(df_behavior):
+def get_peri_stim_licks(df_behavior, event='StimStart'):
     """
     Get peri-stimulus licks for a given behavioral session.
     :param df_behavior: DataFrame with behavior data
@@ -156,8 +154,8 @@ def get_peri_stim_licks(df_behavior):
     licks_left = df_behavior.Port1In.copy()
     licks_right = df_behavior.Port2In.copy()
     for trial in range(len(df_behavior)):
-        licks_left[trial] = [x - df_behavior.StimStart[trial] for x in licks_left[trial]]  # Left
-        licks_right[trial] = [x - df_behavior.StimStart[trial] for x in licks_right[trial]]  # Right
+        licks_left[trial] = [x - df_behavior[event][trial] for x in licks_left[trial]]  # Left
+        licks_right[trial] = [x - df_behavior[event][trial] for x in licks_right[trial]]  # Right
     licks = licks_left + licks_right
 
     return licks
@@ -696,7 +694,7 @@ def plot_mfr(psth, ax=None):
 
     mfr_mean = np.mean(mfr)
     percentile = 20
-    mfr_percentile = np.percentile(mfr, percentile)
+    # mfr_percentile = np.percentile(mfr, percentile)
 
     ax.plot(mfr, color='k')
     ax.fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.25)
@@ -827,8 +825,6 @@ def fano_factor(peri_stim_spikes):
     # fano = fanofactor(peri_stim_spikes)  # With elephant
 
     return fano
-
-
 
 
 ########################################################################################################################
@@ -1007,17 +1003,17 @@ def cluster_report(save=False):
         plt.close()
 
 
-# Get behavioral events
-stim_dur = df_behavior.StimDur.unique()[0]
-delay = df_behavior.Delay.unique()[0]
-go_cue = stim_dur + delay
-
-# Set parameters
-time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
-bin_size = 0.1  # In seconds
-
-subject = df_behavior.Subject.unique()[0]
-date = df_behavior.Date.unique()[0]
+# # Get behavioral events
+# stim_dur = df_behavior.StimDur.unique()[0]
+# delay = df_behavior.Delay.unique()[0]
+# go_cue = stim_dur + delay
+#
+# # Set parameters
+# time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+# bin_size = 0.1  # In seconds
+#
+# subject = df_behavior.Subject.unique()[0]
+# date = df_behavior.Date.unique()[0]
 
 
 def do_cluster_reports():
@@ -1047,12 +1043,98 @@ def do_cluster_reports():
 # SESSION REPORT
 ########################################################################################################################
 
-def plot_rolling_average(df_behavior, kind='side', ax=None):
+def get_roll_avg(df_behavior, kind='side'):
+
+    # if ax is None:
+    #     fig, ax = plt.subplots()
+
+    win_len = 20
+
+    if kind == 'side':
+
+        # color = ['black', 'tab:blue', 'tab:orange']
+        # alpha = [1, 1, 1]
+        # label = ['Total', 'Left', 'Right']
+        # ylabel = 'Accuracy'
+
+        # Compute accuracy rolling average
+        x_total = df_behavior.Hit.index
+        y_total = compute_window(df_behavior.Hit, win_len)  # All responded trials
+        x_0 = df_behavior.Hit[df_behavior.Side == 0].index
+        y_0 = compute_window(df_behavior.Hit[df_behavior.Side == 0], win_len)  # Left responded trials
+        x_1 = df_behavior.Hit[df_behavior.Side == 1].index
+        y_1 = compute_window(df_behavior.Hit[df_behavior.Side == 1], win_len)  # Right responded trials
+
+    elif kind == 'repeat':
+
+        # color = ['black', 'tab:purple', 'tab:brown']
+        # alpha = [1, 1, 1]
+        # label = ['Total', 'Alternate', 'Repeat']
+        # ylabel = 'Accuracy'
+
+        # Compute accuracy for repeating vs alternating rolling average
+        x_total = df_behavior.Hit.index
+        y_total = compute_window(df_behavior.Hit, win_len)  # All responded trials
+        x_0 = df_behavior.Hit[df_behavior.RepTrial == 0].index
+        y_0 = compute_window(df_behavior.Hit[df_behavior.RepTrial == 0], win_len)  # Alternate
+        x_1 = df_behavior.Hit[df_behavior.RepTrial == 1].index
+        y_1 = compute_window(df_behavior.Hit[df_behavior.RepTrial == 1], win_len)  # Repeat
+
+    elif kind == 'rep_bias':
+
+        # color = ['black', 'tab:blue', 'tab:orange']
+        # alpha = [1, 0, 0]
+        # label = ['Total', 'Left', 'Right']
+        # ylabel = 'Repeat bias'
+
+        x_total = df_behavior.RepChoice.index
+        y_total = compute_window(df_behavior.RepChoice, win_len)
+        x_0 = df_behavior[df_behavior.Choice == 0].index.tolist()
+        y_0 = compute_window(df_behavior.RepChoice[df_behavior.Choice == 0], win_len)  # Repeat rate left
+        x_1 = df_behavior[df_behavior.Choice == 1].index.tolist()
+        y_1 = compute_window(df_behavior.RepChoice[df_behavior.Choice == 1], win_len)  # Repeat rate right
+
+    elif kind == 'miss':
+
+        # color = ['black', 'tab:blue', 'tab:orange']
+        # alpha = [1, 1, 1]
+        # label = ['Total', 'Left', 'Right']
+        # ylabel = 'Miss rate'
+
+        # Compute miss rolling average
+        x_total = df_behavior.index
+        y_total = compute_window(df_behavior.Miss, win_len)  # All responded trials
+        x_0 = df_behavior[df_behavior.Side == 0].index
+        y_0 = compute_window(df_behavior.Miss[df_behavior.Side == 0], win_len)  # Left responded trials
+        x_1 = df_behavior[df_behavior.Side == 1].index
+        y_1 = compute_window(df_behavior.Miss[df_behavior.Side == 1], win_len)  # Right responded trials
+
+    # marker = 'o'
+    # ms = mpl.rcParams['lines.markersize'] / 2  # Half of default
+    #
+    # # Plot rolling averages
+    # ax.plot(x_total, y_total, marker=marker, ms=ms, color=color[0], alpha=alpha[0], label=label[0])
+    # ax.plot(x_0, y_0, marker=marker, ms=ms, color=color[1], alpha=alpha[1], label=label[1])
+    # ax.plot(x_1, y_1, marker=marker, ms=ms, color=color[2], alpha=alpha[2], label=label[2])
+    #
+    # # Plot horizontal lines
+    # ax.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
+    # ax.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
+    # ax.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
+    #
+    # ax.set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
+    # ax.set_ylabel(ylabel)
+    # ax.set_yticks(list(np.arange(0, 1.25, 0.25)))
+    # ax.set_yticklabels(['0', '', '0.5', '', '1'])
+    # sns.despine(ax=ax, bottom=True)
+
+    return x_total, y_total, x_0, y_0, x_1, y_1
+
+
+def plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=None):
 
     if ax is None:
         fig, ax = plt.subplots()
-
-    win_len = 20
 
     if kind == 'side':
 
@@ -1061,70 +1143,23 @@ def plot_rolling_average(df_behavior, kind='side', ax=None):
         label = ['Total', 'Left', 'Right']
         ylabel = 'Accuracy'
 
-        # Compute accuracy rolling average
-        cond_total = df_behavior.Miss == 0
-        x_total = df_behavior.Hit[cond_total].index
-        y_total = compute_window(df_behavior.Hit[cond_total], win_len)  # All responded trials
-        cond_0 = (df_behavior.Miss == 0) & (df_behavior.Side == 0)
-        x_0 = df_behavior.Hit[cond_0].index
-        y_0 = compute_window(df_behavior.Hit[cond_0], win_len)  # Left responded trials
-        cond_1 = (df_behavior.Miss == 0) & (df_behavior.Side == 1)
-        x_1 = df_behavior.Hit[cond_1].index
-        y_1 = compute_window(df_behavior.Hit[cond_1], win_len)  # Right responded trials
-
     elif kind == 'repeat':
-
         color = ['black', 'tab:purple', 'tab:brown']
         alpha = [1, 1, 1]
         label = ['Total', 'Alternate', 'Repeat']
         ylabel = 'Accuracy'
 
-        # Compute accuracy for repeating vs alternating rolling average
-        cond_total = df_behavior.Miss == 0
-        x_total = df_behavior.Hit[cond_total].index
-        y_total = compute_window(df_behavior.Hit[cond_total], win_len)  # All responded trials
-        cond_0 = (df_behavior.Miss == 0) & (df_behavior.RepTrial == 0)
-        x_0 = df_behavior.Hit[cond_0].index
-        y_0 = compute_window(df_behavior.Hit[cond_0], win_len)  # Alternate
-        cond_1 = (df_behavior.Miss == 0) & (df_behavior.RepTrial == 1)
-        x_1 = df_behavior.Hit[cond_1].index
-        y_1 = compute_window(df_behavior.Hit[cond_1], win_len)  # Repeat
-
     elif kind == 'rep_bias':
-
         color = ['black', 'tab:blue', 'tab:orange']
         alpha = [1, 0, 0]
         label = ['Total', 'Left', 'Right']
         ylabel = 'Repeat bias'
 
-        cond_total = df_behavior.Miss == 0
-        x_total = df_behavior.RepChoice[cond_total].index
-        y_total = compute_window(df_behavior.RepChoice[cond_total], win_len)
-
-        cond_0 = df_behavior.Choice == 0
-        x_0 = df_behavior[cond_0].index.tolist()
-        y_0 = compute_window(df_behavior.RepChoice[cond_0], win_len)  # Repeat rate left
-
-        cond_1 = df_behavior.Choice == 1
-        x_1 = df_behavior[cond_1].index.tolist()
-        y_1 = compute_window(df_behavior.RepChoice[cond_1], win_len)  # Repeat rate right
-
     elif kind == 'miss':
-
         color = ['black', 'tab:blue', 'tab:orange']
         alpha = [1, 1, 1]
         label = ['Total', 'Left', 'Right']
         ylabel = 'Miss rate'
-
-        # Compute miss rolling average
-        x_total = df_behavior.index
-        y_total = compute_window(df_behavior.Miss, win_len)  # All responded trials
-        cond_0 = df_behavior.Side == 0
-        x_0 = df_behavior[cond_0].index
-        y_0 = compute_window(df_behavior.Miss[cond_0], win_len)  # Left responded trials
-        cond_1 = df_behavior.Side == 1
-        x_1 = df_behavior[cond_1].index
-        y_1 = compute_window(df_behavior.Miss[cond_1], win_len)  # Right responded trials
 
     marker = 'o'
     ms = mpl.rcParams['lines.markersize'] / 2  # Half of default
@@ -1146,22 +1181,14 @@ def plot_rolling_average(df_behavior, kind='side', ax=None):
     sns.despine(ax=ax, bottom=True)
 
 
-def plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None):
+def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal'):
     """
     Compute the synchrony of a PSTH. This is a measure computed per trial.
     :param df_spikes: DataFrame with spike times of a given cluster
     :param time_win: Time window of interest before and after the event (in seconds)
     :param bin_size: Size of the bins in seconds for the PSTH (default: 0.02 s)
     :param method: Method to compute synchrony. Options: 'anal' (analytical formula) or 'shuffles' (shuffles method)
-    :param ax: Axes to plot the synchrony (default: None)
     """
-
-    # Get default figure window size
-    figsize_default = mpl.rcParams['figure.figsize']
-    figsize = (figsize_default[0] * 3, figsize_default[1])
-
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
 
     # # Sort in place cluster_info by depth
     # cluster_info.sort_values('depth', inplace=True)
@@ -1200,6 +1227,25 @@ def plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None
     # Compute rolling average
     sync = compute_window(sync, 20)
 
+    return sync
+
+
+def plot_sync(ax=None):
+    """
+    Plot the synchrony of a PSTH.
+    :param sync: Synchrony
+    :param ax: Axes to plot the synchrony (default: None)
+    """
+
+    # Get default figure window size
+    figsize_default = mpl.rcParams['figure.figsize']
+    figsize = (figsize_default[0] * 3, figsize_default[1])
+
+    if ax is None:
+        fig, ax = plt.subplots(figsize=figsize)
+
+    sync = get_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal')
+
     # Plot synchrony
     ax.plot(sync, color='k')
     ax.axhline(np.mean(sync), color='tab:red')
@@ -1208,7 +1254,63 @@ def plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None
     ax.set_ylabel('Sync')
     ax.set_title('Synchrony')
 
-    return sync
+
+def plot_sync_split():
+    # Plot autocorrelogram for high vs low sync trials
+    sync = plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None)
+    mean_sync = np.mean(sync)
+
+    # Find trials of high and low sync trials as above and below the mean
+    high_sync = df_behavior[sync > mean_sync].Trial.tolist()
+    low_sync = df_behavior[sync < mean_sync].Trial.tolist()
+
+    high_ccg, high_lags = plot_autocorrelogram(df_spikes[df_spikes.Trial.isin(high_sync)], bin_size=0.001, window=[-1000, 1000], ax=None)
+    low_ccg, low_lags = plot_autocorrelogram(df_spikes[df_spikes.Trial.isin(low_sync)], bin_size=0.001, window=[-1000, 1000], ax=None)
+
+    plt.figure()
+    plt.plot(high_lags, high_ccg, color='tab:purple', label='High sync')
+    plt.plot(low_lags, low_ccg, color='tab:green', label='Low sync')
+    plt.xlabel('Time lag (ms)')
+    plt.ylabel('Correlation')
+    plt.legend(frameon=False)
+    sns.despine()
+
+
+def plot_corr_session(ax=None):
+    """
+    Plot the correlation matrix of the session.
+    :param ax: Axes to plot the correlation matrix (default: None)
+    """
+
+    if ax is None:
+        fig, ax = plt.subplots()
+        annot = True
+    else:
+        annot = False
+
+    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
+    _, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    psth = psth / len(cluster_info)
+    mfr, sfr = plot_mfr(psth)
+    sync = get_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal')
+    _, rep_bias, _, _, _, _ = get_roll_avg(df_behavior, kind='rep_bias')
+    _, accuracy, _, _, _, _ = get_roll_avg(df_behavior, kind='side')
+    _, misses, _, _, _, _ = get_roll_avg(df_behavior, kind='miss')
+
+    # Create DataFrame
+    data = {
+        'mfr': mfr,
+        'sync': sync,
+        'rep_bias': rep_bias,
+        'accuracy': accuracy,
+        'misses': misses
+    }
+    df = pd.DataFrame(data)
+    corr = df.corr()
+
+    # Plot correlation matrix
+    sns.heatmap(corr, annot=annot, cmap='coolwarm', vmin=-1, vmax=1, square=True, ax=ax)
+    ax.set_title(f'Mouse {subject}: {date}')
 
 
 def session_report():
@@ -1217,30 +1319,35 @@ def session_report():
     figsize = (8.27, 11.69)  # A4 size in inches portrait
 
     # Set subplots layout with mosaic
-    mosaic = [['Timeline', 'PopPSTH', 'PopGroupDist'],
-              ['MFR', 'MFR', 'MFR'],
-              ['Sync', 'Sync', 'Sync'],
-              ['RepBias', 'RepBias', 'RepBias'],
-              ['AccuracySide', 'AccuracySide', 'AccuracySide'],
-              # ['AccuracyRepeat', 'AccuracyRepeat', 'AccuracyRepeat'],
-              ['Misses', 'Misses', 'Misses']]
+    mosaic = [['Timeline', 'PopGroupDist', 'PopPSTH', 'CorrMatrix'],
+              ['MFR', 'MFR', 'MFR', 'MFR'],
+              ['Sync', 'Sync', 'Sync', 'Sync'],
+              ['RepBias', 'RepBias', 'RepBias', 'RepBias'],
+              ['AccuracySide', 'AccuracySide', 'AccuracySide', 'AccuracySide'],
+              ['Misses', 'Misses', 'Misses', 'Misses']]
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
     # Plot panels
     plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
-    bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
     plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
+    bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
     plot_mfr(psth, ax=ax_dict['MFR'])
-    plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=ax_dict['Sync'])
-    plot_rolling_average(df_behavior, kind='side', ax=ax_dict['AccuracySide'])
-    # plot_rolling_average(df_behavior, kind='repeat', ax=ax_dict['AccuracyRepeat'])
-    plot_rolling_average(df_behavior, kind='rep_bias', ax=ax_dict['RepBias'])
-    plot_rolling_average(df_behavior, kind='miss', ax=ax_dict['Misses'])
+    plot_sync(ax=ax_dict['Sync'])
+
+    x_total, y_total, x_0, y_0, x_1, y_1 = get_roll_avg(df_behavior, kind='side')
+    plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=ax_dict['AccuracySide'])
+    x_total, y_total, x_0, y_0, x_1, y_1 = get_roll_avg(df_behavior, kind='rep_bias')
+    plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='rep_bias', ax=ax_dict['RepBias'])
+    x_total, y_total, x_0, y_0, x_1, y_1 = get_roll_avg(df_behavior, kind='miss')
+    plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='miss', ax=ax_dict['Misses'])
+
+    plot_corr_session(ax=ax_dict['CorrMatrix'])
 
     # Aesthetics
     ax_dict['Timeline'].set_title('')
-    ax_dict['PopPSTH'].set_title('')
     ax_dict['PopGroupDist'].set_xlabel('')
+    ax_dict['PopPSTH'].set_title('')
+    ax_dict['CorrMatrix'].set_title('')
     ax_dict['MFR'].set_xlabel('')
     ax_dict['MFR'].set_xticklabels([])
     ax_dict['Sync'].set_title('')
@@ -1249,7 +1356,6 @@ def session_report():
     ax_dict['AccuracySide'].set_xticklabels([])
     ax_dict['Misses'].spines['bottom'].set_visible(True)
     ax_dict['Misses'].set_xlabel('Trial')
-    # ax_dict['AccuracyRepeat'].set_xticklabels([])
     ax_dict['MFR'].set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
     sns.despine(ax=ax_dict['MFR'], bottom=True)
     sns.despine(ax=ax_dict['Sync'], bottom=True)
@@ -1258,24 +1364,38 @@ def session_report():
     plt.tight_layout()
 
 
-# Plot autocorrelogram for high vs low sync trials
-sync = plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None)
-mean_sync = np.mean(sync)
+def get_rt(df_behavior):
+    """
+    Compute the reaction time (RT) of the licks of a behavioral session.
+    :param df_behavior: DataFrame with the behavioral data
+    :return: Reaction time (RT) of the licks per trial
+    """
 
-# Find trials of high and low sync trials as above and below the mean
-high_sync = df_behavior[sync > mean_sync].Trial.tolist()
-low_sync = df_behavior[sync < mean_sync].Trial.tolist()
+    licks_left = df_behavior.Port1In.copy()
+    licks_right = df_behavior.Port2In.copy()
+    licks = licks_left + licks_right
 
-high_ccg, high_lags = plot_autocorrelogram(df_spikes[df_spikes.Trial.isin(high_sync)], bin_size=0.001, window=[-1000, 1000], ax=None)
-low_ccg, low_lags = plot_autocorrelogram(df_spikes[df_spikes.Trial.isin(low_sync)], bin_size=0.001, window=[-1000, 1000], ax=None)
+    rt = []
+    n_licks = []
 
-plt.figure()
-plt.plot(high_lags, high_ccg, color='tab:purple', label='High sync')
-plt.plot(low_lags, low_ccg, color='tab:green', label='Low sync')
-plt.xlabel('Time lag (ms)')
-plt.ylabel('Correlation')
-plt.legend(frameon=False)
-sns.despine()
+    for trial in range(len(df_behavior)):
+
+        # Curate licks (remove those that happened before the response window open or after the ITI ends)
+        licks[trial] = [lick for lick in licks[trial] if df_behavior.RespWinStart[trial] <= lick <=
+                        df_behavior.RespWinEnd[trial] + df_behavior.ITI[trial]]
+
+        n_licks.append(len(licks[trial]))
+
+        if df_behavior.Miss[trial] == 1:
+            rt.append(np.nan)
+        else:
+            # rt.append(df_behavior.RespWinEnd[trial] - df_behavior.RespWinStart[trial])
+            rt.append(df_behavior.RespWinLen[trial])
+
+        # Align licks to StimStart
+        licks[trial] = [lick - df_behavior.StimStart[trial] for lick in licks[trial]]
+
+    return licks, n_licks, rt
 
 
 
@@ -1283,25 +1403,7 @@ sns.despine()
 ########################################################################################################################
 
 """
-Jaime's Qs/comments:
-in this plot it is very clear that you need at leas 1-2 seconds more at the end of the x-axis to show the entire rate 
-response. I think  there are many interesting questions about the licks that we may want to address. Remember that the 
-people doing Calcium imaging cannot resolve well the timing of the spiking of the neurons locked to the licks. Plus in 
-many lick detectors that work with capacitor, the licks can cause an artifact that obscures the spiking activity just at 
-the time of the licks. You are in a position to dig into the neural correlates of these licks and answer questions like:
-What causes the variability in the lick RT?
-What causes the variability in the lick rate (ie inter-lick-interval)?
-What makes some correct responses  have 2-3 licks and some 8-10?
-Are all response selective neurons locked to the licks?
-
-smooth mean FR across trials by taking longer bins to compute the means rate (e.g. 2-5 trials)
-
-
-
 TO DO:
-
-- Resize the window size in PSTHs and rasters to include 1-2 s more post-response. window_size = [-1, 3] s
-
 Make a population report per session with these parts:
 1. Population raster and PSTH of the first and last responded trial of the session. Check synchrony                     TO DO
 2. Population raster and PSTH of the first second of the last minute of the waiting period before running the task      

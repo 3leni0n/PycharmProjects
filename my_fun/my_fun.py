@@ -666,9 +666,9 @@ def compute_window(data, runningwindow):
     performance = []
     for i in range(len(data)):
         if i < runningwindow:
-            performance.append(round(np.mean(data[0:i + 1]), 2))
+            performance.append(round(np.nanmean(data[0:i + 1]), 2))
         else:
-            performance.append(round(np.mean(data[i - runningwindow:i]), 2))
+            performance.append(round(np.nanmean(data[i - runningwindow:i]), 2))
     return performance
 
 

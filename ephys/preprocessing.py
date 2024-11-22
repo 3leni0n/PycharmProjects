@@ -1,4 +1,5 @@
 # Standard libraries
+from pathlib import Path
 import matplotlib
 import numpy as np
 import pandas as pd
@@ -10,8 +11,9 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 
-# My own libraries
+# My libraries
 from my_fun.my_fun import do_sounds_dict_inv
+from parse.parse_v2 import parse_v2
 
 
 def load_oe_data(directory, sync=True, stream='AP'):
@@ -235,7 +237,7 @@ def load_spike_sorted_data(path_ks4, path_phy2):
     # cluster_Amplitude = pd.read_csv(path_phy2 / 'cluster_Amplitude.tsv', sep='\t')  # Already in cluster_info
     # cluster_Contam_pct = pd.read_csv(path_phy2 / 'cluster_ContamPct.tsv', sep='\t')  # Already in cluster_info
     # cluster_KSLabel = pd.read_csv(path_phy2 / 'cluster_KSLabel.tsv', sep='\t')  # Already in cluster_info
-    params = runpy.run_path(path_phy2 / 'params.py')
+    params = runpy.run_path(path_ks4 / 'params.py')
     sample_rate = params['sample_rate']
 
     # Create pandas DataFrame with spike times and clusters
@@ -399,13 +401,6 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
     :return: df_aligned, df_spikes
     """
 
-    # Temporal alignment of ephys and behavior data (from continuous data)
-    df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (1 TTL per trial)
-    df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
-    df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
-    df_ttl.reset_index(drop=True, inplace=True)  # Reset index
-    assert len(df_ttl) == len(df_behavior), 'Number of stimulus onset TTLs and trials in behavior data do not match'
-
     # Align timestamps to the first timestamp (start at 0). Not in use
     # df_ttl.timestamps = df_ttl.timestamps - first_timestamp
 
@@ -488,3 +483,65 @@ def temp_align(df_ttl, df_behavior, df_spikes, n_decimals=4):
     # df = pd.merge(df_aligned.Trial, df_spikes, on=['Trial'])  # Merge trials and spikes dataframes.
 
     return df_aligned, df_spikes
+
+
+def align_ttl(df_ttl, df_behavior):
+    """
+    Temporal alignment of ephys and behavior data (from continuous data)
+    :param ttl: DataFrame with TTLs
+    :param df_behavior: DataFrame with behavior data
+    :return ttl_aligned: DataFrame with aligned TTLs
+    """
+
+    df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (stimulus onset, 1 TTL per trial)
+    df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
+    df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
+    df_ttl.reset_index(drop=True, inplace=True)  # Reset index
+    assert len(df_ttl) == len(df_behavior), 'Number of stimulus onset TTLs and trials in behavior data do not match'
+
+    return df_ttl
+
+
+def preprocess(id, path_behavior):
+    """
+    Preprocess the data for a given session ID and behavior file.
+    :param id: Ephys session ID
+    :param path_behavior: Path to the behavior file
+    :return: DataFrames with TTLs, behavior data, and spike sorted data
+    """
+
+    # Define the session ID and directory
+    directory = Path() / 'D:' / id  # Ephys PC
+
+    # Load raw Open Ephys data
+    continuous, events = load_oe_data(directory, sync=True, stream='AP')
+
+    # Get TTLs from continuous or/and event data
+    df_ttl = get_ttls(continuous, events)
+
+    # Get the sound filenames and sound orders from TTLs
+    df_keys = decode_ttls(df_ttl)
+
+    # Load behavior data
+    df_behavior = parse_v2(path_behavior)
+
+    # Check if the behavior and ephys data match and get the number of trials common to both
+    n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
+
+    # Load spike sorted data (KS4)
+    path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'kilosort4'
+    path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'Phy2'
+    df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
+    clusters = cluster_info.cluster_id.unique()
+    n_clusters = len(cluster_info)
+
+    # Print session info
+    y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
+
+    # Clean redudant TTLs (useful for check_data)
+    df_ttl = align_ttl(df_ttl, df_behavior)
+
+    # Temporal alignment of ephys and behavior data (skip for now)
+    # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
+
+    return df_ttl, df_behavior, n_trials, df_spikes, cluster_info
