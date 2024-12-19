@@ -32,47 +32,47 @@ from ephys.preprocessing import *
 
 ########################################################################################################################
 
-# # Run preprocessing
-#
-# # Define the session ID and directory
-# # id = '007_2024-06-23_12-46-55'
-# # id = '007_2024-06-24_17-47-22'
+# Run preprocessing
+
+# Define the session ID and directory
+id = '007_2024-06-23_12-46-55'
+# id = '007_2024-06-24_17-47-22'
 # id = '007_2024-06-27_15-06-28'
-# directory = Path() / 'D:' / id  # Ephys PC
-#
-# # Load raw Open Ephys data
-# continuous, events = load_oe_data(directory, sync=True, stream='AP')
-#
-# # Get TTLs from continuous or/and event data
-# df_ttl = get_ttls(continuous, events)
-#
-# # Get the sound filenames and sound orders from TTLs
-# df_keys = decode_ttls(df_ttl)
-#
-# # Load behavior data
-# # path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240623-130152.csv'
-# # path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240624-180217.csv'
+directory = Path() / 'D:' / id  # Ephys PC
+
+# Load raw Open Ephys data
+continuous, events = load_oe_data(directory, sync=True, stream='AP')
+
+# Get TTLs from continuous or/and event data
+df_ttl = get_ttls(continuous, events)
+
+# Get the sound filenames and sound orders from TTLs
+df_keys = decode_ttls(df_ttl)
+
+# Load behavior data
+path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240623-130152.csv'
+# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240624-180217.csv'
 # path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240627-152129.csv'
-# df_behavior = parse_v2(path_behavior)
-#
-# # Check if the behavior and ephys data match and get the number of trials common to both
-# n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
-#
-# # Load spike sorted data (KS4)
-# path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'kilosort4'
-# path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'Phy2'
-# df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
-# clusters = cluster_info.cluster_id.unique()
-# n_clusters = len(cluster_info)
-#
-# # Print session info
-# y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
-#
-# # Clean redudant TTLs (useful for check_data)
-# df_ttl = align_ttl(df_ttl, df_behavior)
-#
-# # Temporal alignment of ephys and behavior data (skip for now)
-# # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
+df_behavior = parse_v2(path_behavior)
+
+# Check if the behavior and ephys data match and get the number of trials common to both
+n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
+
+# Load spike sorted data (KS4)
+path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'kilosort4'
+path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'Phy2'
+df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
+clusters = cluster_info.cluster_id.unique()
+n_clusters = len(cluster_info)
+
+# Print session info
+y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
+
+# Clean redudant TTLs (useful for check_data)
+df_ttl = align_ttl(df_ttl, df_behavior)
+
+# Temporal alignment of ephys and behavior data (skip for now)
+# df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
 
 ########################################################################################################################
 
@@ -530,7 +530,7 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
 ########################################################################################################################
 
 
-def plot_pop_raw(df_spikes, cluster_info, slice='trials', sort_by='n_spikes', bin_size=0.01):
+def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', sort_by='n_spikes', bin_size=0.01):
     """
     Plot population activity of all clusters in 2 subplots: raster (above) and PSTH (below).
     Short time window (a few trials/seconds).
@@ -543,9 +543,11 @@ def plot_pop_raw(df_spikes, cluster_info, slice='trials', sort_by='n_spikes', bi
     # Sort clusters by number of spikes
     cluster_info.sort_values(sort_by, ascending=True).reset_index(drop=True, inplace=True)
 
+    go_cue = df_behavior.StimDur.unique()[0] + df_behavior.Delay.unique()[0]
+
     if slice == 'trials':
         # Slice DataFrame of given time window after first event (behavior started)
-        win_trials = 147, 150  # Edges of trials to plot
+        win_trials = 798, 801  # Edges of trials to plot
         print(f' Plotting trials: {np.arange(win_trials[0], win_trials[1] - 1)}')
         win_events = df_ttl.OFF.iloc[win_trials[0]:win_trials[1]]
         df_slice = df_spikes[
@@ -1181,7 +1183,7 @@ def plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=None):
     sns.despine(ax=ax, bottom=True)
 
 
-def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal'):
+def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', smooth=True):
     """
     Compute the synchrony of a PSTH. This is a measure computed per trial.
     :param df_spikes: DataFrame with spike times of a given cluster
@@ -1224,13 +1226,14 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal'):
     # Normalize
     # sync = (sync - 1) / df_spikes.cluster.nunique()  # Normalize
 
-    # Compute rolling average
-    sync = compute_window(sync, 20)
+    if smooth:
+        # Compute rolling average
+        sync = compute_window(sync, 20)
 
     return sync
 
 
-def plot_sync(ax=None):
+def plot_sync(method='anal', smooth=True, ax=None):
     """
     Plot the synchrony of a PSTH.
     :param sync: Synchrony
@@ -1244,7 +1247,7 @@ def plot_sync(ax=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
 
-    sync = get_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal')
+    sync = get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method=method, smooth=smooth)
 
     # Plot synchrony
     ax.plot(sync, color='k')
@@ -1328,6 +1331,7 @@ def session_report():
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
     # Plot panels
+    y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
     plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
     plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
     bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
