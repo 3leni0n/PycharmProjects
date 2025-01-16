@@ -13,14 +13,23 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-ephys_ids = ['007_2024-06-23_12-46-55',
+ephys_ids = ['007_2024-06-22_10-48-57',
+             '007_2024-06-23_12-46-55',
              '007_2024-06-24_17-47-22',
-             '007_2024-06-27_15-06-28']
-             # '007_2024-07-09_12-10-57',
-             # '007_2024-07-10_12-03-35']
-behavior_ids = ['007_stage_training_v5_20240623-130152',
+             '007_2024-06-27_15-06-28',
+             '007_2024-07-09_12-10-57',
+             '007_2024-07-10_12-03-35',
+             '007_2024-07-11_12-39-21',
+             '007_2024-07-12_13-29-26']
+
+behavior_ids = ['007_stage_training_v5_20240622-110354',
+                '007_stage_training_v5_20240623-130152',
                 '007_stage_training_v5_20240624-180217',
-                '007_stage_training_v5_20240627-152129']
+                '007_stage_training_v5_20240627-152129',
+                '007_stage_training_v5_20240709-122550',
+                '007_stage_training_v5_20240710-121827',
+                '007_stage_training_v5_20240711-123921',
+                '007_stage_training_v5_20240712-134450']
 
 df = pd.DataFrame()
 
@@ -65,27 +74,27 @@ session_index = pd.get_dummies(df.SessionIndex, dtype='int')
 n_sessions = df.Session.nunique()  # Number of sessions
 df = pd.concat([df, session_index], axis=1)  # Add session index to the dataframe
 
-# Normalize trial number and zscore baselineFR and sync (per session)
-df['normTrial'] = df.groupby('Session').Trial.transform(lambda x: (x / x.max()))
-# df['zSync'] = df.groupby('Session').Sync.transform(lambda x: zscore(x))
-# df['zBaseFR'] = df.groupby('Session').BaselineFR.transform(lambda x: zscore(x))
-df['normSync'] = df.groupby('Session').Sync.transform(lambda x: (x / x.max()))
-df['normBaseFR'] = df.groupby('Session').BaselineFR.transform(lambda x: (x / x.max()))
-df['normLickRate'] = df.groupby('Session').LickRate.transform(lambda x: (x / x.max()))
-df['normRT'] = df.groupby('Session').RT.transform(lambda x: (x / x.max()))
+# zscore regressors (per session)
+df['zTrial'] = df.groupby('Session').Trial.transform(lambda x: zscore(x))
+df['zSync'] = df.groupby('Session').Sync.transform(lambda x: zscore(x))
+df['zBaseFR'] = df.groupby('Session').BaselineFR.transform(lambda x: zscore(x))
+df['zLickRate'] = df.groupby('Session').LickRate.transform(lambda x: zscore(x))
+df['zRT'] = df.groupby('Session').RT.transform(lambda x: zscore(x))
 
 ########################################################################################################################
 
 # GLMs
-after_error_indexes = df[df.AfterHit == 0].index.values
-after_hit_indexes = df[df.AfterHit == 1].index.values
+# after_error_indexes = df[df.AfterHit == 0].index.values
+# after_hit_indexes = df[df.AfterHit == 1].index.values
 
 # Accuracy (all trials)
-# endog = df.Hit
-endog = df.iloc[after_hit_indexes].Hit.reset_index(drop=True)
-exog = pd.DataFrame({'Trial': df.normTrial, 'BaseFR': df.normBaseFR, 'Sync': df.normSync})
-exog = pd.concat([exog, session_index], axis=1)
-exog = exog.iloc[after_hit_indexes].reset_index(drop=True)
+endog = df.Hit
+# endog = df.iloc[after_hit_indexes].Hit.reset_index(drop=True)
+# endog = df.iloc[session_index].Hit.reset_index(drop=True)
+exog = pd.DataFrame({'Trial': df.zTrial, 'BaseFR': df.zBaseFR, 'Sync': df.zSync})
+# exog = pd.concat([exog, session_index], axis=1)
+# exog = exog.iloc[after_hit_indexes].reset_index(drop=True)
+# exog = exog.iloc[session_index].reset_index(drop=True)
 # exog = sm.add_constant(exog)  # Add constant (not needed if adding one intercept per session)
 model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
 results = model.fit()
@@ -115,7 +124,7 @@ xticklabels = [label.get_text() for label in plt.xticks()[1]] + ['Cons']
 plt.xticks(xticks, xticklabels)
 
 
-n_shuffles = 10000  # Number of shuffles
+n_shuffles = 1000  # Number of shuffles
 shuffled_params = []
 
 for _ in range(n_shuffles):
@@ -138,52 +147,7 @@ plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.25, edgecolor
 
 
 
-
-
-
-
-factorial(n_sessions)
-from itertools import permutations
-
-df_copy = df.copy()
-# Find the number of trials per session and crop it to the minimum
-n_trials = df_copy.groupby('Session').Trial.count()
-min_trials = n_trials.min()
-# Drop trials above the minimum for each session
-df_copy = df_copy.groupby('Session').apply(lambda x: x[x.Trial < min_trials]).reset_index(drop=True)
-
-df_test
-
-
-# Make a toy data df with 3 sessions and 3 trials per session
-toy_data = pd.DataFrame({
-    "Session": [0] * 3 + [1] * 3 + [3] * 3,
-    "Trial": [0, 1, 2] * 3,  # Repeating trial numbers across sessions
-    "x": np.random.rand(9),  # Random data for variable x
-    "y": np.random.rand(9)   # Random data for variable y
-})
-
-df_test = pd.DataFrame()
-df_temp = toy_data.copy()
-df_temp.y = np.roll(df_temp.y, 3)
-df_test = pd.concat([df_test, df_temp])
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# Add params to params_test df
 
 
 
@@ -244,7 +208,6 @@ upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
 plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.25, edgecolor='none', label='Shuffle Confidence Band')
 
 
-
 # Rep. bias
 endog = df.iloc[after_hit_indexes].RepChoice.reset_index(drop=True)
 exog = pd.DataFrame({'Trial': df.normTrial, 'PrevOut': df.AfterHit, 'RepTrial': df.RepTrial, 'BaseFR': df.normBaseFR,
@@ -302,7 +265,6 @@ shuffled_params = np.array(shuffled_params)
 lower_bound = np.percentile(shuffled_params, 2.5, axis=0)
 upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
 plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.3, edgecolor='none', label='Shuffle Confidence Band')
-
 
 
 # Lick rate

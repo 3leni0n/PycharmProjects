@@ -113,7 +113,8 @@ def daily_report_v5(path, send_slack=False):
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
 
-    if int(df.TrialLag.unique()[0]) > 0 and int(df.K.unique()[0]) > 1:
+    # Make the following calculations only if TrialLag is not nan and K is greater than 1
+    if not np.isnan(float(df.TrialLag.unique()[0])) and int(df.TrialLag.unique()[0]) > 0 and int(df.K.unique()[0]) > 1:
         # Accuracy (hit rate) by reward size (added 07-06-2024)
         accuracy_reward_size = df.groupby(['Side', 'RewardSize'])['Hit'].mean()
         accuracy_reward_size_left = accuracy_reward_size[0]  # Unpack left
@@ -203,7 +204,7 @@ def daily_report_v5(path, send_slack=False):
 
     ####################################################################################################################
 
-    with PdfPages(df.Session.unique()[0]) as pdf:
+    with PdfPages(df.Session.unique()[0] + '.pdf') as pdf:
 
         # PAGE 1
 
@@ -218,7 +219,7 @@ def daily_report_v5(path, send_slack=False):
         # https://towardsdatascience.com/how-to-add-new-line-in-python-f-strings-7b4ccc605f4a
         sum_text = (
             f'Date: {df.Date.unique()[0]}, '
-             # [0:-7] to get rid of the floating numbers in the seconds
+            # [0:-7] to get rid of the floating numbers in the seconds
             f'Time: {df.SessionStart.unique()[0][0:-7]} - {df.SessionEnd.unique()[0][0:-7]}, '
             f'Subject: {df.Subject.unique()[0]}, '
             f'Box: {df.Board.unique()[0][4]}, '
@@ -255,14 +256,14 @@ def daily_report_v5(path, send_slack=False):
             f'Accuracy '
             f'{new_line}'
             f'blocks: {str(int(round(accuracy_blocks * 100)))}% ({str(int(round(accuracy_blocks_left * 100)))}% L, '
-            f'{str(int(round(accuracy_blocks_right * 100)))}% R),'
+            f'{str(int(round(accuracy_blocks_right * 100)))}% R), '
             f'Responses: {str(responses)} ({str(responses_left)} L, {str(responses_right)} R), '
             f'Hits: {str(hits)} ({str(hits_left)} L, {str(hits_right)} R), '
             f'Errors: '
             f'{new_line}'
             f'{str(errors)} ({str(errors_left)} L, {str(errors_right)} R), '
             f'Misses: {str(misses)} ({str(misses_left)} L, {str(misses_right)} R), '
-            f'Miss rate: {str(int(round(miss_rate * 100)))}% ' 
+            f'Miss rate: {str(int(round(miss_rate * 100)))}% '
             f'({str(int(round(miss_rate_left * 100)))}% L, {str(int(round(miss_rate_right * 100)))}% R), '
             f'Sound errors: {str(sound_errors)} ({str(round((sound_errors / trials) * 100, 1))}%), '
             f'{new_line}'
@@ -287,6 +288,8 @@ def daily_report_v5(path, send_slack=False):
 
         change_p = df.P.diff()  # Find trials in which substage/p changes
         change_p = change_p[change_p != 0].dropna()  # Omit 0s and drop first nan
+
+        ################################################################################################################
 
         # PLOT 1: ACCURACY PER SIDE
 
@@ -586,11 +589,11 @@ def daily_report_v5(path, send_slack=False):
 
         time_end_hit = time.time()
         runtime_hit = time_end_hit - time_start_hit
-        print("'Plot 4: misses' took", round(runtime_hit, 2), 'seconds to run')
+        print("'Plot 4: Hit scatter' took", round(runtime_hit, 2), 'seconds to run')
 
         ################################################################################################################
 
-        # PLOT 8: P RIGHT PSYCHOMETRIC CURVE
+        # PLOT 8: PROB. RIGHT PSYCHOMETRIC CURVE
 
         # To do:
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
@@ -657,7 +660,7 @@ def daily_report_v5(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 9: P REPEAT PSYCHOMETRIC CURVE
+        # PLOT 9: PROB. REPEAT PSYCHOMETRIC CURVE
 
         # To do:
         # Change the dense x,y variables notation for annotate by just selecting beforehand which are the x,y coordinates
@@ -732,7 +735,7 @@ def daily_report_v5(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 8: ILDS DISTRIBUTION
+        # PLOT 10: ILDS DISTRIBUTION (INSET)
 
         # Only draw ILDs distribution if evidences are introduced (stage 4)
         if len(df.ILD.unique()) > 2 and df.Task.unique()[0] == 'FD' and df.P.unique()[0] > 0:
@@ -923,8 +926,7 @@ def daily_report_v5(path, send_slack=False):
                         mec = 'tab:blue'
                         mew = None
 
-                    if df_side.Port1In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port1In[j]:
                         pass
                     else:
                         ax.plot(df_side.Port1In[j][i] -
@@ -950,8 +952,7 @@ def daily_report_v5(path, send_slack=False):
                         mec = 'tab:orange'
                         mew = None
 
-                    if df_side.Port2In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port2In[j]:
                         pass
                     else:
                         ax.plot(df_side.Port2In[j][i] -
@@ -996,6 +997,7 @@ def daily_report_v5(path, send_slack=False):
 
         axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
         ylim = [[], []]  # Initialize empty list to store left and right ylim
+        licks = [[], []]  # List of lists: left [0], right [1] trials with left [0] and right [1] licks
 
         for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
 
@@ -1038,8 +1040,7 @@ def daily_report_v5(path, send_slack=False):
                 # Left licks
                 for i in range(len(df_side.Port1In[j])):  # n licks
                     left_licks_per_trial.append(len(df_side.Port1In[j]))
-                    if df_side.Port1In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port1In[j]:
                         pass
                     else:
                         histcounts_L.append(df_side.Port1In[j][i] -
@@ -1048,8 +1049,7 @@ def daily_report_v5(path, send_slack=False):
                 # Right licks
                 for i in range(len(df_side.Port2In[j])):  # n licks
                     right_licks_per_trial.append(len(df_side.Port2In[j]))
-                    if df_side.Port2In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port2In[j]:
                         pass
                     else:
                         histcounts_R.append(df_side.Port2In[j][i] -
@@ -1059,15 +1059,17 @@ def daily_report_v5(path, send_slack=False):
             # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
 
             ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
+            licks[k] = [left_licks_per_trial, right_licks_per_trial]
+
+            # Calculate the number of bins
+            n_bins = int((xlim[k][0][1] - (-2)) / bin_size)
 
             ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
-                    bins=np.linspace(-2, xlim[k][0][1]),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 0)])) / bin_size,
-                                      len(histcounts_L)))
+                    bins=np.linspace(-2, xlim[k][0][1], n_bins),
+                    weights=np.repeat((1 / len((df_side.Miss == 0))) / bin_size, len(histcounts_L)))
             ax.hist(histcounts_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
-                    bins=np.linspace(-2, xlim[k][0][1]),
-                    weights=np.repeat((1 / len(df[(df.Miss == 0) & (df.Side == 1)])) / bin_size,
-                                      len(histcounts_R)))
+                    bins=np.linspace(-2, xlim[k][0][1], n_bins),
+                    weights=np.repeat((1 / len((df_side.Miss == 0))) / bin_size, len(histcounts_R)))
 
             # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
             ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
@@ -1087,7 +1089,119 @@ def daily_report_v5(path, send_slack=False):
 
         ################################################################################################################
 
-        # PLOT 7: PERISTIMULUS FIRST LICK HISTOGRAM
+        # # PLOT 7: PERISTIMULUS CORRECT VS ERROR LICKS HISTOGRAM
+        #
+        # time_start_psth_all = time.time()
+        #
+        # # fig = plt.figure()
+        #
+        # axes_handles = []  # Store handles for plot axes as they will be overwritten by the next iteration
+        # ylim = [[], []]  # Initialize empty list to store left and right ylim
+        # licks = [[], []]  # List of lists: left [0], right [1] trials with left [0] and right [1] licks
+        #
+        # index_test = [[1, 0], [0, 1]]  # For debugging. [left trials[correct, error], right trials[error, correct]]
+        #
+        # for k in range(len(df.Side.unique())):  # k=0 left trials and k=1 right trials
+        #
+        #     histcounts_L = []
+        #     histcounts_R = []
+        #
+        #     left_licks_per_trial = []
+        #     right_licks_per_trial = []
+        #
+        #     index = index_test[k]
+        #
+        #     if k == 0:  # Left subplot: left trials
+        #         # ax = plt.subplot2grid((1, 2), (0, 0))
+        #         ax = plt.subplot2grid((16, 4), (12, 0), rowspan=2, colspan=2)
+        #         axes_handles.append(ax)
+        #         # ax.set_title('Left trials')
+        #         # ax.set_xlabel('Time (s)')
+        #         ax.set_xlim(xlim[k][0])  # Use the same xlim that left raster
+        #         ax.set_xticklabels([])
+        #         ax.set_ylabel('Correct vs error\n(licks/s)')
+        #         ax.spines['top'].set_visible(False)
+        #         ax.spines['bottom'].set_visible(False)
+        #         ax.spines['right'].set_visible(False)
+        #     else:  # Right subplot: right trials
+        #         # ax = plt.subplot2grid((1, 2), (0, 1))
+        #         ax = plt.subplot2grid((16, 4), (12, 2), rowspan=2, colspan=2)
+        #         axes_handles.append(ax)
+        #         # ax.set_title('Right trials')
+        #         # ax.set_xlabel('Time (s)')
+        #         ax.set_xlim(xlim[k][0])  # Use the same xlim that right raster
+        #         ax.set_xticklabels([])
+        #         ax.spines['top'].set_visible(False)
+        #         ax.spines['bottom'].set_visible(False)
+        #         ax.spines['left'].set_visible(False)
+        #         ax.spines['right'].set_visible(False)
+        #         ax.set_yticklabels([])
+        #
+        #     df_side = df[df.Side == k].reset_index()
+        #
+        #     for j in range(len(df_side)):  # n trials
+        #
+        #         # Left licks
+        #         for i in range(len(df_side.Port1In[j])):  # n licks
+        #             left_licks_per_trial.append(len(df_side.Port1In[j]))
+        #             if not df_side.Port1In[j]:
+        #                 pass
+        #             else:
+        #                 # This is for all licks
+        #                 # histcounts_L.append(df_side.Port1In[j][i] -
+        #                 #                     df_side.StimStart[j])
+        #                 if df_side.Hit[j] == index[0]:
+        #                     histcounts_L.append(df_side.Port1In[j][i] - df_side.StimStart[j])
+        #
+        #         # Right licks
+        #         for i in range(len(df_side.Port2In[j])):  # n licks
+        #             right_licks_per_trial.append(len(df_side.Port2In[j]))
+        #             if not df_side.Port2In[j]:
+        #                 pass
+        #             else:
+        #                 # This is for all licks
+        #                 # histcounts_R.append(df_side.Port2In[j][i] -
+        #                 #                     df_side.StimStart[j])
+        #                 if df_side.Hit[j] == index[1]:
+        #                     histcounts_R.append(df_side.Port2In[j][i] - df_side.StimStart[j])
+        #
+        #     # ax.hist(histcounts_L, density=True, histtype='step', color='tab:blue', label='Left licks')
+        #     # ax.hist(histcounts_R, density=True, histtype='step', color='tab:orange', label='Right licks')
+        #
+        #     ylim[k] = [max(histcounts_L), max(histcounts_R)]  # Store ylims from a side
+        #     licks[k] = [left_licks_per_trial, right_licks_per_trial]
+        #
+        #     # Calculate the number of bins
+        #     n_bins = int((xlim[k][0][1] - (-2)) / bin_size)
+        #
+        #     ax.hist(histcounts_L, histtype='step', color='tab:blue', alpha=0.75, label='Left licks',
+        #             bins=np.linspace(-2, xlim[k][0][1], n_bins),
+        #             weights=np.repeat((1 / len(df_side[(df_side.Miss == 0) & (df_side.Hit == index[0])])) / bin_size,
+        #                               len(histcounts_L)))
+        #     ax.hist(histcounts_R, histtype='step', color='tab:orange', alpha=0.75, label='Right licks',
+        #             bins=np.linspace(-2, xlim[k][0][1], n_bins),
+        #             weights=np.repeat((1 / len(df_side[(df_side.Miss == 0) & (df_side.Hit == index[1])])) / bin_size,
+        #                               len(histcounts_R)))
+        #
+        #     # ax.set_xlim([-2, xlim[k][0][1]])  # Set xlim from -2 to trial end to zoom in and cut the fixation
+        #     ax.set_xlim([-1, xlim_max])  # Set xlim from -1 to trial end to zoom in and cut the fixation
+        #
+        # # Find the maximum y-axis limit across all handles
+        # max_ylim = max(ax.get_ylim()[1] for ax in axes_handles)
+        #
+        # # Set the same maximum y-axis limit for all handles
+        # for ax in axes_handles:
+        #     ax.set_ylim([0, max_ylim])
+        #
+        # ax.legend(loc='upper right', fontsize='xx-small', frameon=False)
+        #
+        # time_end_psth_all = time.time()
+        # runtime_psth_all = time_end_psth_all - time_start_psth_all
+        # print("'Plot 7: peristimulus lick histogram (correct vs error)' took", round(runtime_psth_all, 2), 'seconds to run')
+
+        ################################################################################################################
+
+        # PLOT 8: PERISTIMULUS FIRST LICK HISTOGRAM
 
         time_start_psth_first = time.time()
 
@@ -1103,7 +1217,7 @@ def daily_report_v5(path, send_slack=False):
 
             if k == 0:  # Left subplot: left trials
                 # ax = plt.subplot2grid((1, 2), (0, 0))
-                ax = plt.subplot2grid((16, 4), (15, 0), rowspan=1, colspan=2)
+                ax = plt.subplot2grid((16, 4), (14, 0), rowspan=2, colspan=2)
                 axes_handles.append(ax)
                 # ax.set_title('Left trials')
                 ax.set_xlim([0, 2])  # Only interested in what happens during the first 2s
@@ -1114,7 +1228,7 @@ def daily_report_v5(path, send_slack=False):
                 # ax.patch.set_facecolor('none')
             else:  # Right subplot: right trials
                 # ax = plt.subplot2grid((1, 2), (0, 1))
-                ax = plt.subplot2grid((16, 4), (15, 2), rowspan=1, colspan=2)
+                ax = plt.subplot2grid((16, 4), (14, 2), rowspan=2, colspan=2)
                 axes_handles.append(ax)
                 # ax.set_title('Right trials')
                 ax.set_xlim([0, 2])
@@ -1131,8 +1245,7 @@ def daily_report_v5(path, send_slack=False):
 
                 # Left licks
                 for i in range(len(df_side.Port1In[j])):  # n licks
-                    if df_side.Port1In[j] == []:
-                        # if not df.Port1In[j]:  # Equivalent
+                    if not df_side.Port1In[j]:
                         pass
                     else:
                         if df_side.Port1In[j][i] - \
@@ -1194,7 +1307,7 @@ def daily_report_v5(path, send_slack=False):
 
         time_end_psth_first = time.time()
         runtime_psth_first = time_end_psth_first - time_start_psth_first
-        print("'Plot 7: peristimulus lick histogram (first licks)' took", round(runtime_psth_first, 2),
+        print("'Plot 8: peristimulus lick histogram (first licks)' took", round(runtime_psth_first, 2),
               'seconds to run')
 
         time_start_savepag2 = time.time()

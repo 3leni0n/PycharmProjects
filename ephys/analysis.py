@@ -35,8 +35,8 @@ from ephys.preprocessing import *
 # Run preprocessing
 
 # Define the session ID and directory
-id = '007_2024-06-23_12-46-55'
-# id = '007_2024-06-24_17-47-22'
+# id = '007_2024-06-23_12-46-55'
+id = '007_2024-06-24_17-47-22'
 # id = '007_2024-06-27_15-06-28'
 directory = Path() / 'D:' / id  # Ephys PC
 
@@ -50,8 +50,8 @@ df_ttl = get_ttls(continuous, events)
 df_keys = decode_ttls(df_ttl)
 
 # Load behavior data
-path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240623-130152.csv'
-# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240624-180217.csv'
+# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240623-130152.csv'
+path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240624-180217.csv'
 # path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240627-152129.csv'
 df_behavior = parse_v2(path_behavior)
 
@@ -530,41 +530,47 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
 ########################################################################################################################
 
 
-def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', sort_by='n_spikes', bin_size=0.01):
+def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', win_edges=(549, 551), sort_by='depth',
+                 bin_size=0.01):
     """
     Plot population activity of all clusters in 2 subplots: raster (above) and PSTH (below).
     Short time window (a few trials/seconds).
     :param df_spikes: DataFrame with spike times and clusters
     :param slice: Slice the data in trials or time (default: trials)
+    :param win_edges: Edges of the slice (trials or time (s))
     :param sort: Sort clusters by attribute of cluster_info (default: n_spikes)
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
 
-    # Sort clusters by number of spikes
-    cluster_info.sort_values(sort_by, ascending=True).reset_index(drop=True, inplace=True)
+    # Sort clusters
+    if sort_by == 'n_spikes':
+        ascending = True
+    elif sort_by == 'depth':
+        ascending = False
+
+    cluster_info.sort_values(sort_by, ascending=ascending, inplace=True)
+    cluster_info.reset_index(drop=True, inplace=True)
 
     go_cue = df_behavior.StimDur.unique()[0] + df_behavior.Delay.unique()[0]
 
     if slice == 'trials':
         # Slice DataFrame of given time window after first event (behavior started)
-        win_trials = 798, 801  # Edges of trials to plot
-        print(f' Plotting trials: {np.arange(win_trials[0], win_trials[1] - 1)}')
-        win_events = df_ttl.OFF.iloc[win_trials[0]:win_trials[1]]
+        # win_edges = 549, 551  # Edges of trials to plot
+        print(f' Plotting trials: {np.arange(win_edges[0], win_edges[1] - 1)}')
+        win_events = df_ttl.OFF.iloc[win_edges[0]:win_edges[1]]
         df_slice = df_spikes[
             (df_spikes.times > win_events.iloc[0]) & (df_spikes.times < win_events.iloc[-1] + go_cue)]
-        # cluster_info = df_slice.sort('n_spikes')  # Sort clusters by number of spikes
         title = (f"Population activity of {len(cluster_info)} clusters "
                  f"({round(len(cluster_info[cluster_info.group == 'good']) / len(cluster_info) * 100)}% 'good')")
         bins = np.arange(win_events.iloc[0], win_events.iloc[-1] + go_cue, bin_size)
     elif slice == 'time':
         # Slice DataFrame of given time window after first event (behavior started)
-        win_time = 1922, 1927  # Edges of time window to plot
-        print(f' Plotting time: {win_time}')
-        df_slice = df_spikes[(df_spikes.times > win_time[0]) & (df_spikes.times < win_time[1])]
-        # cluster_info = df_slice.sort('n_spikes')  # Sort clusters by number of spikes
+        # win_edges = 1922, 1927  # Edges of time window to plot
+        print(f' Plotting time: {win_edges}')
+        df_slice = df_spikes[(df_spikes.times > win_edges[0]) & (df_spikes.times < win_edges[1])]
         title = (f"Population activity of {len(cluster_info)} clusters "
                  f"({round(len(cluster_info[cluster_info.group == 'good']) / len(cluster_info) * 100)}% 'good')")
-        bins = np.arange(win_time[0], win_time[1], bin_size)
+        bins = np.arange(win_edges[0], win_edges[1], bin_size)
 
     fig, ax = plt.subplots(2, 1, sharex=True)
 
@@ -605,7 +611,7 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', s
                 ax[i].axvline(win_events[_] + 1, color='tab:blue', label='Go cue')
 
     ax[0].set_ylabel('Cluster')
-    ax[1].set_xlabel('Time (s)')
+    ax[1].set_xlabel(f'Time (s) - Trial {win_edges[0]}')
     ax[1].set_ylim(bottom=0)
     ax[1].set_ylabel('FR (spikes/s)')
     plt.suptitle(title)
@@ -1183,7 +1189,7 @@ def plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=None):
     sns.despine(ax=ax, bottom=True)
 
 
-def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', smooth=True):
+def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', smooth=False):
     """
     Compute the synchrony of a PSTH. This is a measure computed per trial.
     :param df_spikes: DataFrame with spike times of a given cluster
@@ -1204,27 +1210,45 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
 
     peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0)
     bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+    # psth = psth / df_spikes.cluster.nunique() / bin_size  # Normalize by the number of clusters and bin size
     psth_mean = np.mean(psth, axis=1)
     psth_std = np.std(psth, axis=1)
 
     # Analytical formula for synchrony
-    # (denominator is the std of the mean as a proxy for lambda in a Poisson process). Fast
+    # (denominator is the std of the mean as a proxy for lambda in a Poisson process). Fast, dependent on normalization
     if method == 'anal':
         sync = psth_std / np.sqrt(psth_mean)
 
-    # Shuffles method for synchrony (slow and computationally expensive)
-    elif method == 'shuffles':
+    # # Shuffles method for synchrony (slow and computationally expensive)
+    # elif method == 'shuffles':
+    #     psth_std_shuffles = []
+    #     for i in range(10):
+    #         peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=2)
+    #         bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+    #         psth = psth / df_spikes.cluster.nunique() / bin_size  # Normalize by the number of clusters and bin size
+    #         psth_std_shuffles.append(np.std(psth, axis=1))
+    #     psth_std_shuffles = np.array(psth_std_shuffles)
+    #     psth_std_shuffles = np.mean(psth_std_shuffles, axis=0)
+    #     sync = psth_std / psth_std_shuffles
+
+    # Invariant to scaling
+    elif method == "shuffles":
         psth_std_shuffles = []
-        for i in range(10):
-            peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=2)
-            bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
-            psth_std_shuffles.append(np.std(psth, axis=1))
-        psth_std_shuffles = np.array(psth_std_shuffles)
-        psth_std_shuffles = np.mean(psth_std_shuffles, axis=0)
-        synch = psth_std / psth_std_shuffles
+        for spike_times in peri_stim_spikes:
+            spike_times = spike_times.values
+            shuffled_spike_times = []
+            for s in range(10):
+                isis = np.diff(spike_times)  # Calculate ISIs
+                np.random.shuffle(isis)  # Shuffle ISIs
+                new_spike_times = np.cumsum(np.insert(isis, 0, spike_times[0]))
+                shuffled_spike_times.append(new_spike_times)
+            _, psth_shuffle = compute_psth(shuffled_spike_times, time_win=time_win, bin_size=bin_size)
+            # psth_shuffle = psth_shuffle/ (df_spikes.cluster.nunique() * bin_size)  # Normalize by the number of clusters and bin size
+            psth_std_shuffles.append(np.mean(np.std(psth_shuffle, axis=1)))
+        sync = psth_std / psth_std_shuffles
 
     # Normalize
-    # sync = (sync - 1) / df_spikes.cluster.nunique()  # Normalize
+    # sync = (sync - 1) / df_spikes.cluster.nunique()
 
     if smooth:
         # Compute rolling average
@@ -1233,7 +1257,7 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
     return sync
 
 
-def plot_sync(method='anal', smooth=True, ax=None):
+def plot_sync(time_win=[-2, 0], method='anal', smooth=False, ax=None):
     """
     Plot the synchrony of a PSTH.
     :param sync: Synchrony
@@ -1247,15 +1271,20 @@ def plot_sync(method='anal', smooth=True, ax=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=figsize)
 
-    sync = get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method=method, smooth=smooth)
+    sync = get_sync(df_spikes, df_ttl, time_win=time_win, bin_size=0.02, method=method, smooth=smooth)
 
     # Plot synchrony
     ax.plot(sync, color='k')
     ax.axhline(np.mean(sync), color='tab:red')
+    ax.plot(sync.argmin(), sync.min(), marker='o', color='tab:red', markerfacecolor='none')
+    ax.plot(sync.argmax(), sync.max(), marker='o', color='tab:red', markerfacecolor='none')
     ax.set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
     ax.set_xlabel('Trial')
     ax.set_ylabel('Sync')
-    ax.set_title('Synchrony')
+    ax.set_title(f'{df_behavior.Session.unique()[0]} ({method} method)')
+
+    print('The minimum sync is', sync.min(), 'at trial', sync.argmin())
+    print('The maximum sync is', sync.max(), 'at trial', sync.argmax())
 
 
 def plot_sync_split():
@@ -1400,8 +1429,6 @@ def get_rt(df_behavior):
         licks[trial] = [lick - df_behavior.StimStart[trial] for lick in licks[trial]]
 
     return licks, n_licks, rt
-
-
 
 
 ########################################################################################################################
