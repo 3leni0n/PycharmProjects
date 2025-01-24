@@ -4,32 +4,39 @@ import pandas as pd
 import statsmodels.api as sm
 from matplotlib import pyplot as plt
 import seaborn as sns
+from scipy.stats import sem, ttest_1samp
 
 from ephys.preprocessing import *
 from ephys.analysis import *
+
+from my_fun.my_fun import add_stars
 
 sns.set_theme()
 sns.set_style('ticks')
 sns.set_context('poster')
 
 
-ephys_ids = ['007_2024-06-22_10-48-57',
-             '007_2024-06-23_12-46-55',
-             '007_2024-06-24_17-47-22',
-             '007_2024-06-27_15-06-28',
-             '007_2024-07-09_12-10-57',
-             '007_2024-07-10_12-03-35',
-             '007_2024-07-11_12-39-21',
-             '007_2024-07-12_13-29-26']
+ephys_ids = [
+    '007_2024-06-22_10-48-57',
+    '007_2024-06-23_12-46-55',
+    '007_2024-06-24_17-47-22',
+    '007_2024-06-27_15-06-28',
+    '007_2024-07-09_12-10-57',
+    '007_2024-07-10_12-03-35',
+    '007_2024-07-11_12-39-21',
+    '007_2024-07-12_13-29-26'
+]
 
-behavior_ids = ['007_stage_training_v5_20240622-110354',
-                '007_stage_training_v5_20240623-130152',
-                '007_stage_training_v5_20240624-180217',
-                '007_stage_training_v5_20240627-152129',
-                '007_stage_training_v5_20240709-122550',
-                '007_stage_training_v5_20240710-121827',
-                '007_stage_training_v5_20240711-123921',
-                '007_stage_training_v5_20240712-134450']
+behavior_ids = [
+    '007_stage_training_v5_20240622-110354',
+    '007_stage_training_v5_20240623-130152',
+    '007_stage_training_v5_20240624-180217',
+    '007_stage_training_v5_20240627-152129',
+    '007_stage_training_v5_20240709-122550',
+    '007_stage_training_v5_20240710-121827',
+    '007_stage_training_v5_20240711-125439',
+    '007_stage_training_v5_20240712-134450'
+]
 
 df = pd.DataFrame()
 
@@ -47,7 +54,8 @@ for i in range(len(ephys_ids)):
     What makes some correct responses  have 2-3 licks and some 8-10?
     Are all response selective neurons locked to the licks?
     """
-    bin_size = 0.1
+    bin_size = 0.02
+    time_win = [-2, 0]
     licks, n_licks, rt = get_rt(df_behavior)
     # licks = get_peri_stim_licks(df_behavior)
     bins, licks_psth = compute_psth(licks, time_win=[1, 2], bin_size=bin_size)
@@ -56,16 +64,15 @@ for i in range(len(ephys_ids)):
     df_behavior['LickRate'] = np.mean(licks_psth, axis=1) / bin_size
 
     # Add baseline FR and sync to behavior dataframe
-    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=[-2, 0])
-    bins, baseline_FR = compute_psth(peri_stim_spikes, time_win=[-2, 0], bin_size=bin_size)
+    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win)
+    bins, baseline_FR = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
     baseline_FR = np.mean(baseline_FR, axis=1)
     baseline_FR = baseline_FR/len(cluster_info)
-    sync = get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal')
+    sync = get_sync(df_spikes, df_ttl, time_win=time_win, bin_size=bin_size, method='anal', smooth=False)
     df_behavior['BaselineFR'] = baseline_FR
     df_behavior['Sync'] = sync
 
     df = pd.concat([df, df_behavior], ignore_index=True)
-
 
 # Make new column called SessionIndex
 df['SessionIndex'] = df.groupby('Session').ngroup()
@@ -74,255 +81,186 @@ session_index = pd.get_dummies(df.SessionIndex, dtype='int')
 n_sessions = df.Session.nunique()  # Number of sessions
 df = pd.concat([df, session_index], axis=1)  # Add session index to the dataframe
 
-# zscore regressors (per session)
-df['zTrial'] = df.groupby('Session').Trial.transform(lambda x: zscore(x))
-df['zSync'] = df.groupby('Session').Sync.transform(lambda x: zscore(x))
-df['zBaseFR'] = df.groupby('Session').BaselineFR.transform(lambda x: zscore(x))
-df['zLickRate'] = df.groupby('Session').LickRate.transform(lambda x: zscore(x))
-df['zRT'] = df.groupby('Session').RT.transform(lambda x: zscore(x))
+# Normalize regressors (per session)
+normalize = 'zscore'
+if normalize == 'zscore':
+    function = lambda x: zscore(x)
+elif normalize == 'max':
+    function = lambda x: x / x.max()
+
+df['zTrial'] = df.groupby('Session').Trial.transform(function)
+df['zSync'] = df.groupby('Session').Sync.transform(function)
+df['zBaseFR'] = df.groupby('Session').BaselineFR.transform(function)
+df['zLickRate'] = df.groupby('Session').LickRate.transform(function)
+df['zRT'] = df.groupby('Session').RT.transform(function)
 
 ########################################################################################################################
 
-# GLMs
-# after_error_indexes = df[df.AfterHit == 0].index.values
-# after_hit_indexes = df[df.AfterHit == 1].index.values
 
-# Accuracy (all trials)
-endog = df.Hit
-# endog = df.iloc[after_hit_indexes].Hit.reset_index(drop=True)
-# endog = df.iloc[session_index].Hit.reset_index(drop=True)
-exog = pd.DataFrame({'Trial': df.zTrial, 'BaseFR': df.zBaseFR, 'Sync': df.zSync})
-# exog = pd.concat([exog, session_index], axis=1)
-# exog = exog.iloc[after_hit_indexes].reset_index(drop=True)
-# exog = exog.iloc[session_index].reset_index(drop=True)
-# exog = sm.add_constant(exog)  # Add constant (not needed if adding one intercept per session)
-model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
-results = model.fit()
-params = results.params
-bse = results.bse
-p_values = results.pvalues
-summary = results.summary()
-print(summary)
-x = params.index.values[:-n_sessions]
-y = params.values[:-n_sessions]
-yerr = bse[:-n_sessions]
-color = 'tab:green'
-plt.figure(constrained_layout=True)
-plt.errorbar(x, y, yerr=yerr, color=color, fmt='o')
-plt.axhline(0, color='tab:gray', linestyle='--')
-plt.title(f'Accuracy ({n_sessions} sessions, {len(endog)} trials)')
-# plt.xlabel('Coefficients')
-plt.ylabel('Weight')
-# plt.legend(frameon=False)
-sns.despine()
+def run_GLM(df, session_index, type='Hit', plot=True):
+    """
+    Fit a GLM model to the data of a single session
+    :param df: dataframe with the data
+    :param session_index: index of the session
+    :param type: type of GLM model to fit
+    :param plot: plot the results
+    :return: parameters, standard errors, p-values
+    """
 
-# Plot intercepts
-plt.errorbar(np.repeat(len(params[:-n_sessions]), n_sessions), params.values[-n_sessions:], yerr=bse[-n_sessions:],
-             color=color, fmt='o')
-xticks = plt.xticks()[0] + [len(params[:-n_sessions])]
-xticklabels = [label.get_text() for label in plt.xticks()[1]] + ['Cons']
-plt.xticks(xticks, xticklabels)
+    indexes = df[df.SessionIndex == session_index].index.values  # Indexes of the current session
 
+    endog = df[type]
+    if type == 'Hit':
+        exog = df[['zTrial', 'zBaseFR', 'zSync']]
+        color = 'tab:green'
+        title = 'Accuracy'
+    elif type == 'Miss':
+        exog = df[['zTrial', 'zBaseFR', 'zSync']]
+        color = 'k'
+        title = 'Miss'
+    elif type == 'RepChoice':
+        exog = df[['zTrial', 'AfterHit', 'RepTrial', 'zBaseFR', 'zSync']]
+        color = 'tab:brown'
+        title = 'Rep. bias'
+    elif type == 'zLickRate':
+        exog = df[['zTrial', 'Hit', 'zBaseFR', 'zSync']]
+        color = 'cyan'
+        title = 'Lick rate'
 
-n_shuffles = 1000  # Number of shuffles
-shuffled_params = []
-
-for _ in range(n_shuffles):
-    # Shuffle the dependent variable
-    shuffled_endog = endog.sample(frac=1, random_state=None).reset_index(drop=True)
-
-    # Fit the GLM model with the shuffled data
-    model = sm.GLM(shuffled_endog, exog, family=sm.families.Binomial(), missing='drop')
+    # Fit the model
+    endog = endog.iloc[indexes]
+    exog = sm.add_constant(exog)  # Add constant (not needed if adding one intercept per session)
+    # exog = pd.concat([exog, session_index], axis=1)  # Add session intercepts
+    exog = exog.iloc[indexes]
+    model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
     results = model.fit()
+    params = results.params
+    bse = results.bse
+    p_values = results.pvalues
+    summary = results.summary()
+    print(summary)
+    x = params.index.values
+    y = params.values
+    yerr = bse
 
-    # Store the coefficients (excluding session intercepts if present)
-    shuffled_params.append(results.params.values[:-n_sessions])
+    if plot:
+        plt.figure(constrained_layout=True)
+        if type == 'RepChoice':
+            plt.xticks(rotation=45)
+        plt.plot(x, y, c=color, marker='o', ls='none', alpha=1)
+        plt.errorbar(x, y, yerr=yerr, color=color, fmt='o', alpha=1)
+        plt.axhline(0, color='tab:gray', linestyle='--')
+        plt.title(f'Accuracy (session {session_index}, {len(endog)} trials)')
+        plt.xlabel('Coefficients')
+        plt.ylabel('Weight')
+        plt.legend(frameon=False)
+        sns.despine()
+        add_stars(p_values, y)
 
-# Convert to a NumPy array for easier manipulation
-shuffled_params = np.array(shuffled_params)
-
-lower_bound = np.percentile(shuffled_params, 2.5, axis=0)
-upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
-plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.25, edgecolor='none', label='Shuffle Confidence Band')
-
-
-
-# Add params to params_test df
-
-
-
-
-
-# Misses
-endog = df.Miss
-exog = pd.DataFrame({'Trial': df.normTrial, 'BaseFR': df.normBaseFR, 'Sync': df.normSync})
-exog = pd.concat([exog, session_index], axis=1)
-# exog = sm.add_constant(exog)  # Add constant (not needed if adding one intercept per session)
-model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
-results = model.fit()
-params = results.params
-bse = results.bse
-p_values = results.pvalues
-summary = results.summary()
-print(summary)
-x = params.index.values[:-n_sessions]
-y = params.values[:-n_sessions]
-yerr = bse[:-n_sessions]
-color = 'k'
-plt.figure(constrained_layout=True)
-plt.errorbar(x, y, yerr=yerr, color=color, fmt='o')
-plt.axhline(0, color='tab:gray', linestyle='--')
-plt.title(f'Misses ({n_sessions} sessions, {len(endog)} trials)')
-# plt.xlabel('Coefficients')
-plt.ylabel('Weight')
-# plt.legend(frameon=False)
-sns.despine()
-
-# Plot intercepts
-plt.errorbar(np.repeat(len(params[:-n_sessions]), n_sessions), params.values[-n_sessions:], yerr=bse[-n_sessions:],
-             color=color, fmt='o')
-xticks = plt.xticks()[0] + [len(params[:-n_sessions])]
-xticklabels = [label.get_text() for label in plt.xticks()[1]] + ['Cons']
-plt.xticks(xticks, xticklabels)
+    return params, bse, p_values, color, title
 
 
-n_shuffles = 10000  # Number of shuffles
-shuffled_params = []
+def mean_GLM(df, type='Hit', replace=False, plot=True):
 
-for _ in range(n_shuffles):
-    # Shuffle the dependent variable
-    shuffled_endog = endog.sample(frac=1, random_state=None).reset_index(drop=True)
+    PARAMS = pd.DataFrame()
+    BSE = pd.DataFrame()
+    P_VALUES = pd.DataFrame()
 
-    # Fit the GLM model with the shuffled data
-    model = sm.GLM(shuffled_endog, exog, family=sm.families.Binomial(), missing='drop')
-    results = model.fit()
+    sessions = df.SessionIndex.unique()
+    if replace:
+        sessions = np.random.choice(sessions, len(sessions), replace=replace)
 
-    # Store the coefficients (excluding session intercepts if present)
-    shuffled_params.append(results.params.values[:-n_sessions])
+    for _ in range(df.Session.nunique()):
 
-# Convert to a NumPy array for easier manipulation
-shuffled_params = np.array(shuffled_params)
+        print(f'Fitting session {sessions[_]}...')
+        params, bse, p_values, color, title = run_GLM(df, sessions[_], type=type, plot=False)
 
-lower_bound = np.percentile(shuffled_params, 2.5, axis=0)
-upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
-plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.25, edgecolor='none', label='Shuffle Confidence Band')
+        # Store the results
+        PARAMS = pd.concat([PARAMS, pd.Series(params, name=_)], axis=1)
+        BSE = pd.concat([BSE, pd.Series(bse, name=_)], axis=1)
+        P_VALUES = pd.concat([P_VALUES, pd.Series(p_values, name=_)], axis=1)
 
+    res = ttest_1samp(PARAMS.values, 0, axis=1)
 
-# Rep. bias
-endog = df.iloc[after_hit_indexes].RepChoice.reset_index(drop=True)
-exog = pd.DataFrame({'Trial': df.normTrial, 'PrevOut': df.AfterHit, 'RepTrial': df.RepTrial, 'BaseFR': df.normBaseFR,
-                     'Sync': df.Sync})
-exog = pd.concat([exog, session_index], axis=1)
-exog = exog.iloc[after_hit_indexes].reset_index(drop=True)
-# exog = sm.add_constant(exog)  # Add constant (not needed if adding one intercept per session)
-model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
-results = model.fit()
-params = results.params
-bse = results.bse
-p_values = results.pvalues
-summary = results.summary()
-print(summary)
-print(summary)
-x = params.index.values[:-n_sessions]
-y = params.values[:-n_sessions]
-yerr = bse[:-n_sessions]
-color = 'tab:green'
-plt.figure(constrained_layout=True)
-plt.errorbar(x, y, yerr=yerr, color=color, fmt='o')
-plt.axhline(0, color='tab:gray', linestyle='--')
-plt.title(f'Repeating bias ({n_sessions} sessions, {len(endog)} trials)')
-# plt.xlabel('Coefficients')
-plt.ylabel('Weight')
-# plt.legend(frameon=False)
-sns.despine()
+    # Plot the average weights
+    if plot:
+        plt.figure(constrained_layout=True)
 
-# Plot intercepts
-plt.errorbar(np.repeat(len(params[:-n_sessions]), n_sessions), params.values[-n_sessions:], yerr=bse[-n_sessions:],
-             color=color, fmt='o')
-xticks = plt.xticks()[0] + [len(params[:-n_sessions])]
-xticklabels = [label.get_text() for label in plt.xticks()[1]] + ['Cons']
-plt.xticks(xticks, xticklabels)
-plt.xticks(rotation=45)
+        # Plot individual sessions
+        for _ in range(df.Session.nunique()):
+            plt.plot(PARAMS.index.values, PARAMS[_], c=color, marker='o', ls='none', alpha=0.1)
+
+        if type == 'RepChoice':
+            plt.xticks(rotation=45)
+
+        x = PARAMS.index.values
+        y = PARAMS.values.mean(axis=1)
+        yerr = sem(PARAMS.values, axis=1)
+        plt.errorbar(x, y, yerr=yerr, color=color, fmt='o')
+        plt.axhline(0, color='tab:gray', linestyle='--')
+        plt.title(f'{title} ({n_sessions} sessions, {len(df)} trials)')
+        plt.ylabel('Weight')
+        sns.despine()
+        add_stars(res.pvalue, y)
+
+        return PARAMS, BSE, P_VALUES, res
 
 
-n_shuffles = 10000  # Number of shuffles
-shuffled_params = []
-
-for _ in range(n_shuffles):
-    # Shuffle the dependent variable
-    shuffled_endog = endog.sample(frac=1, random_state=None).reset_index(drop=True)
-
-    # Fit the GLM model with the shuffled data
-    model = sm.GLM(shuffled_endog, exog, family=sm.families.Binomial(), missing='drop')
-    results = model.fit()
-
-    # Store the coefficients (excluding session intercepts if present)
-    shuffled_params.append(results.params.values[:-n_sessions])
-
-# Convert to a NumPy array for easier manipulation
-shuffled_params = np.array(shuffled_params)
-
-lower_bound = np.percentile(shuffled_params, 2.5, axis=0)
-upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
-plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.3, edgecolor='none', label='Shuffle Confidence Band')
 
 
-# Lick rate
-endog = df.normLickRate
-# endog = df.iloc[after_hit_indexes].normLickRate.reset_index(drop=True)
-exog = pd.DataFrame({'Trial': df.normTrial, 'Hit': df.Hit, 'BaseFR': df.normBaseFR, 'Sync': df.normSync})
-exog = pd.concat([exog, session_index], axis=1)
-# exog = exog.iloc[after_hit_indexes].reset_index(drop=True)
-# exog = sm.add_constant(exog)  # Add constant (not needed if adding one intercept per session)
-model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
-results = model.fit()
-params = results.params
-bse = results.bse
-p_values = results.pvalues
-summary = results.summary()
-print(summary)
-x = params.index.values[:-n_sessions]
-y = params.values[:-n_sessions]
-yerr = bse[:-n_sessions]
-color = 'k'
-plt.figure(constrained_layout=True)
-plt.errorbar(x, y, yerr=yerr, color=color, fmt='o')
-plt.axhline(0, color='tab:gray', linestyle='--')
-plt.title(f'Lick Rate ({n_sessions} sessions, {len(endog)} trials)')
-# plt.xlabel('Coefficients')
-plt.ylabel('Weight')
-# plt.legend(frameon=False)
-sns.despine()
-
-# Plot intercepts
-plt.errorbar(np.repeat(len(params[:-n_sessions]), n_sessions), params.values[-n_sessions:], yerr=bse[-n_sessions:],
-             color=color, fmt='o')
-xticks = plt.xticks()[0] + [len(params[:-n_sessions])]
-xticklabels = [label.get_text() for label in plt.xticks()[1]] + ['Cons']
-plt.xticks(xticks, xticklabels)
 
 
-n_shuffles = 10000  # Number of shuffles
-shuffled_params = []
 
-for _ in range(n_shuffles):
-    # Shuffle the dependent variable
-    shuffled_endog = endog.sample(frac=1, random_state=None).reset_index(drop=True)
 
-    # Fit the GLM model with the shuffled data
-    model = sm.GLM(shuffled_endog, exog, family=sm.families.Binomial(), missing='drop')
-    results = model.fit()
+# # Number of bootstrap samples
+# n_bootstraps = 10
+# bootstrap_means = []
+#
+# # Generate bootstrap samples and calculate the mean
+# for _ in range(n_bootstraps):
+#     y,PARAMS = plot_model(df, type='Hit', replace=True)
+#     bootstrap_means.append(y)
+#
+# # Calculate 95% confidence interval
+# lower_bound = np.percentile(bootstrap_means, 2.5, axis=0)
+# upper_bound = np.percentile(bootstrap_means, 97.5, axis=0)
+#
+# # Plot the confidence interval
+# plt.fill_between(PARAMS.index.values, lower_bound, upper_bound, color='tab:green', alpha=0.25, edgecolor='none',
+#                  label='95% CI')
 
-    # Store the coefficients (excluding session intercepts if present)
-    shuffled_params.append(results.params.values[:-n_sessions])
 
-# Convert to a NumPy array for easier manipulation
-shuffled_params = np.array(shuffled_params)
 
-lower_bound = np.percentile(shuffled_params, 2.5, axis=0)
-upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
-plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.25, edgecolor='none', label='Shuffle Confidence Band')
 
+# # Plot intercepts
+# plt.errorbar(np.repeat(len(params[:-n_sessions]), n_sessions), params.values[-n_sessions:], yerr=bse[-n_sessions:],
+#              color=color, fmt='o')
+# xticks = plt.xticks()[0] + [len(params[:-n_sessions])]
+# xticklabels = [label.get_text() for label in plt.xticks()[1]] + ['Cons']
+# plt.xticks(xticks, xticklabels)
+
+
+# n_shuffles = 1000  # Number of shuffles
+# shuffled_params = []
+#
+# for _ in range(n_shuffles):
+#     # Shuffle the dependent variable
+#     shuffled_endog = endog.sample(frac=1, random_state=None).reset_index(drop=True)
+#
+#     # Fit the GLM model with the shuffled data
+#     model = sm.GLM(shuffled_endog, exog, family=sm.families.Binomial(), missing='drop')
+#     results = model.fit()
+#
+#     # Store the coefficients (excluding session intercepts if present)
+#     shuffled_params.append(results.params.values[:-n_sessions])
+#
+# # Convert to a NumPy array for easier manipulation
+# shuffled_params = np.array(shuffled_params)
+#
+# lower_bound = np.percentile(shuffled_params, 2.5, axis=0)
+# upper_bound = np.percentile(shuffled_params, 97.5, axis=0)
+# plt.fill_between(x, lower_bound, upper_bound, color=color, alpha=0.25, edgecolor='none', label='Shuffle Confidence
+# Band')
 
 
 def plot_sync_hist(df, hue='Hit'):
@@ -346,6 +284,37 @@ def plot_sync_hist(df, hue='Hit'):
     plt.figure(constrained_layout=True)
     sns.histplot(data=df, x='Sync', hue=hue, multiple='layer', kde=True, stat='density', bins='auto', common_norm=False,
                  palette=palette)
-    plt.title('Sync distribution')
+    plt.title(f'Sync dist. ({df.Session.nunique()} sessions, {len(df)} trials)')
     sns.despine()
     plt.legend(labels=labels, frameon=False, loc='upper right')
+
+
+# Compute the mean sync per session
+# sync = df.groupby('SessionIndex').Sync.mean()
+
+# Compute the mean sync per session but only for sessions with indexes 1, 2, 3
+# sync = df[df.SessionIndex.isin([1, 2, 3])].groupby('SessionIndex').Sync.mean()
+
+# for i in df.SessionIndex.unique():
+#     print(i)
+#     plot_sync_hist(df[df.SessionIndex == i], hue='Hit')
+
+
+# Generalized Linear Mixed Effects Models
+endog = df.Hit
+exog = df[['zTrial', 'zBaseFR', 'zSync']]
+exog_vc = session_index
+ident = np.zeros(exog_vc.shape[1], dtype=int)
+model = sm.BinomialBayesMixedGLM(endog, exog, exog_vc, ident)
+
+
+
+random = {"a": '0 + C(SessionIndex)'}
+model = sm.BinomialBayesMixedGLM.from_formula(
+               'Miss ~ zTrial + zBaseFR + zSync', random, df)
+result = model.fit_vb()
+print(result.summary())
+
+plt.figure(constrained_layout=True)
+plt.errorbar(np.arange(4), result.fe_mean, result.fe_sd, color='k', fmt='o')
+plt.axhline(0, color='tab:gray', linestyle='--')

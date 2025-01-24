@@ -913,3 +913,27 @@ def save_fig(folder_out, filename):
     os.chdir(folder_out)
     plt.savefig(Path(folder_out / (filename + '.' + 'png')), format='png', transparent=False)
     plt.savefig(Path(folder_out / (filename + '.' + 'svg')), format='svg', transparent=True)
+
+
+def pval_to_star(pval):
+    """Convert p-value to stars"""
+    if pval <= 0.0001:
+        return '****'
+    elif pval <= 0.001:
+        return '***'
+    elif pval <= 0.01:
+        return '**'
+    elif pval <= 0.05:
+        return '*'
+    return 'ns'
+
+
+def add_stars(pvals, y):
+    """
+    Add significance stars to existing plot
+    """
+    for i, pval in enumerate(pvals):
+        ylim = plt.gca().get_ylim()  # Get y-axis limits
+        ylim_range = ylim[1] - ylim[0]  # Get y-axis range
+        ylim_decimal = ylim_range * 0.1  # 10% of the y-axis range
+        plt.text(i, np.max(y) + ylim_decimal, pval_to_star(pval), ha='center', va='center', color='k')

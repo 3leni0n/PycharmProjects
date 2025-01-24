@@ -4,8 +4,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import zscore, sem, poisson
 from scipy.ndimage import gaussian_filter1d
-import matplotlib as mpl
-mpl.use('Qt5Agg')
 from matplotlib import pyplot as plt
 
 # Plotting parameters
@@ -28,51 +26,33 @@ from elephant.spike_train_correlation import cross_correlation_histogram
 # My own libraries
 from parse.parse_v2 import parse_v2
 from my_fun.my_fun import compute_window
-from ephys.preprocessing import *
+from ephys.preprocessing import preprocess
 
 ########################################################################################################################
 
 # Run preprocessing
 
-# Define the session ID and directory
-# id = '007_2024-06-23_12-46-55'
-id = '007_2024-06-24_17-47-22'
-# id = '007_2024-06-27_15-06-28'
-directory = Path() / 'D:' / id  # Ephys PC
+ephys_ids = ['007_2024-06-22_10-48-57',
+             '007_2024-06-23_12-46-55',
+             '007_2024-06-24_17-47-22',
+             '007_2024-06-27_15-06-28',
+             '007_2024-07-09_12-10-57',
+             '007_2024-07-10_12-03-35',
+             '007_2024-07-11_12-39-21',
+             '007_2024-07-12_13-29-26']
 
-# Load raw Open Ephys data
-continuous, events = load_oe_data(directory, sync=True, stream='AP')
+behavior_ids = ['007_stage_training_v5_20240622-110354',
+                '007_stage_training_v5_20240623-130152',
+                '007_stage_training_v5_20240624-180217',
+                '007_stage_training_v5_20240627-152129',
+                '007_stage_training_v5_20240709-122550',
+                '007_stage_training_v5_20240710-121827',
+                '007_stage_training_v5_20240711-125439',
+                '007_stage_training_v5_20240712-134450']
 
-# Get TTLs from continuous or/and event data
-df_ttl = get_ttls(continuous, events)
-
-# Get the sound filenames and sound orders from TTLs
-df_keys = decode_ttls(df_ttl)
-
-# Load behavior data
-# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240623-130152.csv'
-path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240624-180217.csv'
-# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240627-152129.csv'
-df_behavior = parse_v2(path_behavior)
-
-# Check if the behavior and ephys data match and get the number of trials common to both
-n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
-
-# Load spike sorted data (KS4)
-path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'kilosort4'
-path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'Phy2'
-df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
-clusters = cluster_info.cluster_id.unique()
-n_clusters = len(cluster_info)
-
-# Print session info
-y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
-
-# Clean redudant TTLs (useful for check_data)
-df_ttl = align_ttl(df_ttl, df_behavior)
-
-# Temporal alignment of ephys and behavior data (skip for now)
-# df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
+# id = '007_2024-06-22_10-48-57'
+# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240622-110354.csv'
+# df_ttl, df_behavior, n_trials, df_spikes, cluster_info = preprocess(id, path_behavior)
 
 ########################################################################################################################
 
@@ -136,8 +116,8 @@ def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
         jitter = np.random.normal(0, scale)  # Jitter the stimulus onset timestamps
         stim_onset = df_ttl.OFF[trial] + jitter  # Get the stimulus onset timestamp
         # Select only spikes within the time window of interest around the event
-        spikes_trial = df_cluster[(df_cluster.times > stim_onset - abs(time_win[0])) &
-                                  (df_cluster.times < stim_onset + abs(time_win[1]))].times
+        spikes_trial = df_cluster[(df_cluster.times >= stim_onset - abs(time_win[0])) &
+                                  (df_cluster.times <= stim_onset + abs(time_win[1]))].times
         spikes_trial = spikes_trial - stim_onset  # Align spikes to the event
         peri_stim_spikes.append(spikes_trial)
 
@@ -531,7 +511,7 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
 
 
 def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', win_edges=(549, 551), sort_by='depth',
-                 bin_size=0.01):
+                 bin_size=0.02):
     """
     Plot population activity of all clusters in 2 subplots: raster (above) and PSTH (below).
     Short time window (a few trials/seconds).
@@ -552,6 +532,7 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', w
     cluster_info.reset_index(drop=True, inplace=True)
 
     go_cue = df_behavior.StimDur.unique()[0] + df_behavior.Delay.unique()[0]
+    baseline = 1  # s
 
     if slice == 'trials':
         # Slice DataFrame of given time window after first event (behavior started)
@@ -559,10 +540,10 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', w
         print(f' Plotting trials: {np.arange(win_edges[0], win_edges[1] - 1)}')
         win_events = df_ttl.OFF.iloc[win_edges[0]:win_edges[1]]
         df_slice = df_spikes[
-            (df_spikes.times > win_events.iloc[0]) & (df_spikes.times < win_events.iloc[-1] + go_cue)]
+            (df_spikes.times > win_events.iloc[0] - baseline) & (df_spikes.times < win_events.iloc[-1] + go_cue)]
         title = (f"Population activity of {len(cluster_info)} clusters "
                  f"({round(len(cluster_info[cluster_info.group == 'good']) / len(cluster_info) * 100)}% 'good')")
-        bins = np.arange(win_events.iloc[0], win_events.iloc[-1] + go_cue, bin_size)
+        bins = np.arange(win_events.iloc[0] - baseline, win_events.iloc[-1] + go_cue, bin_size)
     elif slice == 'time':
         # Slice DataFrame of given time window after first event (behavior started)
         # win_edges = 1922, 1927  # Edges of time window to plot
@@ -602,16 +583,20 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', w
     # plt.bar(BIN_EDGES[:-1], HIST, width=bin_size, color='k')
     ax[1].plot(BIN_EDGES[:-1], HIST, color='k')
 
-    # Plot events
+    # Plot events and licks ( aligned to stimulus onset)
     if slice == 'trials':
+        licks = get_peri_stim_licks(df_behavior)
         for i in range(len(ax)):
             for _ in win_events.index.values:
                 ax[i].axvline(win_events[_], color='tab:red', label='Stimulus')
                 ax[i].axvline(win_events[_] + 0.5, color='tab:gray', label='Stimulus')
                 ax[i].axvline(win_events[_] + 1, color='tab:blue', label='Go cue')
+            for _ in licks[win_edges[0]]:
+                ax[i].axvline(_ + df_ttl.OFF.iloc[win_edges[0]], color='cyan')
 
     ax[0].set_ylabel('Cluster')
-    ax[1].set_xlabel(f'Time (s) - Trial {win_edges[0]}')
+    ax[1].set_xlabel(f'Time (s)')
+    ax[0].set_title(f'{df_behavior.Session.unique()[0]}: Trial {np.arange(win_edges[0], win_edges[1] - 1)}')
     ax[1].set_ylim(bottom=0)
     ax[1].set_ylabel('FR (spikes/s)')
     plt.suptitle(title)
@@ -641,7 +626,8 @@ def plot_pop_psth(ax=None):
 ########################################################################################################################
 # STATS
 ########################################################################################################################
-def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=None):
+def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], cross_corr_coeff=False,
+                         ax=None):
     """
     Plot the autocorrelogram of a given cluster.
     :param df_cluster: DataFrame with spike times of a given cluster
@@ -665,7 +651,17 @@ def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=None):
     bin_size = bin_size * units
     binned_spike_train = BinnedSpikeTrain(spike_train, bin_size=bin_size)
     cch, lags = cross_correlation_histogram(binned_spike_train, binned_spike_train, window=window,
-                                            cross_correlation_coefficient=True)
+                                            cross_correlation_coefficient=cross_corr_coeff)
+
+    # # Normalize to correalation
+    # binned_spike_train = binned_spike_train.to_array()
+    # mean = np.mean(binned_spike_train)
+    # variance = np.var(binned_spike_train)
+    # if variance > 0:
+    #     cch = (cch - len(binned_spike_train) * mean ** 2) / (len(binned_spike_train) * variance)
+    # else:
+    #     cch = np.zeros_like(cch)
+
     cch, lags = np.delete(cch.magnitude.flatten(), lags == 0), np.delete(lags, lags == 0)
 
     refractory_period = 2  # In number of bins
@@ -1253,6 +1249,7 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
     if smooth:
         # Compute rolling average
         sync = compute_window(sync, 20)
+        sync = np.array(sync)
 
     return sync
 
@@ -1276,8 +1273,8 @@ def plot_sync(time_win=[-2, 0], method='anal', smooth=False, ax=None):
     # Plot synchrony
     ax.plot(sync, color='k')
     ax.axhline(np.mean(sync), color='tab:red')
-    ax.plot(sync.argmin(), sync.min(), marker='o', color='tab:red', markerfacecolor='none')
-    ax.plot(sync.argmax(), sync.max(), marker='o', color='tab:red', markerfacecolor='none')
+    ax.plot(sync.argmin(), sync.min(), marker='o', color='tab:red')
+    ax.plot(sync.argmax(), sync.max(), marker='o', color='tab:red')
     ax.set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
     ax.set_xlabel('Trial')
     ax.set_ylabel('Sync')
@@ -1289,7 +1286,7 @@ def plot_sync(time_win=[-2, 0], method='anal', smooth=False, ax=None):
 
 def plot_sync_split():
     # Plot autocorrelogram for high vs low sync trials
-    sync = plot_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal', ax=None)
+    sync = get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', smooth=False)
     mean_sync = np.mean(sync)
 
     # Find trials of high and low sync trials as above and below the mean

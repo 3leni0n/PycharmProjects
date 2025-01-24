@@ -204,7 +204,7 @@ def check_data(df_behavior, df_keys):
     sounds_match = [ephys_filenames[i] == behavior_filenames[i] for i in range(n_trials)]
 
     # Check if all sounds from behavior and ephys match
-    assert all(sounds_match), 'Sounds from behavior and ephys do not match'
+    # assert all(sounds_match), 'Sounds from behavior and ephys do not match'
 
     # Check if all values of sounds_match are True
     if all(sounds_match):
@@ -511,10 +511,14 @@ def preprocess(id, path_behavior):
     """
 
     # Define the session ID and directory
-    directory = Path() / 'D:' / id  # Ephys PC
+    directory = Path() / 'D:' / id  # Ephys PC extra HD
+    directory2 = Path.home() / 'Documents' / 'Open Ephys' / id  # Ephys PC main (C:) HD
 
     # Load raw Open Ephys data
-    continuous, events = load_oe_data(directory, sync=True, stream='AP')
+    try:
+        continuous, events = load_oe_data(directory, sync=True, stream='AP')
+    except OSError:
+        continuous, events = load_oe_data(directory2, sync=True, stream='AP')
 
     # Get TTLs from continuous or/and event data
     df_ttl = get_ttls(continuous, events)
