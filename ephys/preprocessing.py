@@ -548,4 +548,4 @@ def preprocess(id, path_behavior):
     # Temporal alignment of ephys and behavior data (skip for now)
     # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
 
-    return df_ttl, df_behavior, n_trials, df_spikes, cluster_info
+    return df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges

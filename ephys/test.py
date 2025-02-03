@@ -71,4 +71,11 @@ plt.legend(frameon=False)
 
 
 
-
+# MAke a figure with 2 subplots and plot syn2 raw and sync smooth
+fig, ax = plt.subplots(2, 1, constrained_layout=True)
+ax[0].plot(sync_smooth, c='k')
+ax[1].plot(sync_raw, c='k')
+ax[0].set_ylabel('Sync (smooth)')
+ax[1].set_ylabel('Sync (raw)')
+ax[1].set_xlabel('Trial')
+plt.suptitle(f'{df_behavior.Session.unique()[0]}')

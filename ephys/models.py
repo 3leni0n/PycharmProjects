@@ -40,11 +40,21 @@ behavior_ids = [
 
 df = pd.DataFrame()
 
+depth = 'cortex'
+
 for i in range(len(ephys_ids)):
 
     id = ephys_ids[i]
     path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
-    df_ttl, df_behavior, n_trials, df_spikes, cluster_info = preprocess(id, path_behavior)
+    df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+        preprocess(id, path_behavior)
+
+    # Select clusters based on depth
+    if depth == 'cortex':
+        clusters = cluster_info[cluster_info.depth <= 1500].cluster_id
+    elif depth == 'deep':
+        clusters = cluster_info[cluster_info.depth > 1500].cluster_id
+    df_spikes = df_spikes[df_spikes.cluster.isin(clusters)]
 
     # Add lick data to behavior dataframe
     """
@@ -68,7 +78,7 @@ for i in range(len(ephys_ids)):
     bins, baseline_FR = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
     baseline_FR = np.mean(baseline_FR, axis=1)
     baseline_FR = baseline_FR/len(cluster_info)
-    sync = get_sync(df_spikes, df_ttl, time_win=time_win, bin_size=bin_size, method='anal', smooth=False)
+    sync = get_sync(df_spikes, df_ttl, time_win=[-2, 3], bin_size=bin_size, method='anal', smooth=True)
     df_behavior['BaselineFR'] = baseline_FR
     df_behavior['Sync'] = sync
 
@@ -112,20 +122,28 @@ def run_GLM(df, session_index, type='Hit', plot=True):
     endog = df[type]
     if type == 'Hit':
         exog = df[['zTrial', 'zBaseFR', 'zSync']]
+        # exog = df[['zBaseFR', 'zSync']]
         color = 'tab:green'
         title = 'Accuracy'
     elif type == 'Miss':
         exog = df[['zTrial', 'zBaseFR', 'zSync']]
+        # exog = df[['zBaseFR', 'zSync']]
         color = 'k'
         title = 'Miss'
     elif type == 'RepChoice':
-        exog = df[['zTrial', 'AfterHit', 'RepTrial', 'zBaseFR', 'zSync']]
+        # exog = df[['zTrial', 'AfterHit', 'RepTrial', 'zBaseFR', 'zSync']]
+        exog = df[['AfterHit', 'RepTrial', 'zBaseFR', 'zSync']]
         color = 'tab:brown'
         title = 'Rep. bias'
     elif type == 'zLickRate':
-        exog = df[['zTrial', 'Hit', 'zBaseFR', 'zSync']]
+        # exog = df[['zTrial', 'Hit', 'zBaseFR', 'zSync']]
+        exog = df[['Hit', 'zBaseFR', 'zSync']]
         color = 'cyan'
         title = 'Lick rate'
+    elif type == 'zSync':
+        exog = df[['zTrial', 'zBaseFR', 'Hit', 'Miss', 'RepChoice']]
+        color = 'k'
+        title = 'zSync'
 
     # Fit the model
     endog = endog.iloc[indexes]
@@ -145,12 +163,12 @@ def run_GLM(df, session_index, type='Hit', plot=True):
 
     if plot:
         plt.figure(constrained_layout=True)
-        if type == 'RepChoice':
+        if type == 'RepChoice' or type == 'zSync':
             plt.xticks(rotation=45)
         plt.plot(x, y, c=color, marker='o', ls='none', alpha=1)
         plt.errorbar(x, y, yerr=yerr, color=color, fmt='o', alpha=1)
         plt.axhline(0, color='tab:gray', linestyle='--')
-        plt.title(f'Accuracy (session {session_index}, {len(endog)} trials)')
+        plt.title(f'{title} (session {session_index}, {len(endog)} trials)')
         plt.xlabel('Coefficients')
         plt.ylabel('Weight')
         plt.legend(frameon=False)
@@ -160,7 +178,7 @@ def run_GLM(df, session_index, type='Hit', plot=True):
     return params, bse, p_values, color, title
 
 
-def mean_GLM(df, type='Hit', replace=False, plot=True):
+def mean_GLM(df, type='Miss', replace=False, plot=True):
 
     PARAMS = pd.DataFrame()
     BSE = pd.DataFrame()
@@ -173,14 +191,18 @@ def mean_GLM(df, type='Hit', replace=False, plot=True):
     for _ in range(df.Session.nunique()):
 
         print(f'Fitting session {sessions[_]}...')
-        params, bse, p_values, color, title = run_GLM(df, sessions[_], type=type, plot=False)
+        params, bse, p_values, color, title = run_GLM(df, sessions[_], type=type, plot=True)
+
 
         # Store the results
         PARAMS = pd.concat([PARAMS, pd.Series(params, name=_)], axis=1)
         BSE = pd.concat([BSE, pd.Series(bse, name=_)], axis=1)
         P_VALUES = pd.concat([P_VALUES, pd.Series(p_values, name=_)], axis=1)
 
+    # Perform a one-sample t-test
     res = ttest_1samp(PARAMS.values, 0, axis=1)
+
+    # color = 'tab:red'
 
     # Plot the average weights
     if plot:
@@ -190,7 +212,7 @@ def mean_GLM(df, type='Hit', replace=False, plot=True):
         for _ in range(df.Session.nunique()):
             plt.plot(PARAMS.index.values, PARAMS[_], c=color, marker='o', ls='none', alpha=0.1)
 
-        if type == 'RepChoice':
+        if type == 'RepChoice' or type == 'zSync':
             plt.xticks(rotation=45)
 
         x = PARAMS.index.values
@@ -206,7 +228,11 @@ def mean_GLM(df, type='Hit', replace=False, plot=True):
         return PARAMS, BSE, P_VALUES, res
 
 
+df_after_error = df[df.AfterHit == 0].reset_index(drop=True)
+df_after_correct = df[df.AfterHit == 1].reset_index(drop=True)
 
+# Make a new colum called AfterSync which is the sync value of the next trial
+df['AfterSync'] = df.Sync.shift(-1)
 
 
 
@@ -282,7 +308,7 @@ def plot_sync_hist(df, hue='Hit'):
 
     # Make histogram of sync split by miss/response
     plt.figure(constrained_layout=True)
-    sns.histplot(data=df, x='Sync', hue=hue, multiple='layer', kde=True, stat='density', bins='auto', common_norm=False,
+    sns.histplot(data=df, x='zSync', hue=hue, multiple='layer', kde=True, stat='density', bins='auto', common_norm=False,
                  palette=palette)
     plt.title(f'Sync dist. ({df.Session.nunique()} sessions, {len(df)} trials)')
     sns.despine()
@@ -300,21 +326,23 @@ def plot_sync_hist(df, hue='Hit'):
 #     plot_sync_hist(df[df.SessionIndex == i], hue='Hit')
 
 
-# Generalized Linear Mixed Effects Models
-endog = df.Hit
-exog = df[['zTrial', 'zBaseFR', 'zSync']]
-exog_vc = session_index
-ident = np.zeros(exog_vc.shape[1], dtype=int)
-model = sm.BinomialBayesMixedGLM(endog, exog, exog_vc, ident)
 
 
-
-random = {"a": '0 + C(SessionIndex)'}
-model = sm.BinomialBayesMixedGLM.from_formula(
-               'Miss ~ zTrial + zBaseFR + zSync', random, df)
-result = model.fit_vb()
-print(result.summary())
-
-plt.figure(constrained_layout=True)
-plt.errorbar(np.arange(4), result.fe_mean, result.fe_sd, color='k', fmt='o')
-plt.axhline(0, color='tab:gray', linestyle='--')
+# # Generalized Linear Mixed Effects Models
+# endog = df.Hit
+# exog = df[['zTrial', 'zBaseFR', 'zSync']]
+# exog_vc = session_index
+# ident = np.zeros(exog_vc.shape[1], dtype=int)
+# model = sm.BinomialBayesMixedGLM(endog, exog, exog_vc, ident)
+#
+#
+#
+# random = {"a": '0 + C(SessionIndex)'}
+# model = sm.BinomialBayesMixedGLM.from_formula(
+#                'Miss ~ zTrial + zBaseFR + zSync', random, df)
+# result = model.fit_vb()
+# print(result.summary())
+#
+# plt.figure(constrained_layout=True)
+# plt.errorbar(np.arange(4), result.fe_mean, result.fe_sd, color='k', fmt='o')
+# plt.axhline(0, color='tab:gray', linestyle='--')

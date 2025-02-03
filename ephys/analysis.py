@@ -5,6 +5,7 @@ import pandas as pd
 from scipy.stats import zscore, sem, poisson
 from scipy.ndimage import gaussian_filter1d
 from matplotlib import pyplot as plt
+import matplotlib as mpl
 
 # Plotting parameters
 import seaborn as sns
@@ -26,7 +27,7 @@ from elephant.spike_train_correlation import cross_correlation_histogram
 # My own libraries
 from parse.parse_v2 import parse_v2
 from my_fun.my_fun import compute_window
-from ephys.preprocessing import preprocess
+from ephys.preprocessing import *
 
 ########################################################################################################################
 
@@ -50,14 +51,33 @@ behavior_ids = ['007_stage_training_v5_20240622-110354',
                 '007_stage_training_v5_20240711-125439',
                 '007_stage_training_v5_20240712-134450']
 
-# id = '007_2024-06-22_10-48-57'
-# path_behavior = Path.home() / 'Downloads' / '007_stage_training_v5_20240622-110354.csv'
-# df_ttl, df_behavior, n_trials, df_spikes, cluster_info = preprocess(id, path_behavior)
+# This code is designed to analyze a single session (behavior + ephys)
+
+id = '007_2024-07-12_13-29-26'
+path_behavior = (Path.home() / 'Downloads' / '007_stage_training_v5_20240712-134450').with_suffix('.csv')
+df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+    preprocess(id, path_behavior)
+
+# Variables needed to run cluster_report or session_report (aesthetics like cluster info in title, etc.)
+# cluster = 0
+# df_cluster = df_spikes[df_spikes.cluster == cluster]
+# group = df_cluster.group.unique()[0]
+
+# Get behavioral events
+stim_dur = df_behavior.StimDur.unique()[0]
+delay = df_behavior.Delay.unique()[0]
+go_cue = stim_dur + delay
+subject = df_behavior.Subject.unique()[0]
+date = df_behavior.Date.unique()[0]
+
+# # Set parameters
+time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+bin_size = 0.1  # In seconds
 
 ########################################################################################################################
 
-# Define helper functions
 
+# Define helper functions
 def get_trial_indexes(df_behavior, condition='outcome'):
     """
     Get trial indexes given a condition. Skip misses by default (hit and choice are nan in misses).
@@ -459,10 +479,13 @@ def plot_psth_split(condition='outcome', over='spikes', ax=None):
 ########################################################################################################################
 
 # Plot both raster and PSTH
-def plot_raster_psth(ax=[None, None]):
+def plot_raster_psth(df_cluster, time_win=[-1, 3], bin_size=0.1, ax=[None, None]):
     """
     Plot a raster plot and PSTH of a given cluster aligned to a specific event.
     """
+
+    cluster = df_cluster.cluster.unique()[0]
+    group = df_cluster.group.unique()[0]
 
     if ax[0] is None and ax[1] is None:
         fig, ax = plt.subplots(2, 1, sharex=True)
@@ -471,13 +494,14 @@ def plot_raster_psth(ax=[None, None]):
         title = ''
 
     responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win=time_win)
     peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
 
     plot_raster(peri_stim_spikes, colors=['k'] * len(peri_stim_spikes), ax=ax[0])
     ax[0].set_title('')
     ax[0].set_xlabel('')
     ax[0].legend().remove()
+    bins, psth = compute_psth(peri_stim_spikes)
     plot_psth(bins, psth, bin_size, ax=ax[1])
     # plot_psth(bins, psth, psth_shuffles, bin_size, ax=ax[1])
     ax[1].set_title('')
@@ -591,8 +615,8 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', w
                 ax[i].axvline(win_events[_], color='tab:red', label='Stimulus')
                 ax[i].axvline(win_events[_] + 0.5, color='tab:gray', label='Stimulus')
                 ax[i].axvline(win_events[_] + 1, color='tab:blue', label='Go cue')
-            for _ in licks[win_edges[0]]:
-                ax[i].axvline(_ + df_ttl.OFF.iloc[win_edges[0]], color='cyan')
+            # for _ in licks[win_edges[0]]:
+            #     ax[i].axvline(_ + df_ttl.OFF.iloc[win_edges[0]], color='cyan')
 
     ax[0].set_ylabel('Cluster')
     ax[1].set_xlabel(f'Time (s)')
@@ -603,9 +627,11 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', w
     plt.tight_layout()
 
 
-def plot_pop_psth(ax=None):
+def plot_pop_psth(time_win=[-1, 3], bin_size=0.1, ax=None):
     """
     Plot population PSTH treating all the spikes as coming from a single superneuron.
+    :param time_win: Time window around the event (default: [-1, 3])
+    :param ax: Axes to plot the population PSTH (default: None)
     """
 
     if ax is None:
@@ -626,7 +652,7 @@ def plot_pop_psth(ax=None):
 ########################################################################################################################
 # STATS
 ########################################################################################################################
-def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], cross_corr_coeff=False,
+def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], cross_corr_coeff=True,
                          ax=None):
     """
     Plot the autocorrelogram of a given cluster.
@@ -675,10 +701,11 @@ def plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], cross_cor
     return cch, lags
 
 
-def plot_mfr(psth, ax=None):
+def plot_mfr(psth, bin_size=0.1, ax=None):
     """
     Compute the mean firing rate per trial of a PSTH.
     :param psth: PSTH
+    :param bin_size: Size of the bins when coputing the PSTH (default: 0.1 s)
     :param ax: Axes to plot the mean firing rate (default: None)
     return: Mean and standard error of the mean firing rate
     """
@@ -833,7 +860,7 @@ def fano_factor(peri_stim_spikes):
 
 ########################################################################################################################
 
-def cluster_report(save=False):
+def cluster_report(df_cluster, save=False):
     """
     Plot a raster and PSTH of a given cluster aligned to a specific event.
     """
@@ -847,10 +874,31 @@ def cluster_report(save=False):
               ['LicksAll', 'LicksOutcome', 'LicksChoice', 'LicksStimulus', 'LicksRepeat']]  # Licks
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
+    # Declare global variables. This trick makes the function work as the variables cluster and group are used in many
+    # functions for aesthetic details (like figure title) but are not passed as arguments to keep the functions simple
+    global cluster
+    global group
+
+    cluster = df_cluster.cluster.unique()[0]
+    group = df_cluster.group.unique()[0]
+
+    print(f'Doing report of cluster {cluster}...')
+
+    df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
+    group = cluster_info[cluster_info.cluster_id == cluster].group.iloc[0]
+    depth = cluster_info[cluster_info.cluster_id == cluster].depth.iloc[0]
+    fr = cluster_info[cluster_info.cluster_id == cluster].fr.iloc[0]
+
+    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    peri_stim_licks = get_peri_stim_licks(df_behavior)
+    bins, licks_psth = compute_psth(peri_stim_licks)
+    # bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
+
     # Plot panels
-    plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], ax=ax_dict['Auto'])
-    plot_mfr(psth, ax=ax_dict['MFR'])
-    plot_raster_psth(ax=[ax_dict['RasterAll'], ax_dict['PSTHAll']])
+    plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], cross_corr_coeff=True, ax=ax_dict['Auto'])
+    plot_mfr(psth, bin_size, ax=ax_dict['MFR'])
+    plot_raster_psth(df_cluster, time_win=time_win, bin_size=bin_size, ax=[ax_dict['RasterAll'], ax_dict['PSTHAll']])
     plot_raster_psth_split(condition='outcome', ax=[ax_dict['RasterOutcome'], ax_dict['PSTHOutcome']])
     plot_raster_psth_split(condition='choice', ax=[ax_dict['RasterChoice'], ax_dict['PSTHChoice']])
     plot_raster_psth_split(condition='stimulus', ax=[ax_dict['RasterStimulus'], ax_dict['PSTHStimulus']])
@@ -1007,41 +1055,16 @@ def cluster_report(save=False):
         plt.close()
 
 
-# # Get behavioral events
-# stim_dur = df_behavior.StimDur.unique()[0]
-# delay = df_behavior.Delay.unique()[0]
-# go_cue = stim_dur + delay
-#
-# # Set parameters
-# time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
-# bin_size = 0.1  # In seconds
-#
-# subject = df_behavior.Subject.unique()[0]
-# date = df_behavior.Date.unique()[0]
-
-
-def do_cluster_reports():
+def do_cluster_reports(cluster_info):
     """
     Loop over all clusters and plot a report for each one.
     """
-    # for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
-    for cluster in cluster_info.cluster_id:
-        print(f'Cluster {cluster}')
-        # cluster = 881
-        df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-        group = cluster_info[cluster_info.cluster_id==cluster].group.iloc[0]
-        depth = cluster_info[cluster_info.cluster_id==cluster].depth.iloc[0]
-        fr = cluster_info[cluster_info.cluster_id==cluster].fr.iloc[0]
 
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
-        bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
-        peri_stim_licks = get_peri_stim_licks(df_behavior)
-        bins, licks_psth = compute_psth(peri_stim_licks)
-        # bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
-        cluster_report(save=True)
+    for cluster in cluster_info[cluster_info.group == 'good'].cluster_id:
+        global df_cluster
+        df_cluster = df_spikes[df_spikes.cluster == cluster]
+        cluster_report(df_cluster, save=False)
 
-
-# do_cluster_reports()
 
 ########################################################################################################################
 # SESSION REPORT
@@ -1170,8 +1193,8 @@ def plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=None):
 
     # Plot rolling averages
     ax.plot(x_total, y_total, marker=marker, ms=ms, color=color[0], alpha=alpha[0], label=label[0])
-    ax.plot(x_0, y_0, marker=marker, ms=ms, color=color[1], alpha=alpha[1], label=label[1])
-    ax.plot(x_1, y_1, marker=marker, ms=ms, color=color[2], alpha=alpha[2], label=label[2])
+    # ax.plot(x_0, y_0, marker=marker, ms=ms, color=color[1], alpha=alpha[1], label=label[1])
+    # ax.plot(x_1, y_1, marker=marker, ms=ms, color=color[2], alpha=alpha[2], label=label[2])
 
     # Plot horizontal lines
     ax.axhline(0.25, color='tab:gray', linestyle=':')  # Accuracy 0.25
@@ -1320,8 +1343,9 @@ def plot_corr_session(ax=None):
     peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
     _, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
     psth = psth / len(cluster_info)
-    mfr, sfr = plot_mfr(psth)
-    sync = get_sync(df_spikes, time_win=[-2, 0], bin_size=0.02, method='anal')
+    mfr, sfr = plot_mfr(psth, bin_size, ax=None)
+    plt.close()  # Close mfr plot
+    sync = get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', smooth=False)
     _, rep_bias, _, _, _, _ = get_roll_avg(df_behavior, kind='rep_bias')
     _, accuracy, _, _, _, _ = get_roll_avg(df_behavior, kind='side')
     _, misses, _, _, _, _ = get_roll_avg(df_behavior, kind='miss')
@@ -1357,12 +1381,12 @@ def session_report():
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
     # Plot panels
-    y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
+    # y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
     plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
     plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
     bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
     plot_mfr(psth, ax=ax_dict['MFR'])
-    plot_sync(ax=ax_dict['Sync'])
+    plot_sync(time_win=[-2, 0], method='anal', smooth=True, ax=ax_dict['Sync'])
 
     x_total, y_total, x_0, y_0, x_1, y_1 = get_roll_avg(df_behavior, kind='side')
     plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=ax_dict['AccuracySide'])
