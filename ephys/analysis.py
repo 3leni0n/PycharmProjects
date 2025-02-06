@@ -350,7 +350,6 @@ def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
 
-    # n_bins = int((2 * time_win) / bin_size) + 1
     n_bins = int((time_win[1] - time_win[0]) / bin_size) + 1
     bins = np.linspace(time_win[0], time_win[1], n_bins)  # linspace is preferred over arange for PSTHs
 
