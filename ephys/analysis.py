@@ -53,22 +53,22 @@ behavior_ids = ['007_stage_training_v5_20240622-110354',
 
 # This code is designed to analyze a single session (behavior + ephys)
 
-id = '007_2024-07-12_13-29-26'
-path_behavior = (Path.home() / 'Downloads' / '007_stage_training_v5_20240712-134450').with_suffix('.csv')
-df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-    preprocess(id, path_behavior)
+# id = '007_2024-07-12_13-29-26'
+# path_behavior = (Path.home() / 'Downloads' / '007_stage_training_v5_20240712-134450').with_suffix('.csv')
+# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+#     preprocess(id, path_behavior)
 
 # Variables needed to run cluster_report or session_report (aesthetics like cluster info in title, etc.)
 # cluster = 0
 # df_cluster = df_spikes[df_spikes.cluster == cluster]
 # group = df_cluster.group.unique()[0]
 
-# Get behavioral events
-stim_dur = df_behavior.StimDur.unique()[0]
-delay = df_behavior.Delay.unique()[0]
-go_cue = stim_dur + delay
-subject = df_behavior.Subject.unique()[0]
-date = df_behavior.Date.unique()[0]
+# # Get behavioral events
+# stim_dur = df_behavior.StimDur.unique()[0]
+# delay = df_behavior.Delay.unique()[0]
+# go_cue = stim_dur + delay
+# subject = df_behavior.Subject.unique()[0]
+# date = df_behavior.Date.unique()[0]
 
 # # Set parameters
 time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
@@ -363,6 +363,37 @@ def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
     return bins, psth
 
 
+def get_all_psth(df_spikes, cluster_info, n_trials, group='good', time_win=[-1, 3], bin_size=0.1):
+    """
+    Create 3-dimensional array (trial x bin x cluster) with all PSTHs for all clusters
+    :param df_spikes: dataframe with spike times
+    :param cluster_info: dataframe with cluster information
+    :param time_win: time window around event
+    :param bin_size: bin size
+    :return: bins, all_psth
+    """
+
+    if group == 'good':
+        cond = cluster_info.group == 'good'
+    elif group == 'mua':
+        cond = cluster_info.group == 'mua'
+    else:  # All clusters
+        cond = (cluster_info.group == 'good') | (cluster_info.group == 'mua')
+
+    n_bins = int((time_win[1] - time_win[0]) / bin_size)
+    n_clusters = len(cluster_info[cond])
+    all_psth = np.zeros((n_trials, n_bins, n_clusters))  # Initialize array to store all PSTHs
+
+    for i, cluster in enumerate(cluster_info[cond].cluster_id):
+        # print(f'{i}: cluster {cluster}')
+        df_cluster = df_spikes[df_spikes.cluster == cluster]
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0)
+        bins, psth = compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1)
+        all_psth[:, :, i] = psth
+
+    return bins, all_psth
+
+
 def compute_psth_shuffles(df_cluster, n_shuffles=1000, time_win=[-1, 3], scale=2, bin_size=0.1):
     """
     Compute PSTHs for shuffled spike times.
@@ -382,7 +413,7 @@ def compute_psth_shuffles(df_cluster, n_shuffles=1000, time_win=[-1, 3], scale=2
     return bins, psth_shuffles
 
 
-def plot_psth(bins, psth, bin_size, color=None, label=None, ax=None):
+def plot_psth(bins, psth, bin_size=0.1, color=None, label=None, ax=None):
     """
     Plot a PSTH of a given cluster aligned to a specific event.
     :param bins: Bins of the PSTH
