@@ -71,8 +71,8 @@ behavior_ids = ['007_stage_training_v5_20240622-110354',
 # date = df_behavior.Date.unique()[0]
 
 # # Set parameters
-time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
-bin_size = 0.1  # In seconds
+# time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+# bin_size = 0.1  # In seconds
 
 ########################################################################################################################
 
@@ -115,7 +115,7 @@ def get_trial_indexes(df_behavior, condition='outcome'):
     return indexes
 
 
-def select_cluster_index(cluster_info, group='all'):
+def select_cluster(cluster_info, group='all'):
     """
     Select cluster indices based on their group (good, mua, all)
     :param cluster_info: cluster_info dataframe
@@ -130,7 +130,7 @@ def select_cluster_index(cluster_info, group='all'):
     elif group == 'mua':
         cond = cluster_info.group == 'mua'
 
-    return cluster_info[cond].index
+    return cluster_info[cond].cluster_id
 
 
 def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
@@ -238,7 +238,7 @@ def plot_raster(df_behavior, peri_stim_spikes, colors=None, ax=None):
     ax.legend(loc='upper left', frameon=False)
 
 
-def plot_raster_split(condition='outcome', ax=None):
+def plot_raster_split(df_behavior, df_ttl, condition='outcome', ax=None):
     """
     Plot a raster plot of a given cluster aligned to a specific event split by condition.
     """
@@ -272,7 +272,7 @@ def plot_raster_split(condition='outcome', ax=None):
 ########################################################################################################################
 
 # Peri-Stimulus Time Histograms (PSTHs)
-def plot_psth_elephant(cluster, align='StimStart'):
+def plot_psth_elephant(df_spikes, cluster, df_behavior, align='StimStart'):
     """
     Use ELEPHANT library
     Plot a PSTH of a given cluster aligned to a specific event.
@@ -313,7 +313,7 @@ def plot_psth_elephant(cluster, align='StimStart'):
         # Elephant tutorial: https://elephant.readthedocs.io/en/latest/tutorials/statistics.html
         # Compute mean firing rate with Elephant
         # https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.mean_firing_rate.html#elephant.statistics.mean_firing_rate
-        mfr.append(np.round(mean_firing_rate(spiketrain).magnitude * 1000, n_decimals))  # In spikes/s
+        mfr.append(np.round(mean_firing_rate(spiketrain).magnitude * 1000, 2))  # In spikes/s
         # print(f"The mean firing rate of cluster {cluster} spiketrain is", mfr)
 
         # Compute time histogram with Elephant
@@ -409,7 +409,7 @@ def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bi
     return bins, all_psth
 
 
-def compute_psth_shuffles(df_cluster, n_shuffles=1000, time_win=[-1, 3], scale=2, bin_size=0.1):
+def compute_psth_shuffles(df_cluster, df_ttl, n_shuffles=1000, time_win=[-1, 3], scale=2, bin_size=0.1):
     """
     Compute PSTHs for shuffled spike times.
     :param n_shuffles: Number of shuffles (default: 1000)
@@ -428,7 +428,7 @@ def compute_psth_shuffles(df_cluster, n_shuffles=1000, time_win=[-1, 3], scale=2
     return bins, psth_shuffles
 
 
-def plot_psth(bins, psth, bin_size=0.1, color=None, label=None, ax=None):
+def plot_psth(bins, psth, df_behavior, bin_size=0.1, color=None, label=None, ax=None):
     """
     Plot a PSTH of a given cluster aligned to a specific event.
     :param bins: Bins of the PSTH
@@ -467,6 +467,9 @@ def plot_psth(bins, psth, bin_size=0.1, color=None, label=None, ax=None):
     bound = [psth_mean - psth_sem, psth_mean + psth_sem]
 
     # Plot PSTH
+    stim_dur = df_behavior.StimDur.unique()[0]
+    delay = df_behavior.Delay.unique()[0]
+    go_cue = stim_dur + delay
     ax.plot(bins[:-1], psth_mean, color=color, label=label)
     ax.fill_between(bins[:-1], bound[0], bound[1], color=color, alpha=0.25)
     ax.axvline(0, color='tab:gray', label='Stimulus' if label is None else '')
@@ -479,7 +482,7 @@ def plot_psth(bins, psth, bin_size=0.1, color=None, label=None, ax=None):
     # ax.legend(loc='upper left', frameon=False)
 
 
-def plot_psth_split(condition='outcome', over='spikes', ax=None):
+def plot_psth_split(df_behavior, df_ttl, condition='outcome', over='spikes', time_win=[-1, 3], bin_size=0.1, ax=None):
     """
     Plot a PSTH of a given cluster aligned to a specific event split by condition.
     """
@@ -514,8 +517,8 @@ def plot_psth_split(condition='outcome', over='spikes', ax=None):
             ylabel = 'Lick rate (licks/s)'
 
         bins, psth = compute_psth(peri_stim)
-        plot_psth(bins, psth, bin_size, color=color[_], label=labels[_], ax=ax)
-        # plot_psth(bins, psth, psth_shuffles, bin_size, color=color[_], label=labels[_], ax=ax)
+        plot_psth(bins, psth, df_behavior, bin_size, color=color[_], label=labels[_], ax=ax)
+        # plot_psth(bins, psth, df_behavior, psth_shuffles, bin_size, color=color[_], label=labels[_], ax=ax)
 
     ax.set_title(title)
     ax.set_ylabel(ylabel)
@@ -524,7 +527,7 @@ def plot_psth_split(condition='outcome', over='spikes', ax=None):
 ########################################################################################################################
 
 # Plot both raster and PSTH
-def plot_raster_psth(df_cluster, time_win=[-1, 3], bin_size=0.1, ax=[None, None]):
+def plot_raster_psth(df_cluster, df_behavior, df_ttl, time_win=[-1, 3], bin_size=0.1, ax=[None, None]):
     """
     Plot a raster plot and PSTH of a given cluster aligned to a specific event.
     """
@@ -547,14 +550,14 @@ def plot_raster_psth(df_cluster, time_win=[-1, 3], bin_size=0.1, ax=[None, None]
     ax[0].set_xlabel('')
     ax[0].legend().remove()
     bins, psth = compute_psth(peri_stim_spikes)
-    plot_psth(bins, psth, bin_size, ax=ax[1])
-    # plot_psth(bins, psth, psth_shuffles, bin_size, ax=ax[1])
+    plot_psth(bins, psth, df_behavior, bin_size, ax=ax[1])
+    # plot_psth(bins, psth, df_behavior, psth_shuffles, bin_size, ax=ax[1])
     ax[1].set_title('')
     plt.suptitle(title)
     plt.tight_layout()
 
 
-def plot_raster_psth_split(condition='outcome', ax=[None, None]):
+def plot_raster_psth_split(df_behavior, df_ttl, condition='outcome', ax=[None, None]):
     """
     Plot a raster and a PSTH split by a condition.
     """
@@ -565,8 +568,8 @@ def plot_raster_psth_split(condition='outcome', ax=[None, None]):
     else:
         title = ''
 
-    plot_raster_split(condition=condition, ax=ax[0])
-    plot_psth_split(condition=condition, ax=ax[1])
+    plot_raster_split(df_behavior, df_ttl, condition=condition, over='spikes', time_win=[-1, 3], bin_size=0.1, ax=ax[0])
+    plot_psth_split(df_behavior, df_ttl, condition=condition, over='spikes', time_win=[-1, 3], bin_size=0.1, ax=ax[1])
     ax[0].set_title('')
     ax[1].set_title('')
     ax[0].set_xlabel('')
@@ -672,7 +675,7 @@ def plot_pop_raw(df_spikes, df_ttl, df_behavior, cluster_info, slice='trials', w
     plt.tight_layout()
 
 
-def plot_pop_psth(time_win=[-1, 3], bin_size=0.1, ax=None):
+def plot_pop_psth(df_spikes, df_ttl, cluster_info, df_behavior, time_win=[-1, 3], bin_size=0.1, ax=None):
     """
     Plot population PSTH treating all the spikes as coming from a single superneuron.
     :param time_win: Time window around the event (default: [-1, 3])
@@ -684,10 +687,11 @@ def plot_pop_psth(time_win=[-1, 3], bin_size=0.1, ax=None):
 
     peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
     bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
-    # _, psth_shuffles = compute_psth_shuffles(df_spikes, n_shuffles=10, scale=2)
+    # _, psth_shuffles = compute_psth_shuffles(df_cluster, df_ttl, n_shuffles=1000, time_win=[-1, 3], scale=2,
+    # bin_size=0.1)
     psth = psth/len(cluster_info)
-    plot_psth(bins, psth, bin_size, ax=ax)
-    # plot_psth(bins, psth / len(cluster_info), psth_shuffles / len(cluster_info), bin_size)
+    plot_psth(bins, psth, df_behavior, bin_size, ax=ax)
+    # plot_psth(bins, psth / len(cluster_info), df_behavior, psth_shuffles / len(cluster_info), bin_size)
     ax.set_title('Population PSTH')
     sns.despine(ax=ax)
 
@@ -838,8 +842,8 @@ def plot_isi(spikes, ax=None):
     elif isinstance(spikes, list):
         # ISIs per trial (requires peri_stim_spikes)
         isis = []
-        for trial in range(len(peri_stim_spikes)):
-            spikes = peri_stim_spikes[trial]
+        for trial in range(len(spikes)):
+            spikes = spikes[trial]
             isis.append(np.diff(spikes))
             # isis.append(isi(spikes))  # With elephant
         isis_flatten = np.concatenate(isis)
@@ -905,7 +909,7 @@ def fano_factor(peri_stim_spikes):
 
 ########################################################################################################################
 
-def cluster_report(df_cluster, save=False):
+def cluster_report(cluster, df_spikes, cluster_info, df_behavior, df_ttl, time_win=[-1, 3], bin_size=0.1, save=False):
     """
     Plot a raster and PSTH of a given cluster aligned to a specific event.
     """
@@ -919,13 +923,13 @@ def cluster_report(df_cluster, save=False):
               ['LicksAll', 'LicksOutcome', 'LicksChoice', 'LicksStimulus', 'LicksRepeat']]  # Licks
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
-    # Declare global variables. This trick makes the function work as the variables cluster and group are used in many
-    # functions for aesthetic details (like figure title) but are not passed as arguments to keep the functions simple
-    global cluster
-    global group
-
-    cluster = df_cluster.cluster.unique()[0]
-    group = df_cluster.group.unique()[0]
+    # # Declare global variables. This trick makes the function work as the variables cluster and group are used in many
+    # # functions for aesthetic details (like figure title) but are not passed as arguments to keep the functions simple
+    # global cluster
+    # global group
+    #
+    # cluster = df_cluster.cluster.unique()[0]
+    # group = df_cluster.group.unique()[0]
 
     print(f'Doing report of cluster {cluster}...')
 
@@ -938,21 +942,22 @@ def cluster_report(df_cluster, save=False):
     bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
     peri_stim_licks = get_peri_stim_licks(df_behavior)
     bins, licks_psth = compute_psth(peri_stim_licks)
-    # bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
+    # bins, psth_shuffles = compute_psth_shuffles(df_cluster, df_ttl, n_shuffles=1000, time_win=[-1, 3], scale=2,
+    # bin_size=0.1)
 
     # Plot panels
     plot_autocorrelogram(df_cluster, bin_size=0.001, window=[-50, 50], cross_corr_coeff=True, ax=ax_dict['Auto'])
     plot_mfr(psth, bin_size, ax=ax_dict['MFR'])
-    plot_raster_psth(df_cluster, time_win=time_win, bin_size=bin_size, ax=[ax_dict['RasterAll'], ax_dict['PSTHAll']])
-    plot_raster_psth_split(condition='outcome', ax=[ax_dict['RasterOutcome'], ax_dict['PSTHOutcome']])
-    plot_raster_psth_split(condition='choice', ax=[ax_dict['RasterChoice'], ax_dict['PSTHChoice']])
-    plot_raster_psth_split(condition='stimulus', ax=[ax_dict['RasterStimulus'], ax_dict['PSTHStimulus']])
-    plot_raster_psth_split(condition='repeat', ax=[ax_dict['RasterRepeat'], ax_dict['PSTHRepeat']])
-    plot_psth(bins, licks_psth, bin_size, ax=ax_dict['LicksAll'])
-    plot_psth_split(condition='outcome', over='licks', ax=ax_dict['LicksOutcome'])
-    plot_psth_split(condition='choice', over='licks', ax=ax_dict['LicksChoice'])
-    plot_psth_split(condition='stimulus', over='licks', ax=ax_dict['LicksStimulus'])
-    plot_psth_split(condition='repeat', over='licks', ax=ax_dict['LicksRepeat'])
+    plot_raster_psth(df_cluster, df_behavior, df_ttl, time_win=time_win, bin_size=bin_size, ax=[ax_dict['RasterAll'], ax_dict['PSTHAll']])
+    plot_raster_psth_split(df_behavior, df_ttl, condition='outcome', ax=[ax_dict['RasterOutcome'], ax_dict['PSTHOutcome']])
+    plot_raster_psth_split(df_behavior, df_ttl, condition='choice', ax=[ax_dict['RasterChoice'], ax_dict['PSTHChoice']])
+    plot_raster_psth_split(df_behavior, df_ttl, condition='stimulus', ax=[ax_dict['RasterStimulus'], ax_dict['PSTHStimulus']])
+    plot_raster_psth_split(df_behavior, df_ttl, condition='repeat', ax=[ax_dict['RasterRepeat'], ax_dict['PSTHRepeat']])
+    plot_psth(bins, licks_psth, df_behavior, bin_size, ax=ax_dict['LicksAll'])
+    plot_psth_split(df_behavior, df_ttl, condition='outcome', over='licks', time_win=[-1, 3], bin_size=0.1, ax=ax_dict['LicksOutcome'])
+    plot_psth_split(df_behavior, df_ttl, condition='choice', over='licks', time_win=[-1, 3], bin_size=0.1, ax=ax_dict['LicksChoice'])
+    plot_psth_split(df_behavior, df_ttl, condition='stimulus', over='licks', time_win=[-1, 3], bin_size=0.1, ax=ax_dict['LicksStimulus'])
+    plot_psth_split(df_behavior, df_ttl, condition='repeat', over='licks', time_win=[-1, 3], bin_size=0.1, ax=ax_dict['LicksRepeat'])
 
     # Remove xlabels
     ax_dict['PSTHAll'].set_xlabel('')
@@ -1246,7 +1251,7 @@ def plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=None):
     ax.axhline(0.5, color='tab:gray', linestyle='--')  # Chance level
     ax.axhline(0.75, color='tab:gray', linestyle=':')  # Accuracy 0.75
 
-    ax.set_xlim([1, len(df_behavior)])  # 1 to not plot trial 0
+    ax.set_xlim([1, len(x_total)])  # 1 to not plot trial 0
     ax.set_ylabel(ylabel)
     ax.set_yticks(list(np.arange(0, 1.25, 0.25)))
     ax.set_yticklabels(['0', '', '0.5', '', '1'])
@@ -1322,7 +1327,7 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
     return sync
 
 
-def plot_sync(time_win=[-2, 0], method='anal', smooth=False, ax=None):
+def plot_sync(df_spikes, df_ttl, df_behavior, time_win=[-2, 0], method='anal', smooth=False, ax=None):
     """
     Plot the synchrony of a PSTH.
     :param sync: Synchrony
@@ -1352,7 +1357,7 @@ def plot_sync(time_win=[-2, 0], method='anal', smooth=False, ax=None):
     print('The maximum sync is', sync.max(), 'at trial', sync.argmax())
 
 
-def plot_sync_split():
+def plot_sync_split(df_spikes, df_ttl, df_behavior):
     # Plot autocorrelogram for high vs low sync trials
     sync = get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', smooth=False)
     mean_sync = np.mean(sync)
@@ -1429,9 +1434,10 @@ def session_report():
     # y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
     plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
     plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
-    bins, psth = plot_pop_psth(ax=ax_dict['PopPSTH'])
+    bins, psth = plot_pop_psth(df_spikes, df_ttl, cluster_info, df_behavior, time_win=[-1, 3], bin_size=0.1,
+                               ax=ax_dict['PopPSTH'])
     plot_mfr(psth, ax=ax_dict['MFR'])
-    plot_sync(time_win=[-2, 0], method='anal', smooth=True, ax=ax_dict['Sync'])
+    plot_sync(df_spikes, df_ttl, df_behavior, time_win=[-2, 0], method='anal', smooth=True, ax=ax_dict['Sync'])
 
     x_total, y_total, x_0, y_0, x_1, y_1 = get_roll_avg(df_behavior, kind='side')
     plot_roll_avg(x_total, y_total, x_0, y_0, x_1, y_1, kind='side', ax=ax_dict['AccuracySide'])

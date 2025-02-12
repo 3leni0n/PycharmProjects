@@ -17,7 +17,8 @@ from pathlib import Path
 from scipy import stats
 from scipy.optimize import minimize
 from collections import namedtuple
-
+import time
+from functools import wraps
 
 ########################################################################################################################
 
@@ -938,3 +939,19 @@ def add_stars(pvals, y):
         star_offset = ylim_range * 0.05  # 10% of the y-axis range
         plt.text(i, np.max(y) + star_offset, pval_to_star(pval), ha='center', va='center', color='k')
         plt.ylim(ylim[0], ylim[1] + star_offset)  # Enlarge ylim to make space for the stars
+
+
+def timer(func):
+    """
+    Decorator to measure execution time of a function
+    :param func: function to measure
+    :return: wrapper
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.time()
+        result = func(*args, **kwargs)
+        end = time.time()
+        print(f"{func.__name__} took {end - start:.2f} seconds")
+        return result
+    return wrapper
