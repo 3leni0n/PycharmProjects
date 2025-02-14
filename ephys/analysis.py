@@ -11,7 +11,7 @@ import matplotlib as mpl
 import seaborn as sns
 sns.set_theme()
 sns.set_style('ticks')
-# sns.set_context('poster')
+# sns.set_context('talk')
 import warnings
 
 warnings.filterwarnings('ignore')
@@ -32,36 +32,11 @@ from ephys.preprocessing import *
 ########################################################################################################################
 
 # Run preprocessing
-
-ephys_ids = ['007_2024-06-22_10-48-57',
-             '007_2024-06-23_12-46-55',
-             '007_2024-06-24_17-47-22',
-             '007_2024-06-27_15-06-28',
-             '007_2024-07-09_12-10-57',
-             '007_2024-07-10_12-03-35',
-             '007_2024-07-11_12-39-21',
-             '007_2024-07-12_13-29-26']
-
-behavior_ids = ['007_stage_training_v5_20240622-110354',
-                '007_stage_training_v5_20240623-130152',
-                '007_stage_training_v5_20240624-180217',
-                '007_stage_training_v5_20240627-152129',
-                '007_stage_training_v5_20240709-122550',
-                '007_stage_training_v5_20240710-121827',
-                '007_stage_training_v5_20240711-125439',
-                '007_stage_training_v5_20240712-134450']
-
-# This code is designed to analyze a single session (behavior + ephys)
-
-# id = '007_2024-07-12_13-29-26'
-# path_behavior = (Path.home() / 'Downloads' / '007_stage_training_v5_20240712-134450').with_suffix('.csv')
-# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-#     preprocess(id, path_behavior)
-
-# Variables needed to run cluster_report or session_report (aesthetics like cluster info in title, etc.)
-# cluster = 0
-# df_cluster = df_spikes[df_spikes.cluster == cluster]
-# group = df_cluster.group.unique()[0]
+id = '007_2024-07-12_13-29-26'
+behavior_id = '007_stage_training_v5_20240712-134450'
+path_behavior = (Path.home() / 'Downloads' / behavior_id).with_suffix('.csv')
+df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+    preprocess(id, path_behavior)
 
 # # Get behavioral events
 # stim_dur = df_behavior.StimDur.unique()[0]
@@ -70,9 +45,9 @@ behavior_ids = ['007_stage_training_v5_20240622-110354',
 # subject = df_behavior.Subject.unique()[0]
 # date = df_behavior.Date.unique()[0]
 
-# # Set parameters
-time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
-bin_size = 0.1  # In seconds
+# Set parameters
+# time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+# bin_size = 0.1  # In seconds
 
 ########################################################################################################################
 
@@ -115,7 +90,7 @@ def get_trial_indexes(df_behavior, condition='outcome'):
     return indexes
 
 
-def select_cluster_index(cluster_info, group='all'):
+def select_cluster(cluster_info, group='all'):
     """
     Select cluster indices based on their group (good, mua, all)
     :param cluster_info: cluster_info dataframe
@@ -130,7 +105,7 @@ def select_cluster_index(cluster_info, group='all'):
     elif group == 'mua':
         cond = cluster_info.group == 'mua'
 
-    return cluster_info[cond].index
+    return cluster_info[cond].cluster_id
 
 
 def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
@@ -223,6 +198,9 @@ def plot_raster(df_behavior, peri_stim_spikes, colors=None, ax=None):
         fig, ax = plt.subplots()
         responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
         peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
+        title = f'Cluster {cluster} ({group})'
+    else:
+        title = ''
 
     if colors is None:
         colors = ['k'] * len(peri_stim_spikes)
@@ -234,7 +212,7 @@ def plot_raster(df_behavior, peri_stim_spikes, colors=None, ax=None):
     ax.axvline(go_cue, color='tab:gray', label='Go cue')
     ax.set_xlabel('Time from stim. onset (s)')
     ax.set_ylabel('Trial')
-    ax.set_title(f'Cluster {cluster} ({group})')
+    ax.set_title(title)
     ax.legend(loc='upper left', frameon=False)
 
 
@@ -313,7 +291,7 @@ def plot_psth_elephant(cluster, align='StimStart'):
         # Elephant tutorial: https://elephant.readthedocs.io/en/latest/tutorials/statistics.html
         # Compute mean firing rate with Elephant
         # https://elephant.readthedocs.io/en/latest/reference/_toctree/statistics/elephant.statistics.mean_firing_rate.html#elephant.statistics.mean_firing_rate
-        mfr.append(np.round(mean_firing_rate(spiketrain).magnitude * 1000, n_decimals))  # In spikes/s
+        mfr.append(np.round(mean_firing_rate(spiketrain).magnitude * 1000, 2))  # In spikes/s
         # print(f"The mean firing rate of cluster {cluster} spiketrain is", mfr)
 
         # Compute time histogram with Elephant
@@ -402,8 +380,8 @@ def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bi
     for i, cluster in enumerate(cluster_info.cluster_id):
         # print(f'{i}: cluster {cluster}')
         df_cluster = df_spikes[df_spikes.cluster == cluster]
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0)
-        bins, psth = compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1)
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win=time_win, scale=0)
+        bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
         all_psth[:, :, i] = psth
 
     return bins, all_psth
@@ -838,8 +816,8 @@ def plot_isi(spikes, ax=None):
     elif isinstance(spikes, list):
         # ISIs per trial (requires peri_stim_spikes)
         isis = []
-        for trial in range(len(peri_stim_spikes)):
-            spikes = peri_stim_spikes[trial]
+        for trial in range(len(spikes)):
+            spikes = spikes[trial]
             isis.append(np.diff(spikes))
             # isis.append(isi(spikes))  # With elephant
         isis_flatten = np.concatenate(isis)
@@ -905,6 +883,10 @@ def fano_factor(peri_stim_spikes):
 
 ########################################################################################################################
 
+
+# cluster = 0
+# df_cluster = df_spikes[df_spikes.cluster == cluster]
+
 def cluster_report(df_cluster, save=False):
     """
     Plot a raster and PSTH of a given cluster aligned to a specific event.
@@ -919,18 +901,18 @@ def cluster_report(df_cluster, save=False):
               ['LicksAll', 'LicksOutcome', 'LicksChoice', 'LicksStimulus', 'LicksRepeat']]  # Licks
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
-    # Declare global variables. This trick makes the function work as the variables cluster and group are used in many
-    # functions for aesthetic details (like figure title) but are not passed as arguments to keep the functions simple
+    # Declare global variables
+    # This trick makes the function work as the variables cluster and group are used in many functions for aesthetic
+    # details (e.g. fig title) but are not passed as arguments to keep the functions simple
     global cluster
     global group
-
     cluster = df_cluster.cluster.unique()[0]
     group = df_cluster.group.unique()[0]
 
     print(f'Doing report of cluster {cluster}...')
 
-    df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
-    group = cluster_info[cluster_info.cluster_id == cluster].group.iloc[0]
+    # df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
+    # group = cluster_info[cluster_info.cluster_id == cluster].group.iloc[0]
     depth = cluster_info[cluster_info.cluster_id == cluster].depth.iloc[0]
     fr = cluster_info[cluster_info.cluster_id == cluster].fr.iloc[0]
 
