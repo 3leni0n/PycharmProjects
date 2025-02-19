@@ -12,7 +12,7 @@ import warnings
 warnings.filterwarnings('ignore')
 
 # My libraries
-from my_fun.my_fun import do_sounds_dict_inv
+from my_fun.my_fun import do_sounds_dict_inv, timer
 from parse.parse_v2 import parse_v2
 
 
@@ -502,6 +502,7 @@ def align_ttl(df_ttl, df_behavior):
     return df_ttl
 
 
+@timer
 def preprocess(id, path_behavior):
     """
     Preprocess the data for a given session ID and behavior file.

@@ -31,21 +31,21 @@ from ephys.preprocessing import *
 
 ########################################################################################################################
 
-# Run preprocessing
-id = '007_2024-07-12_13-29-26'
-behavior_id = '007_stage_training_v5_20240712-134450'
-path_behavior = (Path.home() / 'Downloads' / behavior_id).with_suffix('.csv')
-df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-    preprocess(id, path_behavior)
-
+# # Run preprocessing
+# id = '007_2024-07-12_13-29-26'
+# behavior_id = '007_stage_training_v5_20240712-134450'
+# path_behavior = (Path.home() / 'Downloads' / behavior_id).with_suffix('.csv')
+# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+#     preprocess(id, path_behavior)
+#
 # # Get behavioral events
 # stim_dur = df_behavior.StimDur.unique()[0]
 # delay = df_behavior.Delay.unique()[0]
 # go_cue = stim_dur + delay
 # subject = df_behavior.Subject.unique()[0]
 # date = df_behavior.Date.unique()[0]
-
-# Set parameters
+#
+# # Set parameters
 # time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
 # bin_size = 0.1  # In seconds
 
@@ -81,6 +81,11 @@ def get_trial_indexes(df_behavior, condition='outcome'):
     elif condition == 'prev_out':
         indexes0 = df_behavior[df_behavior.AfterHit == 0].Trial.values
         indexes1 = df_behavior[df_behavior.AfterHit == 1].Trial.values
+
+    elif condition == 'miss':
+        indexes0 = df_behavior[df_behavior.Miss == 0].Trial.values
+        indexes1 = df_behavior[df_behavior.Miss == 1].Trial.values
+
 
     # Store indexes in a list
     indexes0 = indexes0.tolist()
