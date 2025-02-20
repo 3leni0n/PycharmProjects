@@ -64,9 +64,8 @@ for i in range(len(ephys_ids)):
         continue
     else:
         print('Folder is empty. Proceeding...')
-        path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
         df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-            preprocess(ephys_ids[i], path_behavior)
+            preprocess(ephys_ids[i])
         bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
 
     # Save bins and psth

@@ -1,19 +1,40 @@
 # Standard libraries
+import os
 from pathlib import Path
-import matplotlib
 import numpy as np
 import pandas as pd
 from open_ephys.analysis import Session
 import runpy
-matplotlib.use('Qt5Agg')
 from matplotlib import pyplot as plt
 import seaborn as sns
-import warnings
-warnings.filterwarnings('ignore')
 
 # My libraries
 from my_fun.my_fun import do_sounds_dict_inv, timer
 from parse.parse_v2 import parse_v2
+
+
+def get_behavior_id(ephys_id: str) -> Path:
+    """
+    Takes an ephys session ID and finds the corresponding path to the .csv file in the behavior folder
+    :return: Path to the behavior file
+    """
+
+    subject = ephys_id[:3]  # Get the subject ID from the first 3 characters of the ephys session ID
+    date_ephys = ephys_id[4:14]  # Get the date from the ephys session ID
+    date_ephys = date_ephys[:4] + date_ephys[5:7] + date_ephys[8:]  # Remove - characters in ephys date to match Bpod dates
+    folder_parent = Path.home() / 'pv_nmdar_eranet' / 'experiments' / 'Ephys' / 'setups' / subject / 'sessions'
+
+    # List all the child folders in the parent folder
+    sessions = os.listdir(folder_parent)
+    dates_sessions = [session[-15:-7] for session in sessions]
+
+    # Find the indices of the dates that match the ephys date (it should be only one)
+    index = [i for i, date in enumerate(dates_sessions) if date == date_ephys]
+    assert len(index) == 1, 'There is more than one behavior session with the same date as the ephys session'
+    behavior_id = sessions[index[0]]  # Get the behavior session ID
+    path = Path(folder_parent / behavior_id / behavior_id).with_suffix('.csv')  # Get path behavior id
+
+    return path
 
 
 def load_oe_data(directory, sync=True, stream='AP'):
@@ -503,17 +524,16 @@ def align_ttl(df_ttl, df_behavior):
 
 
 @timer
-def preprocess(id, path_behavior):
+def preprocess(ephys_id):
     """
-    Preprocess the data for a given session ID and behavior file.
-    :param id: Ephys session ID
-    :param path_behavior: Path to the behavior file
-    :return: DataFrames with TTLs, behavior data, and spike sorted data
+    Preprocess the data for a given session ID.
+    :param ephys_id: Ephys session ID
+    :return: preprocessed data
     """
 
     # Define the session ID and directory
-    directory = Path() / 'D:' / id  # Ephys PC extra HD
-    directory2 = Path.home() / 'Documents' / 'Open Ephys' / id  # Ephys PC main (C:) HD
+    directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
+    directory2 = Path.home() / 'Documents' / 'Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
 
     # Load raw Open Ephys data
     try:
@@ -528,22 +548,21 @@ def preprocess(id, path_behavior):
     df_keys = decode_ttls(df_ttl)
 
     # Load behavior data
+    path_behavior = get_behavior_id(ephys_id)
     df_behavior = parse_v2(path_behavior)
 
     # Check if the behavior and ephys data match and get the number of trials common to both
     n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
 
     # Load spike sorted data (KS4)
-    path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'kilosort4'
-    path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / id / 'Phy2'
+    path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / ephys_id / 'kilosort4'
+    path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / ephys_id / 'Phy2'
     df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
-    clusters = cluster_info.cluster_id.unique()
-    n_clusters = len(cluster_info)
 
     # Print session info
     y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
 
-    # Clean redudant TTLs (useful for check_data)
+    # Clean redundant TTLs (useful for check_data)
     df_ttl = align_ttl(df_ttl, df_behavior)
 
     # Temporal alignment of ephys and behavior data (skip for now)

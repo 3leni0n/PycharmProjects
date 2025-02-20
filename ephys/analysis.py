@@ -31,12 +31,10 @@ from ephys.preprocessing import *
 
 ########################################################################################################################
 
-# # Run preprocessing
-# id = '007_2024-07-12_13-29-26'
-# behavior_id = '007_stage_training_v5_20240712-134450'
-# path_behavior = (Path.home() / 'Downloads' / behavior_id).with_suffix('.csv')
+# Run preprocessing
+# ephys_id = '007_2024-07-12_13-29-26'
 # df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-#     preprocess(id, path_behavior)
+#     preprocess(ephys_id)
 #
 # # Get behavioral events
 # stim_dur = df_behavior.StimDur.unique()[0]

@@ -27,27 +27,14 @@ ephys_ids = [
     '007_2024-07-12_13-29-26'
 ]
 
-behavior_ids = [
-    '007_stage_training_v5_20240622-110354',
-    '007_stage_training_v5_20240623-130152',
-    '007_stage_training_v5_20240624-180217',
-    '007_stage_training_v5_20240627-152129',
-    '007_stage_training_v5_20240709-122550',
-    '007_stage_training_v5_20240710-121827',
-    '007_stage_training_v5_20240711-125439',
-    '007_stage_training_v5_20240712-134450'
-]
-
 df = pd.DataFrame()
 
 depth = 'cortex'
 
 for i in range(len(ephys_ids)):
 
-    id = ephys_ids[i]
-    path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
     df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-        preprocess(id, path_behavior)
+        preprocess(ephys_ids[i])
 
     # Select clusters based on depth
     if depth == 'cortex':
