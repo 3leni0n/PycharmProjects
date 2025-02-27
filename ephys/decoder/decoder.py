@@ -34,60 +34,50 @@ ephys_ids = [
     '007_2024-07-12_13-29-26'
 ]
 
-behavior_ids = [
-    '007_stage_training_v5_20240622-110354',
-    '007_stage_training_v5_20240623-130152',
-    '007_stage_training_v5_20240624-180217',
-    '007_stage_training_v5_20240627-152129',
-    '007_stage_training_v5_20240709-122550',
-    '007_stage_training_v5_20240710-121827',
-    '007_stage_training_v5_20240711-125439',
-    '007_stage_training_v5_20240712-134450'
-]
-
+# Load spike counts for all neurons of a session (bins, all_psth). If file doesn't exist, create it
 subject = '007'
-
 folder_parent = Path.home() / 'data' / subject
+#
+# for i in range(len(ephys_ids)):
+#
+#     print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+#
+#     # Create child folder within parent folder for each ephys_id with its name if it doesn't exist
+#     folder_child = folder_parent / ephys_ids[i]
+#     folder_child.mkdir(parents=True, exist_ok=True)
+#     os.chdir(folder_child)
+#
+#     # Execute only if folder is empty
+#     if len(os.listdir(folder_child)) > 0:
+#         print('Folder is not empty. Skipping...')
+#         continue
+#     else:
+#         print('Folder is empty. Proceeding...')
+#         df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+#             preprocess(ephys_ids[i])
+#         bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
+#
+#     # Save bins and psth
+#     np.save(folder_child / 'bins.npy', bins)
+#     np.save(folder_child / 'all_psth.npy', all_psth)
+#
+#
+# # Load behavioral data from all sessions in a list of DataFrames
+# behavior = []
+# for _ in range(len(ephys_ids)):
+#     print(f'Loading behavioral session {_ + 1}/{len(ephys_ids)}: {ephys_ids[_]}...')
+#     path_behavior = get_behavior_id(ephys_ids[_])
+#     df_behavior = parse_v2(path_behavior)
+#     behavior.append(df_behavior)
 
-for i in range(len(ephys_ids)):
-
-    print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
-
-    # Create child folder within parent folder for each ephys_id with its name if it doesn't exist
-    folder_child = folder_parent / ephys_ids[i]
-    folder_child.mkdir(parents=True, exist_ok=True)
-    os.chdir(folder_child)
-
-    # Execute only if folder is empty
-    if len(os.listdir(folder_child)) > 0:
-        print('Folder is not empty. Skipping...')
-        continue
-    else:
-        print('Folder is empty. Proceeding...')
-        df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-            preprocess(ephys_ids[i])
-        bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
-
-    # Save bins and psth
-    np.save(folder_child / 'bins.npy', bins)
-    np.save(folder_child / 'all_psth.npy', all_psth)
-
-
-# Load behavioral data from all sessions in a list of DataFrames
-behavior = []
-for i in range(len(behavior_ids)):
-    path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
-    df_behavior = parse_v2(path_behavior)
-    behavior.append(df_behavior)
-
-# Get behavioral events
-stim_dur = df_behavior.StimDur.unique()[0]
-delay = df_behavior.Delay.unique()[0]
-go_cue = stim_dur + delay
+# # Get behavioral events
+# stim_dur = df_behavior.StimDur.unique()[0]
+# delay = df_behavior.Delay.unique()[0]
+# go_cue = stim_dur + delay
 
 ########################################################################################################################
-
-# Define functions for decoding
+# SINGLE SESSION DECODERS
+########################################################################################################################
 @timer
 def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
@@ -235,19 +225,21 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
     :return: pred, pred_err (predicted condition and prediction error)
     """
 
+    n_splits = 5
+
     # Initialize arrays
-    pred = np.empty((X.shape[0], X.shape[1]))
-    pred_err = np.empty((X.shape[0], X.shape[1]))
-    acc = np.empty((X.shape[0], X.shape[1]))
-    acc_null = np.empty((n_shuffles, X.shape[1]))
-    pred_err_null = np.empty((X.shape[0], X.shape[1], n_shuffles))
+    pred = np.empty((X.shape[0], X.shape[1])) * np.nan
+    pred_err = np.empty((X.shape[0], X.shape[1])) * np.nan
+    acc = np.empty((n_splits, X.shape[1])) * np.nan
+    acc_null = np.empty((n_shuffles, X.shape[1])) * np.nan
+    pred_err_null = np.empty((X.shape[0], X.shape[1], n_shuffles)) * np.nan
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
 
     # Cross-validate results
     # kf = KFold()  # K-Fold cross-validation
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  # Stratified cross-validation
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)  # Stratified cross-validation
 
     # Define epoch of interest
     if epoch == 'stim':
@@ -262,7 +254,7 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     # for train_index, test_index in kf.split(X):
-    for train_index, test_index in skf.split(X, y):
+    for k, (train_index, test_index) in enumerate(skf.split(X, y)):
 
         # Cross thinghy happens here
         X_train = np.mean(X[train_index, epoch_start_idx:epoch_end_idx], axis=1)
@@ -293,7 +285,7 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
             pred[test_index, bin_test] = y_pred  # Predicted stimulus condition for each test trial at each time
             # bin_train
             pred_err[test_index, bin_test] = y_pred - y_test  # Difference between predicted and actual labels
-            acc[test_index, bin_test] = y_acc  # Accuracy for each test trial at each time bin_train
+            acc[k, bin_test] = y_acc  # Accuracy for each test trial at each time bin_train
 
             # Compute null distribution by shuffling the labels and evaluating accuracy
             y_test_shuffled = y_test.values.copy()
@@ -308,18 +300,8 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
     return pred, pred_err, acc, acc_null, pred_err_null
 
 
-
-
-
-
-
-
-
-
-
-
 @timer
-def epoch_cross_decoder_split(hit, bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=10):
+def epoch_cross_decoder_split(bins, split, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
     Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
     cross-validation across trials and across time bins.
@@ -330,31 +312,28 @@ def epoch_cross_decoder_split(hit, bins, epoch='stim', X=np.zeros((1, 1, 1)), y=
 
     n_splits = 5
 
-    len_idx0 = len(np.where(hit == 0)[0])
-    len_idx1 = len(np.where(hit == 1)[0])
-
     # Initialize arrays
 
     # indexes[0]
-    pred0 = np.empty((len_idx0, X.shape[1]))
-    pred_err0 = np.empty((len_idx0, X.shape[1]))
-    acc0 = np.empty((n_splits, X.shape[1]))
-    acc_null0 = np.empty((n_splits, n_shuffles, X.shape[1]))
-    pred_err_null0 = np.empty((len_idx0, X.shape[1], n_shuffles))
+    pred0 = np.empty((X.shape[0], X.shape[1])) * np.nan
+    pred_err0 = np.empty((X.shape[0], X.shape[1])) * np.nan
+    acc0 = np.empty((n_splits, X.shape[1])) * np.nan
+    acc_null0 = np.empty((n_splits, n_shuffles, X.shape[1])) * np.nan
+    pred_err_null0 = np.empty((X.shape[0], X.shape[1], n_shuffles)) * np.nan
 
     # indexes[1]
-    pred1 = np.empty((len_idx1, X.shape[1]))
-    pred_err1 = np.empty((len_idx1, X.shape[1]))
-    acc1 = np.empty((n_splits, X.shape[1]))
-    acc_null1 = np.empty((n_splits, n_shuffles, X.shape[1]))
-    pred_err_null1 = np.empty((len_idx1, X.shape[1], n_shuffles))
+    pred1 = np.empty((X.shape[0], X.shape[1])) * np.nan
+    pred_err1 = np.empty((X.shape[0], X.shape[1])) * np.nan
+    acc1 = np.empty((n_splits, X.shape[1])) * np.nan
+    acc_null1 = np.empty((n_splits, n_shuffles, X.shape[1])) * np.nan
+    pred_err_null1 = np.empty((X.shape[0], X.shape[1], n_shuffles)) * np.nan
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
 
     # Cross-validate results
     # kf = KFold()  # K-Fold cross-validation
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  # Stratified cross-validation
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=0)  # Stratified cross-validation
 
     # Define epoch of interest
     if epoch == 'stim':
@@ -377,8 +356,10 @@ def epoch_cross_decoder_split(hit, bins, epoch='stim', X=np.zeros((1, 1, 1)), y=
         # Apply z-scoring normalization to the current time bin_train's data (otherwise might not converge)
         X_train = scaler.fit_transform(X_train)  # Fit and transform on the training set
 
-        test_idx0 = np.where(hit[test_index] == 0)[0]
-        test_idx1 = np.where(hit[test_index] == 1)[0]
+        # test_idx0 = np.where(split[test_index] == 0)[0]
+        test_idx0 = split.loc[split.index.isin(test_index) & (split == 0)].index
+        # test_idx1 = np.where(split[test_index] == 1)[0]
+        test_idx1 = split.loc[split.index.isin(test_index) & (split == 1)].index
 
         # Train decoder (logistic regression) on the current time bin_train’s neural activity
         clf = LogisticRegression()
@@ -417,7 +398,6 @@ def epoch_cross_decoder_split(hit, bins, epoch='stim', X=np.zeros((1, 1, 1)), y=
             pred_err1[test_idx1, bin_test] = y_pred1 - y_test1  # Difference between predicted and actual labels
             acc1[k, bin_test] = y_acc1  # Accuracy for each test trial at each time bin_train
 
-
             # Compute null distribution by shuffling the labels and evaluating accuracy
             y_test_shuffled0 = y_test0.values.copy()
             y_test_shuffled1 = y_test1.values.copy()
@@ -435,30 +415,6 @@ def epoch_cross_decoder_split(hit, bins, epoch='stim', X=np.zeros((1, 1, 1)), y=
                 # actual labels
 
     return pred0, pred1, pred_err0, pred_err1, acc0, acc1, acc_null0, acc_null1, pred_err_null0, pred_err_null1
-
-
-pred0, pred1, pred_err0, pred_err1, acc0, acc1, acc_null0, acc_null1, pred_err_null0, pred_err_null1 = \
-    epoch_cross_decoder_split(hit, bins, epoch='stim', X=all_psth, y=df_behavior.Side, n_shuffles=10)
-
-
-plt.figure(constrained_layout=True)
-plt.plot(bins[:-1], np.mean(acc0, axis=0), color='tab:red', label='Error')
-plt.fill_between(bins[:-1], np.mean(acc0, axis=0) - sem(acc0, axis=0), np.mean(acc0, axis=0) + sem(acc0, axis=0),
-                    color='tab:red', alpha=0.25)
-plt.plot(bins[:-1], np.mean(acc1, axis=0), color='tab:green', label='Correct')
-plt.fill_between(bins[:-1], np.mean(acc1, axis=0) - sem(acc1, axis=0), np.mean(acc1, axis=0) + sem(acc1, axis=0),
-                    color='tab:green', alpha=0.25)
-
-
-
-
-
-
-
-
-
-# pred, pred_err, acc, acc_null = within_decoder(X=all_psth, y=df_behavior.Side, n_shuffles=1000)
-# pred, pred_err, acc, acc_null = cross_decoder(X=all_psth, y=df_behavior.Side, n_shuffles=100)
 
 
 def null_zscore(acc, acc_null):
@@ -492,6 +448,218 @@ def p_val(acc, acc_null):
                        axis=0)  # p-value as the fraction of shuffles where null accuracy > real accuracy
     return p_values
 
+
+########################################################################################################################
+# MEAN DECODERS
+########################################################################################################################
+@timer
+def mean_within_decoder(save=False, plot=False):
+    """
+    Perform within time bin decoder across all sessions.
+    :param save: whether to save the results as a pickle
+    :param plot: whether to plot the decoding accuracy for each session
+    :return: results (dict)
+    """
+
+    results = {
+        'pred': [],
+        'pred_err': [],
+        'acc': [],
+        'acc_null': [],
+        'bins': []
+    }
+
+    for i in range(len(ephys_ids)):
+        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+        path_behavior = get_behavior_id(ephys_ids[i])
+        df_behavior = parse_v2(path_behavior)
+        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
+        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+        pred, pred_err, acc, acc_null = within_decoder(all_psth, df_behavior.Side)
+
+        results['pred'].append(pred)
+        results['pred_err'].append(pred_err)
+        results['acc'].append(acc)
+        results['acc_null'].append(acc_null)
+        results['bins'] = bins
+
+    if save:
+        os.chdir(folder_parent)
+        with open('results_mean_within_decoder.pkl', 'wb') as f:
+            pickle.dump(results, f)
+
+    # Plot decoding accuracy for each session
+    if plot:
+        plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
+
+    return results
+
+
+@timer
+def mean_cross_decoder(save=False, plot=False):
+    """
+    Perform within time bin decoder across all sessions.
+    param save: whether to save the results as a pickle
+    :param plot: whether to plot the decoding accuracy for each session
+    :return: results (dict)
+    """
+
+    results = {
+        'pred': [],
+        'pred_err': [],
+        'acc': [],
+        'acc_null': [],
+        'bins': []
+    }
+
+    for i in range(len(ephys_ids)):
+        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+        path_behavior = get_behavior_id(ephys_ids[i])
+        df_behavior = parse_v2(path_behavior)
+        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
+        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+        pred, pred_err, acc, acc_null = cross_decoder(all_psth, df_behavior.Side)
+
+        results['pred'].append(pred)
+        results['pred_err'].append(pred_err)
+        results['acc'].append(acc)
+        results['acc_null'].append(acc_null)
+        results['bins'] = bins
+
+        if save:
+            os.chdir(folder_parent)
+            with open('results_mean_cross_decoder.pkl', 'wb') as f:
+                pickle.dump(results, f)
+
+        # Plot decoding accuracy for each session
+        if plot:
+            plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
+
+    return results
+
+
+@timer
+def mean_epoch_cross_decoder(epoch='stim', save=False, plot=False):
+    """
+    Perform within time bin decoder across all sessions.
+    :param epoch: epoch of interest (stim, delay, resp)
+    :param save: whether to save the results as a pickle
+    :param plot: whether to plot the decoding accuracy for each session
+    :return: results (dict)
+    """
+
+    results = {
+        'pred': [],
+        'pred_err': [],
+        'acc': [],
+        'acc_null': [],
+        'pred_err_null': [],
+        'bins': []
+    }
+
+    for i in range(len(ephys_ids)):
+
+        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+
+        path_behavior = get_behavior_id(ephys_ids[i])
+        df_behavior = parse_v2(path_behavior)
+        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
+        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+
+        # Testing if misses causes the difference with split
+        resp_indxs = df_behavior[df_behavior.Miss == 0].index
+        df_behavior = df_behavior.iloc[resp_indxs].reset_index(drop=True)
+        all_psth = all_psth[resp_indxs]
+
+        pred, pred_err, acc, acc_null, pred_err_null = epoch_cross_decoder(bins, epoch, all_psth, df_behavior.Side)
+        results['pred'].append(pred)
+        results['pred_err'].append(pred_err)
+        results['acc'].append(acc)
+        results['acc_null'].append(acc_null)
+        results['pred_err_null'].append(pred_err_null)
+        results['bins'] = bins
+
+    # # Plot decoding accuracy for each session
+    # if plot:
+    #     plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
+
+    # Save results as pickle
+    if save:
+        os.chdir(folder_parent)
+        with open('results_mean_epoch_cross_decoder' + '_' + epoch + '.pkl', 'wb') as f:
+            pickle.dump(results, f)
+
+    return results
+
+
+def mean_epoch_cross_decoder_split(epoch='stim', split_by='Hit', save=False, plot=False):
+    """
+    Perform within time bin decoder across all sessions.
+    :param save: whether to save the results as a pickle
+    :param plot: whether to plot the decoding accuracy for each session
+    :return: results (dict)
+    """
+
+    results = {
+        'pred0': [],
+        'pred_err0': [],
+        'pred_err_null0': [],
+        'acc0': [],
+        'acc_null0': [],
+        'pred1': [],
+        'pred_err1': [],
+        'pred_err_null1': [],
+        'acc1': [],
+        'acc_null1': [],
+        'bins': []
+    }
+
+    for i in range(len(ephys_ids)):
+        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+        path_behavior = get_behavior_id(ephys_ids[i])
+        df_behavior = parse_v2(path_behavior)
+        # split = df_behavior[split_by]
+        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
+        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+
+        # Testing if misses causes the difference with split
+        resp_indxs = df_behavior[df_behavior.Miss == 0].index
+        df_behavior = df_behavior.iloc[resp_indxs].reset_index(drop=True)
+        all_psth = all_psth[resp_indxs]
+        split = df_behavior[split_by]
+
+        pred0, pred1, pred_err0, pred_err1, acc0, acc1, acc_null0, acc_null1, pred_err_null0, pred_err_null1 = \
+            epoch_cross_decoder_split(bins, split, epoch, all_psth, df_behavior.Side)
+
+        results['pred0'].append(pred0)
+        results['pred_err0'].append(pred_err0)
+        results['pred_err_null0'].append(pred_err_null0)
+        results['acc0'].append(acc0)
+        results['acc_null0'].append(acc_null0)
+        results['pred1'].append(pred1)
+        results['pred_err1'].append(pred_err1)
+        results['pred_err_null1'].append(pred_err_null1)
+        results['acc1'].append(acc1)
+        results['acc_null1'].append(acc_null1)
+        results['bins'] = bins
+
+        # # Plot decoding accuracy for each session
+        # if plot:
+        #     plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
+
+    # Save results as pickle
+    if save:
+        os.chdir(folder_parent)
+        with open('results_mean_epoch_cross_decoder_split' + '_' + epoch + '_' + 'split_by' + '_' + split_by + '.pkl',
+                  'wb') as f:
+            pickle.dump(results, f)
+
+    return results
+
+
+########################################################################################################################
+# PLOT DECODERS
+########################################################################################################################
 
 def plot_within_decoder(bins, acc, acc_null, z_null=True):
     """
@@ -572,256 +740,6 @@ def plot_cross_decoder(bins, acc, acc_null, z_null=True):
     sns.despine()
 
 
-@timer
-def mean_within_decoder(plot=False):
-    """
-    Perform within time bin decoder across all sessions.
-    :param plot: whether to plot the decoding accuracy for each session
-    :return: results (dict)
-    """
-
-    results = {
-        'pred': [],
-        'pred_err': [],
-        'acc': [],
-        'acc_null': [],
-        'bins': []
-    }
-
-    for i in range(len(ephys_ids)):
-        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
-        path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
-        # df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-        #     preprocess(ephys_ids[i], path_behavior)
-        # bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
-        df_behavior = parse_v2(path_behavior)
-        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
-        pred, pred_err, acc, acc_null = within_decoder(all_psth, df_behavior.Side)
-
-        results['pred'].append(pred)
-        results['pred_err'].append(pred_err)
-        results['acc'].append(acc)
-        results['acc_null'].append(acc_null)
-        results['bins'] = bins
-
-        # Plot decoding accuracy for each session
-        if plot:
-            plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
-
-    return results
-
-
-@timer
-def mean_cross_decoder(save=False, plot=False):
-    """
-    Perform within time bin decoder across all sessions.
-    :param plot: whether to plot the decoding accuracy for each session
-    :return: results (dict)
-    """
-
-    results = {
-        'pred': [],
-        'pred_err': [],
-        'acc': [],
-        'acc_null': [],
-        'bins': []
-    }
-
-    for i in range(len(ephys_ids)):
-        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
-        path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
-        # df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-        #     preprocess(ephys_ids[i], path_behavior)
-        # bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
-        df_behavior = parse_v2(path_behavior)
-        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
-        pred, pred_err, acc, acc_null = cross_decoder(all_psth, df_behavior.Side)
-
-        results['pred'].append(pred)
-        results['pred_err'].append(pred_err)
-        results['acc'].append(acc)
-        results['acc_null'].append(acc_null)
-        results['bins'] = bins
-
-        if save:
-            os.chdir(folder_parent)
-            with open('results_mean_cross_decoder.pkl', 'wb') as f:
-                pickle.dump(results, f)
-
-        # Plot decoding accuracy for each session
-        if plot:
-            plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
-
-    return results
-
-
-with open('results_mean_cross_decoder.pkl', 'rb') as f:
-    data_loaded = pickle.load(f)
-
-
-@timer
-def mean_epoch_cross_decoder(epoch='stim', plot=False):
-    """
-    Perform within time bin decoder across all sessions.
-    :param plot: whether to plot the decoding accuracy for each session
-    :return: results (dict)
-    """
-
-    results = {
-        'pred': [],
-        'pred_err': [],
-        'acc': [],
-        'acc_null': [],
-        'pred_err_null': [],
-        'bins': []
-    }
-
-    for i in range(len(ephys_ids)):
-        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
-        path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
-        # df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-        #     preprocess(ephys_ids[i], path_behavior)
-        # bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
-        df_behavior = parse_v2(path_behavior)
-        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
-
-        pred, pred_err, acc, acc_null, pred_err_null = epoch_cross_decoder(bins, epoch, all_psth, df_behavior.Side)
-        results['pred'].append(pred)
-        results['pred_err'].append(pred_err)
-        results['acc'].append(acc)
-        results['acc_null'].append(acc_null)
-        results['pred_err_null'].append(pred_err_null)
-        results['bins'] = bins
-
-        # # Plot decoding accuracy for each session
-        # if plot:
-        #     plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
-
-    return results
-
-
-
-
-
-
-
-
-
-
-def mean_epoch_cross_decoder_split(epoch='stim', plot=False):
-    """
-    Perform within time bin decoder across all sessions.
-    :param plot: whether to plot the decoding accuracy for each session
-    :return: results (dict)
-    """
-
-    results = {
-
-        'pred0': [],
-        'pred1': [],
-        'pred_err0': [],
-        'pred_err1': [],
-        'acc0': [],
-        'acc1': [],
-        'acc_null0': [],
-        'acc_null1': [],
-        'pred_err_null0': [],
-        'pred_err_null1': []
-    }
-
-    for i in range(len(ephys_ids)):
-        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
-        path_behavior = (Path.home() / 'Downloads' / behavior_ids[i]).with_suffix('.csv')
-        df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-            preprocess(ephys_ids[i], path_behavior)
-        bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
-        # df_behavior = parse_v2(path_behavior)
-        # bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-        # all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
-
-        pred0, pred1, pred_err0, pred_err1, acc0, acc1, acc_null0, acc_null1, pred_err_null0, pred_err_null1 = \
-            epoch_cross_decoder_split(bins, epoch, all_psth, df_behavior.Side)
-        results['pred0'].append(pred0)
-        results['pred_err0'].append(pred_err0)
-        results['acc0'].append(acc0)
-        results['acc_null0'].append(acc_null0)
-        results['pred_err_null0'].append(pred_err_null0)
-        results['pred1'].append(pred1)
-        results['pred_err1'].append(pred_err1)
-        results['acc1'].append(acc1)
-        results['acc_null1'].append(acc_null1)
-        results['pred_err_null1'].append(pred_err_null1)
-        results['bins'] = bins
-
-        # # Plot decoding accuracy for each session
-        # if plot:
-        #     plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
-
-    return results
-
-results = mean_epoch_cross_decoder_split(epoch='stim', plot=False)
-
-
-
-
-
-
-
-
-results_stim = mean_epoch_cross_decoder(epoch='stim', plot=False)
-results_delay = mean_epoch_cross_decoder(epoch='delay', plot=False)
-results_resp = mean_epoch_cross_decoder(epoch='resp', plot=False)
-results = {
-    'result_stim': results_stim,
-    'results_delay': results_delay,
-    'results_resp': results_resp
-}
-
-# Save results as pickle
-os.chdir(folder_parent)
-with open('results_mean_epoch_cross_decoder.pkl', 'wb') as f:
-    pickle.dump(results, f)
-
-
-
-
-
-acc_mean_stim = [results_stim['acc'][i].mean(axis=0) for i in range(len(results_stim['acc']))]
-acc_mean_stim = np.array(acc_mean_stim)
-acc_mean_delay = [results_delay['acc'][i].mean(axis=0) for i in range(len(results_delay['acc']))]
-acc_mean_delay = np.array(acc_mean_delay)
-acc_mean_resp = [results_resp['acc'][i].mean(axis=0) for i in range(len(results_resp['acc']))]
-acc_mean_resp = np.array(acc_mean_resp)
-n_trials = np.sum([results_stim['acc'][i].shape[0] for i in range(len(results_stim['acc']))])
-
-plt.figure(constrained_layout=True)
-plt.plot(results_stim['bins'][:-1], np.mean(acc_mean_stim, axis=0), label='Stimulus')
-plt.fill_between(results_stim['bins'][:-1], np.mean(acc_mean_stim, axis=0) - sem(acc_mean_stim, axis=0),
-                    np.mean(acc_mean_stim, axis=0) + sem(acc_mean_stim, axis=0), edgecolor='none', alpha=0.25)
-plt.plot(results_delay['bins'][:-1], np.mean(acc_mean_delay, axis=0), label='Delay')
-plt.fill_between(results_delay['bins'][:-1], np.mean(acc_mean_delay, axis=0) - sem(acc_mean_delay, axis=0),
-                    np.mean(acc_mean_delay, axis=0) + sem(acc_mean_delay, axis=0), edgecolor='none', alpha=0.25)
-plt.plot(results_resp['bins'][:-1], np.mean(acc_mean_resp, axis=0), label='Response')
-plt.fill_between(results_resp['bins'][:-1], np.mean(acc_mean_resp, axis=0) - sem(acc_mean_resp, axis=0),
-                    np.mean(acc_mean_resp, axis=0) + sem(acc_mean_resp, axis=0), edgecolor='none', alpha=0.25)
-plt.legend(frameon=False)
-plt.xlabel('Time (s)')
-plt.ylabel('Accuracy')
-plt.title(f'Decoding accuracy\n'
-          f'{subject}, {len(results_stim["acc"])} sessions, {n_trials} trials')
-sns.despine()
-
-# results = mean_within_decoder(plot=False)
-# results = mean_cross_decoder(plot=False)
-
-
-# for i in range(len(ephys_ids)):
-#     plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
-
-
 def plot_mean_within_decoder(results, z_null=True):
     """
     Plot the mean decoding accuracy across all sessions.
@@ -842,32 +760,39 @@ def plot_mean_within_decoder(results, z_null=True):
     if z_null:
         z_scores = [null_zscore(results['acc'][i], results['acc_null'][i]) for i in range(len(results['acc']))]
         z_scores_mean = np.mean((z_scores), axis=0)
-        plt.plot(bins[:-1], z_scores_mean, label='Z acc.')
-        # p_values = p_val(acc_mean, acc_null_mean)
+        plt.plot(bins[:-1], z_scores_mean, color='tab:blue', label='Z acc.')
+        p_values = p_val(acc_mean, acc_null_mean)
         # significant_region = p_values < 0.05  # When assessing significance across sessions use p < 0.05
         significant_region = np.abs(z_scores_mean) >= 1.96  # When assessing significance across sessions use 1.96
-        plt.fill_between(bins[:-1], z_scores_mean, where=significant_region, edgecolor='none',
+        plt.fill_between(bins[:-1], z_scores_mean, where=significant_region, edgecolor='none', color='tab:blue',
                          alpha=0.25, label='α < .05')
         plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
         ylabel = 'Z-score'
 
     else:
         # Plot the mean decoding accuracy across all sessions
-        plt.plot(bins[:-1], np.mean(acc_mean, axis=0), label='Acc.')
+        plt.plot(bins[:-1], np.mean(acc_mean, axis=0), color='tab:blue', label='Acc.')
         plt.fill_between(bins[:-1], np.mean(acc_mean, axis=0) - sem(acc_mean, axis=0),
-                         np.mean(acc_mean, axis=0) + sem(acc_mean, axis=0), edgecolor='none', alpha=0.25,
-                         label='Acc. s.e.m.')
+                         np.mean(acc_mean, axis=0) + sem(acc_mean, axis=0), color='tab:blue', edgecolor='none',
+                         alpha=0.25, label='Acc. s.e.m.')
+
         # Plot the mean null accuracy across all sessions (chance level)
-        for _ in range(len(results['acc_null'])):
-            plt.plot(bins[:-1], np.mean(results['acc_null'][_], axis=0), ls='--', c='tab:gray')
+        plt.plot(bins[:-1], np.mean(acc_null_mean, axis=0), color='tab:gray', label='Acc. null')
+        plt.fill_between(bins[:-1], np.mean(acc_null_mean, axis=0) - sem(acc_null_mean, axis=0),
+                         np.mean(acc_null_mean, axis=0) + sem(acc_null_mean, axis=0), color='tab:gray',
+                         edgecolor='none', alpha=0.25, label='Acc. null s.e.m.')
+
+        # Plot the individual sessions null accuracy (chance level)
+        # for _ in range(len(results['acc_null'])):
+        #     plt.plot(bins[:-1], np.mean(results['acc_null'][_], axis=0), ls='--', c='tab:gray')
         ylabel = 'Accuracy'
 
     plt.axvline(0, color='tab:red', linestyle='-')  # Stimulus onset
-    plt.axvline(go_cue, color='tab:gray', linestyle='-')  # Go cue
+    # plt.axvline(go_cue, color='tab:gray', linestyle='-')  # Go cue
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
-    plt.title(f"Decoding accuracy\n"
-              f"{subject}, {len(results['acc'])} sessions, {n_trials} trials")
+    # plt.title(f"Decoding accuracy\n"
+    #           f"{subject}, {len(results['acc'])} sessions, {n_trials} trials")
     sns.despine()
     plt.legend(frameon=False)
 
@@ -892,7 +817,6 @@ def plot_mean_cross_decoder(results, z_null=True):
     bins = results['bins']
 
     if z_null:
-
         z_scores = [null_zscore(results['acc'][i], results['acc_null'][i]) for i in range(len(results['acc']))]
         z_scores_mean = np.mean((z_scores), axis=0)
         plt.imshow(z_scores_mean, origin='lower', cmap='RdBu_r', norm=CenteredNorm())
@@ -904,51 +828,41 @@ def plot_mean_cross_decoder(results, z_null=True):
     plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]))
     plt.axhline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
     plt.axvline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
-    plt.axhline(np.where(bins == delay)[0], color='k', linestyle='-')  # Delay
-    plt.axvline(np.where(bins == delay)[0], color='k', linestyle='-')  # Delay
-    plt.axhline(np.where(bins == go_cue)[0], color='k', linestyle='-')  # Go cue
-    plt.axvline(np.where(bins == go_cue)[0], color='k', linestyle='-')  # Go cue
+    plt.axhline(np.where(bins == 0.5)[0], color='k', linestyle='-')  # Delay
+    plt.axvline(np.where(bins == 0.5)[0], color='k', linestyle='-')  # Delay
+    plt.axhline(np.where(bins == 1)[0], color='k', linestyle='-')  # Go cue
+    plt.axvline(np.where(bins == 1)[0], color='k', linestyle='-')  # Go cue
     plt.xlabel('Test time (s)')
     plt.ylabel('Train time (s)')
-    # plt.title('Cross temporal decoder')
     # plt.title(f"Decoding accuracy\n"
-    #           f"{df_behavior.Subject.unique()[0]}, {len(results['acc'])} trials")
-    plt.title(f"Decoding accuracy\n"
-              f" 007, {len(results['acc'])} sessions, {n_trials} trials")
+    #           f" {subject}, {len(results['acc'])} sessions, {n_trials} trials")
     sns.despine()
 
 
-# Split stim decoder into correct vs error trials
-indexes = [get_trial_indexes(behavior[i], condition='outcome') for i in range(len(behavior))]
+def plot_mean_epoch_cross_decoder(results, epoch='stim', z_null=True):
+    """
+    Plot the mean epoch cross temporal decoding accuracy across all sessions.
+    :param results: dict with decoding results for each session
+    :param z_null:
+    """
 
-# Correct trials
-mae_stim_correct = [-np.abs(results_stim['pred_err'][i][indexes[i][1]]).mean(axis=0) + 1 for i in range(len(results_stim['pred_err']))]
-mae_stim_correct = np.array(mae_stim_correct)
-avg_pred_err_null = [results_stim['pred_err_null'][i].mean(axis=2) for i in range(len(results_stim['pred_err_null']))]
-mae_stim_correct_null = [-np.abs(avg_pred_err_null[i][indexes[i][1]]).mean(axis=0)+1 for i in range(len(results_stim['pred_err_null']))]
-mae_stim_correct_null = np.array(mae_stim_correct_null)
+    if epoch == 'stim':
+        label = 'Stimulus'
+    elif epoch == 'delay':
+        label = 'Delay'
+    elif epoch == 'resp':
+        label = 'Response'
 
-# Error trials
-mae_stim_error = [-np.abs(results_stim['pred_err'][i][indexes[i][0]]).mean(axis=0) + 1 for i in range(len(results_stim['pred_err']))]
-mae_stim_error = np.array(mae_stim_error)
-avg_pred_err_null = [results_stim['pred_err_null'][i].mean(axis=2) for i in range(len(results_stim['pred_err_null']))]
-mae_stim_error_null = [-np.abs(avg_pred_err_null[i][indexes[i][0]]).mean(axis=0)+1 for i in range(len(results_stim['pred_err_null']))]
-mae_stim_error_null = np.array(mae_stim_error_null)
-
-plt.figure(constrained_layout=True)
-color = 'tab:green'
-plt.plot(results_stim['bins'][:-1], mae_stim_correct.mean(axis=0), color=color, label='Correct')
-plt.fill_between(results_stim['bins'][:-1], mae_stim_correct.mean(axis=0) - sem(mae_stim_correct, axis=0),
-                 mae_stim_correct.mean(axis=0) + sem(mae_stim_correct, axis=0), color=color, edgecolor='none',
-                 alpha=0.25)
-color = 'tab:red'
-plt.plot(results_stim['bins'][:-1], mae_stim_error.mean(axis=0), color=color, label='Error')
-plt.fill_between(results_stim['bins'][:-1], mae_stim_error.mean(axis=0) - sem(mae_stim_error, axis=0),
-                 mae_stim_error.mean(axis=0) + sem(mae_stim_error, axis=0), color=color, edgecolor='none',
-                 alpha=0.25)
-plt.legend(frameon=False)
-
-
-
-
-
+    acc_mean = [results['acc'][i].mean(axis=0) for i in range(len(results['acc']))]
+    acc_mean = np.array(acc_mean)
+    n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
+    # plt.figure(constrained_layout=True)
+    plt.plot(results['bins'][:-1], np.mean(acc_mean, axis=0), label=label)
+    plt.fill_between(results['bins'][:-1], np.mean(acc_mean, axis=0) - sem(acc_mean, axis=0),
+                     np.mean(acc_mean, axis=0) + sem(acc_mean, axis=0), edgecolor='none', alpha=0.25)
+    plt.legend(frameon=False)
+    plt.xlabel('Time (s)')
+    plt.ylabel('Accuracy')
+    # plt.title(f'Decoding accuracy\n'
+    #           f'{subject}, {len(results["acc"])} sessions, {n_trials} trials')
+    sns.despine()

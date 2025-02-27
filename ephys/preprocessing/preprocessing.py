@@ -15,7 +15,7 @@ from parse.parse_v2 import parse_v2
 
 def get_behavior_id(ephys_id: str) -> Path:
     """
-    Takes an ephys session ID and finds the corresponding path to the .csv file in the behavior folder
+    Takes an ephys session ID and finds the corresponding path to the matching .csv file in the behavior folder
     :return: Path to the behavior file
     """
 
