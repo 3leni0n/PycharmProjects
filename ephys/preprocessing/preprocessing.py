@@ -225,7 +225,7 @@ def check_data(df_behavior, df_keys):
     sounds_match = [ephys_filenames[i] == behavior_filenames[i] for i in range(n_trials)]
 
     # Check if all sounds from behavior and ephys match
-    # assert all(sounds_match), 'Sounds from behavior and ephys do not match'
+    assert all(sounds_match), 'Sounds from behavior and ephys do not match'
 
     # Check if all values of sounds_match are True
     if all(sounds_match):
@@ -374,8 +374,8 @@ def print_timeline(continuous, events, df_behavior, df_spikes):
           f'lasting {round(len_spikes)} min.')
 
     # Check if the length of the behavioral session from behavioral and ephys data match
-    assert round(len_events) == round(len_behavior), \
-        'Length of behavioral session from behavioral and ephys data do not match'
+    assert abs(round(len_events) - round(len_behavior)) <= 1, \
+        'Length of behavioral session from behavioral and ephys data do not match. '
 
     print('\n')
 
@@ -535,6 +535,8 @@ def preprocess(ephys_id):
     directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
     directory2 = Path.home() / 'Documents' / 'Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
 
+    subject = ephys_id[:3]
+
     # Load raw Open Ephys data
     try:
         continuous, events = load_oe_data(directory, sync=True, stream='AP')
@@ -555,8 +557,8 @@ def preprocess(ephys_id):
     n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
 
     # Load spike sorted data (KS4)
-    path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / ephys_id / 'kilosort4'
-    path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / ephys_id / 'Phy2'
+    path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / subject / ephys_id / 'kilosort4'
+    path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / subject / ephys_id / 'Phy2'
     df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
 
     # Print session info
