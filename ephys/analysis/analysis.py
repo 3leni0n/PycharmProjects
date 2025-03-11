@@ -111,7 +111,7 @@ def select_cluster(cluster_info, group='all'):
     return cluster_info[cond].cluster_id
 
 
-def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
+def get_peri_stim_spikes(df_cluster, df_ttl, align='stim', time_win=[-1, 3], scale=0):
     """
     Get peri-stimulus spikes for a cluster.
     :param df_cluster: DataFrame with spike times of a given cluster
@@ -130,11 +130,16 @@ def get_peri_stim_spikes(df_cluster, df_ttl, time_win=[-1, 3], scale=0):
     for trial in range(len(df_ttl)):
         # print(f'Trial {trial}')
         jitter = np.random.normal(0, scale)  # Jitter the stimulus onset timestamps
-        stim_onset = df_ttl.OFF[trial] + jitter  # Get the stimulus onset timestamp
+
+        if align == 'stim':
+            alignment = df_ttl.OFF[trial] + jitter  # Get the stimulus onset timestamp
+        elif align == 'go_cue':
+            alignment = df_ttl.OFF[trial] + 1 + jitter  # Get the go cue timestamp
+
         # Select only spikes within the time window of interest around the event
-        spikes_trial = df_cluster[(df_cluster.times >= stim_onset - abs(time_win[0])) &
-                                  (df_cluster.times <= stim_onset + abs(time_win[1]))].times
-        spikes_trial = spikes_trial - stim_onset  # Align spikes to the event
+        spikes_trial = df_cluster[(df_cluster.times >= alignment - abs(time_win[0])) &
+                                  (df_cluster.times <= alignment + abs(time_win[1]))].times
+        spikes_trial = spikes_trial - alignment  # Align spikes to the event
         peri_stim_spikes.append(spikes_trial)
 
     return peri_stim_spikes
@@ -366,7 +371,7 @@ def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
     return bins, psth
 
 
-def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1):
+def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align='stim', time_win=[-1, 3], bin_size=0.1):
     """
     Create 3-dimensional array (trial x bin x cluster) with all PSTHs for all clusters
     :param df_spikes: dataframe with spike times
@@ -383,7 +388,7 @@ def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bi
     for i, cluster in enumerate(cluster_info.cluster_id):
         # print(f'{i}: cluster {cluster}')
         df_cluster = df_spikes[df_spikes.cluster == cluster]
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win=time_win, scale=0)
+        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, align=align, time_win=time_win, scale=0)
         bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
         all_psth[:, :, i] = psth
 

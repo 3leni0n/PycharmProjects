@@ -101,13 +101,6 @@ for i in range(len(ephys_ids)):
     df = pd.read_csv(folder_child / filename)
     behavior.append(df)
 
-# # Get behavioral events
-# stim_dur = df_behavior.StimDur.unique()[0]
-# delay = df_behavior.Delay.unique()[0]
-# go_cue = stim_dur + delay
-
-########################################################################################################################
-
 
 def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=False):
     """
@@ -142,6 +135,8 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
     # Get the earliest occurrence and corresponding y-value
     disengaged_trial, disengaged_y = min(filter(None, [idx_total, idx_0, idx_1]), default=(None, None))
 
+    print(f'Disengagement happened in trial {disengaged_trial}')
+
     # Side accuracy plot
     if plot:
         plt.figure(constrained_layout=True)
@@ -162,6 +157,17 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
         sns.despine()
 
     return disengaged_trial
+
+
+# for i in range(len(behavior)):
+#     disengagement = find_disengaged(behavior[i], plot=False)  # Find trial when disengagement happens
+#     engaged = (behavior[i]['Trial'] <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
+#     behavior[i]['Engaged'] = engaged
+
+# # Get behavioral events
+# stim_dur = df_behavior.StimDur.unique()[0]
+# delay = df_behavior.Delay.unique()[0]
+# go_cue = stim_dur + delay
 
 ########################################################################################################################
 # SINGLE SESSION DECODERS
@@ -360,7 +366,7 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
         clf.fit(X_train, y_train)
 
         # Loop over each time bin_train
-        for bin_test in range(X.shape[1]):
+        for bin_test in range(n_bins):
 
             # Define train and testing set for the current time bin_train and fold
             X_test = X[test_index, bin_test]
@@ -512,7 +518,7 @@ def epoch_cross_decoder_split(bins, split, epoch='stim', X=np.zeros((1, 1, 1)), 
 
 
 @timer
-def mean_decoder(kind=None, epoch=None, split_by=None, save=False, plot=False):
+def mean_decoder(kind=None, epoch=None, split_by=None, save=False, plot=False, engagement=None):
     """
     Perform within time bin decoder across all sessions.
     :param kind: type of decoder (within, cross, epoch)
@@ -530,16 +536,29 @@ def mean_decoder(kind=None, epoch=None, split_by=None, save=False, plot=False):
     }
 
     for i in range(len(ephys_ids)):
+
         print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+
         path_behavior = get_behavior_id(ephys_ids[i])
         df_behavior = parse_v2(path_behavior)
+        disengagement = find_disengaged(df_behavior, plot=False)  # Find trial when disengagement happens
+        engaged = (df_behavior.Trial <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
+        df_behavior['Engaged'] = engaged
         bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
         all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
 
-        # # Testing if misses causes the difference with split
-        # resp_indxs = df_behavior[df_behavior.Miss == 0].index
-        # df_behavior = df_behavior.iloc[resp_indxs].reset_index(drop=True)
-        # all_psth = all_psth[resp_indxs]
+        # Engagement
+        if engagement == 0:  # Disengaged trials
+            df_behavior = df_behavior[df_behavior.Engaged == 0].reset_index(drop=True)
+        elif engagement == 1:  # Engaged trials
+            df_behavior = df_behavior[df_behavior.Engaged == 1].reset_index(drop=True)
+        all_psth = all_psth[df_behavior.index.values]
+
+        # Misses
+        resp_idx = df_behavior[df_behavior.Miss == 0].index
+        # resp_idx = df_behavior[df_behavior.Hit == 1].index
+        df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+        all_psth = all_psth[resp_idx]
         # split = df_behavior[split_by]
 
         if kind == 'within':
@@ -556,6 +575,9 @@ def mean_decoder(kind=None, epoch=None, split_by=None, save=False, plot=False):
             pred, pred_err, acc, acc_null = epoch_cross_decoder_split(bins, split, epoch=epoch, X=all_psth,
                                                                       y=df_behavior.Side)
             filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '_' + 'split_by' + '_' + split_by + '.pkl'
+        elif kind == 'test':
+            pass
+            filename = 'results_mean_TEST.pkl'
 
         results['pred'].append(pred)
         results['pred_err'].append(pred_err)
@@ -655,7 +677,7 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
         ylabel = 'Accuracy'
 
     plt.axvline(0, color='tab:red', linestyle='-')  # Stimulus onset
-    plt.axvline(go_cue, color='tab:gray', linestyle='-')  # Go cue
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
     plt.title(f'Decoding accuracy\n'
@@ -683,8 +705,8 @@ def plot_cross_decoder(bins, acc, acc_null, z_null=True):
         axislabel = ''
 
     plt.colorbar()
-    plt.xticks(np.arange(0, len(bins), 10), np.round(bins[::10]))
-    plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]))
+    plt.xticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
+    plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
     plt.axhline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
     plt.axvline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
     plt.axhline(np.where(bins == 0.5)[0], color='k', linestyle='-')  # Delay
@@ -821,8 +843,8 @@ def plot_mean_cross_decoder(results, z_null=True):
         plt.imshow(acc_mean, origin='lower')  # abs needed?
 
     plt.colorbar()
-    plt.xticks(np.arange(0, len(bins), 10), np.round(bins[::10]))
-    plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]))
+    plt.xticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
+    plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
     plt.axhline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
     plt.axvline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
     plt.axhline(np.where(bins == 0.5)[0], color='k', linestyle='-')  # Delay
@@ -901,3 +923,87 @@ def plot_mean_epoch_cross_decoder_split(results, z_null=True):
     plt.legend(frameon=False)
     sns.despine()
 
+
+########################################################################################################################
+# UNDER CONSTRUCTION
+# Please wear safety equipment. Any resemblance to real persons, living or dead, is purely coincidental. I do not take
+# responsibility for any damage caused by the use of this code. Use at your own risk.
+########################################################################################################################
+
+# Testing split according to engagement
+@timer
+def epoch_cross_decoder_TEST(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), eng=np.zeros((1, 1)),
+                             n_shuffles=100):
+    """
+    Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
+    cross-validation across trials and across time bins.
+    :param X: 3D array with neural data (trials x time x neurons)
+    :param y: 1D array with binary stimulus condition
+    :return: pred, pred_err (predicted condition and prediction error)
+    """
+
+    # Get the indexes of the trials where the animal was engaged
+    engaged = eng[eng == 1].index.values
+    disengaged = eng[eng == 0].index.values
+
+    # Initialize arrays
+    n_trials, n_bins, n_neurons = X.shape
+    pred = np.empty((n_trials, n_bins)) * np.nan
+    pred_err = np.empty((n_trials, n_bins)) * np.nan
+    acc = np.empty((n_trials, n_bins)) * np.nan  # Store per trial and bin
+    acc_null = np.empty((n_trials, n_bins, n_shuffles)) * np.nan  # Store per trial, bin, and shuffle
+
+    # Apply z-scoring normalization across neurons and time bins (per trial)
+    scaler = StandardScaler()
+
+    # Define epoch of interest
+    if epoch == 'stim':
+        epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]  # Find index where stim_onset (0) is
+        epoch_end_idx = np.where(np.round(bins, 1) == 0.2)[0][0]  # Find index where delay (0.5) is
+    elif epoch == 'delay':
+        epoch_start_idx = np.where(np.round(bins, 1) == 0.8)[0][0]  # Find index where delay (0.5) is
+        epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]  # Find index where go cue is in bins
+    elif epoch == 'resp':
+        epoch_start_idx = np.where(np.round(bins, 1) == 1.8)[0][0]  # Find index where go cue is in bins
+        epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
+
+    # Cross thinghy happens here
+    # Train decoder on engaged trials
+    X_train = np.mean(X[engaged, epoch_start_idx:epoch_end_idx], axis=1)
+    X_train = scaler.fit_transform(X_train)  # Apply z-scoring normalization to the training and test sets
+    y_train = y[engaged]
+
+    # # Test on disengaged trials
+    # X_test = np.mean(X[disengaged, epoch_start_idx:epoch_end_idx], axis=1)
+    # y_test = y[disengaged]
+
+    # Train decoder (logistic regression) on the current time bin neural activity
+    clf = LogisticRegression()
+    clf.fit(X_train, y_train)
+
+    # Loop over each time bin_train
+    for bin_test in range(n_bins):
+
+        # Define test set for the current time bin
+        X_test = X[disengaged, bin_test]
+        y_test = y[disengaged]
+
+        # Apply z-scoring normalization to the current time bin_train's data (otherwise might not converge)
+        X_test = scaler.transform(X_test)  # Only transform the test set using the same scaler
+
+        # Evaluate decoder
+        y_pred = clf.predict(X_test)  # Predicts the stimulus category for test trials
+        y_acc = (y_pred == y_test).astype(int)  # Computes accuracy per trial
+
+        # Store results
+        pred[disengaged, bin_test] = y_pred  # Predicted stimulus condition for each test trial at each time bin
+        pred_err[disengaged, bin_test] = y_pred - y_test  # Difference between predicted and actual labels
+        acc[disengaged, bin_test] = y_acc  # Accuracy for each test trial at each time bin
+
+        # Compute null distribution by shuffling the labels and evaluating accuracy
+        y_test_shuffled = y_test.values.copy()
+        for _ in range(n_shuffles):
+            np.random.shuffle(y_test_shuffled)
+            acc_null[disengaged, bin_test, _] = (y_pred == y_test_shuffled).astype(int)  # Computes accuracy per trial
+
+    return pred, pred_err, acc, acc_null
