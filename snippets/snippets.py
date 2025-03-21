@@ -12,15 +12,6 @@ Random code lines
 # import matplotlib
 # matplotlib.matplotlib_fname()
 
-# How to pickle
-# save:
-with open('bootstrap_samples_100.pickle', 'wb') as handle:
-    pickle.dump(bootstrap_samples_100, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-# load:
-with open('../Data/new/df_corrected.pickle', 'rb') as handle:
-    df_dat = pickle.load(handle)
-
 # How to 'listen' specific sounds with the DAC mic in the setup:
 # 1. Change the calibration of 'on_play_Sound1' from '001.wav' to the desired sound ('xxx.wav')
 # 2. Open the console, go to the directory 'cd pluginsr-for-pybpod/sound\ test'

@@ -192,7 +192,7 @@ def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     acc_null = np.empty((n_shuffles, n_bins))
 
     # Cross-validate results
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  # Stratified cross-validation
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)  # Stratified cross-validation
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     for train_index, test_index in skf.split(X, y):
@@ -215,7 +215,8 @@ def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
 
             # Evaluate decoder
             y_pred = clf.predict(X_test)  # Predicts the stimulus category for test trials
-            y_acc = accuracy_score(y_test, y_pred)  # Computes accuracy for each fold and time bin_train
+            # y_acc = accuracy_score(y_test, y_pred)  # Computes accuracy for each fold and time bin_train
+            y_acc = (y_pred == y_test).astype(int)  # Accuracy per trial
             # print(f"Accuracy: {y_acc:.2f}")
 
             # Store results
@@ -227,7 +228,8 @@ def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
             y_test_shuffled = y_test.values.copy()
             for _ in range(n_shuffles):
                 np.random.shuffle(y_test_shuffled)
-                acc_null[_, bin_train] = accuracy_score(y_test_shuffled, y_pred)
+                # acc_null[_, bin_train] = accuracy_score(y_test_shuffled, y_pred)
+                acc_null[_, bin_train] = np.mean((y_pred == y_test_shuffled).astype(int))
 
             # # Compute null distribution by shuffling y_train (slower)
             # y_train_shuffled = y_train.values.copy()
@@ -262,7 +264,7 @@ def cross_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
 
     # Cross-validate results
     # kf = KFold()  # K-Fold cross-validation
-    skf = StratifiedKFold(n_splits=5, shuffle=True)  # Stratified cross-validation
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)  # Stratified cross-validation
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     # for train_index, test_index in kf.split(X):
@@ -534,19 +536,25 @@ def mean_decoder(kind=None, epoch=None, split_by=None, engagement=None, plot=Fal
         bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
         all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
 
+        eng_label = ''
         if engagement is not None:  # Add engaged column to df_behavior
             if engagement == 0:  # Disengaged trials
                 df_behavior = df_behavior[df_behavior.Engaged == 0].reset_index(drop=True)
+                eng_label = 'disengaged'
             elif engagement == 1:  # Engaged trials
                 df_behavior = df_behavior[df_behavior.Engaged == 1].reset_index(drop=True)
+                eng_label = 'engaged'
             all_psth = all_psth[df_behavior.index.values]  # Filter all_psth by selected engagement
 
-        # Misses
+        # # Remove misses
         # resp_idx = df_behavior[df_behavior.Miss == 0].index
-        resp_idx = df_behavior[df_behavior.Hit == 1].index
-        df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
-        all_psth = all_psth[resp_idx]
-        # split = df_behavior[split_by]
+        # df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+        # all_psth = all_psth[resp_idx]
+
+        # Remove misses
+        correct_idx = df_behavior[df_behavior.Hit == 1].index  # Correct trials only
+        df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
+        all_psth = all_psth[correct_idx]
 
         if kind == 'within':
             pred, pred_err, acc, acc_null = within_decoder(all_psth, df_behavior.Side)
@@ -556,7 +564,7 @@ def mean_decoder(kind=None, epoch=None, split_by=None, engagement=None, plot=Fal
             filename = 'results_mean_cross_decoder.pkl'
         elif kind == 'epoch':
             pred, pred_err, acc, acc_null = epoch_cross_decoder(bins, epoch, all_psth, df_behavior.Side)
-            filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '.pkl'
+            filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '_' + eng_label + '.pkl'
         elif kind == 'epoch_split':
             split = df_behavior[split_by]
             pred, pred_err, acc, acc_null = epoch_cross_decoder_split(bins, split, epoch=epoch, X=all_psth,
@@ -670,8 +678,8 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
     plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
-    plt.title(f'Decoding accuracy\n'
-              f'{df_behavior.Subject.unique()[0]}, {acc.shape[0]} trials')
+    # plt.title(f'Decoding accuracy\n'
+    #           f'{df_behavior.Subject.unique()[0]}, {acc.shape[0]} trials')
     plt.legend(frameon=False)
     sns.despine()
 
@@ -749,11 +757,12 @@ def plot_epoch_cross_decoder(bins, acc, acc_null, epoch='stim', z_null=True):
     sns.despine()
 
 
-def plot_mean_within_decoder(results, z_null=True):
+def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
     """
     Plot the mean decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
-    :return:
+    :param errorbar: type of error bar (ci=Confidence Interval, sem=Standard Error of the Mean). Only if z_null=False
+    :param z_null: whether to Z-score the decoding accuracy by the null distribution of accuracy
     """
 
     plt.figure(constrained_layout=True)
@@ -783,20 +792,37 @@ def plot_mean_within_decoder(results, z_null=True):
         acc_mean = np.mean(acc_mean, axis=0)
         acc_null_sem = sem(acc_null_mean, axis=0)
         acc_null_mean = np.mean(acc_null_mean, axis=0)
+        acc_CI = 1.96 * acc_sem  # 95% confidence interval
+        acc_null_CI = 1.96 * acc_null_sem  # 95% confidence interval
+
+        if errorbar == 'ci':
+            acc_band = (acc_mean - acc_CI, acc_mean + acc_CI)
+            acc_null_band = (acc_null_mean - acc_null_CI, acc_null_mean + acc_null_CI)
+            acc_band_label = 'Acc. 95% CI'
+            acc_null_band_label = 'Acc. null 95% CI'
+        elif errorbar == 'sem':
+            acc_band = (acc_mean - acc_sem, acc_mean + acc_sem)
+            acc_null_band = (acc_null_mean - acc_null_sem, acc_null_mean + acc_null_sem)
+            acc_band_label = 'Acc. SEM'
+            acc_null_band_label = 'Acc. null SEM'
 
         # Plot the mean decoding accuracy across all sessions
         plt.plot(bins[:-1], acc_mean, color='tab:blue', label='Acc.')
-        plt.fill_between(bins[:-1], acc_mean - acc_sem, acc_mean + acc_sem, color='tab:blue', edgecolor='none',
-                         alpha=0.25, label='Acc. s.e.m.')
+        plt.fill_between(bins[:-1], acc_band[0], acc_band[1], color='tab:blue', edgecolor='none',
+                         alpha=0.25, label=acc_band_label)
 
         # Plot the mean null accuracy across all sessions (chance level)
         plt.plot(bins[:-1], acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
-        plt.fill_between(bins[:-1], acc_null_mean - acc_null_sem, acc_null_mean + acc_null_sem, color='tab:gray',
-                         edgecolor='none', alpha=0.25, label='Acc. null s.e.m.')
+        plt.fill_between(bins[:-1], acc_null_band[0], acc_null_band[1], color='tab:gray',
+                         edgecolor='none', alpha=0.25, label=acc_null_band_label)
+
+        # # Plot the individual sessions accuracy
+        # for _ in range(len(results['acc'])):
+        #     plt.plot(bins[:-1], np.mean(results['acc'][_], axis=0), color='tab:blue', alpha=0.1)
 
         # # Plot the individual sessions null accuracy (chance level)
         # for _ in range(len(results['acc_null'])):
-        #     plt.plot(bins[:-1], np.mean(results['acc_null'][_], axis=0), ls='--', c='tab:gray')
+        #     plt.plot(bins[:-1], np.mean(results['acc_null'][_], axis=0), ls='--', color='tab:gray')
 
         ylabel = 'Accuracy'
 
@@ -852,7 +878,7 @@ def plot_mean_cross_decoder(results, z_null=True):
     sns.despine()
 
 
-def plot_mean_epoch_cross_decoder(results, epoch='stim', z_null=True):
+def plot_mean_epoch_cross_decoder(results, epoch='stim', errorbar='ci', engagement=None, z_null=True):
     """
     Plot the mean epoch cross temporal decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
@@ -861,19 +887,54 @@ def plot_mean_epoch_cross_decoder(results, epoch='stim', z_null=True):
 
     if epoch == 'stim':
         label = 'Stimulus'
+        color = 'tab:blue'
     elif epoch == 'delay':
         label = 'Delay'
+        color = 'tab:orange'
     elif epoch == 'resp':
         label = 'Response'
+        color = 'tab:green'
+
+    if engagement is not None:
+        if engagement == 0:
+            label = 'Disengaged'
+            color = 'tab:gray'
+        elif engagement == 1:
+            label = 'Engaged'
+
 
     acc_mean = [np.nanmean(results['acc'][i], axis=0) for i in range(len(results['acc']))]
     acc_mean = np.array(acc_mean)
     acc_sem = sem(acc_mean, axis=0, nan_policy='omit')
     acc_mean = np.nanmean(acc_mean, axis=0)
+    acc_CI = 1.96 * acc_sem  # 95% confidence interval
+
+    acc_null_mean = [np.nanmean(results['acc_null'][i], axis=(0, 2)) for i in range(len(results['acc_null']))]
+    acc_null_mean = np.array(acc_null_mean)
+    acc_null_sem = sem(acc_null_mean, axis=0, nan_policy='omit')
+    acc_null_mean = np.nanmean(acc_null_mean, axis=0)
+    acc_null_CI = 1.96 * acc_null_sem  # 95% confidence interval
+
+    if errorbar == 'ci':
+        acc_band = (acc_mean - acc_CI, acc_mean + acc_CI)
+        acc_null_band = (acc_null_mean - acc_null_CI, acc_null_mean + acc_null_CI)
+        acc_band_label = 'Acc. 95% CI'
+        acc_null_band_label = 'Acc. null 95% CI'
+    elif errorbar == 'sem':
+        acc_band = (acc_mean - acc_sem, acc_mean + acc_sem)
+        acc_null_band = (acc_null_mean - acc_null_sem, acc_null_mean + acc_null_sem)
+        acc_band_label = 'Acc. SEM'
+        acc_null_band_label = 'Acc. null SEM'
+
     # n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
     # plt.figure(constrained_layout=True)
-    plt.plot(results['bins'][:-1], acc_mean, label=label)
-    plt.fill_between(results['bins'][:-1], acc_mean - acc_sem, acc_mean + acc_sem, edgecolor='none', alpha=0.25)
+    plt.plot(results['bins'][:-1], acc_mean, color=color, label=label)
+    plt.fill_between(results['bins'][:-1], acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
+
+    plt.plot(results['bins'][:-1], acc_null_mean, linestyle='--', color=color)
+    plt.fill_between(results['bins'][:-1], acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
+                        alpha=0.25)
+
     plt.legend(frameon=False)
     plt.xlabel('Time (s)')
     plt.ylabel('Accuracy')
