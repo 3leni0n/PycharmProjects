@@ -314,7 +314,7 @@ def cross_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
 
 # Testing getting accuracy per trial instead of per fold
 @timer
-def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
+def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
     Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
     cross-validation across trials and across time bins.
@@ -322,8 +322,6 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
     :param y: 1D array with binary stimulus condition
     :return: pred, pred_err (predicted condition and prediction error)
     """
-
-    n_splits = 5
 
     # Initialize arrays
     n_trials, n_bins, n_neurons = X.shape
@@ -333,7 +331,6 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
     acc = np.empty((n_trials, n_bins)) * np.nan  # Store per trial and bin
     # acc_null = np.empty((n_shuffles, n_bins))  # Store per shuffle and bin
     acc_null = np.empty((n_trials, n_bins, n_shuffles)) * np.nan  # Store per trial, bin, and shuffle
-    # pred_err_null = np.empty((X.shape[0], X.shape[1], n_shuffles))
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -399,11 +396,11 @@ def epoch_cross_decoder(bins, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1
                 # pred_err_null[test_index, bin_test, _] = y_pred - y_test_shuffled  # Difference between predicted and
                 # actual labels
 
-    return pred, pred_err, acc, acc_null#, pred_err_null
+    return pred, pred_err, acc, acc_null
 
 
 @timer
-def epoch_cross_decoder_split(bins, split, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
+def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
     Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
     cross-validation across trials and across time bins.
@@ -503,11 +500,11 @@ def epoch_cross_decoder_split(bins, split, epoch='stim', X=np.zeros((1, 1, 1)), 
                 # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
                 # actual labels
 
-    return pred, pred_err, acc, acc_null#, pred_err_null0, pred_err_null1
+    return pred, pred_err, acc, acc_null
 
 
 @timer
-def mean_decoder(kind=None, epoch=None, split_by=None, engagement=None, drop_miss=True, hit_only=False, n_shuffles=100,
+def mean_decoder(kind=None, epoch=None, epoch_ortho=None, split_by=None, engagement=None, drop_miss=True, hit_only=False, n_shuffles=100,
                  plot=False, save=False):
     """
     Perform within time bin decoder across all sessions.
@@ -547,22 +544,24 @@ def mean_decoder(kind=None, epoch=None, split_by=None, engagement=None, drop_mis
                 eng_label = 'engaged'
             all_psth = all_psth[df_behavior.index.values]  # Filter all_psth by selected engagement
 
+        # Filter trials
         # Remove misses (default)
         if drop_miss:
             resp_idx = df_behavior[df_behavior.Miss == 0].index
             df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
             all_psth = all_psth[resp_idx]
 
-        # Correct trials only
+        # Correct trials only (not default)
         if hit_only:
             correct_idx = df_behavior[df_behavior.Hit == 1].index
             df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
             all_psth = all_psth[correct_idx]
 
+        # Select decoder
         if kind == 'within':
             pred, pred_err, acc, acc_null = \
                 within_decoder(all_psth, df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_within_decoder.pkl'
+            filename = 'results_mean_within_decoder' + '_' + eng_label + '.pkl'
         elif kind == 'cross':
             pred, pred_err, acc, acc_null = \
                 cross_decoder(all_psth, df_behavior.Side, n_shuffles=n_shuffles)
@@ -576,11 +575,17 @@ def mean_decoder(kind=None, epoch=None, split_by=None, engagement=None, drop_mis
             pred, pred_err, acc, acc_null = \
                 epoch_cross_decoder_split(bins, split, epoch=epoch, X=all_psth, y=df_behavior.Side, n_shuffles=n_shuffles)
             filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '_' + 'split_by' + '_' + split_by + '.pkl'
+
+        # UNDER CONSTRUCTION (use at your own risk)
         elif kind == 'test':
             split = df_behavior[split_by]
             pred, pred_err, acc, acc_null = \
                 epoch_cross_decoder_split_TEST(bins, split, epoch=epoch, X=all_psth, y=df_behavior.Side, n_shuffles=n_shuffles)
             filename = 'results_mean_TEST.pkl'
+        elif kind == 'epoch_ortho':
+            pred, pred_err, acc, acc_null = \
+                epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior.Side, n_shuffles=n_shuffles)
+            filename = 'results_mean_epoch_cross_decoder_ORTHO' + '_' + epoch + '_' + eng_label + '.pkl'
 
         results['pred'].append(pred)
         results['pred_err'].append(pred_err)
@@ -845,7 +850,7 @@ def plot_mean_cross_decoder(results, z_null=True):
     sns.despine()
 
 
-def plot_epoch_cross_decoder(bins, acc, acc_null, epoch='stim', z_null=True):
+def plot_epoch_cross_decoder(bins, acc, acc_null, epoch=None, z_null=True):
 
     """
     Plot the epoch cross temporal decoding accuracy of a single session.
@@ -883,7 +888,7 @@ def plot_epoch_cross_decoder(bins, acc, acc_null, epoch='stim', z_null=True):
     sns.despine()
 
 
-def plot_mean_epoch_cross_decoder(results, epoch='stim', errorbar='ci', engagement=None, z_null=True):
+def plot_mean_epoch_cross_decoder(results, epoch=None, errorbar='ci', engagement=None, z_null=True):
     """
     Plot the mean epoch cross temporal decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
@@ -1034,7 +1039,7 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
 
 # Testing split according to engagement
 @timer
-def epoch_cross_decoder_split_TEST(bins, split, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
+def epoch_cross_decoder_split_TEST(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
     Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
     cross-validation across trials and across time bins.
@@ -1142,8 +1147,6 @@ def epoch_cross_decoder_split_TEST(bins, split, epoch='stim', X=np.zeros((1, 1, 
                 # actual labels
 
     return pred, pred_err, acc, acc_null#, pred_err_null0, pred_err_null1
-
-
 
 
 # def epoch_cross_decoder_split_TEST(bins, split, epoch='stim', X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
@@ -1303,12 +1306,9 @@ def epoch_cross_decoder_split_TEST(bins, split, epoch='stim', X=np.zeros((1, 1, 
 # epoch_cross_decoder_split_TEST(bins, df_behavior.Engaged, epoch='stim', X=all_psth, y=df_behavior.Side, n_shuffles=100)
 
 
-
-
-
-
 @timer
-def epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho="delay", X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
+def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)),
+                              n_shuffles=100):
     """
     Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
     cross-validation across trials and across time bins.
@@ -1352,8 +1352,16 @@ def epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho="delay", X=np.zero
         epoch_start_idx = np.where(np.round(bins, 1) == 1.8)[0][0]  # Find index where go cue is in bins
         epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
 
-    epoch_start_idx_ortho = np.where(np.round(bins, 1) == 0.8)[0][0]  # Find index where delay (0.5) is
-    epoch_end_idx_ortho = np.where(np.round(bins, 1) == 1)[0][0]
+    # Define orthogonalization epoch
+    if epoch_ortho == 'stim':
+        epoch_start_idx_ortho = np.where(np.round(bins, 1) == 0)[0][0]  # Find index where stim_onset (0) is
+        epoch_end_idx_ortho = np.where(np.round(bins, 1) == 0.2)[0][0]  # Find index where delay (0.5) is
+    elif epoch_ortho == 'delay':
+        epoch_start_idx_ortho = np.where(np.round(bins, 1) == 0.8)[0][0]  # Find index where delay (0.5) is
+        epoch_end_idx_ortho = np.where(np.round(bins, 1) == 1)[0][0]  # Find index where go cue is in bins
+    elif epoch_ortho == 'resp':
+        epoch_start_idx_ortho = np.where(np.round(bins, 1) == 1.8)[0][0]  # Find index where go cue is in bins
+        epoch_end_idx_ortho = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     # for train_index, test_index in kf.split(X):
@@ -1380,7 +1388,7 @@ def epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho="delay", X=np.zero
         # v2 = w1 - np.dot(v1, w2)/(v1, v1) * v1
         weights_orthogonalized = weights - np.dot(weights_ortho, weights) / np.dot(weights_ortho, weights_ortho) * weights_ortho
         # How to Compute the Intercept for the Orthogonalized Model?
-        intercept_ortho = clf.intercept_[0] - (clf_ortho.intercept_[0] * clf.intercept_[0] / (clf_ortho.intercept_[0] ** 2))
+        intercept_ortho = clf.intercept_[0] - (clf_ortho.intercept_[0] * clf.intercept_[0] / (clf_ortho.intercept_[0] ** 2)) * clf_ortho.intercept_[0]
 
         # Loop over each time bin_train
         for bin_test in range(n_bins):
@@ -1423,23 +1431,22 @@ def epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho="delay", X=np.zero
                 # pred_err_null[test_index, bin_test, _] = y_pred - y_test_shuffled  # Difference between predicted and
                 # actual labels
 
-    return pred, pred_err, acc, acc_ortho, acc_null#, pred_err_null
+            acc = acc_ortho
+
+    return pred, pred_err, acc, acc_null
 
 
-
-i = 0
-path_behavior = get_behavior_id(ephys_ids[i])
-df_behavior = parse_v2(path_behavior)
-disengagement = find_disengaged(df_behavior, plot=False)  # Find trial when disengagement happens
-engaged = (df_behavior.Trial <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
-df_behavior['Engaged'] = engaged
-bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
-# Correct trials only
-correct_idx = df_behavior[df_behavior.Hit == 1].index
-df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
-all_psth = all_psth[correct_idx]
-epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho='delay', X=all_psth, y=df_behavior.Side,
-                          n_shuffles=100)
-
-
+# i = 0
+# path_behavior = get_behavior_id(ephys_ids[i])
+# df_behavior = parse_v2(path_behavior)
+# disengagement = find_disengaged(df_behavior, plot=False)  # Find trial when disengagement happens
+# engaged = (df_behavior.Trial <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
+# df_behavior['Engaged'] = engaged
+# bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
+# all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+# # Correct trials only
+# correct_idx = df_behavior[df_behavior.Hit == 1].index
+# df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
+# all_psth = all_psth[correct_idx]
+# epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho='delay', X=all_psth, y=df_behavior.Side,
+#                           n_shuffles=100)
