@@ -6,9 +6,10 @@ from daily_report.daily_report_v2 import *
 from daily_report.daily_report_v3 import *
 from daily_report.daily_report_v4 import *
 from daily_report.daily_report_v5 import *
+from daily_report.daily_report_v6 import *
 
 
-def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False):
+def do_daily_reports(version=6, experiment='2AFC_6', index=-1, send_slack=False):
     time_start = time.time()
 
     if experiment is None:
@@ -58,13 +59,13 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
     username = os.path.split(os.path.expanduser('~'))[-1]
 
     if username == 'setup1':
-        remove_from_setup1 = ['000', '001', '005', '008']
+        remove_from_setup1 = []
     else:
         remove_from_setup1 = []
 
     # Switched to training in setup1, remove from setup2 to avoid doing reports from old sessions
     if username == 'setup2':
-        remove_from_setup2 = ['002', '003', '006', '008']
+        remove_from_setup2 = []
     else:
         remove_from_setup2 = []
 
@@ -76,7 +77,7 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
         remove_from_setup_ephys = []
 
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['001', '002', '003', '005', '006', '008', '009']
+    not_training = []
 
     animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + remove_from_setup_ephys \
                         + not_training
@@ -120,6 +121,8 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
                         daily_report_v4(path, send_slack=send_slack)
                     elif version == 5:
                         daily_report_v5(path, send_slack=send_slack)
+                    elif version == 6:
+                        daily_report_v6(path, send_slack=send_slack)
                 except (IndexError, ValueError, FileNotFoundError, KeyError,
                         ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                     print(
@@ -156,6 +159,8 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
                             daily_report_v4(path, send_slack=send_slack)
                         elif version == 5:
                             daily_report_v5(path, send_slack=send_slack)
+                        elif version == 6:
+                            daily_report_v6(path, send_slack=send_slack)
                     except (IndexError, ValueError, FileNotFoundError, KeyError,
                             ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                         print(
@@ -178,6 +183,8 @@ def do_daily_reports(version=5, experiment='2AFC_5', index=-1, send_slack=False)
                         daily_report_v4(path, send_slack=send_slack)
                     elif version == 5:
                         daily_report_v5(path, send_slack=send_slack)
+                    elif version == 6:
+                        daily_report_v6(path, send_slack=send_slack)
                 except (IndexError, ValueError, FileNotFoundError, KeyError,
                         ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
                     print(

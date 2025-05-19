@@ -6,7 +6,7 @@ import pandas as pd
 from string import ascii_lowercase
 # from matplotlib import pyplot as plt
 # from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
-# import slack
+import slack
 import os
 import csv
 import random

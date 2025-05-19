@@ -18,7 +18,7 @@ username = os.path.split(os.path.expanduser('~'))[-1]
 if username == 'setup0':
     experiment = 'Ephys'
 else:
-    experiment = '2AFC_5'
+    experiment = '2AFC_6'
 from daily_report.do_daily_reports import *
 do_daily_reports(experiment=experiment, send_slack=True)
 END
