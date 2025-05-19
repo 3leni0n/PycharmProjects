@@ -11,7 +11,7 @@ from matplotlib.animation import FuncAnimation
 username = os.getlogin()  # Get username
 # username = getpass.getuser()  # Get username
 if username == 'setup1' or username == 'setup2':  # Training boxes 1-8
-    experiment = '2AFC_5'
+    experiment = '2AFC_6'
     max_sessions = 4
 elif username == 'setup0':  # Ephys box 0
     experiment = 'Ephys'
