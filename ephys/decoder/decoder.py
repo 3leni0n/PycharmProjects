@@ -1006,7 +1006,12 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
             acc_null0_mean = 1 - acc_null0_mean
             acc_null0_band = (1 - acc_null0_band[0], 1 - acc_null0_band[1])
     elif split == 'engagement':
-        colors = ('tab:gray', 'tab:green')
+        if epoch == 'stim':
+            colors = ('tab:gray', 'tab:blue')
+        elif epoch == 'delay':
+            colors = ('tab:gray', 'tab:orange')
+        elif epoch == 'resp':
+            colors = ('tab:gray', 'tab:green')
         labels = ('Disengaged', 'Engaged')
 
     # Condition 0 (error/disengaged)
@@ -1021,7 +1026,7 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
     plt.plot(results['bins'][:-1], acc1_mean, color=colors[1], label=labels[1])
     plt.fill_between(results['bins'][:-1], acc1_band[0], acc1_band[1], color=colors[1],
                      edgecolor='none', alpha=0.25)
-    plt.plot(results['bins'][:-1], acc_null1_mean, color='tab:green', linestyle='--')
+    plt.plot(results['bins'][:-1], acc_null1_mean, color=colors[1], linestyle='--')
     # plt.fill_between(results['bins'][:-1], acc_null1_band[0], acc_null1_band[1], color='tab:green', edgecolor='none',
     #                     alpha=0.25)
 
