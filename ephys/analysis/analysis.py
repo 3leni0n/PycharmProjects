@@ -32,20 +32,21 @@ from ephys.preprocessing import *
 ########################################################################################################################
 
 # Run preprocessing
-# ephys_id = '007_2024-07-12_13-29-26'
-# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-#     preprocess(ephys_id)
-#
-# # Get behavioral events
-# stim_dur = df_behavior.StimDur.unique()[0]
-# delay = df_behavior.Delay.unique()[0]
-# go_cue = stim_dur + delay
-# subject = df_behavior.Subject.unique()[0]
-# date = df_behavior.Date.unique()[0]
-#
-# # Set parameters
-# time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
-# bin_size = 0.1  # In seconds
+ephys_id = '007_2024-06-23_12-46-55'
+df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+    preprocess(ephys_id)
+
+# Get behavioral events
+stim_dur = df_behavior.StimDur.unique()[0]
+delay = df_behavior.Delay.unique()[0]
+go_cue = stim_dur + delay
+subject = df_behavior.Subject.unique()[0]
+date = df_behavior.Date.unique()[0]
+
+# Set parameters
+align='stim'
+time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+bin_size = 0.1  # In seconds
 
 ########################################################################################################################
 
@@ -493,7 +494,7 @@ def plot_psth_split(condition='outcome', over='spikes', ax=None):
 
     for _ in range(len(indexes)):
         if over == 'spikes':
-            peri_stim = get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), time_win)
+            peri_stim = get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), align, time_win)
             ylabel = 'FR (spikes/s)'
         elif over == 'licks':
             peri_stim = get_peri_stim_licks(df_behavior.iloc[indexes[_]].reset_index(drop=True))
@@ -924,7 +925,7 @@ def cluster_report(df_cluster, save=False):
     depth = cluster_info[cluster_info.cluster_id == cluster].depth.iloc[0]
     fr = cluster_info[cluster_info.cluster_id == cluster].fr.iloc[0]
 
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win)
+    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, align, time_win)
     bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
     peri_stim_licks = get_peri_stim_licks(df_behavior)
     bins, licks_psth = compute_psth(peri_stim_licks)

@@ -140,9 +140,9 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
     # Side accuracy plot
     if plot:
         plt.figure(constrained_layout=True)
-        plt.plot(x_total, y_total, color='k')
-        plt.plot(x_0, y_0, color='tab:blue')
-        plt.plot(x_1, y_1, color='tab:orange')
+        plt.plot(x_total, y_total, color='k', label='Total')
+        plt.plot(x_0, y_0, color='tab:blue', label='Left')
+        plt.plot(x_1, y_1, color='tab:orange', label='Right')
         plt.axhline(0.25, color='tab:gray', ls=':')
         plt.axhline(0.5, color='tab:gray', ls='--')
         plt.axhline(0.75, color='tab:gray', ls=':')
@@ -154,6 +154,7 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
         plt.xlabel('Trial')
         plt.ylabel('Side acc.')
         plt.title(df_behavior.Session.unique()[0])
+        plt.legend(frameon=False)
         sns.despine()
 
     return disengaged_trial
@@ -342,12 +343,12 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
     # Define epoch of interest
     if epoch == 'stim':
         epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]  # Find index where stim_onset (0) is
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.2)[0][0]  # Find index where delay (0.5) is
+        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]  # Find index where delay (0.5) is
     elif epoch == 'delay':
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.8)[0][0]  # Find index where delay (0.5) is
+        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]  # Find index where delay (0.5) is
         epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]  # Find index where go cue is in bins
     elif epoch == 'resp':
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.8)[0][0]  # Find index where go cue is in bins
+        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]  # Find index where go cue is in bins
         epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
@@ -425,12 +426,12 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
     # Define epoch of interest
     if epoch == 'stim':  # Find index where stim_onset (0-0.5) is
         epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.2)[0][0]
+        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]
     elif epoch == 'delay':  # Find index where delay (0.5-1) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.8)[0][0]
+        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]
         epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]
     elif epoch == 'resp':  # Find index where go cue (1-2) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.8)[0][0]
+        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]
         epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent over-fitting)
@@ -746,16 +747,16 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
         # Plot the mean decoding accuracy across all sessions
         plt.plot(bins[:-1], acc_mean, color='tab:blue', label='Acc.')
         plt.fill_between(bins[:-1], acc_band[0], acc_band[1], color='tab:blue', edgecolor='none',
-                         alpha=0.25, label=acc_band_label)
+                         alpha=0.25)#, label=acc_band_label)
 
         # Plot the mean null accuracy across all sessions (chance level)
         plt.plot(bins[:-1], acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
         plt.fill_between(bins[:-1], acc_null_band[0], acc_null_band[1], color='tab:gray',
-                         edgecolor='none', alpha=0.25, label=acc_null_band_label)
+                         edgecolor='none', alpha=0.25)#, label=acc_null_band_label)
 
-        # # Plot the individual sessions accuracy
-        # for _ in range(len(results['acc'])):
-        #     plt.plot(bins[:-1], np.mean(results['acc'][_], axis=0), color='tab:blue', alpha=0.1)
+        # Plot the individual sessions accuracy
+        for _ in range(len(results['acc'])):
+            plt.plot(bins[:-1], np.mean(results['acc'][_], axis=0), color='tab:blue', alpha=0.1)
 
         # # Plot the individual sessions null accuracy (chance level)
         # for _ in range(len(results['acc_null'])):
@@ -763,8 +764,9 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
 
         ylabel = 'Accuracy'
 
-    plt.axvline(0, color='tab:red', linestyle='-')  # Stimulus onset
-    # plt.axvline(go_cue, color='tab:gray', linestyle='-')  # Go cue
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
+    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
     # plt.title(f"Decoding accuracy\n"
@@ -834,15 +836,15 @@ def plot_mean_cross_decoder(results, z_null=True):
     else:
         plt.imshow(acc_mean, origin='lower')  # abs needed?
 
-    plt.colorbar()
+    plt.colorbar(label='Z-score')
     plt.xticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
     plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
-    plt.axhline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
-    plt.axvline(np.where(bins == 0)[0], color='k', linestyle='-')  # Stimulus onset
-    plt.axhline(np.where(bins == 0.5)[0], color='k', linestyle='-')  # Delay
-    plt.axvline(np.where(bins == 0.5)[0], color='k', linestyle='-')  # Delay
-    plt.axhline(np.where(bins == 1)[0], color='k', linestyle='-')  # Go cue
-    plt.axvline(np.where(bins == 1)[0], color='k', linestyle='-')  # Go cue
+    plt.axhline(np.where(bins == 0)[0], color='tab:gray', linestyle='-')  # Stimulus
+    plt.axvline(np.where(bins == 0)[0], color='tab:gray', linestyle='-')  # Stimulus
+    plt.axhline(np.where(bins == 0.5)[0], color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(np.where(bins == 0.5)[0], color='tab:gray', linestyle='--')  # Delay
+    plt.axhline(np.where(bins == 1)[0], color='tab:gray', linestyle='-')  # Go cue
+    plt.axvline(np.where(bins == 1)[0], color='tab:gray', linestyle='-')  # Go cue
     plt.xlabel('Test time (s)')
     plt.ylabel('Train time (s)')
     # plt.title(f"Decoding accuracy\n"
@@ -1069,12 +1071,12 @@ def epoch_cross_decoder_split_TEST(bins, split, epoch=None, X=np.zeros((1, 1, 1)
     # Define epoch of interest
     if epoch == 'stim':  # Find index where stim_onset (0-0.5) is
         epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.2)[0][0]
+        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]
     elif epoch == 'delay':  # Find index where delay (0.5-1) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.8)[0][0]
+        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]
         epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]
     elif epoch == 'resp':  # Find index where go cue (1-2) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.8)[0][0]
+        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]
         epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]
 
     index1 = np.where(split == 1)[0]  # Indices of correct/engaged trials
