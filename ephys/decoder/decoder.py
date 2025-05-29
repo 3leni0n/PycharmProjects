@@ -152,7 +152,7 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
             plt.plot(disengaged_trial, threshold, 'ro')
 
         plt.xlabel('Trial')
-        plt.ylabel('Side acc.')
+        plt.ylabel('Accuracy')
         plt.title(df_behavior.Session.unique()[0])
         plt.legend(frameon=False)
         sns.despine()
@@ -945,6 +945,10 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, errorbar='ci', engagement
     plt.plot(results['bins'][:-1], acc_null_mean, linestyle='--', color=color)
     plt.fill_between(results['bins'][:-1], acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
                         alpha=0.25)
+
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
+    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
     plt.legend(frameon=False)
     plt.xlabel('Time (s)')
