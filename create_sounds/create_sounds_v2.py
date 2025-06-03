@@ -45,7 +45,7 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
     # Generate white noise
     noise = white_noise(fs=fs, cutoff=cutoff, amp=amp, dur=dur, fn=fn, normalize=normalize)
-    # band_fs=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
+    # cutoff=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
     # FsOut=44100 the most used (audio CD)
 
     ####################################################################################################################

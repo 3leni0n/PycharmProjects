@@ -5,7 +5,8 @@ from scipy.stats import beta  # Important! If using this, can't call any variabl
 import pandas as pd
 from string import ascii_lowercase
 # from matplotlib import pyplot as plt
-# from sympy import symbols, Eq, log, nsolve  # Not installed in setup1 and setup2 PCs
+# from sympy import symbols, Eq, log, nsolve  # Not installed in setup PCs
+from scipy.optimize import fsolve
 import slack
 import os
 import csv
@@ -25,18 +26,19 @@ from functools import wraps
 
 def white_noise(fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000,
                 normalize=True):  # Adapted from UtilsR's 'whiteNoiseGen'
-    """Create 'white noise' (between quotes as the signal is actually being band pass filtered).
+    """Create band-pass filtered white noise (i.e., random noise that only contains frequencies within a specific range).
     Note: if it takes too long try reducing the sampling rate or the filter length.
     :param fs: Sampling frequency
     :param cutoff: Low and high frequency band edges. Should be positive and monotonically increasing
     :param amp: Amplitude
     :param dur: Duration in seconds
     :param fn: Filter length
-    :param normalized: If True normalize signal
+    :param normalize: If True normalize signal
+    :return: Band-pass filtered white noise vector
     """
     mean = 0
     std = 1
-    nyq = fs / 2  # Nyquist frequency (also found as fs * 0.5)
+    nyq = fs / 2  # Nyquist's frequency (also found as fs * 0.5)
     normalized_cutoff = [cutoff[0] / nyq, cutoff[1] / nyq]  # Normalize by Nyquist frequency
     noise = amp * np.random.normal(mean, std, int(fs * dur * 2))  # * 2 as there is an artifact at the beginning of the
     # signal when applying the filter. So create double length and then later trim out the beginning
@@ -61,6 +63,8 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
     :param amp: Amplitude (peak deviation of the function from 0)
     :param phase: Phase (φ -phi-) or horizontal shift (where in its cycle the oscillation is at t = 0 in rad/s)
     :param v_shift: Vertical shift
+    :param plot: If True, plot the sine wave
+    :return: x (time vector), y (sine wave vector)
     """
 
     x = np.arange(0, length, 1 / fs)  # Time vector of 'length' seconds and 'fs' points
@@ -161,48 +165,51 @@ def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, du
     :param dur: duration (in seconds)
     :param n_frames: number of frames
     :param sigma: standard deviation of the normal distribution
-    :param paired: if True, the sum of both sides = 1
     :return: sound left, sound right, stairs left (* n_frames), stairs_right (* n_frames)
     """
 
-    # noise = white_noise(fs=fs, cutoff=[2000, 20000], amp=amp, dur=dur, fn=10000)
     n_points = dur * fs  # Should be an integer
 
     if len(noise) != n_points:
-        raise ValueError('whitenoise and n_points need to  be the same length')
+        raise ValueError('noise and n_points need to  be the same length')
 
-    x, mod_wave = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
+    _, mod_wave = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
     # amp = 0.5 so the length of y domain is 1 (-0.5, 0.5) instead of 2 (-1, 1)
     # phase = -np.pi/2 so the function starts at its minimum
     # v_shift = amp = 0.5 so the function y domain starts at 0 and is positive
 
     if dB_left < 0 or dB_left > max_vol:
-        raise ValueError(f'{dB_left} is an invalid coherence, it must be within the range [0, 1]')
+        raise ValueError(f'{dB_left} dB is invalid; must be between 0 and {max_vol}')
+
+    elif dB_right < 0 or dB_right > max_vol:
+        raise ValueError(f'{dB_right} dB is invalid; must be between 0 and {max_vol}')
 
     elif dB_left == 0 or dB_left == max_vol:
 
-        coh_left = get_amp_from_dB(dB_left, max_vol)
-        coh_right = get_amp_from_dB(dB_right, max_vol)
+        amp_left = get_amp_from_dB(dB_left, max_vol)
+        amp_right = get_amp_from_dB(dB_right, max_vol)
 
-        # If coh == 0, stairsR = 0 and stairsL = -1; elif coh == 1, stairsR == 1 and stairsL == 0
-        envelope_L = np.repeat(coh_left, n_points)
-        envelope_R = np.repeat(coh_right, n_points)
-
-        sound_L = envelope_L * noise * mod_wave * amp  # Change svec for white_noise
-        sound_R = envelope_R * noise * mod_wave * amp
         stairs_L = np.repeat(dB_left, n_frames)  # Change name to envelope
         stairs_R = np.repeat(dB_right, n_frames)
+
+        envelope_L = np.repeat(amp_left, n_points)
+        envelope_R = np.repeat(amp_right, n_points)
+
+        sound_L = envelope_L * noise * mod_wave * amp
+        sound_R = envelope_R * noise * mod_wave * amp
+
         return sound_L, sound_R, stairs_L, stairs_R
 
     else:
-        stairs_L = np.random.normal(dB_left, sigma, size=n_frames)  # Draw samples from a Beta distribution
-        stairs_R = np.random.normal(dB_right, sigma, size=n_frames)  # Draw samples from a Beta distribution
+        # Draw samples from a normal distribution
+        stairs_L = np.random.normal(dB_left, sigma, size=n_frames)
+        stairs_R = np.random.normal(dB_right, sigma, size=n_frames)
 
-        stairs_L_amp = get_amp_from_dB(stairs_L, max_vol)
-        stairs_R_amp = get_amp_from_dB(stairs_R, max_vol)
+        amp_left = get_amp_from_dB(stairs_L, max_vol)
+        amp_right = get_amp_from_dB(stairs_R, max_vol)
 
-        envelope_L = np.repeat(stairs_L_amp, int(n_points / n_frames))
-        envelope_R = np.repeat(stairs_R_amp, int(n_points / n_frames))
+        envelope_L = np.repeat(amp_left, int(n_points / n_frames))
+        envelope_R = np.repeat(amp_right, int(n_points / n_frames))
 
         sound_L = envelope_L * noise * mod_wave * amp
         sound_R = envelope_R * noise * mod_wave * amp
@@ -575,26 +582,62 @@ def get_amps_from_diff(diff):
     return val1, val2
 
 
-def get_dBs_from_diff(diff, max_vol):
-    """Find the parameters to input the amplitude to dB transformation function so it returns values matching reality
-    (calibration value and ambient noise in dB)"""
+# def get_dBs_from_diff(diff, max_vol):
+#     """Find the parameters to input the amplitude to dB transformation function so it returns values matching reality
+#     (calibration value and ambient noise in dB)"""
+#
+#     # Define equations symbols
+#     x, y = symbols('x y')
+#
+#     constant = find_constant(max_vol)
+#
+#     # Define system of nonlinear equations
+#     eq1 = Eq(constant * 10 ** (x / 20) + constant * 10 ** (y / 20) - 1, 0)
+#     eq2 = Eq(x - y - diff, 0)
+#
+#     # Solve equations numerically
+#     sol = np.array(nsolve((eq1, eq2), (x, y), (40, 40))).astype(float)
+#
+#     x = float(sol[0])
+#     y = float(sol[1])
+#
+#     return x, y
 
-    # Define equations symbols
-    x, y = symbols('x y')
+
+def get_dBs_from_diff(diff, max_vol):
+    """
+    Compute the left and right channel dB SPL values that:
+    1. Differ by a specified interaural level difference (ILD), and
+    2. Sum to a total amplitude corresponding to a calibrated maximum volume (e.g., 60 dB SPL)
+    This is useful for generating stereo sound stimuli with precise ILDs while maintaining a fixed overall volume
+
+    :param diff: Interaural level difference in dB (left_dB - right_dB). Positive values make the left channel louder
+    :param max_vol: The calibrated maximum sound level (in dB SPL) corresponding to full-scale amplitude (amp = 1)
+    :return: A tuple containing the dB SPL values for the left and right audio channels.
+    """
 
     constant = find_constant(max_vol)
 
-    # Define system of nonlinear equations
-    eq1 = Eq(constant * 10 ** (x / 20) + constant * 10 ** (y / 20) - 1, 0)
-    eq2 = Eq(x - y - diff, 0)
+    def equations(vars):
+        left_dB, right_dB = vars
 
-    # Solve equations numerically
-    sol = np.array(nsolve((eq1, eq2), (x, y), (40, 40))).astype(float)
+        # Convert dB SPL to linear amplitude using: A = 10^(dB / 20)
+        left_amp = 10 ** (left_dB / 20)  # Convert left dB to amplitude
+        right_amp = 10 ** (right_dB / 20)  # Convert right dB to amplitude
+        # Scale the sum of amplitudes by a constant to ensure that amp 1 = max volume
+        total_amp = constant * (left_amp + right_amp)
+        # Define the equations to solve
+        eq1 = total_amp - 1
+        eq2 = left_dB - right_dB - diff
+        return [eq1, eq2]
 
-    x = float(sol[0])
-    y = float(sol[1])
+    # Smarter initial guess — bias toward max_vol
+    loud = max_vol
+    quiet = max_vol - abs(diff)
+    guess = [quiet, loud] if diff >= 0 else [loud, quiet]
 
-    return x, y
+    left_dB, right_dB = fsolve(equations, guess)
+    return float(left_dB), float(right_dB)
 
 
 def get_dBs_and_amps_from_diff(diff, max_vol):
