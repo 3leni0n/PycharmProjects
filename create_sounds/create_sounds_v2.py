@@ -5,8 +5,9 @@ import sys
 from pathlib import Path
 import os
 import itertools
-import wavio
-from pydub import AudioSegment
+import soundfile as sf
+# import wavio
+# from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
 import string
@@ -15,8 +16,8 @@ from my_fun.my_fun import *
 ########################################################################################################################
 
 
-def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=10,
-                     sigma=1, save=False):
+def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1.1, fn=10000, normalize=True, n_frames=11,
+                     sigma=1, first_frame_0_ILD=True, save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
     amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
     determining from what side, left or right, the sound is louder on average, the evidence represent the information
@@ -51,7 +52,7 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     ####################################################################################################################
 
     # Select the folder and create it if it doesn't exist
-    folder = Path.home()/'Music'/'sounds_test'
+    folder = Path.home()/'Music'/'sounds_first_frame_0_ILD=True'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -64,7 +65,8 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     right_frames = [f'ER{n:01}' for n in range(n_frames)]  # Envelope Right * 10 frames
     columns = (['filename', 'ILD'] +
                left_frames + right_frames +
-               ['max_vol', 'fs', 'cutoff', 'amp', 'dur', 'fn', 'normalize', 'n_frames', 'sigma', 'save'])
+               ['max_vol', 'fs', 'cutoff', 'amp', 'dur', 'fn', 'normalize', 'n_frames', 'sigma', 'first_frame_0_ILD',
+                'save'])
 
     sound_number = 0  # Initialize counter
     data = []
@@ -85,32 +87,28 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
             path_wav = Path(name).with_suffix('.wav')
             print(path_wav)
-            # path_mp3 = name + '.mp3'
-            # path_ogg = name + '.ogg'
             # print(sound_number, name)
 
             SL, SR, EL, ER = do_envelope_dB_normal(noise, dB_left, dB_right, max_vol,
-                                                   fs=fs, amp=amp, dur=dur, n_frames=n_frames, sigma=sigma)
+                                                   fs=fs, amp=amp, dur=dur, n_frames=n_frames, sigma=sigma,
+                                                   first_frame_0_ILD=first_frame_0_ILD)
 
             data.append([filename] + [ILDs_dB[k]] + list(EL) + list(ER) + [max_vol] + [fs] + [cutoff] + [amp] + [dur] +
-                        [fn] + [normalize] + [n_frames] + [sigma] + [save])
+                        [fn] + [normalize] + [n_frames] + [sigma] + [first_frame_0_ILD] + [save])
 
             if save:  # Save sounds only if specified (don't wanna for simulation purposes)
-                # sound = np.column_stack((filename, SL, SR))
                 sound = np.column_stack((SL, SR))
-                # wavio.write(path_wav, sound, fs, sampwidth=1)  # Write the array sound to a wav file
-                wavio.write(path_wav.absolute().as_posix(), sound, fs, sampwidth=1)  # Write the array sound to a wav file
+                # wavio.write(path_wav.absolute().as_posix(), sound, fs, sampwidth=1)  # Write the array sound to a wav file
                 # sound_wav = AudioSegment.from_wav(path_wav)  # Read the wav file to a wav sound
-                # sound_wav.export(path_mp3, format='mp3')  # Export the wav sound to a mp3 file
-                # sound_wav.export(path_ogg, format='ogg')  # Export the wav sound to a ogg file
+                sf.write(path_wav, sound, fs, subtype='PCM_16')
 
-            if k == 0 or k == 8:
+            if k == 0 or k == len(ILDs_dB) - 1:
                 break  # Not to create more than 1 sound for maximum evidence
 
     df = pd.DataFrame(data=data, index=None, columns=columns)
 
     if save:
-        df.to_csv(Path(folder / 'sounds_test').with_suffix('.csv'), index=False)
+        df.to_csv(Path(folder / 'sounds').with_suffix('.csv'), index=False)
         # index=False to avoid writing the 'Unnamed:' column
 
     time_end = time.time()

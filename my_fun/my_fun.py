@@ -153,7 +153,8 @@ def envelope(noise, coh, fs=44100, amp=1, dur=1, n_frames=10, var=0.015, paired=
         return sound_L, sound_R, stairs_L, stairs_R
 
 
-def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, dur=1, n_frames=10, sigma=1):
+def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, dur=1, n_frames=10, sigma=1,
+                          first_frame_0_ILD=True):
     """
     Modulate a white noise sound with a sine wave and wrap it with an envelope according to stimulus coherence
     :param noise: white noise vector
@@ -168,12 +169,12 @@ def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, du
     :return: sound left, sound right, stairs left (* n_frames), stairs_right (* n_frames)
     """
 
-    n_points = dur * fs  # Should be an integer
+    n_points = int(dur * fs)  # Should be an integer
 
     if len(noise) != n_points:
         raise ValueError('noise and n_points need to  be the same length')
 
-    _, mod_wave = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
+    _, sine = sine_wave(length=dur, fs=fs, cycles=n_frames, amp=0.5, phase=-np.pi / 2, v_shift=0.5, plot=False)
     # amp = 0.5 so the length of y domain is 1 (-0.5, 0.5) instead of 2 (-1, 1)
     # phase = -np.pi/2 so the function starts at its minimum
     # v_shift = amp = 0.5 so the function y domain starts at 0 and is positive
@@ -184,37 +185,44 @@ def do_envelope_dB_normal(noise, dB_left, dB_right, max_vol, fs=44100, amp=1, du
     elif dB_right < 0 or dB_right > max_vol:
         raise ValueError(f'{dB_right} dB is invalid; must be between 0 and {max_vol}')
 
-    elif dB_left == 0 or dB_left == max_vol:
-
+    elif dB_left == 0 or dB_left == max_vol:  # Extreme cases
         amp_left = get_amp_from_dB(dB_left, max_vol)
         amp_right = get_amp_from_dB(dB_right, max_vol)
-
         stairs_L = np.repeat(dB_left, n_frames)  # Change name to envelope
         stairs_R = np.repeat(dB_right, n_frames)
-
         envelope_L = np.repeat(amp_left, n_points)
         envelope_R = np.repeat(amp_right, n_points)
-
-        sound_L = envelope_L * noise * mod_wave * amp
-        sound_R = envelope_R * noise * mod_wave * amp
-
-        return sound_L, sound_R, stairs_L, stairs_R
 
     else:
         # Draw samples from a normal distribution
         stairs_L = np.random.normal(dB_left, sigma, size=n_frames)
         stairs_R = np.random.normal(dB_right, sigma, size=n_frames)
 
+        # Force ILD=0 on first frame
+        if first_frame_0_ILD:
+            # From the Supplementary Materials for Rats and Humans Can Optimally Accumulate Evidence for DecisionMaking
+            # (p. 5) to reduce primacy effect
+            first_frame = (stairs_L[0] + stairs_R[0]) / 2
+            stairs_L[0] = first_frame
+            stairs_R[0] = first_frame
+
         amp_left = get_amp_from_dB(stairs_L, max_vol)
         amp_right = get_amp_from_dB(stairs_R, max_vol)
 
-        envelope_L = np.repeat(amp_left, int(n_points / n_frames))
-        envelope_R = np.repeat(amp_right, int(n_points / n_frames))
+        # Distribute amplitudes across exact number of samples
+        counts = np.full(n_frames, n_points // n_frames)
+        counts[:n_points % n_frames] += 1  # Distribute leftover
 
-        sound_L = envelope_L * noise * mod_wave * amp
-        sound_R = envelope_R * noise * mod_wave * amp
+        envelope_L = np.repeat(amp_left, counts)
+        envelope_R = np.repeat(amp_right, counts)
 
-        return sound_L, sound_R, stairs_L, stairs_R
+        # envelope_L = np.repeat(amp_left, int(n_points / n_frames))
+        # envelope_R = np.repeat(amp_right, int(n_points / n_frames))
+
+    sound_L = envelope_L * noise * sine * amp
+    sound_R = envelope_R * noise * sine * amp
+
+    return sound_L, sound_R, stairs_L, stairs_R
 
 
 def get_alpha_beta(mean, var, plot=False):
