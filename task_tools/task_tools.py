@@ -119,7 +119,7 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
         indx_or_path = '/dev/video-cam01'  # Front cam
         # indx_or_path = '/dev/video-cam02'  #  Side cam
     elif username == 'setup1' or username == 'setup2':
-        indx_or_path = 'cam' + conf.PYBPOD_BOARD[-1]
+        indx_or_path = '/dev/video-cam' + conf.PYBPOD_BOARD[-1]
 
     if n_cams == 1:  # For when a 1 cam is needed (all the test tasks, boxes 1-8)
         try:
@@ -174,8 +174,10 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
             print(
                 "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
 
+    return cam
 
-def close_cam(n_cams=1):
+
+def close_cam(cam, n_cams=1):
     """
     This function is a wrapper for the code block closing the camera(s) and recording the video. Its main function is to
     avoid copying the same code across tasks.
