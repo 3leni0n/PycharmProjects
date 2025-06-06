@@ -16,7 +16,7 @@ from my_fun.my_fun import *
 ########################################################################################################################
 
 
-def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1.1, fn=10000, normalize=True, n_frames=11,
+def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
                      sigma=1, first_frame_0_ILD=True, save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
     amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
@@ -52,7 +52,7 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1.1,
     ####################################################################################################################
 
     # Select the folder and create it if it doesn't exist
-    folder = Path.home()/'Music'/'sounds_first_frame_0_ILD=True'
+    folder = Path.home()/'Music'/'sounds_first_frame_0_ILD=False'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
