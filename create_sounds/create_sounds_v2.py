@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 import os
 import itertools
-import soundfile as sf
-# import wavio
+# import soundfile as sf
+import wavio
 # from pydub import AudioSegment
 import pandas as pd
 from matplotlib import pyplot as plt
@@ -98,9 +98,9 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
             if save:  # Save sounds only if specified (don't wanna for simulation purposes)
                 sound = np.column_stack((SL, SR))
-                # wavio.write(path_wav.absolute().as_posix(), sound, fs, sampwidth=1)  # Write the array sound to a wav file
+                wavio.write(path_wav.absolute().as_posix(), sound, fs, sampwidth=1)  # Write the array sound to a wav file
                 # sound_wav = AudioSegment.from_wav(path_wav)  # Read the wav file to a wav sound
-                sf.write(path_wav, sound, fs, subtype='PCM_16')
+                # sf.write(path_wav, sound, fs, subtype='PCM_16')
 
             if k == 0 or k == len(ILDs_dB) - 1:
                 break  # Not to create more than 1 sound for maximum evidence
