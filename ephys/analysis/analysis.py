@@ -31,27 +31,63 @@ from ephys.preprocessing import *
 
 ########################################################################################################################
 
-# Run preprocessing
-ephys_id = '007_2024-06-23_12-46-55'
-df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-    preprocess(ephys_id)
-
-# Get behavioral events
-stim_dur = df_behavior.StimDur.unique()[0]
-delay = df_behavior.Delay.unique()[0]
-go_cue = stim_dur + delay
-subject = df_behavior.Subject.unique()[0]
-date = df_behavior.Date.unique()[0]
-
-# Set parameters
-align='stim'
-time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
-bin_size = 0.1  # In seconds
+# # Run preprocessing
+# ephys_id = 'X'
+# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+#     preprocess(ephys_id)
+#
+# # Get behavioral events
+# stim_dur = df_behavior.StimDur.unique()[0]
+# delay = df_behavior.Delay.unique()[0]
+# go_cue = stim_dur + delay
+# subject = df_behavior.Subject.unique()[0]
+# date = df_behavior.Date.unique()[0]
+#
+# # Set parameters
+# align='stim'
+# time_win = [-1, 3]  # Time window of interest before and after the event (in seconds)
+# bin_size = 0.1  # In seconds
 
 ########################################################################################################################
 
 
 # Define helper functions
+
+def get_ephys_sessions(subject):
+    """
+    Get the ephys sessions for a given subject by searching in both C: and D: drives.
+    :param subject: str, subject number (format: '000')
+    :return: list of ephys session folder names that match the subject number
+    """
+
+    folder_name_len = 23  # Length of the ephys sessions folder name
+
+    # Define the paths for ephys sessions on C: and D: drives on Ephys PC
+    C_drive = Path('C:/Users/Usuario\Documents/Open Ephys')
+    D_drive = Path('D:/')
+
+    # Get all folders (directories) in C: and D: (non-recursive)
+    folders_C = [p.name for p in C_drive.iterdir() if p.is_dir()]
+    folders_D = [p.name for p in D_drive.iterdir() if p.is_dir()]
+
+    # Exclude folders that do not match the expected length
+    folders_C = [p.name for p in C_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+    folders_D = [p.name for p in D_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+
+    # Combine the lists of folders from both drives
+    folders = folders_C + folders_D
+    print(folders)
+
+    # Filter folders that start with the subject number
+    subject_folders = [f for f in folders if f.startswith(subject)]
+    # Sort the subject folders
+    subject_folders.sort()
+    # Print the sorted subject folders
+    print(subject_folders)
+
+    return subject_folders
+
+
 def get_trial_indexes(df_behavior, condition='outcome'):
     """
     Get trial indexes given a condition. Skip misses by default (hit and choice are nan in misses).
