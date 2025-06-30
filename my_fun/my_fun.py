@@ -729,7 +729,7 @@ def compute_psych_curve(x, y, n_points=100):
 
     # https://psychology.stackexchange.com/questions/13347/how-can-i-fit-a-psychometric-function-such-that-the-minimum-is-50-chance-level
 
-    def sigmoid_mme(fit_params: tuple):
+    def sigmoid_mme(fit_params: tuple, xdata, ydata):
         k, x0, b, p = fit_params
 
         # k = weight (slope)
@@ -740,7 +740,7 @@ def compute_psych_curve(x, y, n_points=100):
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))
 
         # Calculate negative log likelihood:
-        ll = - np.sum(stats.norm.logpdf(ydata, loc=y_pred))
+        ll = -np.sum(stats.norm.logpdf(ydata, loc=y_pred))
 
         return ll
 
@@ -754,10 +754,10 @@ def compute_psych_curve(x, y, n_points=100):
     initial_guess = np.array([1, 1, 0, 0])
 
     # Run the minimizer:
-    ll = minimize(sigmoid_mme, initial_guess)
+    ll = minimize(sigmoid_mme, initial_guess, args=(xdata, ydata))
 
     # Fit parameters:
-    k, x0, b, p = [np.around(param, 2) for param in ll['x']]
+    k, x0, b, p = [np.around(param, 2) for param in ll.x]
 
     # Compute the fit with n_points number of points:
     fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(np.min(x), np.max(x), n_points) - x0)))
@@ -897,52 +897,52 @@ def check_date_exist(date, dates):
 
 # The following 2 functions are under testing were developed for kernels. Will need to adapt to make them work for
 # other cases
-def get_experiment(experiment=None, session='glue_sessions'):
+def get_experiment(experiment=None, path_session='glue_sessions'):
     """
     Get experiment
     :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
-    :param session: if glue_sessions look for individual sessions, elif intersession look for intersessions
-    :return: experiment
+    :param path_session: if glue_sessions look for individual sessions, elif intersession look for intersessions
+    :return: experiment, path_experiment: experiment (user input), path to the experiment folder
     """
 
     if experiment is None:
 
-        # folder_in = '/home/alexis/PycharmProjects/glue_sessions/'  # Where the data for all animals is
-        folder = Path.home() / 'PycharmProjects' / session  # Where the data for all animals is
-        experiments = os.listdir(folder)  # List experiments
+        path_experiment = Path.home() / 'PycharmProjects' / path_session  # Where the data for all animals is
+        experiments = list(path_experiment.iterdir())  # List experiments
         experiments.sort()  # Sort them by name
-        # experiments = [x for x in experiments if os.path.isdir(folder_in + x)]  # Get rid of non folders
-        experiments = [x for x in experiments if Path(folder / x).is_dir()]  # Get rid of non folders
+        experiments = [x.name for x in path_experiment.iterdir() if x.is_dir()]  # Get rid of non folders
 
         try:
             experiments.remove('__pycache__')  # Pycharm's file
         except ValueError:
             pass
 
-        print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
+        print('Experiments:\n ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
+        path_experiment = Path.home() / 'PycharmProjects' / path_session / experiment  # Where the data for the animal is
+
     else:
-        folder = Path.home() / 'PycharmProjects' / session / experiment
+        path_experiment = Path.home() / 'PycharmProjects' / path_session / experiment
 
-    return experiment, folder
+    return experiment, path_experiment
 
 
-def get_animal(experiment, session='glue_sessions', animal=None):
+def get_animal(experiment=None, path_session='glue_sessions', animal=None):
     """
     Get animal
-    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
-    :param session: if glue_sessions look for individual sessions, elif intersession look for intersessions
-    :param animal: If not None, animal=animal. Else, show possible animals and ask for user input.
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input
+    :param path_session: if glue_sessions look for individual sessions, elif intersession look for intersessions
+    :param animal: If not None, animal=animal. Else, show possible animals and ask for user input
     :return: animal
     """
 
     if experiment is None:
-        experiment = get_experiment(experiment, session)
-
-    folder_in = Path.home() / 'PycharmProjects' / session / experiment
+        experiment, folder_in = get_experiment(experiment, path_session)
 
     if animal is None:
-        animals = os.listdir(folder_in)  # List animals
+        animals = list(folder_in.iterdir())  # List animals
+        # animals = os.listdir(folder_in)  # List animals
+        animals = [x.name for x in animals]  # Get rid of non folders
         animals.sort()  # Sort them by name
         animals = [x[:-4] for x in animals]  # Get rid of .csv extension
         animals = [i for i in animals if '_corrupted_sessions' not in i]  # Remove '_corrupted_sessions'.csv files

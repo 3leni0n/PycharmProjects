@@ -13,7 +13,7 @@ from my_fun.my_fun import get_experiment
 
 
 # Define functions
-def glue_sessions(animal=None, protocol='stage_training_v5', experiment='2AFC_5', to_csv=False):
+def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6', to_csv=False):
     """
     Glue all the sessions of a given animal.
     :param animal: ID number of the animal
@@ -151,7 +151,7 @@ def glue_sessions(animal=None, protocol='stage_training_v5', experiment='2AFC_5'
     return df, corrupted_sessions
 
 
-def update_glued_sessions(protocol='stage_training_v5', experiment='2AFC_5'):
+def update_glued_sessions(protocol='stage_training_v6', experiment='2AFC_6'):
     """
     Update the glued_sessions .csv files for all animals with the non yet included sessions.
     :param protocol: task code version

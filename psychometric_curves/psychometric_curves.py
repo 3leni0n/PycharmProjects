@@ -6,28 +6,31 @@ from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
 import seaborn as sns
-from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve
+from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, timer
 from parse.parse_v2 import parse_v2
 
-# Mel's code snippet for poster
+# Aesthetic parameters
 sns.set_theme()
 sns.set_style('white')
 sns.set_style('ticks')
 sns.set_context('poster')
-# sns.despine()
 
 
-def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, format='svg', transparent=False):
-    """Plot psychometric curve"""
-
-    time_start = time.time()
-
-    ####################################################################################################################
+@timer
+def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', save=True, format='png', transparent=False):
+    """Plot psychometric curve
+    :param experiment: str, name of the experiment
+    :param animal: str, animal name
+    :param kind: str, 'prob_right' or 'prob_rep'
+    :param save: bool, whether to save the figure
+    :param format: str, file format to save the figure
+    :param transparent: bool, whether to save the figure with a transparent background
+    :return: psych_curve object with the fitted parameters and data
+    """
 
     # Get the path to the data
-    experiment = get_experiment(experiment)
-    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    animal = get_animal(experiment, animal)
+    experiment, folder_in = get_experiment(experiment)
+    animal = get_animal(experiment=experiment, path_session='glue_sessions', animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     ####################################################################################################################
@@ -55,31 +58,36 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
     # Plot psychometric curves
     plt.figure(constrained_layout=True)
 
+    fontsize = 'medium'
+
     if kind == 'prob_right':
 
         # Compute left-right psychometric curve
-        # psych_curve_right = compute_psych_curve(df.Evidence, df.Choice)  # Pilot batch
+        # psych_curve = compute_psych_curve(df.Evidence, df.Choice)  # Pilot batch
         psych_curve = compute_psych_curve(df.ILD, df.Choice, n_points)  # No need to filter out the misses
+
+        # Move extreme datapoints closer to the center to zoom in
+        psych_curve.xdata[0] = -32
+        psych_curve.xdata[-1] = 32
 
         # Plot params
         color = 'tab:orange'
         label = 'Prob. right'
-        plt.xlabel('Stimulus ILD (dB)')
-        plt.ylabel('Prob. choose right')
+        xlabel = 'Stimulus ILD (dB)'
+        ylabel = 'Prob. choose right'
 
         # Annotation params
         lower_lapse = "LR_R="
         upper_lapse = "LR_L="
         # xy = (ilds[0], 1)
         # xytext = (ilds[0], 1)
-        xy = (-20, 1)
-        xytext = (-20, 1)
+        xy = (psych_curve.xdata[0], 1)
+        xytext = (psych_curve.xdata[0], 1)
         va = 'top'
         ha = 'left'
-        fontsize = 'medium'
         loc = 'lower right'
 
-        filename = f'{animal}_PC_prob_right' + '.' + format
+        filename = f'{animal}_PC_prob_right.{format}'
 
     elif kind == 'prob_rep':
 
@@ -87,144 +95,142 @@ def plot_pc(experiment='2AFC_2', animal=None, kind='prob_right', save=False, for
         # psych_curve_rep = compute_psych_curve(df.EviRep, df.RepChoice)  # Pilot batch
         psych_curve = compute_psych_curve(df.ILDRep, df.RepChoice, n_points)
 
+        # Move extreme datapoints closer to the center to zoom in
+        psych_curve.xdata[0] = -32
+        psych_curve.xdata[-1] = 32
+
         # Plot params
         color = 'tab:brown'
         label = 'Prob. repeat'
-        plt.xlabel('Repeating stimulus ILD (dB)')
-        plt.ylabel('Prob. choose repeat')
+        xlabel = 'Repeating stimulus ILD (dB)'
+        ylabel = 'Prob. choose repeat'
 
         # Annotate params
         lower_lapse = "LR_Rep="
         upper_lapse = "LR_Alt="
         # xy = (ilds[-1], 0)
         # xytext = (ilds[-1], 0)
-        xy = (20, 0)
-        xytext = (20, 0)
+        xy = (psych_curve.xdata[-1], 0)
+        xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
         ha = 'right'
-        fontsize = 'medium'
         loc = 'upper left'
 
-        filename = f'{animal}_PC_prob_rep' + '.' + format
+        filename = f'{animal}_PC_prob_rep.{format}'
 
     # Plot psychometric curve and errorbars
-    plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
-             label='')
-
-    # Move extreme datapoints closer to the center to zoom in
-    psych_curve.xdata[0] = -20
-    psych_curve.xdata[-1] = 20
+    x = np.linspace(np.min(ilds), np.max(ilds), n_points)
+    plt.plot(x, psych_curve.fit, color=color, mfc=color, label='')
 
     plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color,
                  fmt='o', mfc=color)
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-                 "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + "\n" +  # Upper lapse rate
+    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                  upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                  xy=xy, xytext=xytext, color=color,
                  va=va, ha=ha, fontsize=fontsize)
 
-    # plt.xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
-    # plt.minorticks_off()  # Remove minor ticks
     plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
-    # plt.title(f'Mouse {len(df.Setup.unique())}, {len(df)} trials')
     plt.axhline(0.5, color='tab:gray', ls='--')
+    plt.axvline(0, color='tab:gray', ls='--')
 
-    # Get fits for bias = 0 and lapses = 0
-    # fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(np.min(x), np.max(x), n_points) - x0)))  # PC function
-    fit_bias0 = lr_lower + (1 - lr_lower - lr_upper) / (1 + np.exp(- sensitivity * (np.linspace(np.min(ilds), np.max(ilds), n_points) - 0)))
-    # plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_bias0, color='tab:olive', mfc='tab:olive', ls=':', label='fit|B=0')
-    pc0_bias0 = lr_lower + (1 - lr_lower - lr_upper) / 2  # Value of the PC for x = 0 when bias = 0
-    fit_lapses0 = 0 + (1 - 0 - 0) / (1 + np.exp(- sensitivity * (np.linspace(np.min(ilds), np.max(ilds), n_points) - bias)))
-    # plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_lapses0, color='tab:cyan', mfc='tab:cyan', ls=':', label='fit|LR=0')
-    # plt.axhline(pc0_bias0, color='tab:blue', ls=':', label='y(x=0)|B=0')
-    pc0_lapses0 = 1 / (1 + np.exp(sensitivity * bias))  # Value of the PC for x = 0 when lapses = 0
-    # plt.axhline(pc0_lapses0, color='tab:orange', ls=':', label='y(x=0)|LR=0')
+    # # Get fits for bias = 0 and lapses = 0
+    # # fit = b + (1 - b - p) / (1 + np.exp(-k * (np.linspace(np.min(x), np.max(x), n_points) - x0)))  # PC function
+    # fit_bias0 = lr_lower + (1 - lr_lower - lr_upper) / (1 + np.exp(- sensitivity * (np.linspace(np.min(ilds), np.max(ilds), n_points) - 0)))
+    # # plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_bias0, color='tab:olive', mfc='tab:olive', ls=':', label='fit|B=0')
+    # pc0_bias0 = lr_lower + (1 - lr_lower - lr_upper) / 2  # Value of the PC for x = 0 when bias = 0
+    # fit_lapses0 = 0 + (1 - 0 - 0) / (1 + np.exp(- sensitivity * (np.linspace(np.min(ilds), np.max(ilds), n_points) - bias)))
+    # # plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), fit_lapses0, color='tab:cyan', mfc='tab:cyan', ls=':', label='fit|LR=0')
+    # # plt.axhline(pc0_bias0, color='tab:blue', ls=':', label='y(x=0)|B=0')
+    # pc0_lapses0 = 1 / (1 + np.exp(sensitivity * bias))  # Value of the PC for x = 0 when lapses = 0
+    # # plt.axhline(pc0_lapses0, color='tab:orange', ls=':', label='y(x=0)|LR=0')
 
-    plt.axvline(0., color='tab:gray', ls='--')
-    # plt.xlim([ilds[0]-7, ilds[-1]+7]
-    plt.xlim([-21, 21])  # To chop the extreme values
-    ilds[0] = -20
-    ilds[-1] = 20
+    plt.xlim([psych_curve.xdata[0] - 1, psych_curve.xdata[-1] + 1])  # To chop the extreme values
+    ilds[0] = psych_curve.xdata[0]
+    ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    plt.ylim([-0.025, 1.025])
-    plt.yticks([0, 0.5, 1])
-    # plt.legend(loc=loc, frameon=False)
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
+    # plt.ylim([-0.025, 1.025])
+    plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    sns.despine()
 
     if save:
-        folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment
+        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'psych curves'
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        # plt.savefig(folder_out / (animal + filename))
         plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
 
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
-
     # return psych_curve, pc0_bias0, pc0_lapses0
-    return psych_curve, fit_bias0, fit_lapses0
-    # return psych_curve
+    # return psych_curve, fit_bias0, fit_lapses0
+    return psych_curve
 
 
-def plot_pcs(experiment='2AFC_3', animals=['325', '327', '329', '330', '332', '333', '335', '337'], kind='prob_right',
-           save=False, format='svg', transparent=False):
+@timer
+def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='prob_right', save=True, format='png',
+             transparent=False):
 
-    """Do the kernels for all animals of a given batch (experiment)"""
-
-    time_start = time.time()
-
-    ####################################################################################################################
+    """Do the psychometric curves for all animals of a given batch (experiment)
+    :param: experiment: str, name of the experiment
+    :param: animals: list, list of animal names
+    :param: kind: str, 'prob_right' or 'prob_rep'
+    :param: save: bool, whether to save the figures
+    :param: format: str, file format to save the figures (e.g. 'png', 'svg')
+    :param: transparent: bool, whether to save the figures with a transparent background
+    :return: psych_curves: list of psychometric curve objects with the fitted parameters and data
+    """
 
     # Get the path to the data
-    experiment = get_experiment(experiment)
-    # folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    # folder_in = Path(folder_in / animal).with_suffix('.csv')
-
-    ####################################################################################################################
+    experiment, folder_in = get_experiment(experiment)
 
     # Initialize empty lists where to store PC parameters
     psych_curves = []
-    pc0_bias0s = []
-    pc0_lapses0s = []
-    fits_bias0 = []
-    fits_lapses0 = []
+    # pc0_bias0s = []
+    # pc0_lapses0s = []
+    # fits_bias0 = []
+    # fits_lapses0 = []
 
     for i in range(len(animals)):
-        # plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
-        # psych_curve, pc0_bias0, pc0_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
-        psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
-        psych_curves.append(psych_curve)
-        fits_bias0.append(fit_bias0)
-        fits_lapses0.append(fit_lapses0)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
+        try:
+            psych_curve = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format,
+                                  transparent=transparent)
+            # psych_curve, pc0_bias0, pc0_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save,
+            #                                               format=format, transparent=transparent)
+            # psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save,
+            #                                               format=format, transparent=transparent)
+            psych_curves.append(psych_curve)
+            # fits_bias0.append(fit_bias0)
+            # fits_lapses0.append(fit_lapses0)
+        except ValueError:
+            print(f'{animals[i]} does not have enough trials')
+            plt.close()
 
     # return psych_curves, pc0_bias0s, pc0_lapses0s
-    return psych_curves, fits_bias0, fits_lapses0
+    # return psych_curves, fits_bias0, fits_lapses0
+    return psych_curves
 
 
-def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                           save=False, kind='prob_right', format='svg', transparent=False):
-
-    time_start = time.time()
-
-    ####################################################################################################################
+@timer
+def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '017'], save=True, kind='prob_right',
+                           format='png', transparent=False):
+    """Plot psychometric curves across animals
+    :param experiment: str, name of the experiment
+    :param animals: list, list of animal names
+    :param kind: str, 'prob_right' or 'prob_rep'
+    :param save: bool, whether to save the figure
+    :param format: str, file format to save the figure
+    :param transparent: bool, whether to save the figure with a transparent background
+    :return: params: array of psychometric curve parameters for each animal
+    """
 
     # Get the path to the data
-    experiment = get_experiment(experiment)
-    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-
-    ####################################################################################################################
+    experiment, folder_in = get_experiment(experiment)
 
     fit = []
     fit_error = []
@@ -232,15 +238,22 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     xdata = []
     ydata = []
     trials = 0
-
+    animals_removed = 0
     n_points = 100
 
     plt.figure(constrained_layout=True)
+    fontsize = 'medium'
 
     for i in range(len(animals)):
+
         df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
         # df = df[df.P > 0]  # Only those sessions with ilds
+
         ilds = np.sort(df.ILD.unique())
+        if len(ilds) != 9:
+            print(f'Animal {animals[i]} has {len(ilds)} ILDs, not 9. Need more trials. Skipping...')
+            animals_removed += 1
+            continue
 
         if kind == 'prob_right':
             psych_curve = compute_psych_curve(df.ILD, df.Choice, n_points)
@@ -264,6 +277,10 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
     ydata = np.array(ydata).flatten()
     psych_curve = compute_psych_curve(xdata, ydata, n_points)
 
+    # Move extreme datapoints closer to the center to zoom in
+    psych_curve.xdata[0] = -32
+    psych_curve.xdata[-1] = 32
+
     if kind == 'prob_right':
 
         # Plot params
@@ -277,13 +294,12 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         upper_lapse = "LR_L="
         # xy = (ilds[0], 1)
         # xytext = (ilds[0], 1)
-        xy = (-20, 1)
-        xytext = (-20, 1)
+        xy = (psych_curve.xdata[0], 1)
+        xytext = (psych_curve.xdata[0], 1)
         va = 'top'
         ha = 'left'
-        fontsize = 'medium'
 
-        filename = ' PC_prob_right_all_animals' + '.' + format
+        filename = f'{experiment}_PC_prob_right.{format}'
 
     elif kind == 'prob_rep':
 
@@ -298,64 +314,50 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
         upper_lapse = "LR_Alt="
         # xy = (ilds[-1], 0)
         # xytext = (ilds[-1], 0)
-        xy = (20, 0)
-        xytext = (20, 0)
+        xy = (psych_curve.xdata[-1], 0)
+        xytext = (psych_curve.xdata[-1], 0)
         color = 'tab:brown'
         va = 'bottom'
         ha = 'right'
-        fontsize = 'medium'
 
-        filename = ' PC_prob_rep_all_animals' + '.' + format
+        filename = f'{experiment}_PC_prob_rep.{format}'
 
     plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
              label=label)
 
-    # Move extreme datapoints closer to the center to zoom in
-    psych_curve.xdata[0] = -20
-    psych_curve.xdata[-1] = 20
-
     plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o',
                  mfc=color)
 
-    # plt.xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
-    # plt.minorticks_off()  # Remove minor ticks
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
-    plt.title(f'N={len(animals)}, {trials} trials')
-    # plt.title(f'N={len(df.Setup.unique())}, {len(df)} trials')
-    # plt.xlim([ilds[0] - 7, ilds[-1] + 7])
-    plt.xlim([-21, 21])  # To chop the extreme values
-    ilds[0] = -20
-    ilds[-1] = 20
+    plt.title(f'N={len(animals) - animals_removed}, {trials} trials')
+
+    plt.xlim([psych_curve.xdata[0] - 1, psych_curve.xdata[-1] + 1])  # To chop the extreme values
+    ilds[0] = psych_curve.xdata[0]
+    ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    plt.ylim([-0.025, 1.025])
-    plt.yticks([0, 0.5, 1])
-    # plt.legend(loc='lower center')
+    # plt.ylim([-0.025, 1.025])
+    plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
-    plt.gca().spines['top'].set_visible(False)
-    plt.gca().spines['right'].set_visible(False)
+    sns.despine()
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-                 "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + "\n" +  # Upper lapse rate
+    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                  upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                  xy=xy, xytext=xytext, color=color,
                  va=va, ha=ha, fontsize=fontsize)
 
     if save:
-        folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment
+        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'psych curves'
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
         plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
     return np.array(params)
 
@@ -363,14 +365,12 @@ def plot_pc_across_animals(experiment='2AFC_2', animals=['325', '327', '329', '3
 ########################################################################################################################
 
 # Across batches
+
+@timer
 def plot_pcs_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None, kind='prob_right',
-           save=False, format='svg', transparent=False):
+           save=False, format='png', transparent=False):
 
-    """Do the kernels for all animals of a given batch (experiment)"""
-
-    time_start = time.time()
-
-    ####################################################################################################################
+    """Do the psychometric curves for all animals of a given batch (experiment)"""
 
     # Get the path to the data
     # experiment = get_experiment(experiment)
@@ -403,25 +403,20 @@ def plot_pcs_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None, kind
         for i in range(len(animals)):
             # plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
             # psych_curve, pc0_bias0, pc0_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
-            psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format, transparent=transparent)
+            psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind,
+                                                          save=save, format=format, transparent=transparent)
             psych_curves.append(psych_curve)
             fits_bias0.append(fit_bias0)
             fits_lapses0.append(fit_lapses0)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
     # return psych_curves, pc0_bias0s, pc0_lapses0s
     return psych_curves, fits_bias0, fits_lapses0
 
 
+@timer
 def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
                            save=False, kind='prob_right', format='svg', transparent=False):
 
-    time_start = time.time()
-
-    ####################################################################################################################
 
     fit = []
     fit_error = []
@@ -568,10 +563,6 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
         os.chdir(folder_out)
         plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
     return np.array(params)
 
@@ -772,9 +763,8 @@ def plot_bias_vs_lapses(kind='prob_rep', save=False, format='svg', transparent=F
     #                                                 save=False, format='svg', transparent=False)
 
     psych_curves, fits_bias0, fits_lapses0 = plot_pcs(experiment='2AFC_2',
-                                                    animals=['325', '327', '329', '330', '332', '333', '335', '337'],
-                                                    kind=kind,
-                                                    save=False, format='svg', transparent=False)
+                                                      animals=['325', '327', '329', '330', '332', '333', '335', '337'],
+                                                      kind=kind, save=False, format='svg', transparent=False)
 
     fits_bias0 = np.array(fits_bias0)
     mean_fits_bias0 = np.mean(fits_bias0, axis=1)
@@ -849,10 +839,10 @@ def plot_bias_vs_lapses(kind='prob_rep', save=False, format='svg', transparent=F
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # # animals = ['332', '333', '337']  # Drug experiments
-kind = 'prob_rep'
-save = False
-format = 'svg'
-transparent = True
+# kind = 'prob_rep'
+# save = False
+# format = 'svg'
+# transparent = True
 
 
 # Psych curves for drug data
