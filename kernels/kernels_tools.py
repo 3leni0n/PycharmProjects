@@ -104,20 +104,29 @@ def make_net_ild_dm(df):
     return design_matrix
 
 
-def make_frames_dm(df, residuals=True, zscore=False):
+def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
 
     # Load sounds
     # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    # sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
-    frames_ild = get_ild(n_frames)
+    frames_ild = get_ild(stim_set=stim_set)
 
     # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
     if residuals:
         sounds_ild = sounds.ILD
-        frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
+        first_frame = frames_ild[0]
+        if stim_set == 6:
+            # sounds_ild = sounds.ILD
+            frames_ild = frames_ild.drop(['filename', 0], axis=1).sub(sounds_ild, axis='rows')
+            frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
+            frames_ild.insert(1, column=0, value=first_frame)  # Insert back first_frame in 2nd column
+        else:
+            # sounds_ild = sounds.ILD
+            frames_ild = frames_ild.drop('filename', axis=1).sub(sounds_ild, axis='rows')
+            frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
 
     filenames = df.Filename.tolist()
 
@@ -131,7 +140,7 @@ def make_frames_dm(df, residuals=True, zscore=False):
     if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
         if zscore:
             stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
-            # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
+            # returns same result, but not axis 1). 0 along trials that's what I want to do :)
 
     design_matrix = stim_strength
 

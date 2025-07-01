@@ -56,7 +56,7 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
+def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
            control=None, n_mean_frames=None, iterations=1000):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
@@ -78,27 +78,26 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     ####################################################################################################################
 
     # Get the path to the data
-    experiment = get_experiment(experiment)
-    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    animal = get_animal(experiment, animal)
+    experiment, folder_in = get_experiment(experiment)
+    animal = get_animal(experiment=experiment, path_session='glue_sessions', animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     ####################################################################################################################
 
-    # Load sounds
-    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    sounds = pd.read_csv(sounds_path)
-    n_frames = sounds.n_frames.unique()[0]
-    frames_ild = get_ild(n_frames)
+    # # Load sounds
+    # # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
+    # sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    # sounds = pd.read_csv(sounds_path)
+    # n_frames = sounds.n_frames.unique()[0]
+    # frames_ild = get_ild(n_frames)
 
     ####################################################################################################################
 
-    # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
-    if residuals:
-        sounds_ild = sounds.ILD
-        frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-        frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
+    # # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
+    # if residuals:
+    #     sounds_ild = sounds.ILD
+    #     frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
+    #     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
 
     ####################################################################################################################
 
@@ -108,7 +107,8 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     ####################################################################################################################
 
     # Load intersession data
-    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (animal + '_intersession.csv')
+    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (str(int(animal)) + '_intersession.csv')
+    # str(int(animal)) to remove the 0 padding in ID
     df_intersession = pd.read_csv(path_intersession)
 
     # There are some short, corrupted sessions (dates) for which there is no intersession data because one of the values
@@ -186,7 +186,7 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     ####################################################################################################################
 
     n_trials = len(df)
-    filenames = df.Filename.tolist()
+    # behavior_filenames = df.Filename.tolist()
 
     # Control
     if control is not None:
@@ -198,17 +198,19 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
 
         # Get complete dataset compute every iteration, otherwise the 2nd time will be doing the half of the half!
         choices = df.Choice.reset_index(drop=True)  # Indices must match for modeling
-        stim_strength = frames_ild.loc[
-            [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
-            columns=['filename'])
-        stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+        # stim_strength = frames_ild.loc[
+        #     [np.where(sounds.filename == np.array(behavior_filenames[i]))[0][0] for i in range(len(behavior_filenames))]].drop(
+        #     columns=['filename'])
+        # stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+        #
+        # # Zscore
+        # if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+        #     if zscore:
+        #         stim_strength = pd.DataFrame(
+        #             stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+        #         # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
 
-        # Zscore
-        if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
-            if zscore:
-                stim_strength = pd.DataFrame(
-                    stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
-                # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
+        stim_strength, n_frames = make_frames_dm(df)
 
         # Average frames (to have more trials per regressor)
         if n_mean_frames is not None:
@@ -303,7 +305,30 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         print(summary)
 
         # Get shuffles
-        shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)
+        # shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)  # Only frames
+
+        ################################################################################################################
+
+        # WORK IN PROGRESS
+        net_ilds = list(df.ILD.abs().unique())
+        net_ilds.sort()
+        net_ilds = net_ilds[1:]  # Remove 0
+
+        shuffles = get_shuffles_GLM(endog, exog, iterations=iterations, kind='pk_session_index')
+        session_index_params = params[n_frames:-len(net_ilds)]
+        session_index_std_error = beta_std_err[n_frames:-len(net_ilds)]
+        session_index_p_values = p_values[n_frames:-len(net_ilds)]
+        shuffles_session_index = [shuffles[i].iloc[n_frames:-len(net_ilds)] for i in range(len(shuffles))]  # From shuffles
+
+        shuffles = get_shuffles_GLM(endog, exog, iterations=iterations, kind='pk_net_stim')
+        net_stim_params = params[-len(net_ilds):]
+        net_stim_std_err = beta_std_err[-len(net_ilds):]
+        net_stim_p_values = p_values[-len(net_ilds):]
+        net_stim_shuffles = [shuffles[i].iloc[-len(net_ilds):] for i in range(len(shuffles))]  # From shuffles
+
+        ################################################################################################################
+
+        shuffles = get_shuffles_GLM(endog, exog, iterations=iterations, kind='pk_frames')
 
         # Remove session index and stimulus constants
         params = params.iloc[:n_frames]  # From params
@@ -312,12 +337,18 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         p_values = p_values.iloc[:n_frames]  # From p_values
 
         # Store results in a namedtuple
-        PK = namedtuple('PK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'n_frames', 'experiment',
+        PK = namedtuple('PK', ['params', 'session_index_params', 'net_stim_params', 'std_err', 'session_index_std_error',
+                               'net_stim_std_err', 'p_values', 'session_index_p_values', 'net_stim_p_values', 'shuffles',
+                               'shuffles_session_index', 'net_stim_shuffles', 'n_trials', 'n_frames', 'experiment',
                                'animal', 'target_ilds', 'drug', 'residuals', 'zscore', 'control', 'n_mean_frames',
                                'iterations'])
-        pk = PK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-                n_frames=n_frames, experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
-                residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+        pk = PK(params=params, session_index_params=session_index_params, net_stim_params=net_stim_params,
+                std_err=beta_std_err, session_index_std_error=session_index_std_error, net_stim_std_err=net_stim_std_err,
+                p_values=p_values, session_index_p_values=session_index_p_values, net_stim_p_values=net_stim_p_values,
+                shuffles=shuffles, shuffles_session_index=shuffles_session_index, net_stim_shuffles=net_stim_shuffles,
+                n_trials=n_trials, n_frames=n_frames, experiment=experiment, animal=animal, target_ilds=target_ilds,
+                drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                iterations=iterations)
 
         time_end = time.time()
         runtime = time_end - time_start
@@ -326,22 +357,29 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     return pk
 
 
-def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
-            control=None, n_mean_frames=None, iterations=1000, save=False, format='svg', transparent=False):
-
-    time_start = time.time()
+def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
+            control=None, n_mean_frames=None, iterations=1000, save=False):
 
     if type(experiment) == list:
-        pk = get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=[-2, 0, 2], drug=None,
-                         residuals=True, zscore=False, control=None, n_mean_frames=None, iterations=1)
+        pk = get_mean_pk(experiments=experiments, animals=None, target_ilds=target_ilds, drug=drug,
+                         residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
         title = f'N={len(pk.animal)}, {pk.n_trials} trials'
-        filename = f'{pk.animal}mean_PK: ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
+        filename_prefix = 'mean_'
     else:
         pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
                     residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                     iterations=iterations)
         title = f'Mouse {pk.animal}, {pk.n_trials} trials'
-        filename = f'{pk.animal}_PK_ILDs: {target_ilds}, {n_mean_frames} averaged frames' + '.' + format
+        filename_prefix = ''
+
+    # Default plotting parameters
+    color = 'k'
+    color_upper_shuffle = 'tab:red'
+    label = ''
+
+    ####################################################################################################################
+
+    # PLOT FRAMES KERNEL
 
     # Residuals
     if residuals:
@@ -351,13 +389,6 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
             ylabel = 'GLM weight (z-scored)'
         else:
             ylabel = 'GLM weight'
-
-    # Default plotting parameters
-    color = 'k'
-    color_upper_shuffle = 'tab:red'
-    label = ''
-
-    ###################################################################################################################
 
     plt.figure(constrained_layout=True)
     n_frames = pk.n_frames
@@ -370,8 +401,6 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
     plt.xlabel('Stimulus frame')
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
-
-    ####################################################################################################################
 
     # Annotate significance
     if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
@@ -391,7 +420,6 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
     percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
     plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
     plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
-
     xticks = np.arange(1, n_frames + 1, 2)
     xticklabels = xticks + 1
     plt.xticks(xticks, xticklabels)
@@ -401,18 +429,75 @@ def plot_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, resid
         plt.xticks([1, 2])  # Readjust xticks
 
     if save:
-        folder_out = Path.home() / 'Documentos' / 'kernels' / experiment
-        # if not os.path.exists(folder_out):
-        #     os.mkdir(folder_out)
+        filename = f'{pk.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'kernels' / 'PK' / experiment
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
-        os.chdir(folder_out)
-        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
+        save_fig(folder_out, filename)
         plt.close()
 
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
+    ####################################################################################################################
+
+    # PLOT NET STIMULUS KERNEL
+
+    plt.figure(constrained_layout=True)
+    x = pk.net_stim_params.index.values
+    x[-1] = 16  # Trick to zoom in
+    y = pk.net_stim_params
+    yerr = pk.net_stim_std_err
+    plt.plot(x, y, color=color, marker='o')
+    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+    plt.title(title)
+    plt.xlabel('Net stimuli')
+    plt.ylabel('GLM weight')
+    # plt.legend(frameon=False)
+    plt.xticks(x, ['2', '4', '8', '70'])
+
+    shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
+    percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+    sns.despine(trim=True)
+
+    if save:
+        filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT SESSION INDEX KERNEL
+
+    if type(experiment) == str:  # Don't do it for the mean kernel
+
+        plt.figure(constrained_layout=True)
+        x = pk.session_index_params.index.values
+        y = pk.session_index_params
+        yerr = pk.session_index_std_error
+        plt.plot(x, y, color=color, marker='o')
+        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xlabel('Session index')
+        plt.ylabel('GLM weight')
+        # plt.legend(frameon=False)
+        # plt.xticks(x, ['2', '4', '8', '70'])
+        shuffles_mean = np.mean(pk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
+        percentiles2dot5 = np.percentile(pk.shuffles_session_index, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97dot5 = np.percentile(pk.shuffles_session_index, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
+        plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
+        sns.despine(trim=True)
+
+        if save:
+            filename = f'{pk.animal}_PK_session_index_{target_ilds}, {n_mean_frames} averaged frames'
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+            save_fig(folder_out, filename)
+            plt.close()
+
 
 
 def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],

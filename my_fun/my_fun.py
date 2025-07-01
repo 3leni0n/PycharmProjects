@@ -688,11 +688,17 @@ def ild():
     return df_ild
 
 
-def get_ild(n_frames):
+def get_ild(stim_set=6):
     # Load sounds
-    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    if stim_set == 1:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
+    if stim_set == 2:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    elif stim_set == 6:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+
     sounds = pd.read_csv(sounds_path)
-    # n_frames = 10
+    n_frames = sounds.n_frames.unique()[0]
 
     # Left frames
     left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]

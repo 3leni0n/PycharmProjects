@@ -7,7 +7,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 from glue_sessions.glue_sessions import update_glued_sessions
-from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig
+from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig, timer
 # import statsmodels.formula.api as smf
 
 
@@ -21,14 +21,11 @@ from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_
 
 ########################################################################################################################
 
-
+@timer
 def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_slack=False):
     """Do intersession report per animal, where the x axis is the number of training days (not sessions) and y axis
     the variable of interest
     """
-
-    # Register time
-    time_start_total = time.time()
 
     # Import dates_indexes
     # Group by date (not session as animals sometimes do several dates_indexes within a day)
@@ -1141,11 +1138,6 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         df_intersession.to_csv(Path(folder_csv_out / (setup + '_intersession.csv')),
                                index=False)  # index=False to avoid the 'Unmmaed: 0' column
 
-    # Register time again and compute the total run time of the script
-    time_end_total = time.time()
-    runtime_total = time_end_total - time_start_total
-    print('The script took', round(runtime_total, 2), 'seconds to run', '\n')
-
     # This block needs to be the last otherwise it sends the file too soon and corrupted
     if send_slack:
         # with open('/home/alexis/slack_bot_token', 'r') as f:  # Get slack bot token Alexis personal laptop
@@ -1164,18 +1156,16 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
 ########################################################################################################################
 
-def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignment='n_sessions', to_csv=True,
+@timer
+def do_intersessions(protocol='stage_training_v6', experiment='2AFC_6', alignment='n_sessions', to_csv=True,
                      send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
-
-    time_start = time.time()
 
     # Update glued sessions first
     update_glued_sessions(protocol=protocol, experiment=experiment)
 
     if experiment is None:
 
-        # folder = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
         folder = Path.home() / 'pv_nmdar_eranet' / 'experiments'
 
         experiments = os.listdir(folder)  # List experiments
@@ -1216,8 +1206,10 @@ def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignmen
         elif username == 'setup2':
             if box > 4:
                 flag = True
+        elif username != 'setup0' or username != 'setup1' or username != 'setup2':
+            flag = True
 
-        if df.Protocol.unique()[0] != 'stage_training_v5':  # In Ephys PC (setup0) there is only one experiment (Ephys)
+        if df.Protocol.unique()[0] != 'stage_training_v6':  # In Ephys PC (setup0) there is only one experiment (Ephys)
             # instead of the 2AFC_X nomenclature followed in the other PCs
             flag = False
 
@@ -1226,10 +1218,6 @@ def do_intersessions(protocol='stage_training_v5', experiment='2AFC_5', alignmen
                 intersession_within_animal(path, alignment=alignment, to_csv=to_csv, send_slack=send_slack)
             except:
                 print(f'Could not do intersession report of animal {i}')
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
 
 ########################################################################################################################

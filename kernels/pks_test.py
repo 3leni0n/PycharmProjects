@@ -46,7 +46,7 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_experiment, get_animal, get_ild, save_fig
+from my_fun.my_fun import get_experiment, get_animal, get_ild, save_fig, timer
 from kernels.kernels_tools import *
 
 # Plotting parameters
@@ -56,7 +56,8 @@ sns.set_style('ticks')
 sns.set_context('poster')
 
 
-def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
+@timer
+def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
            control=None, n_mean_frames=None, iterations=1000):
     """
     Compute a psychophysical kernel and plot it. The target ILDs can be added, the stimuli can be zscored and several
@@ -73,14 +74,9 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     :return: GLM model parameters
     """
 
-    time_start = time.time()
-
-    ####################################################################################################################
-
     # Get the path to the data
-    experiment = get_experiment(experiment)
-    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    animal = get_animal(experiment, animal)
+    experiment, folder_in = get_experiment(experiment)
+    animal = get_animal(experiment=experiment, path_session='glue_sessions', animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     ####################################################################################################################
@@ -108,7 +104,8 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
     ####################################################################################################################
 
     # Load intersession data
-    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (animal + '_intersession.csv')
+    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (str(int(animal)) + '_intersession.csv')
+    # str(int(animal)) to remove the 0 padding in ID
     df_intersession = pd.read_csv(path_intersession)
 
     # There are some short, corrupted sessions (dates) for which there is no intersession data because one of the values
@@ -286,8 +283,8 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
         endog = choices
         dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
         if residuals:
-            dm_net_ild = make_net_ild_dm(df)
-            exog = pd.concat([stim_strength, dm_session_index, dm_net_ild], axis=1)
+            dm_ild = make_net_ild_dm(df)
+            exog = pd.concat([stim_strength, dm_session_index, dm_ild], axis=1)
         else:
             exog = pd.concat([stim_strength, dm_session_index], axis=1)
 
@@ -350,17 +347,11 @@ def get_pk(experiment='2AFC_2', animal=None, target_ilds=None, drug=None, residu
                 drug=drug, residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
                 iterations=iterations)
 
-        time_end = time.time()
-        runtime = time_end - time_start
-        print('The script took', round(runtime, 2), 'seconds to run')
-
     return pk
 
 
-def plot_pk(experiment=None, animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
+def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
             control=None, n_mean_frames=None, iterations=1000, save=False):
-
-    time_start = time.time()
 
     if type(experiment) == list:
         pk = get_mean_pk(experiments=experiments, animals=None, target_ilds=target_ilds, drug=drug,
@@ -433,7 +424,9 @@ def plot_pk(experiment=None, animal=None, target_ilds=None, drug=None, residuals
     if save:
         filename = f'{pk.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
         filename = filename_prefix + filename
-        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'kernels' / 'PK' / experiment
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
         save_fig(folder_out, filename)
         plt.close()
 
@@ -498,9 +491,6 @@ def plot_pk(experiment=None, animal=None, target_ilds=None, drug=None, residuals
             save_fig(folder_out, filename)
             plt.close()
 
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
 
 def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
