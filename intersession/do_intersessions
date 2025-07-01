@@ -18,7 +18,7 @@ username = os.path.split(os.path.expanduser('~'))[-1]
 if username == 'setup0':
     experiment = 'Ephys'
 else:
-    experiment = '2AFC_5'
+    experiment = '2AFC_6'
 from intersession.intersession_within_animal import *
 do_intersessions(experiment=experiment, send_slack=True)
 END
