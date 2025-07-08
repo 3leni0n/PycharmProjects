@@ -106,5 +106,5 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     return df
 
 
-df = create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
-                     sigma=1, first_frame_0_ILD=True, save=True)
+df2 = create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
+                     sigma=1, first_frame_0_ILD=True, save=False)
