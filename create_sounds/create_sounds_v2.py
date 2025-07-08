@@ -1,7 +1,6 @@
 # Import libraries
 import time
 import numpy as np
-import sys
 from pathlib import Path
 import os
 import itertools
@@ -16,7 +15,8 @@ from my_fun.my_fun import *
 ########################################################################################################################
 
 
-def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
+@timer
+def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
                      sigma=1, first_frame_0_ILD=True, save=False):
     """Function to create the sounds set for an ILD 2AFC task. A white noise vector will be generated, and then its
     amplitude will fluctuate through an envelope to produce sounds with a given evidence. Since the task consist in
@@ -29,7 +29,7 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     UPDATE with v2!!!!
     """
 
-    time_start = time.time()
+    np.random.seed(42)  # Set the seed for reproducibility
 
     ILDs_dB = np.array([-max_vol, -8, -4, -2, 0, 2, 4, 8, max_vol])
 
@@ -37,22 +37,10 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     for i in ILDs_dB:
         value = get_dBs_from_diff(i, max_vol)
         dBs.append(value)
-
-    dBs = np.round(dBs)
-    dBs_right = list(abs(np.unique(dBs.flatten())))
-    dBs_left = list(np.flip(dBs_right))
-
-    ####################################################################################################################
-
-    # Generate white noise
-    noise = white_noise(fs=fs, cutoff=cutoff, amp=amp, dur=dur, fn=fn, normalize=normalize)
-    # cutoff=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
-    # FsOut=44100 the most used (audio CD)
-
-    ####################################################################################################################
+    dBs = np.round(dBs, 2)
 
     # Select the folder and create it if it doesn't exist
-    folder = Path.home()/'Music'/'sounds_first_frame_0_ILD=False'
+    folder = Path.home()/'Music'/'sounds_6.1'
 
     if not os.path.exists(folder):
         os.mkdir(folder)
@@ -73,21 +61,25 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
     for k in range(len(ILDs_dB)):
 
-        dB_left = dBs_left[k]
-        dB_right = dBs_right[k]
+        dB_left, dB_right = dBs[k]
 
         for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
+
             # Sound number (name) from 1 (aaa) to 9261 (uuu)
             sound_number += 1
             # name = folder + chars[k] + i + j
             name = Path(folder / (chars[k] + i + j))
-
 
             filename = chars[k] + i + j  # For the csv file
 
             path_wav = Path(name).with_suffix('.wav')
             print(path_wav)
             # print(sound_number, name)
+
+            # Generate white noise
+            noise = white_noise(fs=fs, cutoff=cutoff, amp=amp, dur=dur, fn=fn, normalize=normalize)
+            # cutoff=[2000, 20000] as in rat's tasks. Human range is 20-20000 and mice 1000-70000
+            # FsOut=44100 the most used (audio CD)
 
             SL, SR, EL, ER = do_envelope_dB_normal(noise, dB_left, dB_right, max_vol,
                                                    fs=fs, amp=amp, dur=dur, n_frames=n_frames, sigma=sigma,
@@ -111,8 +103,8 @@ def create_sounds_v2(max_vol=60, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
         df.to_csv(Path(folder / 'sounds').with_suffix('.csv'), index=False)
         # index=False to avoid writing the 'Unnamed:' column
 
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('\nThe script took', round(runtime, 2), 'seconds to run')
-
     return df
+
+
+df = create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
+                     sigma=1, first_frame_0_ILD=True, save=True)

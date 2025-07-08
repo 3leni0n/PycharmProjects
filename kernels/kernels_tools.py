@@ -107,9 +107,13 @@ def make_net_ild_dm(df):
 def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
 
     # Load sounds
-    # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    # sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+    if stim_set == 1:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
+    if stim_set == 2:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    elif stim_set == 6:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
     frames_ild = get_ild(stim_set=stim_set)
@@ -118,13 +122,13 @@ def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
     if residuals:
         sounds_ild = sounds.ILD
         first_frame = frames_ild[0]
+        first_frame.iloc[0] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
+        first_frame.iloc[-1] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
         if stim_set == 6:
-            # sounds_ild = sounds.ILD
             frames_ild = frames_ild.drop(['filename', 0], axis=1).sub(sounds_ild, axis='rows')
             frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
             frames_ild.insert(1, column=0, value=first_frame)  # Insert back first_frame in 2nd column
         else:
-            # sounds_ild = sounds.ILD
             frames_ild = frames_ild.drop('filename', axis=1).sub(sounds_ild, axis='rows')
             frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
 
@@ -147,7 +151,7 @@ def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
     return design_matrix, n_frames
 
 
-def get_shuffles_GLM(endog, exog, iterations, kind):
+def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
     """
     Permutation test. Shuffling the endog or exog indexes is the same, so it doesn't matter. Shuffling along the columns
     of stim_strength is wrong because it breaks the temporal structure of the data. Shuffling the frames within trial
@@ -161,6 +165,21 @@ def get_shuffles_GLM(endog, exog, iterations, kind):
 
     shuffles = []
 
+    # Load sounds
+    if stim_set == 1:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
+    if stim_set == 2:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    elif stim_set == 6:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+
+    sounds = pd.read_csv(sounds_path)
+    n_frames = sounds.n_frames.unique()[0]
+    net_ilds = list(sounds.ILD.abs().unique())
+    net_ilds.sort()
+    net_ilds = net_ilds[1:]  # Remove 0
+    len_net_ilds = len(net_ilds)
+
     for _ in range(iterations):
 
         # print(f'Iteration {_}/{iterations}')  # Prints make it slower
@@ -172,17 +191,17 @@ def get_shuffles_GLM(endog, exog, iterations, kind):
 
         # Pshychophysical kernels
         if kind == 'pk_frames':
-            frames_shuffled = exog.iloc[:, 0:10].sample(frac=1).reset_index(drop=True)
+            frames_shuffled = exog.iloc[:, 0:n_frames].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog
-            exog_shuffled.iloc[:, 0:10] = frames_shuffled
+            exog_shuffled.iloc[:, 0:n_frames] = frames_shuffled
         elif kind == 'pk_session_index':
-            session_indexes_shuffled = exog.iloc[:, 10:-4].sample(frac=1).reset_index(drop=True)
+            session_indexes_shuffled = exog.iloc[:, n_frames:-len_net_ilds].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog
-            exog_shuffled.iloc[:, 10:-4] = session_indexes_shuffled
+            exog_shuffled.iloc[:, n_frames:-len_net_ilds] = session_indexes_shuffled
         elif kind == 'pk_net_stim':
-            net_stim_shuffled = exog.iloc[:, -4:].sample(frac=1).reset_index(drop=True)
+            net_stim_shuffled = exog.iloc[:, -len_net_ilds:].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog
-            exog_shuffled.iloc[:, -4:] = net_stim_shuffled
+            exog_shuffled.iloc[:, -len_net_ilds:] = net_stim_shuffled
 
         # History kernels
         elif kind == 'hk_rminus':

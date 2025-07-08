@@ -633,9 +633,9 @@ def get_dBs_from_diff(diff, max_vol):
         left_amp = 10 ** (left_dB / 20)  # Convert left dB to amplitude
         right_amp = 10 ** (right_dB / 20)  # Convert right dB to amplitude
         # Scale the sum of amplitudes by a constant to ensure that amp 1 = max volume
-        total_amp = constant * (left_amp + right_amp)
+        total_power = (constant**2) * (left_amp**2 + right_amp**2)
         # Define the equations to solve
-        eq1 = total_amp - 1
+        eq1 = total_power - 1
         eq2 = left_dB - right_dB - diff
         return [eq1, eq2]
 
@@ -645,6 +645,7 @@ def get_dBs_from_diff(diff, max_vol):
     guess = [quiet, loud] if diff >= 0 else [loud, quiet]
 
     left_dB, right_dB = fsolve(equations, guess)
+
     return float(left_dB), float(right_dB)
 
 

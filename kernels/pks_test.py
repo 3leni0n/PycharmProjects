@@ -79,25 +79,6 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
     animal = get_animal(experiment=experiment, path_session='glue_sessions', animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
-    ####################################################################################################################
-
-    # # Load sounds
-    # # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-    # sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    # sounds = pd.read_csv(sounds_path)
-    # n_frames = sounds.n_frames.unique()[0]
-    # frames_ild = get_ild(n_frames)
-
-    ####################################################################################################################
-
-    # # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
-    # if residuals:
-    #     sounds_ild = sounds.ILD
-    #     frames_ild = frames_ild.drop('filename', 1).sub(sounds_ild, axis='rows')
-    #     frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
-
-    ####################################################################################################################
-
     # Load behavioral data
     df = pd.read_csv(folder_in)
 
@@ -207,7 +188,7 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
         #             stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
         #         # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
 
-        stim_strength, n_frames = make_frames_dm(df)
+        stim_strength, n_frames = make_frames_dm(df, stim_set=6, residuals=residuals, zscore=zscore)
 
         # Average frames (to have more trials per regressor)
         if n_mean_frames is not None:
@@ -283,8 +264,8 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
         endog = choices
         dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
         if residuals:
-            dm_ild = make_net_ild_dm(df)
-            exog = pd.concat([stim_strength, dm_session_index, dm_ild], axis=1)
+            dm_net_ild = make_net_ild_dm(df)
+            exog = pd.concat([stim_strength, dm_session_index, dm_net_ild], axis=1)
         else:
             exog = pd.concat([stim_strength, dm_session_index], axis=1)
 
@@ -416,7 +397,7 @@ def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, resid
     xticks = np.arange(1, n_frames + 1, 2)
     xticklabels = xticks + 1
     plt.xticks(xticks, xticklabels)
-    sns.despine(trim=True)  # Despine axes triming the 0
+    sns.despine()  # Despine axes triming the 0
 
     if n_mean_frames == 2:
         plt.xticks([1, 2])  # Readjust xticks
@@ -451,7 +432,7 @@ def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, resid
     percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
     plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
     plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
-    sns.despine(trim=True)
+    sns.despine()
 
     if save:
         filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
@@ -483,14 +464,13 @@ def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, resid
         plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
         plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
         plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
-        sns.despine(trim=True)
+        sns.despine()
 
         if save:
             filename = f'{pk.animal}_PK_session_index_{target_ilds}, {n_mean_frames} averaged frames'
             folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
             save_fig(folder_out, filename)
             plt.close()
-
 
 
 def plot_pks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'],
