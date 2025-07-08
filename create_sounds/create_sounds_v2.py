@@ -61,7 +61,7 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
 
     for k in range(len(ILDs_dB)):
 
-        dB_left, dB_right = dBs[k]
+        dB_right, dB_left = dBs[k]
 
         for i, j in itertools.product(chars, chars):  # Iterate through all the possible combinations of chars
 
@@ -100,11 +100,7 @@ def create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, f
     df = pd.DataFrame(data=data, index=None, columns=columns)
 
     if save:
-        df.to_csv(Path(folder / 'sounds').with_suffix('.csv'), index=False)
+        df.to_csv(Path(folder / 'sounds_6.1').with_suffix('.csv'), index=False)
         # index=False to avoid writing the 'Unnamed:' column
 
     return df
-
-
-df2 = create_sounds_v2(max_vol=70, fs=44100, cutoff=[2000, 20000], amp=1, dur=1, fn=10000, normalize=True, n_frames=11,
-                     sigma=1, first_frame_0_ILD=True, save=False)
