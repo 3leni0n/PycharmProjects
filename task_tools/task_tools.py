@@ -115,21 +115,22 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
 
     # Select automatically the cam depending on the PC (only for n_cams=1)
     username = os.getlogin()
-    if username == 'setup0':
+    if username == 'setup0':  # Ephys PC
         indx_or_path = '/dev/video-cam01'  # Front cam
         # indx_or_path = '/dev/video-cam02'  #  Side cam
-    elif username == 'setup1' or username == 'setup2':
+    elif username == 'setup1' or username == 'setup2':  # Boxes 1-8
         indx_or_path = '/dev/video-cam' + conf.PYBPOD_BOARD[-1]
 
     if n_cams == 1:  # For when a 1 cam is needed (all the test tasks, boxes 1-8)
         try:
-            cam = VideoR(indx_or_path=indx_or_path,
-                         name_video=conf.PYBPOD_SESSION + '.avi',
+            # Front camera
+            cam = VideoR(indx_or_path=indx_or_path + '_front',
+                         name_video=conf.PYBPOD_SESSION + '_front' + '.avi',
                          path=video_folder,
                          fps=60,
                          # codec_cam='MJPG',  # Commented for video compression
                          # codec_video='MJPG',  # Commented for video compression
-                         title=conf.PYBPOD_BOARD,
+                         title=conf.PYBPOD_BOARD + '_front',
                          cam_sync=cam_sync,
                          states_on_sync=states_on_sync,
                          mask=mask
@@ -143,24 +144,26 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
 
     elif n_cams == 2:  # For when 2 cams are needed (ephys box only, 'cam_double' and 'stage_training' tasks)
         try:
-            cam1 = VideoR(indx_or_path='/dev/video-cam01',
-                          name_video=conf.PYBPOD_SESSION + '_cam01.avi',  # Different file names to not overwrite each other
+            # Front camera
+            cam1 = VideoR(indx_or_path=indx_or_path + '_front',
+                          name_video=conf.PYBPOD_SESSION + '_front' + '.avi',  # Different file names to not overwrite each other
                           path=video_folder,
                           fps=60,
                           # codec_cam='MJPG',  # Commented for video compression
                           # codec_video='MJPG'  # Commented for video compression
-                          title=conf.PYBPOD_BOARD,
+                          title=conf.PYBPOD_BOARD + '_front',
                           cam_sync=cam_sync,
                           states_on_sync=states_on_sync,
                           mask=mask
                           )
-            cam2 = VideoR(indx_or_path='/dev/video-cam02',
-                          name_video=conf.PYBPOD_SESSION + '_cam02.avi',  # Different file names to not overwrite each other
+            # Side camera
+            cam2 = VideoR(indx_or_path=indx_or_path + '_side',
+                          name_video=conf.PYBPOD_SESSION + '_front' + '.avi',  # Different file names to not overwrite each other
                           path=video_folder,
                           fps=60,
                           # codec_cam='MJPG',  # Commented for video compression
                           # codec_video='MJPG'  # Commented for video compression
-                          title=conf.PYBPOD_BOARD,
+                          title=conf.PYBPOD_BOARD + '_side',
                           cam_sync=cam_sync,
                           states_on_sync=states_on_sync,
                           mask=mask
