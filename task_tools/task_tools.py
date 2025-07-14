@@ -138,6 +138,7 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
             cam.play()
             if int(conf.VAR_REC) > 0:
                 cam.record()
+            return cam
         except:
             print(
                 "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
@@ -173,11 +174,10 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
             if int(conf.VAR_REC) > 0:
                 cam1.record()
                 cam2.record()
+            return cam1, cam2
         except:
             print(
                 "Could not open device. This may happen because either it's already in use or wrong device index number was provided")
-
-    return cam
 
 
 def close_cam(cam, n_cams=1):
