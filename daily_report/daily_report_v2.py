@@ -14,6 +14,7 @@
 ########################################################################################################################
 
 import matplotlib.pyplot as plt
+from pathlib import Path
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # For inset plot
 from matplotlib.patches import Patch  # For custom legend
 from matplotlib.lines import Line2D  # For custom legend
@@ -45,13 +46,14 @@ def daily_report_v2(path, send_slack=False):
 
     # Select the folder and create it if it doesn't exist
     experiment = df.Experiment.unique()[0]  # Batch ID
-    folder = '/home/alexis/Documentos/daily reports/' + experiment + '/'
-    # folder = '/home/setup2/Documents/daily reports/' + experiment + '/'
+    folder = Path.home() / 'Documents' / 'daily reports' / experiment
     if not os.path.exists(folder):
-        os.mkdir(folder)
+        # os.mkdir(folder)
+        folder.mkdir(parents=True, exist_ok=True)
     os.chdir(folder)
     setup = df.Setup.unique()[0]  # Animal ID
-    folder = folder + setup
+    # folder = folder + setup
+    folder = Path(folder / setup)
     if not os.path.exists(folder):
         os.mkdir(folder)
     os.chdir(folder)
@@ -129,7 +131,7 @@ def daily_report_v2(path, send_slack=False):
 
     ####################################################################################################################
 
-    with PdfPages(df.Session.unique()[0]) as pdf:
+    with PdfPages(df.Session.unique()[0] + '.pdf') as pdf:
 
         # PAGE 1
 
@@ -530,7 +532,7 @@ def daily_report_v2(path, send_slack=False):
             # ax11.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
             #               color='tab:brown', fmt='o', markerfacecolor='none')
 
-            ax11.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+            # ax11.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax11.minorticks_off()  # Remove minor ticks
             ax11.set_xlabel('ILD')
             # ax11.set_xlim([min(np.sort(df.ILD.unique())), max(np.sort(df.ILD.unique()))])  # Include min and max ILDs
@@ -627,7 +629,7 @@ def daily_report_v2(path, send_slack=False):
             ax13.errorbar(psych_curve_rep.xdata, psych_curve_rep.ydata, yerr=psych_curve_rep.fit_error,
                           color='tab:brown', fmt='o', markerfacecolor='none')
 
-            ax13.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
+            # ax13.set_xscale('symlog', linthreshx=20)  # Set symmetric logarithmic spacing to zoom in the middle
             ax13.minorticks_off()  # Remove minor ticks
             ax13.set_xlabel('ILD')
             # ax13.set_xlim([min(np.sort(df.ILD.unique())), max(np.sort(df.ILD.unique()))])  # Include min and max ILDs
