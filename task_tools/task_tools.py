@@ -159,7 +159,7 @@ def open_cam(n_cams=1, cam_sync=None, states_on_sync=False, mask=False):
                           )
             # Side camera
             cam2 = VideoR(indx_or_path=indx_or_path + '_side',
-                          name_video=conf.PYBPOD_SESSION + '_front' + '.avi',  # Different file names to not overwrite each other
+                          name_video=conf.PYBPOD_SESSION + '_side' + '.avi',  # Different file names to not overwrite each other
                           path=video_folder,
                           fps=60,
                           # codec_cam='MJPG',  # Commented for video compression
