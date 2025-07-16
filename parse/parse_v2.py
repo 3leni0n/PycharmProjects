@@ -7,15 +7,43 @@
 # Import modules
 from pathlib import Path
 import pandas as pd
+from io import StringIO
 import numpy as np
 
 
 ########################################################################################################################
 
+
+def safe_read_csv(path, sep=';', skiprows=6):
+
+    # Open the file and read all lines into a list
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+    # Filter lines to exclude traceback and garbage lines that cause parsing errors (stderr/stdout with extra delimiters)
+    # We start from `skiprows` to ignore initial metadata/header lines.
+    # Keep only lines that either:
+    # - start with any of the expected valid prefixes (e.g. 'VAL', 'EVENT', etc.), OR
+    # - have the same number of separators (';') as the first valid data line (lines[skiprows])
+    valid_lines = [line for line in lines[skiprows:]
+                   if line.startswith(('VAL', 'EVENT', 'STATE', 'INFO', 'TRIAL', 'SESSION', 'MSG')) or
+                   line.count(';') == lines[skiprows].count(';')]
+
+    # Recreate a file-like object in memory
+    cleaned_data = ''.join(valid_lines)
+
+    # Use StringIO to create a file-like object from the cleaned string data,
+    # then read it into a pandas DataFrame with the specified separator
+    # Using 'python' engine to handle potential irregularities in the CSV structure
+    return pd.read_csv(StringIO(cleaned_data), sep=sep, engine='python')
+
+
 def parse_v2(path):
 
     # Don't take first 6 lines (they start with __underscores__ and it crashes)
-    df = pd.read_csv(path, skiprows=6, sep=';')
+    # df = pd.read_csv(path, skiprows=6, sep=';')
+    df = safe_read_csv(path)
+
     sounds_2 = pd.read_csv(Path.home()/'PycharmProjects'/'create_sounds'/'sounds_2.csv')
 
     ####################################################################################################################

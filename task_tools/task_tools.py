@@ -190,5 +190,6 @@ def close_cam(cam, n_cams=1):
         cam.stop()
 
     elif n_cams == 2:  # For when 2 cams are needed (ephys box only, 'cam_double' and 'stage_training' tasks)
+        cam1, cam2 = cam
         cam1.stop()
         cam2.stop()
