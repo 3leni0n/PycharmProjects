@@ -1,5 +1,4 @@
 # To do:
-
 # Include the new VARs in upper text
 
 ########################################################################################################################
@@ -10,9 +9,7 @@ import pandas as pd
 from io import StringIO
 import numpy as np
 
-
 ########################################################################################################################
-
 
 def safe_read_csv(path, sep=';', skiprows=6):
 
@@ -143,6 +140,11 @@ def parse_v2(path):
         k = [str(df[df.MSG == 'VAR_K']['+INFO'].iloc[0])] * n_trials  # Added on 06-06-2024
     except IndexError:
         k = [np.nan] * n_trials
+
+    try:
+        drug = [str(df[df.MSG == 'VAR_DRUG']['+INFO'].iloc[0])] * n_trials  # Added on 16-07-2025
+    except IndexError:
+        drug = [None] * n_trials
 
 
     # Registered values (out of loop)
@@ -462,7 +464,7 @@ def parse_v2(path):
                'MessageFound', 'SoundLeft', 'SoundRight', 'Sound', 'ILD', 'ILDRep', 'Port1In', 'Port1Out', 'Port2In',
                'Port2Out', 'ValveLeft', 'ValveRight', 'AW', 'AWTrials', 'Switch', 'Timeout', 'Fixation', 'Stage',
                'Motor', 'REC', 'Progression', 'CB', 'RespWin', 'ITI', 'WarmUp', 'RecoveryMode', 'P', 'PRight', 'Blocks',
-               'BlockLen', 'Task', 'Ephys', 'Wait', 'TrialLag', 'K', 'StimDur', 'Delay', 'VarDelay', 'RewardSize',
+               'BlockLen', 'Task', 'Ephys', 'Wait', 'TrialLag', 'K', 'Drug', 'StimDur', 'Delay', 'VarDelay', 'RewardSize',
                'SerialPort', 'Protocol', 'Creator', 'Project', 'Experiment', 'Board', 'Setup', 'NetPort', 'Subject',
                'BpodApiVersion', 'Session', 'Date', 'SessionStart', 'SessionEnd']
 
@@ -471,7 +473,7 @@ def parse_v2(path):
                     resp_win_end, resp_win_len, filename, filename2, files_match, message, message_found, sound_left,
                     sound_right, sound, ild, ild_rep, port1in, port1out, port2in, port2out, valve_1, valve_2, aw,
                     aw_trials, switch, timeout, fixation, stage, motor, rec, progression, cb, resp_win, iti, warm_up,
-                    recovery_mode, p, p_right, blocks, block_len, task, ephys, wait, trial_lag, k, stim_dur, delay,
+                    recovery_mode, p, p_right, blocks, block_len, task, ephys, wait, trial_lag, k, drug, stim_dur, delay,
                     var_delay, reward_size, serial_port, protocol, creator, project, experiment, board, setup, net_port,
                     subject, bpod_api_version, session, date, time_session_started, time_session_ended))
 

@@ -17,7 +17,7 @@ sns.set_context('poster')
 
 
 @timer
-def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', save=True, format='png', transparent=False):
+def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, save=True, format='png', transparent=False):
     """Plot psychometric curve
     :param experiment: str, name of the experiment
     :param animal: str, animal name
@@ -43,10 +43,18 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', save=True, form
     # Filter trials
     df = df[df.P > 0]  # Only those sessions with ilds
     # Only sessions with accuracy > X threshold?
-    try:
-        df = df[df.Drug.isnull()]  # Remove drug experimental sessions
-    except AttributeError:  # As 24.05.2023 only batch 2 has drug data. Need to reparse batch 3 to add Drug column
-        pass
+    # try:
+    #     df = df[df.Drug.isnull()]  # Remove drug experimental sessions
+    # except AttributeError:  # As 24.05.2023 only batch 2 has drug data. Need to reparse batch 3 to add Drug column
+    #     pass
+
+    if drug is not None:
+        df = df[df.Drug == drug]
+        if pd.isna(drug):
+            df = df[df.Drug.isna()]
+        elif drug in [0, 1]:
+            df = df[df.Drug == drug]
+
 
     ####################################################################################################################
 
@@ -67,8 +75,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', save=True, form
         psych_curve = compute_psych_curve(df.ILD, df.Choice, n_points)  # No need to filter out the misses
 
         # Move extreme datapoints closer to the center to zoom in
-        psych_curve.xdata[0] = -32
-        psych_curve.xdata[-1] = 32
+        psych_curve.xdata[0] = -20
+        psych_curve.xdata[-1] = 20
 
         # Plot params
         color = 'tab:orange'
@@ -96,8 +104,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', save=True, form
         psych_curve = compute_psych_curve(df.ILDRep, df.RepChoice, n_points)
 
         # Move extreme datapoints closer to the center to zoom in
-        psych_curve.xdata[0] = -32
-        psych_curve.xdata[-1] = 32
+        psych_curve.xdata[0] = -20
+        psych_curve.xdata[-1] = 20
 
         # Plot params
         color = 'tab:brown'
@@ -173,8 +181,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', save=True, form
 
 
 @timer
-def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='prob_right', save=True, format='png',
-             transparent=False):
+def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='prob_right', drug=np.nan, save=True,
+             format='png', transparent=False):
 
     """Do the psychometric curves for all animals of a given batch (experiment)
     :param: experiment: str, name of the experiment
@@ -198,8 +206,8 @@ def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='pr
 
     for i in range(len(animals)):
         try:
-            psych_curve = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save, format=format,
-                                  transparent=transparent)
+            psych_curve = plot_pc(experiment=experiment, animal=animals[i], kind=kind, drud=drug, save=save,
+                                  format=format, transparent=transparent)
             # psych_curve, pc0_bias0, pc0_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save,
             #                                               format=format, transparent=transparent)
             # psych_curve, fit_bias0, fit_lapses0 = plot_pc(experiment=experiment, animal=animals[i], kind=kind, save=save,
@@ -218,7 +226,7 @@ def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='pr
 
 @timer
 def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '017'], save=True, kind='prob_right',
-                           format='png', transparent=False):
+                           drug=np.nan, format='png', transparent=False):
     """Plot psychometric curves across animals
     :param experiment: str, name of the experiment
     :param animals: list, list of animal names
@@ -247,7 +255,12 @@ def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '0
     for i in range(len(animals)):
 
         df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
-        # df = df[df.P > 0]  # Only those sessions with ilds
+        df = df[df.P > 0]  # Only those sessions with ilds
+
+        if pd.isna(drug):
+            df = df[df.Drug.isna()]
+        elif drug in [0, 1]:
+            df = df[df.Drug == drug]
 
         ilds = np.sort(df.ILD.unique())
         if len(ilds) != 9:
@@ -278,8 +291,8 @@ def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '0
     psych_curve = compute_psych_curve(xdata, ydata, n_points)
 
     # Move extreme datapoints closer to the center to zoom in
-    psych_curve.xdata[0] = -32
-    psych_curve.xdata[-1] = 32
+    psych_curve.xdata[0] = -20
+    psych_curve.xdata[-1] = 20
 
     if kind == 'prob_right':
 
