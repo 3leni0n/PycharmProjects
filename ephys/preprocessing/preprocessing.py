@@ -1,4 +1,7 @@
 # Standard libraries
+import socket  # Check remote vs local
+import platform  # Check remote vs local
+import getpass  # Check remote vs local
 import os
 from pathlib import Path
 import numpy as np
@@ -13,6 +16,18 @@ from my_fun.my_fun import do_sounds_dict_inv, timer
 from parse.parse_v2 import parse_v2
 
 
+# Check remote vs local
+hostname = socket.gethostname()  # Machine name (remote if SSH)
+username = getpass.getuser()  # Logged-in user
+os_type = platform.system()  # 'Linux', 'Darwin' (macOS), 'Windows'
+
+if (hostname == 'headnode' or hostname == 'minibaps' or hostname == 'minibaps2') \
+    and os_type == 'Linux' and username == 'alexis':
+    development = 'remote'
+else:
+    development = 'local'  # Local machine (Ephys PC)
+
+
 def get_behavior_id(ephys_id: str) -> Path:
     """
     Takes an ephys session ID and finds the corresponding path to the matching .csv file in the behavior folder
@@ -22,7 +37,11 @@ def get_behavior_id(ephys_id: str) -> Path:
     subject = ephys_id[:3]  # Get the subject ID from the first 3 characters of the ephys session ID
     date_ephys = ephys_id[4:14]  # Get the date from the ephys session ID
     date_ephys = date_ephys[:4] + date_ephys[5:7] + date_ephys[8:]  # Remove - characters in ephys date to match Bpod dates
-    folder_parent = Path.home() / 'pv_nmdar_eranet' / 'experiments' / 'Ephys' / 'setups' / subject / 'sessions'
+
+    if development == 'local':
+        folder_parent = Path.home() / 'pv_nmdar_eranet' / 'experiments' / 'Ephys' / 'setups' / subject / 'sessions'
+    elif development == 'remote':
+        folder_parent = Path('/archive/alexis') / 'pv_nmdar_eranet' / 'experiments'/ 'Ephys' / 'setups' / subject / 'sessions'
 
     # List all the child folders in the parent folder
     sessions = os.listdir(folder_parent)
@@ -534,14 +553,18 @@ def preprocess(ephys_id):
     # Define the session ID and directory
     directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
     directory2 = Path.home() / 'Documents' / 'Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
+    directory3 = Path('/archive/alexis/ephys') / ephys_id  # Remote server archive (remote development)
 
     subject = ephys_id[:3]
 
     # Load raw Open Ephys data
-    try:
-        continuous, events = load_oe_data(directory, sync=True, stream='AP')
-    except OSError:
-        continuous, events = load_oe_data(directory2, sync=True, stream='AP')
+    if development == 'local':
+        try:
+            continuous, events = load_oe_data(directory, sync=True, stream='AP')
+        except OSError:
+            continuous, events = load_oe_data(directory2, sync=True, stream='AP')
+    elif development == 'remote':
+        continuous, events = load_oe_data(directory3, sync=True, stream='AP')
 
     # Get TTLs from continuous or/and event data
     df_ttl = get_ttls(continuous, events)
@@ -557,8 +580,19 @@ def preprocess(ephys_id):
     n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
 
     # Load spike sorted data (KS4)
-    path_ks4 = Path.home() / 'Downloads' / 'spike_sorting' / subject / ephys_id / 'kilosort4'
-    path_phy2 = Path.home() / 'Downloads' / 'spike_sorting' / subject / ephys_id / 'Phy2'
+    if development == 'local':
+        path_spike_sorting = Path.home() / 'Downloads' / 'spike_sorting' / subject / ephys_id
+        path_ks4 = path_spike_sorting / 'kilosort4'
+        path_phy2 = path_spike_sorting / 'Phy2'
+    elif development == 'remote':
+        # After rsync copy files (final)
+        # path_spike_sorting = Path('/archive/alexis/ephys/spike sorting') / subject / ephys_id
+        # path_ks4 = path_spike_sorting/ 'kilosort4'
+        # path_phy2 = path_spike_sorting / 'phy2'
+        # Temporary path for rsync copy files (in progress)
+        path_spike_sorting = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_id
+        path_ks4 = path_spike_sorting / 'kilosort4'
+        path_phy2 = path_spike_sorting / 'phy2'
     df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
 
     # Print session info
