@@ -1013,3 +1013,31 @@ def timer(func):
         print(f"{func.__name__} took {end - start:.2f} seconds to run")
         return result
     return wrapper
+
+
+def filter_drug_sessions(df: pd.DataFrame) -> pd.DataFrame:
+    """Filter out saline sessions (Drug==0) that are not immediately followed by a drug session (Drug==1) for paired
+    saline-drug analyses (batch #6).
+    :return: df with only paired saline-drug sessions
+    """
+
+    # Ensure proper sorting
+    df['Date'] = pd.to_datetime(df['Date'])
+    session_info = df.drop_duplicates(subset='Date')[['Date', 'Drug']].sort_values('Date')
+
+    # Reset index for easy access
+    session_info = session_info.reset_index(drop=True)
+
+    # Find saline sessions immediately followed by a drug session
+    paired_sessions = []
+    for i in range(len(session_info) - 1):
+        current = session_info.iloc[i]
+        next = session_info.iloc[i + 1]
+        if current.Drug == 0 and next.Drug == 1:
+            paired_sessions.append(session_info.Date[i])
+
+    # Filter original df
+    # df = df[df.Date.isin(paired_sessions)]
+    df = df[(df.Date.isin(paired_sessions) | (df.Drug == 1))]
+
+    return df
