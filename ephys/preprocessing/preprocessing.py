@@ -549,12 +549,12 @@ def preprocess(ephys_id):
     :return: preprocessed data
     """
 
-    # Define the session ID and directory
-    directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
-    directory2 = Path.home() / 'Documents' / 'Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
-    directory3 = Path('/archive/alexis/ephys') / ephys_id  # Remote server archive (remote development)
-
     subject = ephys_id[:3]
+
+    # Define the session ID and directory
+    directory = Path() / 'D:' / subject / ephys_id  # Ephys PC extra SSD HD (C:)
+    directory2 = Path.home() / 'Documents' / 'Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
+    directory3 = Path('/archive/alexis/ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
 
     # Load raw Open Ephys data
     if development == 'local':
