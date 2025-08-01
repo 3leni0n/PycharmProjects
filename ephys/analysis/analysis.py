@@ -53,7 +53,7 @@ from ephys.preprocessing import *
 
 # Define helper functions
 
-def get_ephys_sessions(subject):
+def get_ephys_sessions(subject: str) -> list:
     """
     Get the ephys sessions for a given subject by searching in both C: and D: drives.
     :param subject: str, subject number (format: '000')
@@ -62,28 +62,27 @@ def get_ephys_sessions(subject):
 
     folder_name_len = 23  # Length of the ephys sessions folder name
 
-    # Define the paths for ephys sessions on C: and D: drives on Ephys PC
-    C_drive = Path('C:/Users/Usuario\Documents/Open Ephys')
-    D_drive = Path('D:/')
+    development = dev()
 
-    # Get all folders (directories) in C: and D: (non-recursive)
-    folders_C = [p.name for p in C_drive.iterdir() if p.is_dir()]
-    folders_D = [p.name for p in D_drive.iterdir() if p.is_dir()]
+    if development == 'local':
 
-    # Exclude folders that do not match the expected length
-    folders_C = [p.name for p in C_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
-    folders_D = [p.name for p in D_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+        # Define the paths for ephys sessions on C: and D: drives on Ephys PC
+        C_drive = Path('C:/Users/Usuario\Documents/Open Ephys')
+        D_drive = Path('D:/')
 
-    # Combine the lists of folders from both drives
-    folders = folders_C + folders_D
-    print(folders)
+        # Get all folders in C: and D: (non-recursive), excluding folders that do not match the expected length
+        folders_C = [p.name for p in C_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+        folders_D = [p.name for p in D_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
 
-    # Filter folders that start with the subject number
-    subject_folders = [f for f in folders if f.startswith(subject)]
-    # Sort the subject folders
-    subject_folders.sort()
-    # Print the sorted subject folders
-    print(subject_folders)
+        folders = folders_C + folders_D  # Combine the lists of folders from both drives
+
+    elif development == 'remote':
+        remote_drive = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject
+        folders = [p.name for p in remote_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+
+    subject_folders = [f for f in folders if f.startswith(subject)]  # Filter folders that start with subject number
+    subject_folders.sort()  # Sort the subject folders
+    print(subject_folders)  # Print the sorted subject folders
 
     return subject_folders
 

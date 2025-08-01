@@ -15,6 +15,7 @@ from ephys.analysis import *
 import seaborn as sns
 import time
 import pickle
+import traceback
 
 sns.set_theme()
 sns.set_style('ticks')
@@ -46,6 +47,7 @@ folder_parent = Path.home() / 'data' / subject
 # ]
 
 ephys_ids = get_ephys_sessions(subject)
+error_sessions = []
 
 # Compute spike counts for all neurons of a session (bins, all_psth). If file doesn't exist, create it
 for i in range(len(ephys_ids)):
@@ -62,13 +64,20 @@ for i in range(len(ephys_ids)):
         print('Files exist in folder. Skipping')
         continue
     else:
-        print('Files do not exist in folder. Proceeding')
-        df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-            preprocess(ephys_ids[i])
-        bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
-    # Save bins and psth
-    np.save(folder_child / 'bins.npy', bins)
-    np.save(folder_child / 'all_psth.npy', all_psth)
+        try:  # Some sessions crash preprocess
+            print('Files do not exist in folder. Proceeding')
+            df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
+                preprocess(ephys_ids[i])
+            bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
+
+            # Save bins and psth
+            np.save(folder_child / 'bins.npy', bins)
+            np.save(folder_child / 'all_psth.npy', all_psth)
+        except Exception as e:
+            print(f'An error occurred: {e}')
+            traceback.print_exc()
+            error_sessions.append(ephys_ids[i])
+            continue
 
 
 # Parse behavior of a session. If file doesn't exist, create it

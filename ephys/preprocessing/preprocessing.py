@@ -16,16 +16,23 @@ from my_fun.my_fun import do_sounds_dict_inv, timer
 from parse.parse_v2 import parse_v2
 
 
-# Check remote vs local
-hostname = socket.gethostname()  # Machine name (remote if SSH)
-username = getpass.getuser()  # Logged-in user
-os_type = platform.system()  # 'Linux', 'Darwin' (macOS), 'Windows'
+def dev():
+    """
+    Check if the code is running in a remote server or in a local machine.
+    """
 
-if (hostname == 'headnode' or hostname == 'minibaps' or hostname == 'minibaps2') \
-    and os_type == 'Linux' and username == 'alexis':
-    development = 'remote'
-else:
-    development = 'local'  # Local machine (Ephys PC)
+    # Check remote vs local
+    hostname = socket.gethostname()  # Machine name (remote if SSH)
+    username = getpass.getuser()  # Logged-in user
+    os_type = platform.system()  # 'Linux', 'Darwin' (macOS), 'Windows'
+    if (hostname == 'headnode' or hostname == 'minibaps' or hostname == 'minibaps2') \
+        and os_type == 'Linux' and username == 'alexis':
+        development = 'remote'
+    else:
+        development = 'local'  # Local machine (Ephys PC)
+    print(f'Development mode: {development} ({hostname}, {username}, {os_type})')
+
+    return development
 
 
 def get_behavior_id(ephys_id: str) -> Path:
@@ -38,10 +45,12 @@ def get_behavior_id(ephys_id: str) -> Path:
     date_ephys = ephys_id[4:14]  # Get the date from the ephys session ID
     date_ephys = date_ephys[:4] + date_ephys[5:7] + date_ephys[8:]  # Remove - characters in ephys date to match Bpod dates
 
+    # Check if the code is running in a remote server or in a local machine
+    development = dev()
     if development == 'local':
-        folder_parent = Path.home() / 'pv_nmdar_eranet' / 'experiments' / 'Ephys' / 'setups' / subject / 'sessions'
+        folder_parent = Path.home() / 'pv_nmdar_eranet/experiments/Ephys/setups' / subject / 'sessions'
     elif development == 'remote':
-        folder_parent = Path('/archive/alexis') / 'pv_nmdar_eranet' / 'experiments'/ 'Ephys' / 'setups' / subject / 'sessions'
+        folder_parent = Path('/archive/alexis/pv_nmdar_eranet/experiments/Ephys/setups')  / subject / 'sessions'
 
     # List all the child folders in the parent folder
     sessions = os.listdir(folder_parent)
@@ -551,11 +560,13 @@ def preprocess(ephys_id):
     """
 
     # Define the session ID and directory
-    directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
-    directory2 = Path.home() / 'Documents' / 'Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
-    directory3 = Path('/archive/alexis/ephys') / ephys_id  # Remote server archive (remote development)
-
     subject = ephys_id[:3]
+    directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
+    directory2 = Path.home() / 'Documents/Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
+    directory3 = Path('/archive/alexis/ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
+    # directory3 = Path('/archive/mouse/Alexis ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
+
+    development = dev()
 
     # Load raw Open Ephys data
     if development == 'local':
@@ -581,7 +592,7 @@ def preprocess(ephys_id):
 
     # Load spike sorted data (KS4)
     if development == 'local':
-        path_spike_sorting = Path.home() / 'Downloads' / 'spike_sorting' / subject / ephys_id
+        path_spike_sorting = Path.home() / 'Downloads/spike_sorting' / subject / ephys_id
         path_ks4 = path_spike_sorting / 'kilosort4'
         path_phy2 = path_spike_sorting / 'Phy2'
     elif development == 'remote':
