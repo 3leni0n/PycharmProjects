@@ -27,7 +27,6 @@ def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6'
 
     if experiment is None:
 
-        # folder_in = '/home/alexis/pv_nmdar_eranet/experiments/'  # Where the data for all animals is
         folder_in = Path.home() / 'pv_nmdar_eranet' / 'experiments'  # Where the data for all animals is
         experiments = os.listdir(folder_in)  # List experiments
         experiments.sort()  # Sort them by name
@@ -66,7 +65,6 @@ def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6'
     glued_sessions = []  # Initialize empty list so if it's the first time glue all sessions
 
     # Select the output folder and create it if it doesn't exist
-    # folder_out = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'
     folder_out = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
     if not os.path.exists(folder_out):
         # os.mkdir(folder_out)
@@ -77,13 +75,11 @@ def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6'
     glued_animals = [x for x in glued_animals if x.endswith('.csv')]  # Get rid of non csv files
 
     if animal + '.csv' in glued_animals:
-        # df = pd.read_csv('/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/' + animal + '.csv')
         df = pd.read_csv(Path(Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment / animal).with_suffix('.csv'))
         glued_sessions = df.Session.unique().tolist()
     else:
         df = pd.DataFrame()  # Create empty DataFrame if there's no csv yet for that animal
 
-    # folder_in = folder_in + animal + '/sessions/'  # Update folder_in with selected animal
     folder_in = Path(folder_in / animal / 'sessions')  # Update folder_in with selected animal
     sessions = os.listdir(folder_in)  # List sessions
     sessions.sort()  # Sort them by date
@@ -177,7 +173,6 @@ def update_glued_sessions(protocol='stage_training_v6', experiment='2AFC_6'):
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    # folder = '/home/alexis/pv_nmdar_eranet/experiments/' + experiment + '/setups/'  # Where the data for all animals is
     folder = Path.home() / 'pv_nmdar_eranet' / 'experiments' / experiment / 'setups'  # Where the data for all animals is
     animals = os.listdir(folder)  # List animals
     animals.sort()  # Sort them by name
@@ -215,7 +210,6 @@ def glue_animals(protocol='stage_training_v4', experiment='2AFC_4', update=False
     # Get the path to the data
     experiment, folder = get_experiment(experiment, session='glue_sessions')
 
-    # folder_in = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
     # folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment  # Where the data for all animals is
 
     # Update first the glued sessions
@@ -235,7 +229,6 @@ def glue_animals(protocol='stage_training_v4', experiment='2AFC_4', update=False
 
     if to_csv:
         filename = experiment + '_all_sessions'
-        # df.to_csv(folder + 'all' + '.csv', index=False)  # index=False to avoid the 'Unnamed: 0' column
         df.to_csv(Path(folder / filename).with_suffix('.csv'), index=False)  # index=False to avoid the 'Unnamed: 0' column
 
     time_end = time.time()

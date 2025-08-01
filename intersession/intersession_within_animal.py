@@ -6,6 +6,8 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+
+from create_sounds.test_task import responses
 from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig, timer
 # import statsmodels.formula.api as smf
@@ -171,7 +173,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     # SUMMARY VARIABLES
 
     subject = df.groupby('Date').Subject.unique().astype('int')
-    board = df.groupby('Date').Board.unique()
+    board = df.groupby('Date').Board.transform(lambda x: x.unique()[0])
 
     # Trials
     trials = df.groupby('Date').Trial.size()
@@ -1337,7 +1339,7 @@ def learning_curves(experiment='2AFC_4', alignment='n_sessions', offset=None, sa
 
 ########################################################################################################################
 
-def glue_animals_intersessions(protocol='stage_training_v4', experiment='2AFC_4', update=False, to_csv=False):
+def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6', update=False, to_csv=False):
     """
     Concatenate all intersession .csv files from each animal into a single .csv file
     :param protocol: task code version
@@ -1351,22 +1353,20 @@ def glue_animals_intersessions(protocol='stage_training_v4', experiment='2AFC_4'
         update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
 
     # Get the path to the data
-    experiment, folder = get_experiment(experiment, session='intersession')
-    # folder_in = Path.home() / 'PycharmProjects' / 'intersession' / experiment
+    experiment, path_experiment = get_experiment(experiment=experiment, path_session='intersession')
 
-    # path = '/home/alexis/PycharmProjects/intersession/' + experiment + '/'
-    intersessions = os.listdir(folder)  # Get list of
+    intersessions = os.listdir(path_experiment)  # Get list of
     intersessions.sort()
     intersessions = [x for x in intersessions if x.endswith('.csv')]  # Get rid of non csv files
 
     df = pd.DataFrame()
 
     for i in range(len(intersessions)):
-        df_intersession = pd.read_csv(folder / intersessions[i])
+        df_intersession = pd.read_csv(path_experiment / intersessions[i])
         df = pd.concat([df, df_intersession])
 
     if to_csv:
-        df.to_csv(Path(folder / (experiment + '_intersessions' + '.csv')), index=False)
+        df.to_csv(Path(path_experiment / (experiment + '_intersessions' + '.csv')), index=False)
         # index=False to avoid the 'Unnamed: 0' column
 
     return df
@@ -1401,3 +1401,34 @@ def glue_animals_intersessions(protocol='stage_training_v4', experiment='2AFC_4'
 # # Delay only in batch 2AFC_4
 # M = smf.mixedlm("AccMaxEvi ~ SessionNumber + Age + DoW + P + VarDelay", data=df_all_intersessions, groups=df_all_intersessions.Subject).fit()
 # M.summary()
+
+# Intersession across boxes
+
+# Intersession grouped by box (Board). X axis is still Dates, but in each plot there's one trace per animal. There's one plot per box
+df = glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6', update=False, to_csv=False)
+
+boxes = df.Board.unique()  # Get the boxes
+animals_per_box = {box: df[df.Board == box].Subject.unique() for box in boxes}  # Get the animals per box
+
+# Make a plot with a subplot per box
+plt.figure(figsize=(10, 6))
+for i, box in enumerate(boxes):
+    ax = plt.subplot(len(boxes), 1, i + 1)  # Create a subplot for each box
+    df_box = df[df.Board == box]  # Filter the DataFrame for the current box
+
+    # Plot each animal in the box
+    for animal in animals_per_box[box]:
+        df_animal = df_box[df_box.Subject == animal]
+        ax.plot(df_animal.Dates, df_animal.Accuracy, marker='o', label=animal)
+
+    ax.set_title(f'Box {box}')
+    ax.set_ylabel('Accuracy')
+    ax.set_xlabel('Dates')
+    ax.legend(loc='upper right', fontsize='small')
+
+# Box 3
+df_3 = df[df.Board == 'Bpod3']
+
+# Compute hits by dates
+hits = df_3.groupby('Dates').Hits.sum().astype('int')
+responses = df_3.groupby('Dates').Responses.sum()

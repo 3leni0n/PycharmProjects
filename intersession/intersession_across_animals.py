@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 import pandas as pd
 import os
@@ -8,18 +9,13 @@ from my_fun.my_fun import slack_spam
 ########################################################################################################################
 
 
-def intersession_across_animals(experiment='2AFC_4', send_slack=False):
-
-    # Register time
-    time_start_total = time.time()
-
-    ####################################################################################################################
+def intersession_across_animals(experiment='2AFC_6', send_slack=False):
 
     # Select folder where input data is
-    folder_in = '/home/alexis/PycharmProjects/intersession/' + experiment + '/'
+    folder_in = Path.home() / 'PycharmProjects' / 'intersession' / experiment
 
     # Select the folder where to save the PDF or create it if it doesn't exist
-    folder_out = '/home/alexis/Documentos/intersession reports/' + experiment
+    folder_out = Path.home() / 'Documents' / 'intersession reports' / experiment
     if not os.path.exists(folder_out):
         os.mkdir(folder_out)
     os.chdir(folder_out)
@@ -77,7 +73,7 @@ def intersession_across_animals(experiment='2AFC_4', send_slack=False):
 
         for i in range(len(animals)):
 
-            df = pd.read_csv(folder_in + animals[i])  # Load intersession data from an animal
+            df = pd.read_csv(folder_in / animals[i])  # Load intersession data from an animal
             df_dt = pd.to_datetime(df.Dates)  # Convert to dates to datetime, x axis
 
             ################################################################################################################
