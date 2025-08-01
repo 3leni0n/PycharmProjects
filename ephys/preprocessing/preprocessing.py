@@ -103,10 +103,12 @@ def load_oe_data(directory, sync=True, stream='AP'):
     events = recording.events  # Get the event data
     if stream == 'AP':
         continuous = continuous[0]  # Get the continuous AP data
-        events = events[events.stream_index == 0]  # Action Potential (AP) stream
+        # events = events[events.stream_index == 0]  # Do not use, stream_index and stream_name match is OS dependent
+        events = events[events.stream_name == 'ProbeA-AP']  # Action Potential (AP) stream
     elif stream == 'LFP':
         continuous = continuous[1]  # Get the continuous LFP data
-        events = events[events.stream_index == 1]  # Local Field Potential (LFP) stream
+        # events = events[events.stream_index == 1]  # Do not use, stream_index and stream_name match is OS dependent
+        events = events[events.stream_name == 'ProbeA-LFP']  # Local Field Potential (LFP) stream
     # data = recording.continuous[0].get_samples(start_sample_index=0, end_sample_index=10000)
     events.reset_index(drop=True, inplace=True)
 
@@ -165,7 +167,7 @@ def get_ttls(continuous, events, n_decimals=4, double_check=False):
         TTLs = TTLs_events  # Use TTLs from event data
 
     # Create a new DataFrame with only the columns 'ON', 'OFF' and 'Length'
-    df_ttl = events[['ON', 'OFF', 'Length']]
+    df_ttl = events[['ON', 'OFF', 'Length']].copy()  # Copy the DataFrame to avoid modifying the original one
 
     # Align TTLs (do not start at 0) to the first timestamp (to start at 0)
     # This is equivalent (but much slower) to adding the first timestamp to the spikes timestamps (that do start at 0)
@@ -541,7 +543,7 @@ def align_ttl(df_ttl, df_behavior):
     :return ttl_aligned: DataFrame with aligned TTLs
     """
 
-    df_ttl = df_ttl[df_ttl['key'] == 'play']  # Keep only rows with key == play (stimulus onset, 1 TTL per trial)
+    df_ttl = df_ttl[df_ttl['key'] == 'play'].copy()  # Keep only rows with key == play (stimulus onset, 1 TTL per trial)
     df_ttl['Trial'] = np.arange(len(df_ttl))  # Prepare a column with trial indexes for merging
     df_ttl = df_ttl.iloc[:len(df_behavior)]  # Keep only the first n TTLs (n = number of trials in behavior data)
     df_ttl.reset_index(drop=True, inplace=True)  # Reset index
