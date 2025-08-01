@@ -223,13 +223,12 @@ def check_data(df_behavior, df_keys):
 
     if len(index) == 0:
         print('All sounds sent by Bpod match those received by Arduino')
-        behavior_filenames = df_behavior['Filename']
     else:
         print('Trials which sounds sent by Bpod do not match those received by Arduino:')
         print(df_behavior.iloc[index].Trial)
-        behavior_filenames = df_behavior['Filename2']
 
     # Get the number of trials from behavior and ephys data
+    behavior_filenames = df_behavior['Filename']
     n_trials_behavior = len(behavior_filenames)
     n_trials_ephys = len(ephys_filenames)
     diff_n_trials = n_trials_behavior - n_trials_ephys

@@ -6,7 +6,7 @@ from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
 import seaborn as sns
-from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, timer
+from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, timer, filter_drug_sessions
 from parse.parse_v2 import parse_v2
 
 # Aesthetic parameters
@@ -45,16 +45,14 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
     # Only sessions with accuracy > X threshold?
     # try:
     #     df = df[df.Drug.isnull()]  # Remove drug experimental sessions
-    # except AttributeError:  # As 24.05.2023 only batch 2 has drug data. Need to reparse batch 3 to add Drug column
+    # except AttributeError: # As 24.05.2023 only batch 2 has drug data. Need to reparse batch 3 to add Drug column
     #     pass
 
-    if drug is not None:
+    if drug is None:
+        df = df[~df.Drug.isin([0, 1])]
+    elif drug in [0, 1]:
+        df = filter_drug_sessions(df)
         df = df[df.Drug == drug]
-        if pd.isna(drug):
-            df = df[df.Drug.isna()]
-        elif drug in [0, 1]:
-            df = df[df.Drug == drug]
-
 
     ####################################################################################################################
 
@@ -80,15 +78,12 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
 
         # Plot params
         color = 'tab:orange'
-        label = 'Prob. right'
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
 
         # Annotation params
         lower_lapse = "LR_R="
         upper_lapse = "LR_L="
-        # xy = (ilds[0], 1)
-        # xytext = (ilds[0], 1)
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
@@ -109,15 +104,12 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
 
         # Plot params
         color = 'tab:brown'
-        label = 'Prob. repeat'
         xlabel = 'Repeating stimulus ILD (dB)'
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
         lower_lapse = "LR_Rep="
         upper_lapse = "LR_Alt="
-        # xy = (ilds[-1], 0)
-        # xytext = (ilds[-1], 0)
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
@@ -225,7 +217,7 @@ def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='pr
 
 
 @timer
-def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '017'], save=True, kind='prob_right',
+def plot_mean_pc(experiment='2AFC_6', animals=['014', '015', '016', '017'], save=True, kind='prob_right',
                            drug=np.nan, format='png', transparent=False):
     """Plot psychometric curves across animals
     :param experiment: str, name of the experiment
@@ -257,9 +249,10 @@ def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '0
         df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
         df = df[df.P > 0]  # Only those sessions with ilds
 
-        if pd.isna(drug):
-            df = df[df.Drug.isna()]
+        if drug is None:
+            df = df[~df.Drug.isin([0, 1])]
         elif drug in [0, 1]:
+            df = filter_drug_sessions(df)
             df = df[df.Drug == drug]
 
         ilds = np.sort(df.ILD.unique())
@@ -305,8 +298,6 @@ def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '0
         # Annotation params
         lower_lapse = "LR_R="
         upper_lapse = "LR_L="
-        # xy = (ilds[0], 1)
-        # xytext = (ilds[0], 1)
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
@@ -325,8 +316,6 @@ def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '0
         # Annotate params
         lower_lapse = "LR_Rep="
         upper_lapse = "LR_Alt="
-        # xy = (ilds[-1], 0)
-        # xytext = (ilds[-1], 0)
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         color = 'tab:brown'
@@ -372,8 +361,107 @@ def plot_pc_across_animals(experiment='2AFC_6', animals=['014', '015', '016', '0
         plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
 
-    return np.array(params)
+    # return np.array(params)
+    return psych_curve
 
+
+def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'],
+                      kind='prob_right'):
+    """
+    Plot psychometric curves across animals for saline and drug conditions
+    :param experiment: str, name of the experiment
+    :param animals: list, list of animal names
+    :param kind: str, 'prob_right' or 'prob_rep'
+    :return:
+    """
+
+    # psych_curve_rest = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=None,
+    #                                           format='png', transparent=False)  # Rest
+    psych_curve_saline = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=0,
+                                                format='png', transparent=False)  # Saline
+    plt.close()
+    psych_curve_drug = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=1,
+                                              format='png', transparent=False)  # Drug (MK-801)
+    plt.close()
+
+    # Plot the PCs in the same figure
+    plt.figure(constrained_layout=True)
+    ilds = psych_curve_saline.xdata  # ILDs
+    n_points = 100  # Number of points to plot the psychometric curve
+
+    if kind == 'prob_right':
+        color = 'tab:orange'
+        xlabel = 'Stimulus ILD (dB)'
+        ylabel = 'Prob. choose right'
+        loc = 'upper center'
+    elif kind == 'prob_rep':
+        color = 'tab:brown'
+        xlabel = 'Repeating stimulus ILD (dB)'
+        ylabel = 'Prob. choose repeat'
+        loc = 'lower center'
+
+    # SALINE
+    # color = 'tab:orange'
+    label = 'saline'
+    plt.plot(np.linspace(-70, 70, n_points), psych_curve_saline.fit, color=color, mfc=color, label=label)
+    plt.errorbar(psych_curve_saline.xdata, psych_curve_saline.ydata, yerr=psych_curve_saline.fit_error, color=color,
+                 fmt='o', mfc=color)
+
+    # Annotation params
+    lower_lapse = "LR_R="
+    upper_lapse = "LR_L="
+    xy = (psych_curve_saline.xdata[0], 1)
+    xytext = (psych_curve_saline.xdata[0], 1)
+    va = 'top'
+    ha = 'left'
+    fontsize = 'medium'
+
+    sensitivity, bias, lr_lower, lr_upper = psych_curve_saline.params
+    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                 xy=xy, xytext=xytext, color=color,
+                 va=va, ha=ha, fontsize=fontsize)
+
+    # DRUG
+    color = 'tab:pink'
+    label = 'drug'
+    plt.plot(np.linspace(-70, 70, n_points), psych_curve_drug.fit, color=color, mfc=color, label=label)
+    plt.errorbar(psych_curve_drug.xdata, psych_curve_drug.ydata, yerr=psych_curve_drug.fit_error, color=color, fmt='o',
+                 mfc=color)
+
+    # Annotate params
+    lower_lapse = "LR_Rep="
+    upper_lapse = "LR_Alt="
+    xy = (psych_curve_drug.xdata[-1], 0)
+    xytext = (psych_curve_drug.xdata[-1], 0)
+    va = 'bottom'
+    ha = 'right'
+
+    sensitivity, bias, lr_lower, lr_upper = psych_curve_drug.params
+    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                 xy=xy, xytext=xytext, color=color,
+                 va=va, ha=ha, fontsize=fontsize)
+
+    plt.axhline(0.5, color='tab:gray', ls='--')
+    plt.axvline(0., color='tab:gray', ls='--')
+    # plt.title(f'N={len(animals) - animals_removed}, {trials} trials')
+    # plt.title('N=7')
+    plt.xlim([psych_curve_saline.xdata[0] - 1, psych_curve_saline.xdata[-1] + 1])  # To chop the extreme values
+    ilds[0] = psych_curve_saline.xdata[0]
+    ilds[-1] = psych_curve_saline.xdata[-1]
+    plt.xticks(ilds)
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
+    # plt.ylim([-0.025, 1.025])
+    plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    sns.despine()
+    plt.legend(frameon=False, loc=loc)
 
 ########################################################################################################################
 
