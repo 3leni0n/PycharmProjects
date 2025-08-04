@@ -6,8 +6,8 @@ import os
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
+import seaborn as sns
 
-from create_sounds.test_task import responses
 from glue_sessions.glue_sessions import update_glued_sessions
 from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig, timer
 # import statsmodels.formula.api as smf
@@ -120,6 +120,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     # For 2AFC_6 (batch 6)
     doi_24 = '2025-06-26'  # First attempt ti fix XYZ coordinates per mouse
+    doi_25 = '2025-07-15'  # Drug experiment beginning
 
     # For testing specific events
     # doi_test = '2023-06-09'
@@ -130,7 +131,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
             doi_14, doi_15, doi_17, doi_18, doi_19, doi_20, doi_21,
             # Batch 4  (skipped doi_12, doi_13, doi_16 for clarity)
             doi_22, doi_23,  # Batch 5
-            doi_24]
+            doi_24, doi_25]
     dois_indexes = []
 
     for i in range(len(dois)):
@@ -1160,8 +1161,6 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     return df_intersession
 
 
-########################################################################################################################
-
 @timer
 def do_intersessions(protocol='stage_training_v6', experiment='2AFC_6', alignment='n_sessions', to_csv=True,
                      send_slack=False):
@@ -1226,8 +1225,136 @@ def do_intersessions(protocol='stage_training_v6', experiment='2AFC_6', alignmen
                 print(f'Could not do intersession report of animal {i}')
 
 
-########################################################################################################################
+@timer
+def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6', update=False, to_csv=False):
+    """
+    Concatenate all intersession .csv files from each animal into a single .csv file
+    :param protocol: task code version
+    :param update: If True update first the glued sessions
+    :param to_csv: True for saving the output DataFrame, default is False (do not save)
+    :return: DataFrame with all the intersession concatenated
+    """
 
+    # Update first the glued sessions
+    if update:
+        update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
+
+    # Get the path to the data
+    experiment, path_experiment = get_experiment(experiment=experiment, path_session='intersession')
+
+    intersessions = os.listdir(path_experiment)  # Get list of
+    intersessions.sort()
+    intersessions = [x for x in intersessions if x.endswith('.csv')]  # Get rid of non csv files
+
+    df = pd.DataFrame()
+
+    for i in range(len(intersessions)):
+        df_intersession = pd.read_csv(path_experiment / intersessions[i])
+        df = pd.concat([df, df_intersession])
+
+    if to_csv:
+        df.to_csv(Path(path_experiment / (experiment + '_intersessions' + '.csv')), index=False)
+        # index=False to avoid the 'Unnamed: 0' column
+
+    return df
+
+
+@timer
+def intersession_across_boxes(protocol='stage_training_v6', experiment='2AFC_6', variable='Accuracy', mean=False,
+                              update=False, to_csv=False):
+    """
+    Plot intersession across boxes (Board). X axis is still Dates, but in each plot there's one trace per animal.
+    There's one plot per box
+    :param protocol:
+    :param experiment:
+    :param update:
+    :param to_csv:
+    :return:
+    """
+
+    # Dates of interest (format: 'yyyy-mm-dd') to plot a vertical line
+    # For 2AFC_6 (batch 6)
+    doi_24 = '2025-06-26'  # First attempt ti fix XYZ coordinates per mouse
+    doi_25 = '2025-07-15'  # Drug experiment beginning
+    dois = [doi_24, doi_25]  # Dates of interest
+
+    df = glue_animals_intersessions(protocol=protocol, experiment=experiment, update=update, to_csv=to_csv)
+    df['Dates'] = pd.to_datetime(df['Dates'])
+    df = df[df.Subject != 11]  # Drop animal 011 from analysis
+    boxes = list(df.Board.unique()) # Get the boxes
+    boxes.sort()  # Sort boxes by number
+    animals_per_box = {box: df[df.Board == box].Subject.unique() for box in boxes}  # Get the animals per box
+
+    if variable == 'Accuracy':
+        ylim = [0.4, 1]  # Y limits for accuracy
+        hline_y = 0.5  # Chance level for accuracy
+        y_ticks = [0.5, 0.75, 1]  # Y ticks for accuracy
+        y_ticklabels = ['0.5', '0.75', '1']  # Y tick labels for accuracy
+    elif variable == 'LateralBias':
+        ylim = [-1, 1]
+        hline_y = 0
+        y_ticks = [-1, -0.5, 0, 0.5, 1]
+        y_ticklabels = ['L', '-0.5', '0', '0.5', 'R']
+
+    # Make a plot with a subplot per box
+    figsize = (11.69, 8.27)  # A4 size in inches
+    plt.figure(figsize=figsize)
+
+    for i, box in enumerate(boxes):
+        ax = plt.subplot(len(boxes), 1, i + 1)  # Create a subplot for each box
+        df_box = df[df.Board == box]  # Filter the DataFrame for the current box
+
+        # Collect all unique dates (across animals in this box)
+        unique_dates = sorted(df_box.Dates.unique())
+        session_indexes = np.arange(len(unique_dates))
+
+        # Subsample ticks every 5 days
+        tick_step = 5
+        tick_dates = unique_dates[::tick_step]
+        tick_labels = session_indexes[::tick_step]
+
+        # Find the indexes of the dates of interest and plot vertical lines
+        for doi in dois:
+            doi_dt = pd.to_datetime(doi)
+            if doi_dt in unique_dates:
+                ax.axvline(doi_dt, color='tab:red', linestyle='--')
+            else:
+                print(f'Date of interest {doi} not found in box {box}')
+
+        # Plot
+        ax.axhline(hline_y, color='tab:gray', linestyle='--')  # Chance level
+        if mean:
+            # Plot mean with std as errobars per box in black
+            df_mean = df_box.groupby('Dates')[variable].mean()
+            ax.plot(df_mean.index, df_mean, color='k', label='Mean')
+            df_std = df_box.groupby('Dates')[variable].std()
+            ax.fill_between(df_mean.index, df_mean - df_std, df_mean + df_std, color='k', alpha=0.2, label='Std')
+        else:
+            # Plot each animal in the box
+            for animal in animals_per_box[box]:
+                df_animal = df_box[df_box.Subject == animal].sort_values('Dates')
+                ax.plot(df_animal.Dates, df_animal[variable], marker='o', label=animal)
+
+        ax.set_ylim(ylim)
+        ax.set_yticks(y_ticks,y_ticklabels)
+        ax.set_ylabel(f'{box}')
+        ax.legend(loc='upper left', frameon=False)
+
+        # Replace date ticks with session numbers
+        ax.set_xticks(tick_dates)
+        ax.set_xticklabels(tick_labels)
+
+        if i == 0:
+            ax.set_title(variable)
+
+        if i != 3:  # Remove lower axes line unless last plot (Box 4)
+            sns.despine(bottom=True, ax=ax)
+            ax.set_xticklabels([])  # Remove x-tick labels for all but the last plot
+        else:
+            sns.despine(ax=ax)
+            ax.set_xlabel('N sessions')
+
+@timer
 def learning_curves(experiment='2AFC_4', alignment='n_sessions', offset=None, save=False):
     """
     Plot the learning trajectories (accuracy vs time) of all animals of a given batch
@@ -1339,41 +1466,6 @@ def learning_curves(experiment='2AFC_4', alignment='n_sessions', offset=None, sa
 
 ########################################################################################################################
 
-def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6', update=False, to_csv=False):
-    """
-    Concatenate all intersession .csv files from each animal into a single .csv file
-    :param protocol: task code version
-    :param update: If True update first the glued sessions
-    :param to_csv: True for saving the output DataFrame, default is False (do not save)
-    :return: DataFrame with all the intersession concatenated
-    """
-
-    # Update first the glued sessions
-    if update:
-        update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
-
-    # Get the path to the data
-    experiment, path_experiment = get_experiment(experiment=experiment, path_session='intersession')
-
-    intersessions = os.listdir(path_experiment)  # Get list of
-    intersessions.sort()
-    intersessions = [x for x in intersessions if x.endswith('.csv')]  # Get rid of non csv files
-
-    df = pd.DataFrame()
-
-    for i in range(len(intersessions)):
-        df_intersession = pd.read_csv(path_experiment / intersessions[i])
-        df = pd.concat([df, df_intersession])
-
-    if to_csv:
-        df.to_csv(Path(path_experiment / (experiment + '_intersessions' + '.csv')), index=False)
-        # index=False to avoid the 'Unnamed: 0' column
-
-    return df
-
-########################################################################################################################
-
-
 # For debugging
 # path = Path.home() / 'PycharmProjects' / 'glue_sessions' / '2AFC_4' / '911.csv'  # Where the data for all animals is
 # alignment = 'age'
@@ -1401,34 +1493,3 @@ def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6'
 # # Delay only in batch 2AFC_4
 # M = smf.mixedlm("AccMaxEvi ~ SessionNumber + Age + DoW + P + VarDelay", data=df_all_intersessions, groups=df_all_intersessions.Subject).fit()
 # M.summary()
-
-# Intersession across boxes
-
-# Intersession grouped by box (Board). X axis is still Dates, but in each plot there's one trace per animal. There's one plot per box
-df = glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6', update=False, to_csv=False)
-
-boxes = df.Board.unique()  # Get the boxes
-animals_per_box = {box: df[df.Board == box].Subject.unique() for box in boxes}  # Get the animals per box
-
-# Make a plot with a subplot per box
-plt.figure(figsize=(10, 6))
-for i, box in enumerate(boxes):
-    ax = plt.subplot(len(boxes), 1, i + 1)  # Create a subplot for each box
-    df_box = df[df.Board == box]  # Filter the DataFrame for the current box
-
-    # Plot each animal in the box
-    for animal in animals_per_box[box]:
-        df_animal = df_box[df_box.Subject == animal]
-        ax.plot(df_animal.Dates, df_animal.Accuracy, marker='o', label=animal)
-
-    ax.set_title(f'Box {box}')
-    ax.set_ylabel('Accuracy')
-    ax.set_xlabel('Dates')
-    ax.legend(loc='upper right', fontsize='small')
-
-# Box 3
-df_3 = df[df.Board == 'Bpod3']
-
-# Compute hits by dates
-hits = df_3.groupby('Dates').Hits.sum().astype('int')
-responses = df_3.groupby('Dates').Responses.sum()
