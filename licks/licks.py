@@ -3,22 +3,8 @@ import numpy as np
 import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
-from networkx.classes import edges
 
-from ephys.analysis import get_peri_stim_licks
-
-# df_behavior = pd.read_csv(r'C:\Users\Usuario\PycharmProjects\glue_sessions\2AFC_2\333.csv', low_memory=False)
-df_behavior = pd.read_csv(r'C:\Users\Usuario\PycharmProjects\glue_sessions\2AFC_5\007.csv', low_memory=False)
-
-# Filters for groups 1-3
-# df_behavior = df_behavior[df_behavior.P > 0].reset_index(drop=True)
-
-# Filters for groups 4-5 (otherwise bump in lick rate before stimulus onset)
-df_behavior = df_behavior[df_behavior.Task == 'FD'].reset_index(drop=True)
-df_behavior = df_behavior[df_behavior.Delay == 0.5].reset_index(drop=True)
-
-
-# Define lick functions
+# Define functions to get licks and RTs
 def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame) -> pd.Series:
     """
     Curate licks for a given behavioral session (remove licks before Response Window opens or after ITI ends).
@@ -192,7 +178,7 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     # Print % corrupted trials
     try:
         print(f'{len(premature_lick_trials) / len(df_behavior) * 100:.2f}% of trials corrupted due to licks outside response window')
-    except ZeroDivisionError as e:
+    except ZeroDivisionError:
         print('0% of trials corrupted due to licks outside response window')
 
     # # Drop corrupted trials from DataFrame
@@ -220,6 +206,9 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
 
 ########################################################################################################################
 
+# Licks and RTs plotting functions
+
+
 def plot_licks_psth(bins, left_psth, right_psth):
     # Plot PSTH
     plt.figure(constrained_layout=True)
@@ -233,11 +222,118 @@ def plot_licks_psth(bins, left_psth, right_psth):
     sns.despine()
 
 
-def plot_rts(rt):
+def plot_rts(df_behavior, density=False):
+
     plt.figure(constrained_layout=True)
+
+    if density:
+        ylabel = 'Density'
+    else:
+        ylabel = 'Frequency'
+
     # plt.hist(rt2, bins=1000, density=False, label='RT2', color='tab:orange', edgecolor='none', alpha=0.5)
-    plt.hist(rt, bins=1000, density=False, label='RT', color='tab:blue', edgecolor='none', alpha=0.5)
-    plt.title(f'Reaction Time Histogram ({df_behavior.Subject.unique()[0]}, N={len(df_behavior)})')
-    plt.xlabel('Reaction Time (s)')
-    # plt.ylabel('Frequency')
+    plt.hist(df_behavior.RT, bins=1000, density=density, label='RT', color='k', edgecolor='none')
+    plt.title(f'Reaction Time ({df_behavior.Subject.unique()[0]}, N={len(df_behavior)})')
+    plt.xlabel('Time (s) from go cue')
+    plt.ylabel(ylabel)
+    sns.despine()
+
+
+def plot_rts_split(df_behavior, split='outcome', kind='kde'):
+
+    plt.figure(constrained_layout=True)
+
+    for i in range(2):
+
+        if i == 0:
+            color = 'tab:red'
+            label = 'Hit'
+        else:
+            color = 'tab:green'
+            label = 'Error'
+
+        if kind == 'hist':
+            plt.hist(df_behavior[df_behavior.Hit == i].RT, bins=1000, density=True, label=label, color=color,
+                     edgecolor='none', alpha=0.5)
+        elif kind == 'kde':
+            sns.kdeplot(df_behavior[df_behavior.Hit == i].RT, color=color, label=label)
+
+    plt.legend(frameon=False)
+    plt.title(f'Reaction Time ({df_behavior.Subject.unique()[0]}, N={len(df_behavior)})')
+    plt.xlabel('Time (s) from go cue')
+    plt.ylabel('Density')
+    sns.despine()
+
+
+def plot_chrono_curve(df_behavior, absolute=True):
+    """
+    Plot the chronometric curve of a behavioral session.
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :param absolute: If True, plot the absolute value of ILD (default: True)
+    :return:
+    """
+
+    if absolute:
+        df_behavior['abs_ILD'] = df_behavior['ILD'].abs()
+        mean_rts = df_behavior.groupby('abs_ILD')['RT'].mean().reset_index()
+        ilds = sorted(df_behavior['abs_ILD'].unique())
+        x = mean_rts['abs_ILD']
+        title = 'Chronometric curve '
+        xlabel = '|ILD|'
+    else:
+        mean_rts = df_behavior.groupby('ILD')['RT'].mean().reset_index()
+        ilds = sorted(df_behavior['ILD'].unique())
+        x = mean_rts['ILD']
+        title = 'Chronometric curve'
+        xlabel = 'ILD'
+
+    print(mean_rts)
+    plt.figure(constrained_layout=True)
+    y = mean_rts['RT']
+    plt.plot(x, y, color='k', marker='o', linestyle='-')
+    plt.xticks(ilds)
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel('Mean RT (s)')
+    plt.grid()
+    sns.despine()
+
+
+def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
+    """
+    Plot the chronometric curve of a behavioral session split by outcome.
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :param split: Split by 'outcome' or 'hit_error'
+    :param absolute: If True, plot the absolute value of ILD (default: True)
+    :return:
+    """
+
+    if absolute:
+        df_behavior['abs_ILD'] = df_behavior['ILD'].abs()
+        ild_col = 'abs_ILD'
+        title = 'Chronometric curve '
+        xlabel = '|ILD|'
+    else:
+        ild_col = 'ILD'
+        title = 'Chronometric curve'
+        xlabel = 'ILD'
+
+    plt.figure(constrained_layout=True)
+
+    for i in range(2):
+        if split == 'outcome':
+            label = 'Error' if i == 0 else 'Hit'
+            color = 'tab:red' if i == 0 else 'tab:green'
+            subset = df_behavior[df_behavior.Hit == i]
+
+        mean_rts = subset.groupby(ild_col)['RT'].mean().reset_index()
+        x = mean_rts[ild_col]
+        y = mean_rts['RT']
+
+        plt.plot(x, y, color=color, marker='o', linestyle='-', label=label)
+
+    plt.title(title)
+    plt.xlabel(xlabel)
+    plt.ylabel('Mean RT (s)')
+    plt.legend(frameon=False)
     sns.despine()
