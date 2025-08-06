@@ -3,6 +3,8 @@ import numpy as np
 import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
+from networkx.classes import edges
+
 from ephys.analysis import get_peri_stim_licks
 
 # df_behavior = pd.read_csv(r'C:\Users\Usuario\PycharmProjects\glue_sessions\2AFC_2\333.csv', low_memory=False)
@@ -15,39 +17,33 @@ df_behavior = pd.read_csv(r'C:\Users\Usuario\PycharmProjects\glue_sessions\2AFC_
 df_behavior = df_behavior[df_behavior.Task == 'FD'].reset_index(drop=True)
 df_behavior = df_behavior[df_behavior.Delay == 0.5].reset_index(drop=True)
 
-# Convert string representations of lists back to actual lists
-df_behavior["Port1In"] = df_behavior["Port1In"].apply(ast.literal_eval)
-df_behavior["Port2In"] = df_behavior["Port2In"].apply(ast.literal_eval)
-
 
 # Define lick functions
 def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame) -> pd.Series:
     """
     Curate licks for a given behavioral session (remove licks before Response Window opens or after ITI ends).
+    Note that timestamps (in seconds) of licks and events are relative to the trial onset (0 s).
     :return: Series with curated licks
     """
 
-    corrupted_trials = []  # List of indices of corrupted trials where licks happened out of Response Window
-    tolerance = 0.1  # In seconds, tolerance for licks outside the response window (delay of motor Arduino code)
+    premature_lick_trials = []  # List of indices of corrupted trials where licks happened out of Response Window
+    tolerance = 0.0  # In seconds, tolerance for licks outside the response window (delay of motor Arduino code)
+    time_window = 1  # Time window to consider for licks (in seconds). This will result N licks = lick rate (Hz)
 
     for trial in range(len(licks)):
         resp_win_start = df_behavior.RespWinStart.iloc[trial]
         resp_win_end = df_behavior.RespWinEnd.iloc[trial]
-        iti = df_behavior.ITI.iloc[trial]
 
-        # Check if any licks are outside valid window
-        if any((lick < resp_win_start - tolerance or lick > resp_win_end + iti + tolerance) for lick in licks.iloc[trial]):
-            corrupted_trials.append(trial)
+        # Check if any licks before response window start to detect trials in which the motor was stuck
+        # (do not include in the condition licks after response window end, as these depend on the time the lickport was
+        # available (which varies depending on trial outcome)
+        if any((lick < resp_win_start - tolerance) for lick in licks.iloc[trial]):
+            premature_lick_trials.append(trial)
 
-        # n_licks = len(licks.iloc[trial])  # Before curation
-        licks[trial] = [lick for lick in licks.iloc[trial] if resp_win_start - tolerance <= lick <= resp_win_end + iti + tolerance]
+        licks[trial] = [lick for lick in licks.iloc[trial]
+                        if resp_win_start - tolerance <= lick <= resp_win_end + time_window + tolerance]
 
-        # # After curation, compare the number of licks before and after
-        # if len(licks.iloc[trial]) != n_licks:
-        #     print(f'Trial {trial} licks curated: {n_licks} -> {len(licks.iloc[trial])}')
-        #     corrupted_trials.append(trial)
-
-    return licks, corrupted_trials
+    return licks, premature_lick_trials
 
 
 def get_peri_stim_licks(df_behavior, event='StimStart'):
@@ -57,12 +53,16 @@ def get_peri_stim_licks(df_behavior, event='StimStart'):
     :return: pd.Series with a list of peri-stimulus licks per trial
     """
 
+    # Convert string representations of lists back to actual lists
+    df_behavior["Port1In"] = df_behavior["Port1In"].apply(ast.literal_eval)
+    df_behavior["Port2In"] = df_behavior["Port2In"].apply(ast.literal_eval)
+
     licks_left = df_behavior.Port1In.copy()
     licks_right = df_behavior.Port2In.copy()
 
     # Curate licks
-    licks_left, corrupted_trials_left = curate_licks(licks_left, df_behavior)
-    licks_right, corrupted_trials_right = curate_licks(licks_right, df_behavior)
+    licks_left, premature_lick_trials_left = curate_licks(licks_left, df_behavior)
+    licks_right, premature_lick_trials_right = curate_licks(licks_right, df_behavior)
 
     for trial in range(len(df_behavior)):
 
@@ -72,15 +72,15 @@ def get_peri_stim_licks(df_behavior, event='StimStart'):
         licks_right[trial] = [x - event_time for x in licks_right.iloc[trial]]  # Right
 
     licks = [licks_left] + [licks_right]
-    corrupted_trials = [corrupted_trials_left] + [corrupted_trials_right]
+    premature_lick_trials = [premature_lick_trials_left] + [premature_lick_trials_right]
 
-    return licks, corrupted_trials
+    return licks, premature_lick_trials
 
 
 def compute_psth(peri_stim_licks, time_win=[-1, 3], bin_size=0.1):
     """
     Compute a PSTH of a given cluster aligned to a specific event.
-    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    :param peri_stim_spikes: Lick times of a given subject (output of get_peri_stim_licks)
     :param time_win: List with the time window around the event (default: [-1, 3])
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
@@ -113,15 +113,16 @@ def inter_lick_interval(licks: pd.Series) -> list:
         if n_licks < 2:  # Minimum of 2 licks required to compute ILI
             ili.append(np.nan)
         else:
-            intervals = np.diff(licks_trial)
-            ili.append(np.mean(intervals))
+            # intervals = np.diff(licks_trial)
+            # ili.append(np.mean(intervals))
+            ili.append(np.diff(licks_trial))
 
     return ili
 
 
 def get_rt(df_behavior):
     """
-    Compute the reaction time (RT) of the licks of a behavioral session.
+    Compute the reaction time (RT) of a behavioral session from event data.
     :param df_behavior: DataFrame with the behavioral data
     :return: Reaction time (RT) of the licks per trial
     """
@@ -138,9 +139,9 @@ def get_rt(df_behavior):
     return rt
 
 
-def get_rt2(licks):
+def get_rt2(licks, df_behavior):
     """
-    Compute the reaction time (RT) of the licks of a behavioral session.
+    Compute the reaction time (RT) of a behavioral session from lick data.
     :param df_behavior: DataFrame with the behavioral data
     :return: Reaction time (RT) of the licks per trial
     """
@@ -155,51 +156,71 @@ def get_rt2(licks):
         trial_licks = licks.iloc[trial]
         trial_licks.sort()  # Sort licks in ascending order
 
-        if not trial_licks:  # If no licks in the trial
+        if not trial_licks or df_behavior.Miss.iloc[trial] == 1:  # If no licks in the trial
             rt2.append(np.nan)
         else:
-            rt2.append(min(trial_licks))  # Use the first lick as RT
+            # Align response window start to stimulus onset
+            stim_start = df_behavior.StimStart.iloc[trial]
+            resp_win_start = df_behavior.RespWinStart.iloc[trial]
+            resp_win_start_aligned = resp_win_start - stim_start
+
+            # Find the first lick within the response window
+            first_lick = min(trial_licks)
+            first_lick_aligned = first_lick - resp_win_start_aligned
+
+            if first_lick_aligned < 0:  # If the first lick is before the response window
+                rt2.append(np.nan)
+            else:
+                rt2.append(first_lick_aligned)  # Use the first lick as RT
 
     return rt2
 
 
-# Apply lick functions
-licks, corrupted_trials = get_peri_stim_licks(df_behavior, event='StimStart')
+def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
+    """
+    Main function to compute licks and reaction times for a given behavioral session.
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :return: DataFrame with additional columns for licks and reaction times
+    """
 
-# Combine left and right corrupted trials
-corrupted_trials = sorted(set(corrupted_trials[0] + corrupted_trials[1]))
+    # Apply lick functions
+    licks, premature_lick_trials = get_peri_stim_licks(df_behavior, event='StimStart')
 
-# Print % corrupted trials
-try:
-    print(f'{len(corrupted_trials) / len(df_behavior) * 100:.2f}% of trials corrupted due to licks outside response window')
-except ZeroDivisionError as e:
-    print('0% of trials corrupted due to licks outside response window')
+    # Combine left and right corrupted trials
+    premature_lick_trials = sorted(set(premature_lick_trials[0] + premature_lick_trials[1]))
 
-# # Drop corrupted trials from DataFrame
-# df_behavior = df_behavior.drop(index=corrupted_trials).reset_index(drop=True)
+    # Print % corrupted trials
+    try:
+        print(f'{len(premature_lick_trials) / len(df_behavior) * 100:.2f}% of trials corrupted due to licks outside response window')
+    except ZeroDivisionError as e:
+        print('0% of trials corrupted due to licks outside response window')
 
-licks_left = licks[0]
-licks_right = licks[1]
-n_licks_left = [len(lick) for lick in licks_left]
-n_licks_right = [len(lick) for lick in licks_right]
-ili_left = inter_lick_interval(licks_left)
-ili_right = inter_lick_interval(licks_right)
-rt = get_rt(df_behavior)
+    # # Drop corrupted trials from DataFrame
+    # df_behavior = df_behavior.drop(index=premature_lick_trials).reset_index(drop=True)
 
-# Add lick vars to DataFrame
-df_behavior['LicksLeft'] = licks[0]
-df_behavior['LicksRight'] = licks[1]
-df_behavior['nLicksLeft'] = n_licks_left
-df_behavior['nLicksRight'] = n_licks_right
-df_behavior['ILI_Left'] = ili_left
-df_behavior['ILI_Right'] = ili_right
-df_behavior['RT'] = rt
+    licks_left = licks[0]
+    licks_right = licks[1]
+    n_licks_left = [len(lick) for lick in licks_left]
+    n_licks_right = [len(lick) for lick in licks_right]
+    ili_left = inter_lick_interval(licks_left)
+    ili_right = inter_lick_interval(licks_right)
+    rt = get_rt(df_behavior)
 
-bins, left_psth = compute_psth(licks_left, time_win=[-1, 3], bin_size=0.1)
-bins, right_psth = compute_psth(licks_right, time_win=[-1, 3], bin_size=0.1)
-bins = bins[:-1]  # Remove the last bin edge to match the histogram length
+    # Add lick vars to DataFrame
+    df_behavior['LicksLeft'] = licks[0]
+    df_behavior['LicksRight'] = licks[1]
+    df_behavior['nLicksLeft'] = n_licks_left
+    df_behavior['nLicksRight'] = n_licks_right
+    df_behavior['ILI_Left'] = ili_left
+    df_behavior['ILI_Right'] = ili_right
+    df_behavior['RT'] = rt
 
-def plot_licks_psth():
+    return df_behavior
+
+
+########################################################################################################################
+
+def plot_licks_psth(bins, left_psth, right_psth):
     # Plot PSTH
     plt.figure(constrained_layout=True)
     plt.plot(bins, left_psth.mean(axis=0), label='Left licks', color='tab:blue')
@@ -211,20 +232,12 @@ def plot_licks_psth():
     plt.legend(frameon=False)
     sns.despine()
 
-plot_licks_psth()
 
-
-
-rt2 = get_rt2(licks)
-# Check minimum and maximum RT
-print(f'Minimum RT: {np.nanmin(rt2):.3f} s | Maximum RT: {np.nanmax(rt2):.3f} s')
-
-# Count number of trials with RT < 1 s
-n_trials_fast_rt = sum(np.array(rt2) < 1)
-print(f'Number of trials with RT < 1 s: {n_trials_fast_rt}')
-
-
-# Plot hist of rt and rt 2 to compare
-plt.figure(constrained_layout=True)
-plt.hist(rt)
-plt.hist(rt2)
+def plot_rts(rt):
+    plt.figure(constrained_layout=True)
+    # plt.hist(rt2, bins=1000, density=False, label='RT2', color='tab:orange', edgecolor='none', alpha=0.5)
+    plt.hist(rt, bins=1000, density=False, label='RT', color='tab:blue', edgecolor='none', alpha=0.5)
+    plt.title(f'Reaction Time Histogram ({df_behavior.Subject.unique()[0]}, N={len(df_behavior)})')
+    plt.xlabel('Reaction Time (s)')
+    # plt.ylabel('Frequency')
+    sns.despine()
