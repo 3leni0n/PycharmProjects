@@ -12,7 +12,7 @@ def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame) -> pd.Series:
     :return: Series with curated licks
     """
 
-    premature_lick_trials = []  # List of indices of corrupted trials where licks happened out of Response Window
+    premature_lick_trials = []  # List of indices of trials where licks happened before response window
     tolerance = 0.0  # In seconds, tolerance for licks outside the response window (delay of motor Arduino code)
     time_window = 1  # Time window to consider for licks (in seconds). This will result N licks = lick rate (Hz)
 
@@ -172,16 +172,16 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     # Apply lick functions
     licks, premature_lick_trials = get_peri_stim_licks(df_behavior, event='StimStart')
 
-    # Combine left and right corrupted trials
+    # Combine left and right premature lick trials
     premature_lick_trials = sorted(set(premature_lick_trials[0] + premature_lick_trials[1]))
 
-    # Print % corrupted trials
+    # Print % premature lick trials
     try:
-        print(f'{len(premature_lick_trials) / len(df_behavior) * 100:.2f}% of trials corrupted due to licks outside response window')
+        print(f'{len(premature_lick_trials) / len(df_behavior) * 100:.2f}% of premature lick trials (before response window)')
     except ZeroDivisionError:
-        print('0% of trials corrupted due to licks outside response window')
+        print('0% of premature lick trials (before response window)')
 
-    # # Drop corrupted trials from DataFrame
+    # # Drop premature lick trials from DataFrame
     # df_behavior = df_behavior.drop(index=premature_lick_trials).reset_index(drop=True)
 
     licks_left = licks[0]
@@ -223,6 +223,12 @@ def plot_licks_psth(bins, left_psth, right_psth):
 
 
 def plot_rts(df_behavior, density=False):
+    """
+    Plot the reaction time (RT) distribution of a behavioral session (all trials).
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :param density: If True, plot density instead of frequency (default: False)
+    :return:
+    """
 
     plt.figure(constrained_layout=True)
 
@@ -231,61 +237,103 @@ def plot_rts(df_behavior, density=False):
     else:
         ylabel = 'Frequency'
 
-    # plt.hist(rt2, bins=1000, density=False, label='RT2', color='tab:orange', edgecolor='none', alpha=0.5)
-    plt.hist(df_behavior.RT, bins=1000, density=density, label='RT', color='k', edgecolor='none')
-    plt.title(f'Reaction Time ({df_behavior.Subject.unique()[0]}, N={len(df_behavior)})')
+    if df_behavior.Subject.unique().size > 1:
+        title = f'Reaction Time\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+    else:
+        title = f'Reaction Time\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+
+    rts = df_behavior.RT
+    plt.hist(rts, bins=1000, density=density, label='RT', color='k')
+
+    # sns.kdeplot(rts)
+    plt.title(title)
     plt.xlabel('Time (s) from go cue')
     plt.ylabel(ylabel)
     sns.despine()
 
 
 def plot_rts_split(df_behavior, split='outcome', kind='kde'):
+    """
+    Plot the reaction time (RT) distribution of a behavioral session split by outcome.
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :param split:
+    :param kind: Kind of plot to use ('hist' or 'kde')
+    :return:
+    """
+
+    # Split
+    if split == 'outcome':
+        var = 'Hit'
+        colors = ['tab:red', 'tab:green']
+        labels = ['Error', 'Hit']
+    elif split == 'choice':
+        var = 'Choice'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['Left', 'Right']
+    elif split == 'stim':
+        var = 'Side'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['Left', 'Right']
+    elif split == 'repeat':
+        var = 'RepTrial'
+        colors = ['tab:purple', 'tab:brown']
+        labels = ['Alt.', 'Rep.']
+    elif split == 'prev_out':
+        var = 'AfterHit'
+        colors = ['tab:red', 'tab:green']
+        labels = ['Error', 'Hit']
 
     plt.figure(constrained_layout=True)
 
     for i in range(2):
 
-        if i == 0:
-            color = 'tab:red'
-            label = 'Hit'
-        else:
-            color = 'tab:green'
-            label = 'Error'
-
+        rts = df_behavior[df_behavior[var] == i].RT
+        # Kind of plot
         if kind == 'hist':
-            plt.hist(df_behavior[df_behavior.Hit == i].RT, bins=1000, density=True, label=label, color=color,
+            plt.hist(rts, bins=1000, density=False, label=labels[i], color=colors[i],
                      edgecolor='none', alpha=0.5)
+            ylabel = 'Frequency'
         elif kind == 'kde':
-            sns.kdeplot(df_behavior[df_behavior.Hit == i].RT, color=color, label=label)
+            sns.kdeplot(rts, color=colors[i], label=labels[i])
+            ylabel = 'Density'
+
+        # Title
+        if df_behavior.Subject.unique().size > 1:
+            title = f'Reaction Time\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+        else:
+            title = f'Reaction Time\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
 
     plt.legend(frameon=False)
-    plt.title(f'Reaction Time ({df_behavior.Subject.unique()[0]}, N={len(df_behavior)})')
+    plt.title(title)
     plt.xlabel('Time (s) from go cue')
-    plt.ylabel('Density')
+    plt.ylabel(ylabel)
     sns.despine()
 
 
 def plot_chrono_curve(df_behavior, absolute=True):
     """
-    Plot the chronometric curve of a behavioral session.
+    Plot the chronometric curve of a behavioral session (all trials).
     :param df_behavior: DataFrame with the behavioral data of a session
     :param absolute: If True, plot the absolute value of ILD (default: True)
     :return:
     """
 
     if absolute:
-        df_behavior['abs_ILD'] = df_behavior['ILD'].abs()
-        mean_rts = df_behavior.groupby('abs_ILD')['RT'].mean().reset_index()
-        ilds = sorted(df_behavior['abs_ILD'].unique())
-        x = mean_rts['abs_ILD']
-        title = 'Chronometric curve '
+        df_behavior['absILD'] = df_behavior['ILD'].abs()
+        mean_rts = df_behavior.groupby('absILD')['RT'].mean().reset_index()
+        ilds = sorted(df_behavior['absILD'].unique())
+        x = mean_rts['absILD']
         xlabel = '|ILD|'
     else:
         mean_rts = df_behavior.groupby('ILD')['RT'].mean().reset_index()
         ilds = sorted(df_behavior['ILD'].unique())
         x = mean_rts['ILD']
-        title = 'Chronometric curve'
         xlabel = 'ILD'
+
+    if df_behavior.Subject.unique().size > 1:
+        title = f'Chronometric Curve\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+    else:
+        title = f'Chronometric Curve\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
 
     print(mean_rts)
     plt.figure(constrained_layout=True)
@@ -308,32 +356,59 @@ def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
     :return:
     """
 
+    # Split
+    if split == 'outcome':
+        var = 'Hit'
+        colors = ['tab:red', 'tab:green']
+        labels = ['Error', 'Hit']
+    elif split == 'choice':
+        var = 'Choice'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['Left', 'Right']
+    elif split == 'stim':
+        var = 'Side'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['Left', 'Right']
+    elif split == 'repeat':
+        var = 'RepTrial'
+        colors = ['tab:purple', 'tab:brown']
+        labels = ['Alt.', 'Rep.']
+    elif split == 'prev_out':
+        var = 'AfterHit'
+        colors = ['tab:red', 'tab:green']
+        labels = ['Error', 'Hit']
+
+    # Collapse trials by ILD or not
     if absolute:
-        df_behavior['abs_ILD'] = df_behavior['ILD'].abs()
-        ild_col = 'abs_ILD'
-        title = 'Chronometric curve '
+        df_behavior['absILD'] = df_behavior['ILD'].abs()
+        ilds = sorted(df_behavior['absILD'].unique())
+        ild_col = 'absILD'
         xlabel = '|ILD|'
     else:
+        ilds = sorted(df_behavior['ILD'].unique())
         ild_col = 'ILD'
-        title = 'Chronometric curve'
         xlabel = 'ILD'
 
     plt.figure(constrained_layout=True)
-
     for i in range(2):
-        if split == 'outcome':
-            label = 'Error' if i == 0 else 'Hit'
-            color = 'tab:red' if i == 0 else 'tab:green'
-            subset = df_behavior[df_behavior.Hit == i]
 
+        subset = df_behavior[df_behavior[var] == i]
         mean_rts = subset.groupby(ild_col)['RT'].mean().reset_index()
         x = mean_rts[ild_col]
         y = mean_rts['RT']
 
-        plt.plot(x, y, color=color, marker='o', linestyle='-', label=label)
+        plt.plot(x, y, color=colors[i], marker='o', linestyle='-', label=labels[i])
 
+    # Title
+    if df_behavior.Subject.unique().size > 1:
+        title = f'Chronometric Curve\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+    else:
+        title = f'Chronometric Curve\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+
+    plt.xticks(ilds)
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel('Mean RT (s)')
     plt.legend(frameon=False)
+    plt.grid()
     sns.despine()

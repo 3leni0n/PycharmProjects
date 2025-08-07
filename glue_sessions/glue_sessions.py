@@ -73,7 +73,8 @@ def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6'
     glued_animals = [x for x in glued_animals if x.endswith('.csv')]  # Get rid of non csv files
 
     if animal + '.csv' in glued_animals:
-        df = pd.read_csv(Path(Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment / animal).with_suffix('.csv'))
+        df = pd.read_csv(Path(Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment / animal).with_suffix('.csv'),
+                         low_memory=False)
         glued_sessions = df.Session.unique().tolist()
     else:
         df = pd.DataFrame()  # Create empty DataFrame if there's no csv yet for that animal
@@ -199,8 +200,6 @@ def glue_animals(experiment='2AFC_6', update=True, to_csv=False):
     # Get the path to the data
     experiment, folder = get_experiment(experiment, path_session='glue_sessions')
 
-    protocol = 'stage_training_v' + experiment[-1]  # Get the last digit of the experiment
-
     # Update first the glued sessions
     if update:
         update_glued_sessions(experiment=experiment)  # Update glued sessions first
@@ -212,7 +211,7 @@ def glue_animals(experiment='2AFC_6', update=True, to_csv=False):
     df = pd.DataFrame()  # Create empty dataframe
 
     for i in range(len(animals)):
-        df_animal = pd.read_csv(Path(folder / animals[i]))
+        df_animal = pd.read_csv(Path(folder / animals[i]), low_memory=False)
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 
