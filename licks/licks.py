@@ -5,16 +5,19 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Define functions to get licks and RTs
-def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame) -> pd.Series:
+def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame, time_window=1) -> pd.Series:
     """
     Curate licks for a given behavioral session (remove licks before Response Window opens or after ITI ends).
     Note that timestamps (in seconds) of licks and events are relative to the trial onset (0 s).
+    :param licks: Series with a list of licks per trial
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :param time_window: Time window to consider for licks (in seconds). This will result in N licks = lick rate (Hz)
+    :return: Curated Series with l
     :return: Series with curated licks
     """
 
     premature_lick_trials = []  # List of indices of trials where licks happened before response window
     tolerance = 0.0  # In seconds, tolerance for licks outside the response window (delay of motor Arduino code)
-    time_window = 1  # Time window to consider for licks (in seconds). This will result N licks = lick rate (Hz)
 
     for trial in range(len(licks)):
         resp_win_start = df_behavior.RespWinStart.iloc[trial]
@@ -32,7 +35,7 @@ def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame) -> pd.Series:
     return licks, premature_lick_trials
 
 
-def get_peri_stim_licks(df_behavior, event='StimStart'):
+def get_peri_stim_licks(df_behavior, event='StimStart', time_window=1):
     """
     Get peri-stimulus licks for a given behavioral session
     :param df_behavior: DataFrame with behavior data
@@ -40,15 +43,18 @@ def get_peri_stim_licks(df_behavior, event='StimStart'):
     """
 
     # Convert string representations of lists back to actual lists
-    df_behavior["Port1In"] = df_behavior["Port1In"].apply(ast.literal_eval)
-    df_behavior["Port2In"] = df_behavior["Port2In"].apply(ast.literal_eval)
+    try:
+        df_behavior["Port1In"] = df_behavior["Port1In"].apply(ast.literal_eval)
+        df_behavior["Port2In"] = df_behavior["Port2In"].apply(ast.literal_eval)
+    except ValueError:
+        print('Port1In or Port2In are already lists')
 
     licks_left = df_behavior.Port1In.copy()
     licks_right = df_behavior.Port2In.copy()
 
     # Curate licks
-    licks_left, premature_lick_trials_left = curate_licks(licks_left, df_behavior)
-    licks_right, premature_lick_trials_right = curate_licks(licks_right, df_behavior)
+    licks_left, premature_lick_trials_left = curate_licks(licks_left, df_behavior, time_window)
+    licks_right, premature_lick_trials_right = curate_licks(licks_right, df_behavior, time_window)
 
     for trial in range(len(df_behavior)):
 
@@ -108,7 +114,7 @@ def inter_lick_interval(licks: pd.Series) -> list:
 
 def get_rt(df_behavior):
     """
-    Compute the reaction time (RT) of a behavioral session from event data.
+    Compute the reaction time (RT) of a behavioral session from EVENT data.
     :param df_behavior: DataFrame with the behavioral data
     :return: Reaction time (RT) of the licks per trial
     """
@@ -127,7 +133,7 @@ def get_rt(df_behavior):
 
 def get_rt2(licks, df_behavior):
     """
-    Compute the reaction time (RT) of a behavioral session from lick data.
+    Compute the reaction time (RT) of a behavioral session from LICK data.
     :param df_behavior: DataFrame with the behavioral data
     :return: Reaction time (RT) of the licks per trial
     """
@@ -201,6 +207,10 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     df_behavior['ILI_Right'] = ili_right
     df_behavior['RT'] = rt
 
+    licks, premature_lick_trials = get_peri_stim_licks(df_behavior, event='StimStart', time_window=0)
+    rt2 = get_rt2(licks, df_behavior)
+    df_behavior['RT2'] = rt2
+
     return df_behavior
 
 
@@ -233,9 +243,13 @@ def plot_rts(df_behavior, density=False):
     plt.figure(constrained_layout=True)
 
     if density:
+        histtype='bar'
         ylabel = 'Density'
+        edgecolor = 'k'
     else:
+        histtype = 'bar'
         ylabel = 'Frequency'
+        edgecolor = 'none'
 
     if df_behavior.Subject.unique().size > 1:
         title = f'Reaction Time\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
@@ -243,9 +257,8 @@ def plot_rts(df_behavior, density=False):
         title = f'Reaction Time\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
 
     rts = df_behavior.RT
-    plt.hist(rts, bins=1000, density=density, label='RT', color='k')
+    plt.hist(rts, bins=1000, histtype=histtype, density=density, color='k', edgecolor=edgecolor)
 
-    # sns.kdeplot(rts)
     plt.title(title)
     plt.xlabel('Time (s) from go cue')
     plt.ylabel(ylabel)
@@ -282,6 +295,10 @@ def plot_rts_split(df_behavior, split='outcome', kind='kde'):
         var = 'AfterHit'
         colors = ['tab:red', 'tab:green']
         labels = ['Error', 'Hit']
+    elif split == 'session_half':
+        var = 'SessionHalf'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['1st half', '2nd half']
 
     plt.figure(constrained_layout=True)
 
