@@ -240,24 +240,22 @@ def plot_rts(df_behavior, density=False):
     :return:
     """
 
+    rts = df_behavior.RT
+
     plt.figure(constrained_layout=True)
+    color = 'k'
 
     if density:
-        histtype='bar'
         ylabel = 'Density'
-        edgecolor = 'k'
+        sns.kdeplot(df_behavior['RT'], label='RT', color=color)
     else:
-        histtype = 'bar'
         ylabel = 'Frequency'
-        edgecolor = 'none'
+        plt.hist(rts, bins=1000, color=color, edgecolor=color)
 
     if df_behavior.Subject.unique().size > 1:
         title = f'Reaction Time\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
     else:
         title = f'Reaction Time\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
-
-    rts = df_behavior.RT
-    plt.hist(rts, bins=1000, histtype=histtype, density=density, color='k', edgecolor=edgecolor)
 
     plt.title(title)
     plt.xlabel('Time (s) from go cue')
@@ -287,7 +285,11 @@ def plot_rts_split(df_behavior, split='outcome', kind='kde'):
         var = 'Side'
         colors = ['tab:blue', 'tab:orange']
         labels = ['Left', 'Right']
-    elif split == 'repeat':
+    elif split == 'rep_choice':
+        var = 'RepChoice'
+        colors = ['tab:purple', 'tab:brown']
+        labels = ['Alt.', 'Rep.']
+    elif split == 'rep_trial':
         var = 'RepTrial'
         colors = ['tab:purple', 'tab:brown']
         labels = ['Alt.', 'Rep.']

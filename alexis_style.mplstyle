@@ -1,0 +1,20 @@
+# Figure resolution
+figure.figsize : 6.4, 4.8
+figure.dpi : 100
+savefig.dpi : 100
+
+# Axes properties
+axes.edgecolor: black
+xtick.direction: out
+ytick.direction: out
+
+# Legend
+legend.frameon: False
+
+# Despine (remove right and top spines)
+axes.spines.right : False
+axes.spines.top : False
+
+# Save figure
+savefig.format: svg
+savefig.transparent: True
