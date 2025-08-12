@@ -122,6 +122,7 @@ def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
     if residuals:
         sounds_ild = sounds.ILD
         first_frame = frames_ild[0]
+        first_frame = first_frame.copy()
         first_frame.iloc[0] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
         first_frame.iloc[-1] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
         if stim_set == 6:

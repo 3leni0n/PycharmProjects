@@ -989,7 +989,9 @@ def pval_to_star(pval):
 
 def add_stars(pvals, y):
     """
-    Add significance stars to existing plot
+    Add significance stars to individual points in existing plot.
+    :param pvals: list of p-values to convert to stars
+    :param y: y values of the points to add stars to
     """
     for i, pval in enumerate(pvals):
         ylim = plt.gca().get_ylim()  # Get y-axis limits
@@ -997,6 +999,29 @@ def add_stars(pvals, y):
         star_offset = ylim_range * 0.05  # 10% of the y-axis range
         plt.text(i, np.max(y) + star_offset, pval_to_star(pval), ha='center', va='center', color='k')
         plt.ylim(ylim[0], ylim[1] + star_offset)  # Enlarge ylim to make space for the stars
+
+
+def add_star_between(pval, x1=0, x2=1):
+    """
+    Add significance star to comparison between 2 points in existing plot.
+    :param pval: p-value to convert to stars
+    :param x1: x-coordinate of the left point of the horizontal line
+    :param x2: x-coordinate of the right point of the horizontal line
+    """
+
+    color='k'
+
+    # Get y max of the current axis
+    ax = plt.gca()
+    y = ax.get_ylim()[1]
+
+    # Plot horizontal line
+    plt.plot([x1, x2], [y, y], c=color)
+
+    # Plot text
+    text = pval_to_star(pval)
+    x = (x1 + x2) * 0.5  # Center the text between x1 and x2
+    plt.text(x, y, text, ha='center', va='bottom', c=color)
 
 
 def timer(func):
@@ -1015,15 +1040,19 @@ def timer(func):
     return wrapper
 
 
-def filter_drug_sessions(df: pd.DataFrame) -> pd.DataFrame:
+def filter_drug_sessions(df):
     """Filter out saline sessions (Drug==0) that are not immediately followed by a drug session (Drug==1) for paired
     saline-drug analyses (batch #6).
     :return: df with only paired saline-drug sessions
     """
 
-    # Ensure proper sorting
-    df['Date'] = pd.to_datetime(df['Date'])
-    session_info = df.drop_duplicates(subset='Date')[['Date', 'Drug']].sort_values('Date')
+    if 'Date' in df.columns:
+        col_name = 'Date'  # Sessions
+    elif 'Dates' in df.columns:
+        col_name = 'Dates'  # Intersessions
+
+    df[col_name] = pd.to_datetime(df[col_name])
+    session_info = df.drop_duplicates(subset=col_name)[[col_name, 'Drug']].sort_values(col_name)
 
     # Reset index for easy access
     session_info = session_info.reset_index(drop=True)
@@ -1034,10 +1063,9 @@ def filter_drug_sessions(df: pd.DataFrame) -> pd.DataFrame:
         current = session_info.iloc[i]
         next = session_info.iloc[i + 1]
         if current.Drug == 0 and next.Drug == 1:
-            paired_sessions.append(session_info.Date[i])
+            paired_sessions.append(session_info[col_name][i])
 
     # Filter original df
-    # df = df[df.Date.isin(paired_sessions)]
-    df = df[(df.Date.isin(paired_sessions) | (df.Drug == 1))]
+    df = df[(df[col_name].isin(paired_sessions) | (df.Drug == 1))]
 
     return df

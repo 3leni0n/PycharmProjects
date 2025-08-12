@@ -407,6 +407,9 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     fit_pc_rep = pd.Series(fit_pc_rep, dates)
     fit_error_pc_rep = pd.Series(fit_error_pc_rep, dates)
 
+    # Drug
+    drug = df.groupby('Date').Drug.unique().astype(float)
+
     ####################################################################################################################
 
     filename = f'{setup}_intersession_({alignment}_aligned).pdf'
@@ -1118,7 +1121,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
                    'MessageCount', 'P', 'VarDelay', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight', 'FitErrorPCRight',
                    'ParamsPCRight', 'SensitivityPCRight', 'BiasPCRight', 'LapseRight', 'LapseLeft', 'PCRep', 'xPCRep',
                    'yPCRep', 'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep', 'BiasPCRep', 'LapseRep',
-                   'LapseAlt']
+                   'LapseAlt', 'Drug']
 
         data = list(
             zip(dates, dow, age, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
@@ -1131,7 +1134,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
                 rewards_right, water, water_left, water_right, stage, sounds_mismatch, no_sound, message_count, p,
                 var_delay, pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
                 sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep, ydata_pc_rep,
-                fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt))
+                fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt, drug))
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 
@@ -1162,12 +1165,12 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
 
 @timer
-def do_intersessions(protocol='stage_training_v6', experiment='2AFC_6', alignment='n_sessions', to_csv=True,
+def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
                      send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     # Update glued sessions first
-    update_glued_sessions(protocol=protocol, experiment=experiment)
+    update_glued_sessions(experiment=experiment)
 
     if experiment is None:
 
@@ -1226,10 +1229,9 @@ def do_intersessions(protocol='stage_training_v6', experiment='2AFC_6', alignmen
 
 
 @timer
-def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6', update=False, to_csv=False):
+def glue_animals_intersessions(experiment='2AFC_6', update=True, to_csv=True):
     """
     Concatenate all intersession .csv files from each animal into a single .csv file
-    :param protocol: task code version
     :param update: If True update first the glued sessions
     :param to_csv: True for saving the output DataFrame, default is False (do not save)
     :return: DataFrame with all the intersession concatenated
@@ -1237,7 +1239,7 @@ def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6'
 
     # Update first the glued sessions
     if update:
-        update_glued_sessions(protocol=protocol, experiment=experiment)  # Update glued sessions first
+        update_glued_sessions(experiment=experiment)  # Update glued sessions first
 
     # Get the path to the data
     experiment, path_experiment = get_experiment(experiment=experiment, path_session='intersession')
@@ -1260,7 +1262,7 @@ def glue_animals_intersessions(protocol='stage_training_v6', experiment='2AFC_6'
 
 
 @timer
-def intersession_across_boxes(protocol='stage_training_v6', experiment='2AFC_6', variable='Accuracy', mean=False,
+def intersession_across_boxes(experiment='2AFC_6', variable='Accuracy', mean=False,
                               update=False, to_csv=False):
     """
     Plot intersession across boxes (Board). X axis is still Dates, but in each plot there's one trace per animal.
@@ -1278,7 +1280,7 @@ def intersession_across_boxes(protocol='stage_training_v6', experiment='2AFC_6',
     doi_25 = '2025-07-15'  # Drug experiment beginning
     dois = [doi_24, doi_25]  # Dates of interest
 
-    df = glue_animals_intersessions(protocol=protocol, experiment=experiment, update=update, to_csv=to_csv)
+    df = glue_animals_intersessions(experiment=experiment, update=update, to_csv=to_csv)
     df['Dates'] = pd.to_datetime(df['Dates'])
     df = df[df.Subject != 11]  # Drop animal 011 from analysis
     boxes = list(df.Board.unique()) # Get the boxes

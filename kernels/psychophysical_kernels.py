@@ -503,10 +503,9 @@ def plot_pks(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '0
 
     time_start = time.time()
 
-    experiment = get_experiment(experiment)
+    experiment, folder = get_experiment(experiment)
 
-    # folder = '/home/alexis/PycharmProjects/glue_sessions/' + experiment + '/'  # Where the data for all animals is
-    folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
+    # folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
     for i in range(len(animals)):
         # path = folder + animals[i]
@@ -522,7 +521,7 @@ def plot_pks(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '0
 
 
 @timer
-def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None, drug=None, residuals=True,
+def get_mean_pk(experiments=['2AFC_6'], animals=None, target_ilds=None, drug=None, residuals=True,
                 zscore=False, control=None, n_mean_frames=None, iterations=1000):
     """
     Get the kernels for all animals of a given batch (single string experiment) or across batches (list of experiments)
@@ -565,6 +564,7 @@ def get_mean_pk(experiments=['2AFC_2', '2AFC_3'], animals=None, target_ilds=None
             animals = ['419', '420', '422', '616', '619', '623']
         elif experiments[j] == '2AFC_6':
             animals = ['014', '016', '017', '020', '021', '022', '023', '024', '025']
+            animals = ['014', '016', '020', '021', '024', '025']
 
         folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 

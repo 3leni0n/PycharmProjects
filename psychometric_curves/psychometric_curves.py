@@ -217,8 +217,8 @@ def plot_pcs(experiment='2AFC_6', animals=['014', '015', '016', '017'], kind='pr
 
 
 @timer
-def plot_mean_pc(experiment='2AFC_6', animals=['014', '015', '016', '017'], save=True, kind='prob_right',
-                           drug=np.nan, format='png', transparent=False):
+def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'], save=True,
+                 kind='prob_right', drug=np.nan, format='png', transparent=False):
     """Plot psychometric curves across animals
     :param experiment: str, name of the experiment
     :param animals: list, list of animal names
@@ -318,7 +318,6 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '015', '016', '017'], save
         upper_lapse = "LR_Alt="
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
-        color = 'tab:brown'
         va = 'bottom'
         ha = 'right'
 
@@ -361,10 +360,11 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '015', '016', '017'], save
         plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
         plt.close()
 
-    # return np.array(params)
-    return psych_curve
+    params = np.array(params)
+    return psych_curve, params
 
 
+@timer
 def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'],
                       kind='prob_right'):
     """
@@ -375,85 +375,79 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
     :return:
     """
 
-    # psych_curve_rest = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=None,
-    #                                           format='png', transparent=False)  # Rest
-    psych_curve_saline = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=0,
-                                                format='png', transparent=False)  # Saline
-    plt.close()
-    psych_curve_drug = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=1,
-                                              format='png', transparent=False)  # Drug (MK-801)
-    plt.close()
-
-    # Plot the PCs in the same figure
-    plt.figure(constrained_layout=True)
-    ilds = psych_curve_saline.xdata  # ILDs
-    n_points = 100  # Number of points to plot the psychometric curve
-
     if kind == 'prob_right':
         color = 'tab:orange'
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
+        columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:brown'
         xlabel = 'Repeating stimulus ILD (dB)'
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
+        columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
 
-    # SALINE
-    # color = 'tab:orange'
-    label = 'saline'
-    plt.plot(np.linspace(-70, 70, n_points), psych_curve_saline.fit, color=color, mfc=color, label=label)
-    plt.errorbar(psych_curve_saline.xdata, psych_curve_saline.ydata, yerr=psych_curve_saline.fit_error, color=color,
-                 fmt='o', mfc=color)
-
-    # Annotation params
-    lower_lapse = "LR_R="
-    upper_lapse = "LR_L="
-    xy = (psych_curve_saline.xdata[0], 1)
-    xytext = (psych_curve_saline.xdata[0], 1)
-    va = 'top'
-    ha = 'left'
+    df_params = pd.DataFrame(columns=columns)
+    plt.figure(constrained_layout=True)
     fontsize = 'medium'
 
-    sensitivity, bias, lr_lower, lr_upper = psych_curve_saline.params
-    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                 xy=xy, xytext=xytext, color=color,
-                 va=va, ha=ha, fontsize=fontsize)
+    for drug in range(2):
 
-    # DRUG
-    color = 'tab:pink'
-    label = 'drug'
-    plt.plot(np.linspace(-70, 70, n_points), psych_curve_drug.fit, color=color, mfc=color, label=label)
-    plt.errorbar(psych_curve_drug.xdata, psych_curve_drug.ydata, yerr=psych_curve_drug.fit_error, color=color, fmt='o',
-                 mfc=color)
+        psych_curve, params = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=drug,
+                                                    format='png', transparent=False)
+        plt.close()
 
-    # Annotate params
-    lower_lapse = "LR_Rep="
-    upper_lapse = "LR_Alt="
-    xy = (psych_curve_drug.xdata[-1], 0)
-    xytext = (psych_curve_drug.xdata[-1], 0)
-    va = 'bottom'
-    ha = 'right'
+        if drug == 0:
+            label = 'saline'
 
-    sensitivity, bias, lr_lower, lr_upper = psych_curve_drug.params
-    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                 xy=xy, xytext=xytext, color=color,
-                 va=va, ha=ha, fontsize=fontsize)
+            # Annotation params
+            lower_lapse = "LR_R="
+            upper_lapse = "LR_L="
+            xy = (psych_curve.xdata[0], 1)
+            xytext = (psych_curve.xdata[0], 1)
+            va = 'top'
+            ha = 'left'
+        elif drug == 1:
+            color = 'tab:pink'
+            label = 'drug'  # (MK-801)
+
+            # Annotate params
+            lower_lapse = "LR_R="
+            upper_lapse = "LR_L="
+            xy = (psych_curve.xdata[-1], 0)
+            xytext = (psych_curve.xdata[-1], 0)
+            va = 'bottom'
+            ha = 'right'
+
+        # Add drug column to params
+        params = np.hstack((params, np.full((params.shape[0], 1), drug, dtype=int)))
+
+        # Add params to DataFrame
+        df_params = pd.concat([df_params, pd.DataFrame(params, columns=columns)], ignore_index=True)
+
+        # Plot the PCs in the same figure
+        ilds = psych_curve.xdata  # ILDs
+        n_points = 100  # Number of points to plot the psychometric curve
+
+        plt.plot(np.linspace(-70, 70, n_points), psych_curve.fit, color=color, mfc=color, label=label)
+        plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
+
+        sensitivity, bias, lr_lower, lr_upper = psych_curve.params
+        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                     lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                     upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                     xy=xy, xytext=xytext, color=color,
+                     va=va, ha=ha, fontsize=fontsize)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
     # plt.title(f'N={len(animals) - animals_removed}, {trials} trials')
     # plt.title('N=7')
-    plt.xlim([psych_curve_saline.xdata[0] - 1, psych_curve_saline.xdata[-1] + 1])  # To chop the extreme values
-    ilds[0] = psych_curve_saline.xdata[0]
-    ilds[-1] = psych_curve_saline.xdata[-1]
+    plt.xlim([psych_curve.xdata[0] - 1, psych_curve.xdata[-1] + 1])  # To chop the extreme values
+    ilds[0] = psych_curve.xdata[0]
+    ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
     # plt.ylim([-0.025, 1.025])
@@ -462,6 +456,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
     plt.ylabel(ylabel)
     sns.despine()
     plt.legend(frameon=False, loc=loc)
+
+    return df_params
 
 ########################################################################################################################
 
@@ -473,13 +469,6 @@ def plot_pcs_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None, kind
 
     """Do the psychometric curves for all animals of a given batch (experiment)"""
 
-    # Get the path to the data
-    # experiment = get_experiment(experiment)
-    # folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    # folder_in = Path(folder_in / animal).with_suffix('.csv')
-
-    ####################################################################################################################
-
     # Initialize empty lists where to store PC parameters
     psych_curves = []
     pc0_bias0s = []
@@ -490,7 +479,6 @@ def plot_pcs_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None, kind
     for k in range(len(experiments)):
 
         # Get the path to the data
-        # experiment = get_experiment(experiment[experiments[k]])
         experiment = experiments[k]
         folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
@@ -517,7 +505,6 @@ def plot_pcs_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None, kind
 @timer
 def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
                            save=False, kind='prob_right', format='svg', transparent=False):
-
 
     fit = []
     fit_error = []
