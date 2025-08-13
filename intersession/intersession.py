@@ -9,7 +9,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn as sns
 
 from glue_sessions.glue_sessions import update_glued_sessions
-from my_fun.my_fun import compute_psych_curve, slack_spam, get_experiment, save_fig, timer
+from my_fun.my_fun import *
 # import statsmodels.formula.api as smf
 
 
@@ -1229,7 +1229,7 @@ def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
 
 
 @timer
-def glue_animals_intersessions(experiment='2AFC_6', update=True, to_csv=True):
+def glue_animals_intersessions(experiment='2AFC_6', filter_drug=False, update=True, to_csv=True):
     """
     Concatenate all intersession .csv files from each animal into a single .csv file
     :param update: If True update first the glued sessions
@@ -1247,11 +1247,14 @@ def glue_animals_intersessions(experiment='2AFC_6', update=True, to_csv=True):
     intersessions = os.listdir(path_experiment)  # Get list of
     intersessions.sort()
     intersessions = [x for x in intersessions if x.endswith('.csv')]  # Get rid of non csv files
+    # print(intersessions)
 
     df = pd.DataFrame()
 
     for i in range(len(intersessions)):
         df_intersession = pd.read_csv(path_experiment / intersessions[i])
+        if filter_drug:
+            df_intersession = filter_drug_sessions(df_intersession)
         df = pd.concat([df, df_intersession])
 
     if to_csv:

@@ -1046,26 +1046,28 @@ def filter_drug_sessions(df):
     :return: df with only paired saline-drug sessions
     """
 
+    # The column date is called differently depending on session or intersession data
     if 'Date' in df.columns:
         col_name = 'Date'  # Sessions
+        # df.drop_duplicates(subset=col_name, inplace=True)  # Keep a row per unique date
     elif 'Dates' in df.columns:
         col_name = 'Dates'  # Intersessions
 
-    df[col_name] = pd.to_datetime(df[col_name])
-    session_info = df.drop_duplicates(subset=col_name)[[col_name, 'Drug']].sort_values(col_name)
-
-    # Reset index for easy access
-    session_info = session_info.reset_index(drop=True)
+    # In case of sessions data
+    df[col_name] = pd.to_datetime(df[col_name])  # Convert to datetime if not already
+    df.sort_values(by=col_name, inplace=True)  # Sort by date
+    df.reset_index(drop=True, inplace=True)  # Reset index inplace
 
     # Find saline sessions immediately followed by a drug session
     paired_sessions = []
-    for i in range(len(session_info) - 1):
-        current = session_info.iloc[i]
-        next = session_info.iloc[i + 1]
+    for i in range(len(df) - 1):
+        current = df.iloc[i]
+        next = df.iloc[i + 1]
         if current.Drug == 0 and next.Drug == 1:
-            paired_sessions.append(session_info[col_name][i])
+            paired_sessions.append(df[col_name][i])
 
     # Filter original df
     df = df[(df[col_name].isin(paired_sessions) | (df.Drug == 1))]
+    df.reset_index(drop=True, inplace=True)
 
     return df
