@@ -1,3 +1,5 @@
+import warnings
+warnings.filterwarnings('ignore')
 import time
 from pathlib import Path
 import os
@@ -24,7 +26,6 @@ sns.set_context('poster')
 #     animals = ['419', '420', '422', '616', '619', '623']
 
 
-@timer
 def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, save=False, format='png', transparent=False):
     """Plot psychometric curve
     :param experiment: str, name of the experiment
@@ -92,8 +93,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
         ylabel = 'Prob. choose right'
 
         # Annotation params
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = "LR_L="
+        upper_lapse = "LR_R="
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
@@ -118,8 +119,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = "LR_Alt="
+        upper_lapse = "LR_Rep="
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
@@ -182,7 +183,6 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
     return psych_curve
 
 
-@timer
 def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'], save=True,
                  kind='prob_right', drug=np.nan, format='png', transparent=False):
     """Plot psychometric curves across animals
@@ -262,8 +262,8 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
         ylabel = 'Prob. choose right'
 
         # Annotation params
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = "LR_L="
+        upper_lapse = "LR_R="
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
@@ -280,8 +280,8 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = "LR_Alt="
+        upper_lapse = "LR_Rep="
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
@@ -329,7 +329,6 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
     params = np.array(params)
     return psych_curve, params
 
-@timer
 def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
     """
     Plot psychometric curves across animals for saline and drug conditions
@@ -344,8 +343,8 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = "LR_L="
+        upper_lapse = "LR_R="
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:brown'
@@ -353,8 +352,8 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = "LR_Alt="
+        upper_lapse = "LR_Rep="
 
     df_params = pd.DataFrame(columns=columns)
     plt.figure(constrained_layout=True)
@@ -426,7 +425,6 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
     return df_params
 
 
-@timer
 def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'],
                       kind='prob_right'):
     """
@@ -442,8 +440,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = "LR_L="
+        upper_lapse = "LR_R="
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:brown'
@@ -451,8 +449,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = "LR_Alt="
+        upper_lapse = "LR_Rep="
 
     df_params = pd.DataFrame(columns=columns)
     plt.figure(constrained_layout=True)
@@ -524,7 +522,6 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
 
 # Across batches
 
-@timer
 def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
                            save=False, kind='prob_right', format='svg', transparent=False):
 
@@ -593,8 +590,8 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
         ylabel = 'Prob. choose right'
 
         # Annotation params
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = "LR_L="
+        upper_lapse = "LR_R="
         # xy = (ilds[0], 1)
         # xytext = (ilds[0], 1)
         xy = (-20, 1)
@@ -614,8 +611,8 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = "LR_Alt="
+        upper_lapse = "LR_Rep="
         # xy = (ilds[-1], 0)
         # xytext = (ilds[-1], 0)
         xy = (20, 0)

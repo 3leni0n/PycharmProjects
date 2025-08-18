@@ -741,7 +741,8 @@ def compute_psych_curve(x, y, n_points=100):
 
         # k = weight (slope)
         # x0 = bias
-        # b, p = lapses
+        # b = lower lapse
+        # p = upper lapse
 
         # Function to fit:
         y_pred = b + (1 - b - p) / (1 + np.exp(-k * (xdata - x0)))

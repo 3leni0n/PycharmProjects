@@ -36,6 +36,8 @@ values of Bi. The values of beta can be computed in python with the 'logistic re
 # stimulus were used.
 
 
+import warnings
+warnings.filterwarnings('ignore')
 import time
 from pathlib import Path
 import os
