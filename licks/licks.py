@@ -3,6 +3,8 @@ import numpy as np
 import ast
 import matplotlib.pyplot as plt
 import seaborn as sns
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+
 
 # Define functions to get licks and RTs
 def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame, time_window=1) -> pd.Series:
@@ -92,7 +94,7 @@ def compute_psth(peri_stim_licks, time_win=[-1, 3], bin_size=0.1):
 
 def inter_lick_interval(licks: pd.Series) -> list:
     """
-    Compute the inter-lick interval (ILI) of the licks of a behavioral session.
+    Compute the mean inter-lick interval (ILI) of the licks of a behavioral session.
     :return: Inter-lick interval (ILI) of the licks per trial
     """
 
@@ -105,9 +107,8 @@ def inter_lick_interval(licks: pd.Series) -> list:
         if n_licks < 2:  # Minimum of 2 licks required to compute ILI
             ili.append(np.nan)
         else:
-            # intervals = np.diff(licks_trial)
-            # ili.append(np.mean(intervals))
-            ili.append(np.diff(licks_trial))
+            intervals = np.diff(licks_trial)
+            ili.append(np.mean(intervals))
 
     return ili
 
@@ -194,8 +195,14 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     licks_right = licks[1]
     n_licks_left = [len(lick) for lick in licks_left]
     n_licks_right = [len(lick) for lick in licks_right]
+    # n_licks = np.where(df_behavior.Side == 0, n_licks_left, n_licks_right)  # N licks in correct side
+    # n_licks = np.where(df_behavior.Choice == 0, n_licks_left, n_licks_right)  # N licks in chosen side
+    n_licks = np.array(n_licks_left) + np.array(n_licks_right)  # Total N licks in both sides
     ili_left = inter_lick_interval(licks_left)
     ili_right = inter_lick_interval(licks_right)
+    # ili = np.where(df_behavior.Side == 0, ili_left, ili_right)  # ILI in correct side
+    # ili = np.where(df_behavior.Choice == 0, ili_left, ili_right)  # ILI in chosen side
+    ili = [np.nanmean([l, r]) if not (np.isnan(l) and np.isnan(r)) else np.nan for l, r in zip(ili_left, ili_right)]
     rt = get_rt(df_behavior)
 
     # Add lick vars to DataFrame
@@ -203,10 +210,13 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     df_behavior['LicksRight'] = licks[1]
     df_behavior['nLicksLeft'] = n_licks_left
     df_behavior['nLicksRight'] = n_licks_right
-    df_behavior['ILI_Left'] = ili_left
-    df_behavior['ILI_Right'] = ili_right
+    df_behavior['nLicks'] = n_licks
+    df_behavior['leftILI'] = ili_left
+    df_behavior['rightILI'] = ili_right
+    df_behavior['ILI'] = ili
     df_behavior['RT'] = rt
 
+    # Add RT2 to DataFrame
     licks, premature_lick_trials = get_peri_stim_licks(df_behavior, event='StimStart', time_window=0)
     rt2 = get_rt2(licks, df_behavior)
     df_behavior['RT2'] = rt2
@@ -216,46 +226,31 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
 
 ########################################################################################################################
 
-# Licks and RTs plotting functions
+# Plotting functions
 
-
-def plot_licks_psth(bins, left_psth, right_psth):
-    # Plot PSTH
-    plt.figure(constrained_layout=True)
-    plt.plot(bins, left_psth.mean(axis=0), label='Left licks', color='tab:blue')
-    plt.plot(bins, right_psth.mean(axis=0), label='Right licks', color='tab:orange')
-    plt.axvline(0, color='black', linestyle='--')
-    plt.xlabel('Time (s)')
-    plt.ylabel('Lick Rate')
-    plt.title('Peri-Stimulus Lick Histogram')
-    plt.legend(frameon=False)
-    sns.despine()
-
-
-def plot_rts(df_behavior, density=False):
+def plot_licks_dist(df_behavior, var='RT', density=False):
     """
-    Plot the reaction time (RT) distribution of a behavioral session (all trials).
-    :param df_behavior: DataFrame with the behavioral data of a session
+    Plot the licks distribution for a variable of interest.
+    :param df_behavior: DataFrame with the behavioral data
+    :param var: Variable to plot (e.g., 'RT', 'nLicks', 'ILI')
     :param density: If True, plot density instead of frequency (default: False)
-    :return:
+    :return: None
     """
-
-    rts = df_behavior.RT
 
     plt.figure(constrained_layout=True)
     color = 'k'
 
     if density:
         ylabel = 'Density'
-        sns.kdeplot(df_behavior['RT'], label='RT', color=color)
+        sns.kdeplot(df_behavior[var], color=color)
     else:
         ylabel = 'Frequency'
-        plt.hist(rts, bins=1000, color=color, edgecolor=color)
+        plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
 
     if df_behavior.Subject.unique().size > 1:
-        title = f'Reaction Time\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+        title = f'{var}\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
     else:
-        title = f'Reaction Time\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+        title = f'{var}\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
 
     plt.title(title)
     plt.xlabel('Time (s) from go cue')
@@ -263,42 +258,43 @@ def plot_rts(df_behavior, density=False):
     sns.despine()
 
 
-def plot_rts_split(df_behavior, split='outcome', kind='kde'):
+def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
     """
-    Plot the reaction time (RT) distribution of a behavioral session split by outcome.
-    :param df_behavior: DataFrame with the behavioral data of a session
-    :param split:
+    Plot the licks distribution of a variable of interest split by condition.
+    :param df_behavior: DataFrame with the behavioral data
+    :param var: Variable to plot (e.g., 'RT', 'nLicks', 'ILI')
+    :param split: Split by 'outcome', 'choice', 'stim', 'rep_choice', 'rep_trial', 'prev_out', or 'session_half'
     :param kind: Kind of plot to use ('hist' or 'kde')
     :return:
     """
 
     # Split
     if split == 'outcome':
-        var = 'Hit'
+        split_var_name = 'Hit'
         colors = ['tab:red', 'tab:green']
         labels = ['Error', 'Hit']
     elif split == 'choice':
-        var = 'Choice'
+        split_var_name = 'Choice'
         colors = ['tab:blue', 'tab:orange']
         labels = ['Left', 'Right']
     elif split == 'stim':
-        var = 'Side'
+        split_var_name = 'Side'
         colors = ['tab:blue', 'tab:orange']
         labels = ['Left', 'Right']
     elif split == 'rep_choice':
-        var = 'RepChoice'
+        split_var_name = 'RepChoice'
         colors = ['tab:purple', 'tab:brown']
         labels = ['Alt.', 'Rep.']
     elif split == 'rep_trial':
-        var = 'RepTrial'
+        split_var_name = 'RepTrial'
         colors = ['tab:purple', 'tab:brown']
         labels = ['Alt.', 'Rep.']
     elif split == 'prev_out':
-        var = 'AfterHit'
+        split_var_name = 'AfterHit'
         colors = ['tab:red', 'tab:green']
         labels = ['Error', 'Hit']
-    elif split == 'session_half':
-        var = 'SessionHalf'
+    elif split == 'half':
+        split_var_name = 'SessionHalf'
         colors = ['tab:blue', 'tab:orange']
         labels = ['1st half', '2nd half']
 
@@ -306,27 +302,109 @@ def plot_rts_split(df_behavior, split='outcome', kind='kde'):
 
     for i in range(2):
 
-        rts = df_behavior[df_behavior[var] == i].RT
+        split_var = df_behavior[df_behavior[split_var_name] == i][var]
         # Kind of plot
         if kind == 'hist':
-            plt.hist(rts, bins=1000, density=False, label=labels[i], color=colors[i],
+            plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
                      edgecolor='none', alpha=0.5)
             ylabel = 'Frequency'
         elif kind == 'kde':
-            sns.kdeplot(rts, color=colors[i], label=labels[i])
+            sns.kdeplot(split_var, color=colors[i], label=labels[i])
             ylabel = 'Density'
 
         # Title
         if df_behavior.Subject.unique().size > 1:
-            title = f'Reaction Time\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+            title = (f'{var}\n '
+                     f'(N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)')
         else:
-            title = f'Reaction Time\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+            title = (f'{var}\n '
+                     f'(mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)')
 
     plt.legend(frameon=False)
     plt.title(title)
     plt.xlabel('Time (s) from go cue')
     plt.ylabel(ylabel)
     sns.despine()
+
+
+def plot_ild_dist(df_behavior, var='RT'):
+    """
+    Plot the licks distribution of a variable of interest split by absolute ILD levels.
+    :param df_behavior: DataFrame with the behavioral data of a session
+    :param var: Reaction Time (RT) or number of licks (nLicks)
+    :return:
+    """
+
+    plt.figure(constrained_layout=True)
+
+    # Collapse the signed ILD levels to absolute values for cleaner visualization
+    abs_ilds = sorted(df_behavior.absILD.unique().astype(int), reverse=True)
+    palette = list(sns.color_palette('tab10', len(abs_ilds)))[::-1]
+
+    peaks = {}
+    # Plot the distribution for each absolute ILD level
+    for i, ild in enumerate(abs_ilds):
+        df_ild = df_behavior[df_behavior.absILD == ild]
+
+        # Plot and capture the Line2D object
+        color = palette[i]
+        line = sns.kdeplot(df_ild[var], label=ild, color=color)
+
+        # Extract x and y data from the plotted line
+        line = plt.gca().lines[-1]
+        x, y = line.get_data()
+
+        # Find the peak (x at maximum y)
+        peak_rt = x[np.argmax(y)]
+        peaks[ild] = peak_rt
+
+    # Print peaks
+    for ild, peak in peaks.items():
+        print(f'ILD {ild}: peak {var} = {peak:.3f} s')
+
+    mean_rt = np.mean(list((peaks.values())))
+    print(f'Mean {var} = {mean_rt:.3f} s')
+
+    plt.title(var + ' distribution')
+    plt.xlabel(var)
+    plt.ylabel('Density')
+    plt.legend(loc='upper center', frameon=False, title='|ILD|')
+    sns.despine()
+
+    if var == 'RT':
+
+        # Zoomed inset on the peak of the distribution
+        ax = plt.gca()  # get current axes
+        ax_inset = inset_axes(ax, width='30%', height='30%', loc='upper right')
+        xlim = (mean_rt - 0.025, mean_rt + 0.025)
+
+        for i, line in enumerate(ax.lines):
+            x = line.get_xdata()
+            y = line.get_ydata()
+            mask = (x >= xlim[0]) & (x <= xlim[1])
+            color = palette[i]
+            ax_inset.plot(x[mask], y[mask], label=line.get_label(), color=color)
+
+        ax_inset.set_xlim(xlim)
+        ax_inset.set_xticks([])
+        ax_inset.set_yticks([])
+        sns.despine(ax=ax_inset)
+
+        # Zoomed inset on the second peak of the distribution
+        ax_inset = inset_axes(ax, width='30%', height='30%', loc='center right')
+        xlim = (0.15, 0.2)
+
+        for i, line in enumerate(ax.lines):
+            x = line.get_xdata()
+            y = line.get_ydata()
+            mask = (x >= xlim[0]) & (x <= xlim[1])
+            color = palette[i]
+            ax_inset.plot(x[mask], y[mask], label=line.get_label(), color=color)
+
+        ax_inset.set_xlim(xlim)
+        ax_inset.set_xticks([])
+        ax_inset.set_yticks([])
+        sns.despine(ax=ax_inset)
 
 
 def plot_chrono_curve(df_behavior, absolute=True):

@@ -1,7 +1,7 @@
 # Figure resolution
 figure.figsize : 6.4, 4.8
 figure.dpi : 100
-savefig.dpi : 100
+savefig.dpi : 300
 
 # Axes properties
 axes.edgecolor: black
