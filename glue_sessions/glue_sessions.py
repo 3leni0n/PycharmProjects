@@ -146,7 +146,6 @@ def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6'
 def update_glued_sessions(experiment='2AFC_6'):
     """
     Update the glued_sessions .csv files for all animals with the non yet included sessions.
-    :param protocol: task code version
     :param experiment: batch of the animals
     :return:
     """
@@ -167,7 +166,10 @@ def update_glued_sessions(experiment='2AFC_6'):
         print('Experiments: ' + str(experiments)[1:-1])  # Remove square brackets
         experiment = input('Enter experiment name')
 
-    protocol = 'stage_training_v' + experiment[-1]  # Get the last digit of the experiment
+    if experiment == 'Ephys':
+        protocol = 'stage_training_v5'  # Ephys experiment (2AFC_5) uses stage_training_v5 protocol
+    else:
+        protocol = 'stage_training_v' + experiment[-1]  # Get the last digit of the experiment
 
     folder = Path.home() / 'pv_nmdar_eranet' / 'experiments' / experiment / 'setups'  # Where the data for all animals is
     animals = os.listdir(folder)  # List animals
@@ -190,7 +192,6 @@ def update_glued_sessions(experiment='2AFC_6'):
 def glue_animals(experiment='2AFC_6', update=True, to_csv=False):
     """
     Glue all the sessions from all the animals of a given batch.
-    :param protocol: task code version
     :param experiment: batch of animals
     :param update: If True update first the glued sessions
     :param to_csv: if True save data as .csv file

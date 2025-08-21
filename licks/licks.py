@@ -248,7 +248,7 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
         plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
 
     if df_behavior.Subject.unique().size > 1:
-        title = f'{var}\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+        title = f'{var}\n (N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials)'
     else:
         title = f'{var}\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
 
@@ -315,7 +315,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
         # Title
         if df_behavior.Subject.unique().size > 1:
             title = (f'{var}\n '
-                     f'(N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)')
+                     f'(N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials)')
         else:
             title = (f'{var}\n '
                      f'(mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)')
