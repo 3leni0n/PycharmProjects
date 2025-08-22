@@ -721,18 +721,18 @@ def get_ild(stim_set=6):
     return frames_ild
 
 
-def compute_window(data, runningwindow):
+def compute_window(data, win_length=20):
     """
-    Computes a rolling average with a length of runningwindow samples.
+    Computes a rolling average with a length of window samples.
     """
 
-    performance = []
+    roll_avg = []
     for i in range(len(data)):
-        if i < runningwindow:
-            performance.append(round(np.nanmean(data[0:i + 1]), 2))
+        if i < win_length:
+            roll_avg.append(round(np.nanmean(data[0:i + 1]), 2))
         else:
-            performance.append(round(np.nanmean(data[i - runningwindow:i]), 2))
-    return performance
+            roll_avg.append(round(np.nanmean(data[i - win_length + 1:i + 1]), 2))
+    return roll_avg
 
 
 def compute_psych_curve(x, y, n_points=100):
