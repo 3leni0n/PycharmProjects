@@ -1078,7 +1078,7 @@ def filter_drug_sessions(df):
     return df
 
 
-def save_notebook_files(notebook_path="notebook.ipynb"):
+def save_notebook_files(notebook_path='notebook.ipynb'):
     """
     Save all figures from the notebook outputs to a folder named after the notebook.
     The folder will be created in the same directory as the notebook.
@@ -1089,7 +1089,7 @@ def save_notebook_files(notebook_path="notebook.ipynb"):
     :return: None
     """
     nb_path = Path(notebook_path)
-    folder = nb_path.stem + "_files"
+    folder = nb_path.stem + '_files'
     folder = Path(folder)
     folder.mkdir(exist_ok=True)
 
@@ -1097,21 +1097,21 @@ def save_notebook_files(notebook_path="notebook.ipynb"):
     img_count = 0
 
     for cell in nb.cells:
-        if cell.cell_type != "code":
+        if cell.cell_type != 'code':
             continue
-        for output in cell.get("outputs", []):
-            for fmt in ["image/png", "image/svg+xml"]:
-                if fmt in output.get("data", {}):
-                    data = output["data"][fmt]
-                    if fmt == "image/png":
-                        ext = "png"
+        for output in cell.get('outputs', []):
+            for fmt in ['image/png', 'image/svg+xml']:
+                if fmt in output.get('data', {}):
+                    data = output['data'][fmt]
+                    if fmt == 'image/png':
+                        ext = 'png'
                         img_bytes = base64.b64decode(data)
                     else:  # SVG is already text
-                        ext = "svg"
-                        img_bytes = data.encode("utf-8")
+                        ext = 'svg'
+                        img_bytes = data.encode('utf-8')
                     img_count += 1
-                    file_path = folder / f"figure_{img_count}.{ext}"
-                    with open(file_path, "wb") as f:
+                    file_path = folder / f'figure_{img_count}.{ext}'
+                    with open(file_path, 'wb') as f:
                         f.write(img_bytes)
 
-    print(f"Saved {img_count} images to {folder}/")
+    print(f'Saved {img_count} images to {folder}/')

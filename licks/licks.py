@@ -2,8 +2,10 @@ import pandas as pd
 import numpy as np
 import ast
 import matplotlib.pyplot as plt
-import seaborn as sns
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from matplotlib.ticker import MaxNLocator
+import seaborn as sns
+from scipy.stats import sem
 
 
 # Define functions to get licks and RTs
@@ -237,23 +239,41 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
     :return: None
     """
 
-    plt.figure(constrained_layout=True)
+    # plt.figure(constrained_layout=True)
     color = 'k'
 
-    if density:
-        ylabel = 'Density'
-        sns.kdeplot(df_behavior[var], color=color)
-    else:
-        ylabel = 'Frequency'
-        plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
+    # Continuous variables
+    if var == 'RT' or var == 'ILI':
+        if density:
+            ylabel = 'Density'
+            sns.kdeplot(df_behavior[var], color=color)
+        else:
+            ylabel = 'Frequency'
+            plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
+        plt.xlabel('Time (s) from go cue')
+
+    # Discrete variable
+    elif var == 'nLicks':
+        min_val = df_behavior[var].min()
+        max_val = df_behavior[var].max()
+        bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
+        plt.hist(df_behavior[var], bins=bins, color='black', density=True)
+        ax = plt.gca()
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+        plt.xlim(0, 20)
+        # plt.xlim(min_val - 0.5, max_val + 0.5)
+        plt.xlabel(var)
+        if density:
+            ylabel = 'Density'
+        else:
+            ylabel = 'Frequency'
 
     if df_behavior.Subject.unique().size > 1:
-        title = f'{var}\n (N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials)'
+        title = f'{var}\n N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials'
     else:
-        title = f'{var}\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+        title = f'{var}\n ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials'
 
     plt.title(title)
-    plt.xlabel('Time (s) from go cue')
     plt.ylabel(ylabel)
     sns.despine()
 
@@ -298,36 +318,54 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
         colors = ['tab:blue', 'tab:orange']
         labels = ['1st half', '2nd half']
 
-    plt.figure(constrained_layout=True)
+    # plt.figure(constrained_layout=True)
 
     for i in range(2):
 
         split_var = df_behavior[df_behavior[split_var_name] == i][var]
-        # Kind of plot
-        if kind == 'hist':
-            plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
-                     edgecolor='none', alpha=0.5)
-            ylabel = 'Frequency'
-        elif kind == 'kde':
-            sns.kdeplot(split_var, color=colors[i], label=labels[i])
-            ylabel = 'Density'
 
-        # Title
+        # Continuous variables
+        if var == 'RT' or var == 'ILI':
+            if kind == 'hist':
+                plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
+                         edgecolor='none', alpha=0.5)
+                ylabel = 'Frequency'
+            elif kind == 'kde':
+                sns.kdeplot(split_var, color=colors[i], label=labels[i])
+                ylabel = 'Density'
+            plt.xlabel('Time (s) from go cue')
+
+        # Discrete variable
+        elif var == 'nLicks':
+            min_val = split_var.min()
+            max_val = split_var.max()
+            bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
+            density = True if kind == 'kde' else False
+            plt.hist(split_var, bins=bins, density=density, histtype='step', linewidth=1.5, color=colors[i], label=labels[i])
+            ax = plt.gca()
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+            plt.xlim(0, 20)
+            # plt.xlim(min_val - 0.5, max_val + 0.5)
+            plt.xlabel(var)
+            if kind == 'kde':
+                ylabel = 'Density'
+            else:
+                ylabel = 'Frequency'
+
         if df_behavior.Subject.unique().size > 1:
             title = (f'{var}\n '
-                     f'(N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials)')
+                     f'N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials')
         else:
             title = (f'{var}\n '
-                     f'(mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)')
+                     f'ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials')
 
     plt.legend(frameon=False)
     plt.title(title)
-    plt.xlabel('Time (s) from go cue')
     plt.ylabel(ylabel)
     sns.despine()
 
 
-def plot_ild_dist(df_behavior, var='RT'):
+def plot_ild_dist(df_behavior, var='RT', insets=True):
     """
     Plot the licks distribution of a variable of interest split by absolute ILD levels.
     :param df_behavior: DataFrame with the behavioral data of a session
@@ -335,7 +373,7 @@ def plot_ild_dist(df_behavior, var='RT'):
     :return:
     """
 
-    plt.figure(constrained_layout=True)
+    # plt.figure(constrained_layout=True)
 
     # Collapse the signed ILD levels to absolute values for cleaner visualization
     abs_ilds = sorted(df_behavior.absILD.unique().astype(int), reverse=True)
@@ -345,22 +383,43 @@ def plot_ild_dist(df_behavior, var='RT'):
     # Plot the distribution for each absolute ILD level
     for i, ild in enumerate(abs_ilds):
         df_ild = df_behavior[df_behavior.absILD == ild]
-
-        # Plot and capture the Line2D object
         color = palette[i]
-        line = sns.kdeplot(df_ild[var], label=ild, color=color)
 
-        # Extract x and y data from the plotted line
-        line = plt.gca().lines[-1]
-        x, y = line.get_data()
+        # Continuous variables
+        if var == 'RT' or var == 'ILI':
+            # Plot and capture the Line2D object
+            sns.kdeplot(df_ild[var], color=color, label=ild)
+            loc = 'upper center'
 
-        # Find the peak (x at maximum y)
-        peak_rt = x[np.argmax(y)]
-        peaks[ild] = peak_rt
+            # Extract x and y data from the plotted line
+            line = plt.gca().lines[-1]
+            x, y = line.get_data()
 
-    # Print peaks
-    for ild, peak in peaks.items():
-        print(f'ILD {ild}: peak {var} = {peak:.3f} s')
+            # Find the peak (x at maximum y)
+            peak_rt = x[np.argmax(y)]
+            peaks[ild] = peak_rt
+
+        # Discrete variable
+        elif var == 'nLicks':
+            # min_val = df_ild[var].min()
+            # max_val = df_ild[var].max()
+            # bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
+            # plt.hist(df_ild[var], bins=bins, density=True, histtype='step', linewidth=1.5, color=color, label=ild)
+            # ax = plt.gca()
+            # ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+            # plt.xlim(0, 20)
+            # # plt.xlim(min_val - 0.5, max_val + 0.5)
+            # plt.xlabel(var)
+
+            nlicks = df_ild[var]
+            nlicks_mean = nlicks.mean()
+            nlicks_sem = sem(nlicks)
+            plt.errorbar(i, nlicks_mean, nlicks_sem, fmt='o', color=color, label=ild)
+            loc = 'upper right'
+
+    # # Print peaks
+    # for ild, peak in peaks.items():
+    #     print(f'ILD {ild}: peak {var} = {peak:.3f} s')
 
     mean_rt = np.mean(list((peaks.values())))
     print(f'Mean {var} = {mean_rt:.3f} s')
@@ -368,10 +427,10 @@ def plot_ild_dist(df_behavior, var='RT'):
     plt.title(var + ' distribution')
     plt.xlabel(var)
     plt.ylabel('Density')
-    plt.legend(loc='upper center', frameon=False, title='|ILD|')
+    plt.legend(loc=loc, frameon=False, title='|ILD|')
     sns.despine()
 
-    if var == 'RT':
+    if var == 'RT' and insets:
 
         # Zoomed inset on the peak of the distribution
         ax = plt.gca()  # get current axes
@@ -407,6 +466,46 @@ def plot_ild_dist(df_behavior, var='RT'):
         sns.despine(ax=ax_inset)
 
 
+def plot_licks_per_subject(df_behavior, plot_func, format='A4', **kwargs):
+    """
+    Plot a subplot per subject of a given plotting function. Adjust automatically the figure grid to fit all subjects.
+    :param df_behavior: DataFrame containing the behavioral data.
+    :param plot_func: Plotting function to be applied.
+    :param kwargs: Keyword arguments to be passed to `plot_func`.
+    :return: None
+    """
+
+    subjects = df_behavior['Subject'].unique()
+    n_subj = len(subjects)
+
+    # Layout: N columns, enough rows
+    ncols = 3
+    nrows = -(-n_subj // ncols)  # Ceiling division
+
+    # Paper size (format)
+    if format == 'A4':
+        figsize = (8.27, 11.69)
+    if format == 'A3':
+        figsize = (11.69, 16.54)
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
+
+    for ax, subject in zip(axes.flatten(), subjects):
+        df_subject = df_behavior[df_behavior['Subject'] == subject]
+        plt.sca(ax)  # Make ax current
+        plot_func(df_subject, **kwargs)
+
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
+
+    # remove unused axes if any
+    for ax in axes.flatten()[len(subjects):]:
+        ax.remove()
+
+    # fig.suptitle(var)
+    fig.tight_layout()
+
+
 def plot_chrono_curve(df_behavior, absolute=True):
     """
     Plot the chronometric curve of a behavioral session (all trials).
@@ -428,9 +527,9 @@ def plot_chrono_curve(df_behavior, absolute=True):
         xlabel = 'ILD'
 
     if df_behavior.Subject.unique().size > 1:
-        title = f'Chronometric Curve\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+        title = f'Chronometric Curve\n N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials'
     else:
-        title = f'Chronometric Curve\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+        title = f'Chronometric Curve\n ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials'
 
     print(mean_rts)
     plt.figure(constrained_layout=True)
@@ -498,9 +597,9 @@ def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
 
     # Title
     if df_behavior.Subject.unique().size > 1:
-        title = f'Chronometric Curve\n (N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials)'
+        title = f'Chronometric Curve\n N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials'
     else:
-        title = f'Chronometric Curve\n (mouse {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials)'
+        title = f'Chronometric Curve\n ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials'
 
     plt.xticks(ilds)
     plt.title(title)
