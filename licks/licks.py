@@ -250,7 +250,8 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
         else:
             ylabel = 'Frequency'
             plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
-        plt.xlabel('Time (s) from go cue')
+        plt.xlim(0, 1)
+        plt.xlabel('Time (s)')
 
     # Discrete variable
     elif var == 'nLicks':
@@ -269,9 +270,11 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
             ylabel = 'Frequency'
 
     if df_behavior.Subject.unique().size > 1:
-        title = f'{var}\n N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials'
+        title = (f'{var}\n'
+                 f'N={len(df_behavior.Subject.unique())}, {len(df_behavior)/1000:.1f}k trials')
     else:
-        title = f'{var}\n ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials'
+        title = (f'{var}\n'
+                 f'{df_behavior.Subject.unique()[0]}, {len(df_behavior)/1000:.1f}k trials')
 
     plt.title(title)
     plt.ylabel(ylabel)
@@ -317,6 +320,10 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
         split_var_name = 'SessionHalf'
         colors = ['tab:blue', 'tab:orange']
         labels = ['1st half', '2nd half']
+    elif split == 'drug':
+        split_var_name = 'Drug'
+        colors = ['tab:gray', 'tab:pink']
+        labels = ['Saline', 'Drug']
 
     # plt.figure(constrained_layout=True)
 
@@ -333,7 +340,8 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
             elif kind == 'kde':
                 sns.kdeplot(split_var, color=colors[i], label=labels[i])
                 ylabel = 'Density'
-            plt.xlabel('Time (s) from go cue')
+            plt.xlim(0, 1)
+            plt.xlabel('Time (s)')
 
         # Discrete variable
         elif var == 'nLicks':
@@ -341,7 +349,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
             max_val = split_var.max()
             bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
             density = True if kind == 'kde' else False
-            plt.hist(split_var, bins=bins, density=density, histtype='step', linewidth=1.5, color=colors[i], label=labels[i])
+            plt.hist(split_var, bins=bins, density=density, histtype='step', color=colors[i], label=labels[i])
             ax = plt.gca()
             ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
             plt.xlim(0, 20)
@@ -353,11 +361,11 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
                 ylabel = 'Frequency'
 
         if df_behavior.Subject.unique().size > 1:
-            title = (f'{var}\n '
-                     f'N={len(df_behavior.Subject.unique())}, {len(df_behavior)} trials')
+            title = (f'{var}\n'
+                     f'N={len(df_behavior.Subject.unique())}, {len(df_behavior)/1000:.1f}k trials')
         else:
-            title = (f'{var}\n '
-                     f'ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials')
+            title = (f'{var}\n'
+                     f'{df_behavior.Subject.unique()[0]}, {len(df_behavior)/1000:.1f}k trials')
 
     plt.legend(frameon=False)
     plt.title(title)

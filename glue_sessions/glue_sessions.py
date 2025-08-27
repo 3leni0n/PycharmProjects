@@ -6,8 +6,7 @@ import pandas as pd
 from parse.parse import parse
 from parse.parse_v2 import parse_v2
 import csv
-from my_fun.my_fun import get_experiment
-
+from my_fun.my_fun import *
 # To do:
 # Add training day index column to df
 
@@ -189,7 +188,7 @@ def update_glued_sessions(experiment='2AFC_6'):
         glue_sessions(animal=animals[i], protocol=protocol, experiment=experiment, to_csv=True)
 
 
-def glue_animals(experiment='2AFC_6', update=True, to_csv=False):
+def glue_animals(experiment='2AFC_6', filter_drug=False, update=True, to_csv=False):
     """
     Glue all the sessions from all the animals of a given batch.
     :param experiment: batch of animals
@@ -213,6 +212,8 @@ def glue_animals(experiment='2AFC_6', update=True, to_csv=False):
 
     for i in range(len(animals)):
         df_animal = pd.read_csv(Path(folder / animals[i]), low_memory=False)
+        if filter_drug:
+            df_animal = filter_drug_sessions(df_animal)
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 
