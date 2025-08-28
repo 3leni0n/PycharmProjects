@@ -91,28 +91,6 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
     # str(int(animal)) to remove the 0 padding in ID
     df_intersession = pd.read_csv(path_intersession)
 
-    # There are some short, corrupted sessions (dates) for which there is no intersession data because one of the values
-    # for some of the columns is empty. Remove them from trial data
-    dates_trials = df.Date.unique()
-    dates_intersession = df_intersession.Dates.unique()
-    dates_to_remove = [x for x in dates_trials if x not in dates_intersession]
-    df = df[~df.Date.isin(dates_to_remove)]
-
-    # Add intersession data to df. Needs to be done before filtering out trials so lengths match
-    session_index = []
-    accuracy = []
-    accuracy_left = []
-    accuracy_right = []
-    for i in range(len(df_intersession)):
-        session_index += [df_intersession.index.values[i]] * df_intersession.Trials[i]
-        accuracy += [df_intersession.Accuracy[i]] * df_intersession.Trials[i]
-        accuracy_left += [df_intersession.AccuracyLeft[i]] * df_intersession.Trials[i]
-        accuracy_right += [df_intersession.AccuracyRight[i]] * df_intersession.Trials[i]
-    df['SessionIndex'] = session_index
-    df['Accuracy'] = accuracy
-    df['AccuracyLeft'] = accuracy_left
-    df['AccuracyRight'] = accuracy_right
-
     ####################################################################################################################
 
     # Filter trials
@@ -120,14 +98,20 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
     df = df[df.P > 0]  # Only trials/sessions with P > 0
     if target_ilds is not None:
         df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
-    accuracy_threshold = 0.5
-    df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
-    # with accuracy >= threshold
+
+    threshold = 0.5  # Accuracy threshold to remove bad sessions
+    # mask = df_intersession.Accuracy < threshold
+    mask = (df_intersession.AccuracyLeft > threshold) & (df_intersession.AccuracyRight > threshold)
+
+    # Remove bad sessions based on intersession data
+    if drug is None:
+        dates_to_remove = df_intersession[mask].Dates
+        df = df[~df.Date.isin(dates_to_remove)].reset_index(drop=True)
 
     ####################################################################################################################
 
     # Drug sessions/trials
-    if drug is not None:  # Select drug session trials
+    if drug is not None:  # Select drug session/trials
 
         if experiment == '2AFC_2':
             df_drug = pd.read_csv(Path.home() / 'PycharmProjects' / 'drugs' / 'Mouse injections MK801.csv')  # Load drug data
@@ -162,7 +146,29 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
 
         elif experiment == '2AFC_6':
             if drug in [0, 1]:
+                # Filter out saline sessions that are not paired to drug sessions
                 df = filter_drug_sessions(df)
+                df_intersession = filter_drug_sessions(df_intersession)
+
+                # Remove bad sessions
+
+                # Add paired session index
+                n_paired_sessions = len(df_intersession) // 2
+                # print(f'{n_paired_sessions:.0f} paired sessions')
+                paired_sessions = np.repeat(np.arange(n_paired_sessions), 2)
+                df_intersession['PairedSession'] = paired_sessions
+
+                # Remove from intersession data
+                bad_paired_sessions = df_intersession[mask].PairedSession
+                # print(f'Bad sessions: {bad_paired_sessions}')
+                bad_paired_dates = df_intersession[df_intersession.PairedSession.isin(bad_paired_sessions)].Dates
+                df_intersession = df_intersession[~df_intersession.Dates.isin(bad_paired_dates)].reset_index(
+                    drop=True)
+                # print(f'Dropped {len(bad_paired_sessions)}/{n_paired_sessions} ({(len(bad_paired_sessions) / n_paired_sessions) * 100:.0f}%) paired sessions')
+
+                # Remove from trial data
+                df = df[~df.Date.isin(bad_paired_dates)].reset_index(drop=True)
+
                 df = df[df.Drug == drug]
 
     else:  # Don't select drug session trials
@@ -198,7 +204,20 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
         #             stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
         #         # returns same result, but not axis 1). 0 along trials that's what I wanna do :)
 
-        stim_strength, n_frames = make_frames_dm(df, stim_set=6, residuals=residuals, zscore=zscore)
+        # Set stimuli set
+        if experiment == '2AFC_6':
+            stim_set = 6
+        elif experiment == '2AFC':
+            stim_set = 1
+        else:
+            stim_set = 2
+
+        # Make stimulus strength design matrix
+        stim_strength, n_frames = make_frames_dm(df, stim_set=stim_set, residuals=residuals, zscore=zscore)
+
+        if stim_set == 6:
+            stim_strength = stim_strength.iloc[:, 1:]  # Remove 1st frame with 0 net evidence
+            n_frames = n_frames - 1
 
         # Average frames (to have more trials per regressor)
         if n_mean_frames is not None:
@@ -212,6 +231,7 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
                     axis=1))  # Get the mean per trial of every 'n_frames_per_mean_frame' frames
             stim_strength = pd.DataFrame(data=stim_strength_mean).T
             filename = f'_PK_ILDs: {target_ilds}, {n_mean_frames} averaged frames'
+            n_frames = n_mean_frames  # Update n_frames
 
         # Random 50% vs 50% of trials without replacement
         trials_indexes = choices.index.values
@@ -376,7 +396,11 @@ def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, resid
 
     plt.figure(constrained_layout=True)
     n_frames = pk.n_frames
-    x = np.arange(n_frames)
+
+    if n_mean_frames is not None:
+        n_frames = n_mean_frames
+
+    x = np.arange(1, n_frames + 1)
     y = pk.params
     yerr = pk.std_err
     plt.plot(x, y, color=color, marker='o', label=label)
@@ -404,13 +428,11 @@ def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, resid
     percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
     plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
     plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
-    xticks = np.arange(1, n_frames + 1, 2)
-    xticklabels = xticks + 1
-    plt.xticks(xticks, xticklabels)
-    sns.despine()  # Despine axes triming the 0
 
     if n_mean_frames == 2:
         plt.xticks([1, 2])  # Readjust xticks
+
+    sns.despine()
 
     if save:
         filename = f'{pk.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
@@ -426,8 +448,7 @@ def plot_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, resid
     # PLOT NET STIMULUS KERNEL
 
     plt.figure(constrained_layout=True)
-    x = pk.net_stim_params.index.values
-    x[-1] = 16  # Trick to zoom in
+    x = np.arange(len(pk.net_stim_params.index.values))
     y = pk.net_stim_params
     yerr = pk.net_stim_std_err
     plt.plot(x, y, color=color, marker='o')
@@ -559,7 +580,7 @@ def get_mean_pk(experiments=['2AFC_6'], animals=None, target_ilds=None, drug=Non
         elif experiments[j] == '2AFC_3':
             animals = ['419', '420', '422', '616', '619', '623']
         elif experiments[j] == '2AFC_6':
-            animals = ['014', '016', '017', '020', '021', '022', '023', '024', '025']
+            animals = ['014', '016', '017', '018', '019', '020', '021', '022', '023', '024', '025']
 
         folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
@@ -567,18 +588,23 @@ def get_mean_pk(experiments=['2AFC_6'], animals=None, target_ilds=None, drug=Non
 
         for i in range(len(animals)):
             print(f'Getting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
-            pk = get_pk(experiment=experiment, animal=animals[i], target_ilds=target_ilds, drug=drug,
-                        residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                        iterations=iterations)
-            animals_across_batches.append(pk.animal)
-            params_across_animals.append(pk.params)
-            session_index_params_across_animals.append(pk.session_index_params)
-            net_stim_params_across_animals.append(pk.net_stim_params)
-            shuffles_across_animals.append(pk.shuffles)
-            shuffles_session_index_across_animals.append(pk.shuffles_session_index)
-            net_stim_shuffles_across_animals.append(pk.net_stim_shuffles)
-            n_trials_across_animals.append(pk.n_trials)
-            pks.append(pk)
+            try:
+                pk = get_pk(experiment=experiment, animal=animals[i], target_ilds=target_ilds, drug=drug,
+                            residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                            iterations=iterations)
+                animals_across_batches.append(pk.animal)
+                params_across_animals.append(pk.params)
+                session_index_params_across_animals.append(pk.session_index_params)
+                net_stim_params_across_animals.append(pk.net_stim_params)
+                shuffles_across_animals.append(pk.shuffles)
+                shuffles_session_index_across_animals.append(pk.shuffles_session_index)
+                net_stim_shuffles_across_animals.append(pk.net_stim_shuffles)
+                n_trials_across_animals.append(pk.n_trials)
+                pks.append(pk)
+            except Exception as e:
+                print(f'Could not get kernel of animal {animals[i]}')
+                print(e)
+                continue
         experiments_across_batches.append(experiment)
 
     n_trials = sum(n_trials_across_animals)
@@ -634,6 +660,161 @@ def get_mean_pk(experiments=['2AFC_6'], animals=None, target_ilds=None, drug=Non
 
     return mean_pk
     # return pks
+
+
+@timer
+def plot_drug_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
+            control=None, n_mean_frames=None, iterations=1000, save=False):
+
+    if type(experiment) == list:
+        pk_saline = get_mean_pk(experiments=experiment, animals=None, target_ilds=target_ilds, drug=0, residuals=residuals,
+                                zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+        pk_drug = get_mean_pk(experiments=experiment, animals=None, target_ilds=target_ilds, drug=1, residuals=residuals,
+                              zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
+        title = f'N={len(pk_saline.animal)}, {pk_saline.n_trials + pk_drug.n_trials} trials'
+        filename_prefix = 'mean_'
+    else:
+        pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
+                    residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
+                    iterations=iterations)
+        title = f'Mouse {pk.animal}, {pk.n_trials} trials'
+        filename_prefix = ''
+
+    # Default plotting parameters
+    color_saline = 'tab:gray'
+    color_drug = 'tab:pink'
+    color_upper_shuffle = 'tab:red'
+    label = ''
+
+    ####################################################################################################################
+
+    # PLOT FRAMES KERNEL
+
+    # Residuals
+    if residuals:
+        ylabel = 'GLM weight (residuals)'
+    else:
+        if zscore:   # To not do both (otherwise I'd be subtracting the mean twice)
+            ylabel = 'GLM weight (z-scored)'
+        else:
+            ylabel = 'GLM weight'
+
+    plt.figure(constrained_layout=True)
+    n_frames = pk_saline.n_frames
+
+    if n_mean_frames is not None:
+        n_frames = n_mean_frames
+
+    x = np.arange(1, n_frames + 1)
+    y_saline = pk_saline.params
+    y_drug = pk_drug.params
+    yerr_saline = pk_saline.std_err
+    yerr_drug = pk_drug.std_err
+    # plt.plot(x, y_saline, color=color_saline, marker='o', label=label)
+    plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', label='saline')
+    plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', label='drug')
+    plt.title(title)
+    plt.xlabel('Stimulus frame')
+    plt.ylabel(ylabel)
+    plt.legend(frameon=False)
+
+    # Annotate significance
+    if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
+        n_frames = n_mean_frames
+
+    # if pk.p_values is not None:
+    #     for i in range(n_frames):
+    #         if pk.p_values[i] <= 0.05:
+    #             text = '*'
+    #         else:
+    #             # text = 'ns'
+    #             text = ''
+    #         plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+    #                      color=color, va='center', ha='center', fontsize='medium')
+
+    # shuffles_mean = np.mean(pk.shuffles, axis=0)  # Get the mean of all the shuffles
+    # percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    # plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
+    # xticks = np.arange(1, n_frames + 1, 2)
+    # xticklabels = xticks + 1
+    # plt.xticks(xticks, xticklabels)
+    sns.despine()  # Despine axes triming the 0
+
+    if n_mean_frames == 2:
+        plt.xticks([1, 2])  # Readjust xticks
+
+    if save:
+        filename = f'{pk.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'kernels' / 'PK' / experiment
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT NET STIMULUS KERNEL
+
+    # plt.figure(constrained_layout=True)
+    # x = np.arange(len(pk_saline.net_stim_params.index.values))
+    # y_saline = pk_saline.net_stim_params
+    # y_drug = pk_drug.net_stim_params
+    # yerr_saline = pk_saline.net_stim_std_err
+    # yerr_drug = pk_drug.net_stim_std_err
+    # # plt.plot(x, y, color=color, marker='o')
+    # plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o')
+    # plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o')
+    # plt.title(title)
+    # plt.xlabel('Net stimuli')
+    # plt.ylabel('GLM weight')
+    # plt.legend(frameon=False)
+    # plt.xticks(x, ['2', '4', '8', '70'])
+    #
+    # # shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
+    # # percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    # # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    # # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+    # sns.despine()
+    #
+    # if save:
+    #     filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
+    #     filename = filename_prefix + filename
+    #     folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+    #     save_fig(folder_out, filename)
+    #     plt.close()
+
+    ####################################################################################################################
+
+    # PLOT SESSION INDEX KERNEL
+
+    if type(experiment) == str:  # Don't do it for the mean kernel
+
+        plt.figure(constrained_layout=True)
+        x = pk.session_index_params.index.values
+        y = pk.session_index_params
+        yerr = pk.session_index_std_error
+        plt.plot(x, y, color=color, marker='o')
+        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xlabel('Session index')
+        plt.ylabel('GLM weight')
+        # plt.legend(frameon=False)
+        # plt.xticks(x, ['2', '4', '8', '70'])
+        shuffles_mean = np.mean(pk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
+        percentiles2dot5 = np.percentile(pk.shuffles_session_index, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97dot5 = np.percentile(pk.shuffles_session_index, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
+        plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
+        sns.despine()
+
+        if save:
+            filename = f'{pk.animal}_PK_session_index_{target_ilds}, {n_mean_frames} averaged frames'
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+            save_fig(folder_out, filename)
+            plt.close()
 
 
 ########################################################################################################################
@@ -870,163 +1051,3 @@ def primacy_recency_index(pk):
 
 
 # Set parameters
-experiment = ['2AFC_6']
-animal = None
-
-# pk_saline = get_mean_pk(experiments=experiment, animals=None, target_ilds=None, drug=0, residuals=True, zscore=False,
-#                         control=None, n_mean_frames=None, iterations=10)
-#
-# pk_drug = get_mean_pk(experiments=experiment, animals=None, target_ilds=None, drug=1, residuals=True, zscore=False,
-#                       control=None, n_mean_frames=None, iterations=10)
-
-
-@timer
-def plot_drug_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residuals=True, zscore=False,
-            control=None, n_mean_frames=None, iterations=1000, save=False):
-
-    if type(experiment) == list:
-        pk_saline = get_mean_pk(experiments=experiment, animals=None, target_ilds=target_ilds, drug=0, residuals=residuals,
-                                zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
-        pk_drug = get_mean_pk(experiments=experiment, animals=None, target_ilds=target_ilds, drug=1, residuals=residuals,
-                              zscore=zscore, control=control, n_mean_frames=n_mean_frames, iterations=iterations)
-        title = f'N={len(pk_saline.animal)}, {pk_saline.n_trials + pk_drug.n_trials} trials'
-        filename_prefix = 'mean_'
-    else:
-        pk = get_pk(experiment=experiment, animal=animal, target_ilds=target_ilds, drug=drug,
-                    residuals=residuals, zscore=zscore, control=control, n_mean_frames=n_mean_frames,
-                    iterations=iterations)
-        title = f'Mouse {pk.animal}, {pk.n_trials} trials'
-        filename_prefix = ''
-
-    # Default plotting parameters
-    color_saline = 'tab:gray'
-    color_drug = 'tab:pink'
-    color_upper_shuffle = 'tab:red'
-    label = ''
-
-    ####################################################################################################################
-
-    # PLOT FRAMES KERNEL
-
-    # Residuals
-    if residuals:
-        ylabel = 'GLM weight (residuals)'
-    else:
-        if zscore:   # To not do both (otherwise I'd be subtracting the mean twice)
-            ylabel = 'GLM weight (z-scored)'
-        else:
-            ylabel = 'GLM weight'
-
-    plt.figure(constrained_layout=True)
-    n_frames = pk_saline.n_frames
-    x = np.arange(n_frames)
-    y_saline = pk_saline.params
-    y_drug = pk_drug.params
-    yerr_saline = pk_saline.std_err
-    yerr_drug = pk_drug.std_err
-    # plt.plot(x, y_saline, color=color_saline, marker='o', label=label)
-    plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', label='saline')
-    plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', label='drug')
-    plt.title(title)
-    plt.xlabel('Stimulus frame')
-    plt.ylabel(ylabel)
-    plt.legend(frameon=False)
-
-    # Annotate significance
-    if n_mean_frames is not None:  # If averaged frames, loop over the number of averaged frames instead
-        n_frames = n_mean_frames
-
-    # if pk.p_values is not None:
-    #     for i in range(n_frames):
-    #         if pk.p_values[i] <= 0.05:
-    #             text = '*'
-    #         else:
-    #             # text = 'ns'
-    #             text = ''
-    #         plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
-    #                      color=color, va='center', ha='center', fontsize='medium')
-
-    # shuffles_mean = np.mean(pk.shuffles, axis=0)  # Get the mean of all the shuffles
-    # percentiles95 = np.percentile(pk.shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    # plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
-    # xticks = np.arange(1, n_frames + 1, 2)
-    # xticklabels = xticks + 1
-    # plt.xticks(xticks, xticklabels)
-    sns.despine()  # Despine axes triming the 0
-
-    if n_mean_frames == 2:
-        plt.xticks([1, 2])  # Readjust xticks
-
-    if save:
-        filename = f'{pk.animal}_PK_ILDs_{target_ilds}, {n_mean_frames} averaged frames'
-        filename = filename_prefix + filename
-        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'kernels' / 'PK' / experiment
-        if not folder_out.exists():
-            folder_out.mkdir(parents=True, exist_ok=True)
-        save_fig(folder_out, filename)
-        plt.close()
-
-    ####################################################################################################################
-
-    # PLOT NET STIMULUS KERNEL
-
-    plt.figure(constrained_layout=True)
-    x = pk_saline.net_stim_params.index.values
-    x[-1] = 16  # Trick to zoom in
-    y_saline = pk_saline.net_stim_params
-    y_drug = pk_drug.net_stim_params
-    yerr_saline = pk_saline.net_stim_std_err
-    yerr_drug = pk_drug.net_stim_std_err
-    # plt.plot(x, y, color=color, marker='o')
-    plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o')
-    plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o')
-    plt.title(title)
-    plt.xlabel('Net stimuli')
-    plt.ylabel('GLM weight')
-    plt.legend(frameon=False)
-    plt.xticks(x, ['2', '4', '8', '70'])
-
-    # shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
-    # percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
-    sns.despine()
-
-    if save:
-        filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
-        filename = filename_prefix + filename
-        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
-        save_fig(folder_out, filename)
-        plt.close()
-
-    ####################################################################################################################
-
-    # PLOT SESSION INDEX KERNEL
-
-    if type(experiment) == str:  # Don't do it for the mean kernel
-
-        plt.figure(constrained_layout=True)
-        x = pk.session_index_params.index.values
-        y = pk.session_index_params
-        yerr = pk.session_index_std_error
-        plt.plot(x, y, color=color, marker='o')
-        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
-        plt.xlabel('Session index')
-        plt.ylabel('GLM weight')
-        # plt.legend(frameon=False)
-        # plt.xticks(x, ['2', '4', '8', '70'])
-        shuffles_mean = np.mean(pk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
-        percentiles2dot5 = np.percentile(pk.shuffles_session_index, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
-        percentiles97dot5 = np.percentile(pk.shuffles_session_index, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
-        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-        plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
-        plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
-        sns.despine()
-
-        if save:
-            filename = f'{pk.animal}_PK_session_index_{target_ilds}, {n_mean_frames} averaged frames'
-            folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
-            save_fig(folder_out, filename)
-            plt.close()

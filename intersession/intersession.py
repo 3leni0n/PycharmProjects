@@ -23,7 +23,7 @@ from my_fun.my_fun import *
 
 ########################################################################################################################
 
-@timer
+
 def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_slack=False):
     """Do intersession report per animal, where the x axis is the number of training days (not sessions) and y axis
     the variable of interest
@@ -1164,7 +1164,6 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     return df_intersession
 
 
-@timer
 def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
                      send_slack=False):
     """Do the intersessions for all animals of a given batch (experiment)"""
@@ -1228,8 +1227,7 @@ def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
                 print(f'Could not do intersession report of animal {i}')
 
 
-@timer
-def glue_animals_intersessions(experiment='2AFC_6', filter_drug=False, update=True, to_csv=True):
+def glue_animals_intersessions(experiment='2AFC_6', filter_drug=False, update=True, to_csv=False):
     """
     Concatenate all intersession .csv files from each animal into a single .csv file
     :param update: If True update first the glued sessions
@@ -1264,7 +1262,6 @@ def glue_animals_intersessions(experiment='2AFC_6', filter_drug=False, update=Tr
     return df
 
 
-@timer
 def intersession_across_boxes(experiment='2AFC_6', variable='Accuracy', mean=False,
                               update=False, to_csv=False):
     """
@@ -1359,7 +1356,6 @@ def intersession_across_boxes(experiment='2AFC_6', variable='Accuracy', mean=Fal
             sns.despine(ax=ax)
             ax.set_xlabel('N sessions')
 
-@timer
 def learning_curves(experiment='2AFC_4', alignment='n_sessions', offset=None, save=False):
     """
     Plot the learning trajectories (accuracy vs time) of all animals of a given batch

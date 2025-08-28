@@ -53,6 +53,11 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, sa
     # Load behavioral data
     df = pd.read_csv(folder_in)
 
+    # Load intersession data
+    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (str(int(animal)) + '_intersession.csv')
+    # str(int(animal)) to remove the 0 padding in ID
+    df_intersession = pd.read_csv(path_intersession)
+
     # Filter trials
     df = df[df.P > 0]  # Only those sessions with ilds
     # Only sessions with accuracy > X threshold?
