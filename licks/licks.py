@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
 import seaborn as sns
-from scipy.stats import sem
 
 
 # Define functions to get licks and RTs
@@ -110,7 +109,8 @@ def inter_lick_interval(licks: pd.Series) -> list:
             ili.append(np.nan)
         else:
             intervals = np.diff(licks_trial)
-            ili.append(np.mean(intervals))
+            # ili.append(intervals[0])  # First ili (interval between 1st-2nd lick)
+            ili.append(np.mean(intervals))  # Mean ili
 
     return ili
 
@@ -250,7 +250,7 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
         else:
             ylabel = 'Frequency'
             plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
-        plt.xlim(0, 1)
+        plt.xlim(0, 0.5)
         plt.xlabel('Time (s)')
 
     # Discrete variable
@@ -340,7 +340,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
             elif kind == 'kde':
                 sns.kdeplot(split_var, color=colors[i], label=labels[i])
                 ylabel = 'Density'
-            plt.xlim(0, 1)
+            plt.xlim(0, 0.5)
             plt.xlabel('Time (s)')
 
         # Discrete variable
@@ -397,6 +397,8 @@ def plot_ild_dist(df_behavior, var='RT', insets=True):
         if var == 'RT' or var == 'ILI':
             # Plot and capture the Line2D object
             sns.kdeplot(df_ild[var], color=color, label=ild)
+            # sns.histplot(df_ild[var], stat='density', element='step', fill=False, kde=False, color=color, label=ild)
+            plt.xlim(0, 0.5)
             loc = 'upper center'
 
             # Extract x and y data from the plotted line
@@ -406,23 +408,24 @@ def plot_ild_dist(df_behavior, var='RT', insets=True):
             # Find the peak (x at maximum y)
             peak_rt = x[np.argmax(y)]
             peaks[ild] = peak_rt
+            print(f'ILD {ild}: peak {var} = {peak_rt:.3f} s')
 
         # Discrete variable
         elif var == 'nLicks':
-            # min_val = df_ild[var].min()
-            # max_val = df_ild[var].max()
-            # bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
-            # plt.hist(df_ild[var], bins=bins, density=True, histtype='step', linewidth=1.5, color=color, label=ild)
-            # ax = plt.gca()
-            # ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
-            # plt.xlim(0, 20)
-            # # plt.xlim(min_val - 0.5, max_val + 0.5)
-            # plt.xlabel(var)
+            min_val = df_ild[var].min()
+            max_val = df_ild[var].max()
+            bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
+            plt.hist(df_ild[var], bins=bins, density=True, histtype='step', linewidth=1.5, color=color, label=ild)
+            ax = plt.gca()
+            ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+            plt.xlim(0, 20)
+            # plt.xlim(min_val - 0.5, max_val + 0.5)
+            plt.xlabel(var)
 
-            nlicks = df_ild[var]
-            nlicks_mean = nlicks.mean()
-            nlicks_sem = sem(nlicks)
-            plt.errorbar(i, nlicks_mean, nlicks_sem, fmt='o', color=color, label=ild)
+            # nlicks = df_ild[var]
+            # nlicks_mean = nlicks.mean()
+            # nlicks_sem = sem(nlicks)
+            # plt.errorbar(i, nlicks_mean, nlicks_sem, fmt='o', color=color, label=ild)
             loc = 'upper right'
 
     # # Print peaks
@@ -474,6 +477,38 @@ def plot_ild_dist(df_behavior, var='RT', insets=True):
         sns.despine(ax=ax_inset)
 
 
+def plot_ild_dist_mean(df_behavior, var='RT'):
+    """
+    Plot the mean ± SEM of a variable for each absolute ILD level as a categorical bar plot.
+    """
+    abs_ilds = sorted(df_behavior.absILD.unique().astype(int))
+    palette = list(sns.color_palette('tab10', len(abs_ilds)))
+
+    means = []
+    sems = []
+
+    # Compute means and SEMs
+    for ild in abs_ilds:
+        df_ild = df_behavior[df_behavior.absILD == ild][var]
+        mean_ild = df_ild.mean()
+        sem_ild = df_ild.sem()
+        means.append(mean_ild)
+        sems.append(sem_ild)
+
+    y_min = min(means) - 0.25 * (max(means) - min(means))
+    x = np.arange(len(abs_ilds))  # positions for the bars
+    # plt.bar(x, means, yerr=sems, color=palette)
+    plt.bar(x, means - y_min, bottom=y_min, yerr=sems, color=palette)
+    # plt.errorbar(x, means, sems, fmt='-o', color=color, label=label)
+
+    plt.ylim(y_min, None)
+    plt.xticks(x, abs_ilds)  # ILD values as category labels
+    plt.xlabel('|ILD|')
+    plt.ylabel(var)
+    plt.title(f'Mean {var}')
+    sns.despine()
+
+
 def plot_licks_per_subject(df_behavior, plot_func, format='A4', **kwargs):
     """
     Plot a subplot per subject of a given plotting function. Adjust automatically the figure grid to fit all subjects.
@@ -496,12 +531,14 @@ def plot_licks_per_subject(df_behavior, plot_func, format='A4', **kwargs):
     if format == 'A3':
         figsize = (11.69, 16.54)
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False, sharex=True, sharey=True)
 
     for ax, subject in zip(axes.flatten(), subjects):
         df_subject = df_behavior[df_behavior['Subject'] == subject]
         plt.sca(ax)  # Make ax current
         plot_func(df_subject, **kwargs)
+        title = (f'{df_behavior.Subject.unique()[0]}, {len(df_behavior) / 1000:.1f}k trials')
+        ax.set_title(title)
 
         if ax.get_legend() is not None:
             ax.get_legend().remove()
