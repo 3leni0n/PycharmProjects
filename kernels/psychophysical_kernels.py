@@ -101,7 +101,7 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
 
     threshold = 0.5  # Accuracy threshold to remove bad sessions
     # mask = df_intersession.Accuracy < threshold
-    mask = (df_intersession.AccuracyLeft > threshold) & (df_intersession.AccuracyRight > threshold)
+    mask = (df_intersession.AccuracyLeft < threshold) | (df_intersession.AccuracyRight < threshold)
 
     # Remove bad sessions based on intersession data
     if drug is None:

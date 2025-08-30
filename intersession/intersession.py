@@ -1255,6 +1255,8 @@ def glue_animals_intersessions(experiment='2AFC_6', filter_drug=False, update=Tr
             df_intersession = filter_drug_sessions(df_intersession)
         df = pd.concat([df, df_intersession])
 
+    df = df.reset_index(drop=True)  # Reset index after concatenation
+
     if to_csv:
         df.to_csv(Path(path_experiment / (experiment + '_intersessions' + '.csv')), index=False)
         # index=False to avoid the 'Unnamed: 0' column
