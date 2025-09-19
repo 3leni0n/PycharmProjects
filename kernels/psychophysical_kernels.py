@@ -77,8 +77,9 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
     """
 
     # Get the path to the data
-    experiment, folder_in = get_experiment(experiment)
-    animal = get_animal(experiment=experiment, path_session='glue_sessions', animal=animal)
+    experiment, folder_in = get_experiment(experiment, path_session='glue_sessions')
+    # experiment, folder_in = get_experiment(experiment, path_session='glmhmm')  # For engagement data
+    animal = get_animal(experiment=experiment, animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     # Load behavioral data
@@ -107,6 +108,11 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
     if drug is None:
         dates_to_remove = df_intersession[mask].Dates
         df = df[~df.Date.isin(dates_to_remove)].reset_index(drop=True)
+
+    # # Engagement
+    # engaged = [1 if state == 0 else 0 for state in df.State]
+    # df['Engaged'] = engaged
+    # df = df[df.Engaged == 1]  # Only engaged trials
 
     ####################################################################################################################
 
@@ -575,8 +581,8 @@ def get_mean_pk(experiments=['2AFC_6'], animals=None, target_ilds=None, drug=Non
         print(experiment)
 
         if experiments[j] == '2AFC_2':
-            # animals = ['325', '327', '329', '330', '332', '333', '335', '337']
-            animals = ['332', '333', '337']  # Drug experiments
+            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            # animals = ['332', '333', '337']  # Drug experiments
         elif experiments[j] == '2AFC_3':
             animals = ['419', '420', '422', '616', '619', '623']
         elif experiments[j] == '2AFC_6':
