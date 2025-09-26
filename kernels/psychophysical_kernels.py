@@ -896,7 +896,6 @@ def primacy_recency_index(pk):
 # experiment = '2AFC_2'
 # # experiment = ['2AFC_2', '2AFC_3']
 # experiments = ['2AFC_2']
-# # animal = '333'
 # # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments (batch 2)

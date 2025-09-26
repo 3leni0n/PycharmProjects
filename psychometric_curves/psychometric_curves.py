@@ -26,7 +26,7 @@ sns.set_context('poster')
 #     animals = ['419', '420', '422', '616', '619', '623']
 
 
-def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=np.nan, save=False, format='png', transparent=False):
+def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save=False, format='png', transparent=False):
     """Plot psychometric curve
     :param experiment: str, name of the experiment
     :param animal: str, animal name

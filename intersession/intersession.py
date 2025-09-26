@@ -178,27 +178,27 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     # Trials
     trials = df.groupby('Date').Trial.size()
-    trials_left = df[df.Side == 0].groupby('Date').Trial.size()
-    trials_right = df[df.Side == 1].groupby('Date').Trial.size()
+    trials_left = df[df.Side == 0].groupby('Date').Trial.size().reindex(dates, fill_value=0)
+    trials_right = df[df.Side == 1].groupby('Date').Trial.size().reindex(dates, fill_value=0)
 
     # Choice
-    chose_left = df[df.Choice == 0].groupby('Date').size()
-    chose_right = df[df.Choice == 1].groupby('Date').size()
+    chose_left = df[df.Choice == 0].groupby('Date').size().reindex(dates, fill_value=0)
+    chose_right = df[df.Choice == 1].groupby('Date').size().reindex(dates, fill_value=0)
 
     # Hits
     hits = df.groupby('Date').Hit.sum().astype('int')
-    hits_left = df[df.Side == 0].groupby('Date').Hit.sum().astype('int')
-    hits_right = df[df.Side == 1].groupby('Date').Hit.sum().astype('int')
-    hits_rep = df[df.RepTrial == 1].groupby('Date').Hit.sum().astype('int')  # Include in daily_report
-    hits_alt = df[df.RepTrial == 0].groupby('Date').Hit.sum().astype('int')  # Include in daily_report
-    hits_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Hit.sum().astype('int')
+    hits_left = df[df.Side == 0].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0)
+    hits_right = df[df.Side == 1].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0)
+    hits_rep = df[df.RepTrial == 1].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0) # Include in daily_report
+    hits_alt = df[df.RepTrial == 0].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0) # Include in daily_report
+    hits_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0)
 
     # Errors
-    errors = df.groupby('Date').WrongLick.sum().astype(int) + df.groupby('Date').Punish.sum().astype(int)
+    errors = df.groupby('Date').WrongLick.sum().astype(int) + df.groupby('Date').Punish.sum().astype(int).reindex(dates, fill_value=0)
     errors_left = df[df.Side == 0].groupby('Date').WrongLick.sum().astype(int) + \
-                  df[df.Side == 0].groupby('Date').Punish.sum().astype(int)
+                  df[df.Side == 0].groupby('Date').Punish.sum().astype(int).reindex(dates, fill_value=0)
     errors_right = df[df.Side == 1].groupby('Date').WrongLick.sum().astype(int) + \
-                   df[df.Side == 1].groupby('Date').Punish.sum().astype(int)
+                   df[df.Side == 1].groupby('Date').Punish.sum().astype(int).reindex(dates, fill_value=0)
 
     # Performance
     performance = hits / trials
@@ -207,9 +207,9 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     # Responses (valid trials)
     responses = df.groupby('Date').Response.sum()
-    responses_left = df[df.Side == 0].groupby('Date').Response.sum()
-    responses_right = df[df.Side == 1].groupby('Date').Response.sum()
-    responses_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Response.sum()
+    responses_left = df[df.Side == 0].groupby('Date').Response.sum().reindex(dates, fill_value=0)
+    responses_right = df[df.Side == 1].groupby('Date').Response.sum().reindex(dates, fill_value=0)
+    responses_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Response.sum().reindex(dates, fill_value=0)
 
     # Response rate
     response_rate = responses / trials
@@ -217,14 +217,14 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     response_rate_right = responses_right / trials_right
 
     # Repetitions/Alternations
-    repetitions = df[df.RepChoice == 1].groupby('Date').RepChoice.sum().astype(int)  # Include in daily_report
-    reps_left = df[df.Choice == 0].groupby('Date').RepChoice.sum().astype('int')
-    reps_right = df[df.Choice == 1].groupby('Date').RepChoice.sum().astype('int')
+    repetitions = df[df.RepChoice == 1].groupby('Date').RepChoice.sum().astype(int).reindex(dates, fill_value=0)  # Include in daily_report
+    reps_left = df[df.Choice == 0].groupby('Date').RepChoice.sum().astype(int).reindex(dates, fill_value=0)
+    reps_right = df[df.Choice == 1].groupby('Date').RepChoice.sum().astype(int).reindex(dates, fill_value=0)
     rep_rate_left = reps_left / chose_left
     rep_rate_right = reps_right / chose_right
-    alternations = df[df.RepChoice == 0].groupby('Date').RepChoice.size()  # Include in daily_report
-    alts_left = df[(df.RepChoice == 0) & (df.Choice == 0)].groupby('Date').RepChoice.size()
-    alts_right = df[(df.RepChoice == 0) & (df.Choice == 1)].groupby('Date').RepChoice.size()
+    alternations = df[df.RepChoice == 0].groupby('Date').RepChoice.size().reindex(dates, fill_value=0)  # Include in daily_report
+    alts_left = df[(df.RepChoice == 0) & (df.Choice == 0)].groupby('Date').RepChoice.size().reindex(dates, fill_value=0)
+    alts_right = df[(df.RepChoice == 0) & (df.Choice == 1)].groupby('Date').RepChoice.size().reindex(dates, fill_value=0)
     alt_rate_left = alts_left / chose_left
     alt_rate_right = alts_right / chose_right
 
@@ -243,17 +243,17 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     # Delay
     try:
-        var_delay = df.groupby('Date').VarDelay.mean()
+        var_delay = df.groupby('Date').VarDelay.mean().reindex(dates, fill_value=0)
     except AttributeError:  # 'DataFrameGroupBy' object has no attribute 'VarDelay'
         var_delay = [np.nan] * len(dates)
 
     # Blocks were introduced in batch 4, so this won't work for the first 3 batches
     try:
         # Accuracy blocks (accuracy of first trial of each block)
-        blocks = df.groupby('Date').Blocks.unique()
+        blocks = df.groupby('Date').Blocks.unique().reindex(dates, fill_value=0)
         # block_len = df.groupby('Date').BlockLen.unique()
-        side = df.groupby('Date').Side.apply(list)
-        warm_up = df.groupby('Date').WarmUp.unique()
+        side = df.groupby('Date').Side.apply(list).reindex(dates, fill_value=0)
+        warm_up = df.groupby('Date').WarmUp.unique().reindex(dates, fill_value=0)
         block_change_indexes = []
         block_change_dist = []  # Should be the same as block_len, but block_len wasn't from the beginning of blocks
         block_change_dist_mode = []
@@ -286,9 +286,9 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
         pass
 
     # Misses (invalid trials)
-    misses = df.groupby('Date').Miss.sum()
-    misses_left = df[df.Side == 0].groupby('Date').Miss.sum()
-    misses_right = df[df.Side == 1].groupby('Date').Miss.sum()
+    misses = df.groupby('Date').Miss.sum().reindex(dates, fill_value=0)
+    misses_left = df[df.Side == 0].groupby('Date').Miss.sum().reindex(dates, fill_value=0)
+    misses_right = df[df.Side == 1].groupby('Date').Miss.sum().reindex(dates, fill_value=0)
 
     # Miss rate
     miss_rate = misses / trials
@@ -296,9 +296,9 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     miss_rate_right = misses_right / trials_right
 
     # Reward
-    rewards = df.groupby('Date').Reward.sum()
-    rewards_left = df[df.Side == 0].groupby('Date').Reward.sum()
-    rewards_right = df[df.Side == 1].groupby('Date').Reward.sum()
+    rewards = df.groupby('Date').Reward.sum().reindex(dates, fill_value=0)
+    rewards_left = df[df.Side == 0].groupby('Date').Reward.sum().reindex(dates, fill_value=0)
+    rewards_right = df[df.Side == 1].groupby('Date').Reward.sum().reindex(dates, fill_value=0)
 
     # Water
     reward_size = 2.5  # μL
@@ -307,25 +307,25 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     water_right = rewards_right * reward_size
 
     # Stage / Substage
-    stage = df.groupby('Date').Stage.mean().round()
+    stage = df.groupby('Date').Stage.mean().round().reindex(dates, fill_value=0)
     # substage = df.groupby('Date').Substage.mean().round()  # Need to add it again to the parse, even if its nan
-    motor = df.groupby('Date').Motor.mean().round()
+    motor = df.groupby('Date').Motor.mean().round().reindex(dates, fill_value=0)
 
     # Sound
-    sounds_mismatch = df['FilesMatch'].eq(0).astype(int).groupby(df['Date']).sum()
-    no_sound = df['Sound'].eq(0).astype(int).groupby(df['Date']).sum()
-    message_count = df.groupby('Date').MessageFound.sum()
+    sounds_mismatch = df['FilesMatch'].eq(0).astype(int).groupby(df['Date']).sum().reindex(dates, fill_value=0)
+    no_sound = df['Sound'].eq(0).astype(int).groupby(df['Date']).sum().reindex(dates, fill_value=0)
+    message_count = df.groupby('Date').MessageFound.sum().reindex(dates, fill_value=0)
 
     # Probabilities of difficult trials (non-maximum evidence)
-    p = df.groupby('Date').P.mean()
+    p = df.groupby('Date').P.mean().reindex(dates, fill_value=0)
     p = p.fillna(0)
 
     # Psychometric parameters
     # evidences = df.groupby('Date').Evidence.apply(list)  # Need to add it again to the parse, even if its nan
-    ilds = df.groupby('Date').ILD.apply(list)
-    ilds_rep = df.groupby('Date').ILDRep.apply(list)
-    choices = df.groupby('Date').Choice.apply(list)
-    rep_choices = df.groupby('Date').RepChoice.apply(list)
+    ilds = df.groupby('Date').ILD.apply(list).reindex(dates, fill_value=0)
+    ilds_rep = df.groupby('Date').ILDRep.apply(list).reindex(dates, fill_value=0)
+    choices = df.groupby('Date').Choice.apply(list).reindex(dates, fill_value=0)
+    rep_choices = df.groupby('Date').RepChoice.apply(list).reindex(dates, fill_value=0)
 
     # Prob. right
     pc_right = []
@@ -408,7 +408,10 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     fit_error_pc_rep = pd.Series(fit_error_pc_rep, dates)
 
     # Drug
-    drug = df.groupby('Date').Drug.unique().astype(float)
+    try:
+        drug = df.groupby('Date').Drug.unique().astype(float).reindex(dates, fill_value=0)
+    except AttributeError:  # 'DataFrameGroupBy' object has no attribute 'Drug'
+        drug = n_dates * [np.nan]
 
     ####################################################################################################################
 
@@ -1169,7 +1172,7 @@ def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
     """Do the intersessions for all animals of a given batch (experiment)"""
 
     # Update glued sessions first
-    update_glued_sessions(experiment=experiment)
+    # update_glued_sessions(experiment=experiment)
 
     if experiment is None:
 
@@ -1204,7 +1207,9 @@ def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
         flag = False  # flag always needs to be initialized as False
 
         # Only do the intersession reports of the animals training in that PC (so the data is stored locally)
-        if username == 'setup0':
+        if username == 'Usuario':  # Ephys PC
+            flag = True
+        elif username == 'setup0':
             if box == 0:
                 flag = True
         elif username == 'setup1':
@@ -1216,9 +1221,9 @@ def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
         elif username != 'setup0' or username != 'setup1' or username != 'setup2':
             flag = True
 
-        if df.Protocol.unique()[0] != 'stage_training_v6':  # In Ephys PC (setup0) there is only one experiment (Ephys)
-            # instead of the 2AFC_X nomenclature followed in the other PCs
-            flag = False
+        # if df.Protocol.unique()[0] != 'stage_training_v6':  # In Ephys PC (setup0) there is only one experiment (Ephys)
+        #     # instead of the 2AFC_X nomenclature followed in the other PCs
+        #     flag = False
 
         if flag:
             try:
