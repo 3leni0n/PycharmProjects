@@ -763,33 +763,33 @@ def plot_drug_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, 
 
     # PLOT NET STIMULUS KERNEL
 
-    # plt.figure(constrained_layout=True)
-    # x = np.arange(len(pk_saline.net_stim_params.index.values))
-    # y_saline = pk_saline.net_stim_params
-    # y_drug = pk_drug.net_stim_params
-    # yerr_saline = pk_saline.net_stim_std_err
-    # yerr_drug = pk_drug.net_stim_std_err
-    # # plt.plot(x, y, color=color, marker='o')
-    # plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o')
-    # plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o')
-    # plt.title(title)
-    # plt.xlabel('Net stimuli')
-    # plt.ylabel('GLM weight')
-    # plt.legend(frameon=False)
-    # plt.xticks(x, ['2', '4', '8', '70'])
-    #
-    # # shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
-    # # percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    # # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    # # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
-    # sns.despine()
-    #
-    # if save:
-    #     filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
-    #     filename = filename_prefix + filename
-    #     folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
-    #     save_fig(folder_out, filename)
-    #     plt.close()
+    plt.figure(constrained_layout=True)
+    x = np.arange(len(pk_saline.net_stim_params.index.values))
+    y_saline = pk_saline.net_stim_params
+    y_drug = pk_drug.net_stim_params
+    yerr_saline = pk_saline.net_stim_std_err
+    yerr_drug = pk_drug.net_stim_std_err
+    # plt.plot(x, y, color=color, marker='o')
+    plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o')
+    plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o')
+    plt.title(title)
+    plt.xlabel('Net stimuli')
+    plt.ylabel('GLM weight')
+    plt.legend(frameon=False)
+    plt.xticks(x, ['2', '4', '8', '70'])
+
+    # shuffles_mean = np.mean(pk.net_stim_shuffles, axis=0)  # Get the mean of all the shuffles
+    # percentiles95 = np.percentile(pk.net_stim_shuffles, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+    sns.despine()
+
+    if save:
+        filename = f'{pk.animal}_PK_net_stim_{target_ilds}, {n_mean_frames} averaged frames'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'PK' / experiment
+        save_fig(folder_out, filename)
+        plt.close()
 
     ####################################################################################################################
 

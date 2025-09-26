@@ -112,7 +112,8 @@ def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
     if stim_set == 2:
         sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     elif stim_set == 6:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
+    print(sounds_path)
 
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
@@ -172,7 +173,7 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
     if stim_set == 2:
         sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     elif stim_set == 6:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
 
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
@@ -186,7 +187,7 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
         # print(f'Iteration {_}/{iterations}')  # Prints make it slower
 
         # Shuffling the endog or the exog doesn't matter if there's only one regressor. When there's more, shuffling
-        # needs regressor precission
+        # needs regressor precision
         # endog_shuffled = endog.sample(frac=1).reset_index(drop=True)  # Shuffle endog
         # exog_shuffled = exog.sample(frac=1).reset_index(drop=True)  # Shuffle exog
 

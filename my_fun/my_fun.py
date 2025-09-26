@@ -700,7 +700,7 @@ def get_ild(stim_set=6):
     if stim_set == 2:
         sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     elif stim_set == 6:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.csv'
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
 
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]

@@ -234,7 +234,7 @@ def glue_groups(groups=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6']):
     df = pd.DataFrame()
 
     for i in range(len(groups)):
-        df_groups = glue_animals(experiment=groups[i])
+        df_groups = glue_animals(experiment=groups[i], update=False)
         df = pd.concat([df, df_groups])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 

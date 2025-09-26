@@ -230,7 +230,7 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
 
 # Plotting functions
 
-def plot_licks_dist(df_behavior, var='RT', density=False):
+def plot_licks_dist(df_behavior, var='RT', density=False, **kwargs):
     """
     Plot the licks distribution for a variable of interest.
     :param df_behavior: DataFrame with the behavioral data
@@ -240,16 +240,17 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
     """
 
     # plt.figure(constrained_layout=True)
-    color = 'k'
+    # color = 'k'
+    color = kwargs.pop('color', 'k')  # default black, removed from kwargs
 
     # Continuous variables
     if var == 'RT' or var == 'ILI':
         if density:
             ylabel = 'Density'
-            sns.kdeplot(df_behavior[var], color=color)
+            sns.kdeplot(df_behavior[var], color=color, **kwargs)
         else:
             ylabel = 'Frequency'
-            plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color)
+            plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color, **kwargs)
         plt.xlim(0, 0.5)
         plt.xlabel('Time (s)')
 
@@ -258,7 +259,7 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
         min_val = df_behavior[var].min()
         max_val = df_behavior[var].max()
         bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
-        plt.hist(df_behavior[var], bins=bins, color='black', density=True)
+        plt.hist(df_behavior[var], bins=bins, color=color, density=True, **kwargs)
         ax = plt.gca()
         ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
         plt.xlim(0, 20)
@@ -279,6 +280,9 @@ def plot_licks_dist(df_behavior, var='RT', density=False):
     plt.title(title)
     plt.ylabel(ylabel)
     sns.despine()
+
+    if 'label' in kwargs:
+        plt.legend()
 
 
 def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
