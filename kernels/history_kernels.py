@@ -1,3 +1,8 @@
+"""
+To do:
+- Choice history regressors to re-start every session
+"""
+
 import time
 from pathlib import Path
 import os
@@ -8,7 +13,7 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_experiment, get_animal, save_fig
+from my_fun.my_fun import get_experiment, get_animal, save_fig, timer
 from kernels.kernels_tools import *
 
 
@@ -24,7 +29,7 @@ sns.set_context('poster')
 # From 'Response outcomes gate the impact of expectations on perceptual decisions', Figure 4
 # (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
 
-
+@timer
 def get_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000):
     """
     Get history kernels for a given animal. The history kernel is the GLM weight of previously rewarded (r+) and
@@ -38,14 +43,10 @@ def get_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=100
     :return: hk: namedtuple, history kernel
     """
 
-    time_start = time.time()
-
-    ####################################################################################################################
-
     # Get the path to the data
-    experiment = get_experiment(experiment)
-    folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-    animal = get_animal(experiment, animal)
+    experiment, folder_in = get_experiment(experiment, path_session='glue_sessions')
+    # experiment, folder_in = get_experiment(experiment, path_session='glmhmm')  # For engagement data
+    animal = get_animal(experiment=experiment, animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
     ####################################################################################################################
@@ -141,36 +142,98 @@ def get_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=100
     dm_session_index = make_session_index_dm(df)
     dm_ild = make_net_ild_dm(df)
     exog = pd.concat([dm_choice_history, dm_session_index, dm_ild], axis=1)
+    exog = exog.iloc[trial_lag:, :].reset_index(drop=True)  # To remove the nans
 
     ####################################################################################################################
 
     endog = df.Choice
+    endog = endog.iloc[trial_lag:].reset_index(drop=True)  # To remove the nans
     model = sm.GLM(endog, exog, family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family
     results = model.fit()
     params = results.params
-    beta_std_err = results.bse
+    bse = results.bse
     p_values = results.pvalues
     summary = results.summary()
     print(summary)
 
     # Get shuffles
-    shuffles = get_shuffles_GLM(endog, exog, iterations)
+    # shuffles = get_shuffles_GLM(endog, exog, iterations)
 
+    # Rpminus and Rminus
     # Remove session index and stimulus constants
-    params = params.iloc[:trial_lag * 2]  # From params
-    shuffles = [shuffles[i].iloc[:trial_lag * 2] for i in range(len(shuffles))]  # From shuffles
-    beta_std_err = beta_std_err.iloc[:trial_lag * 2]  # From beta_std_err
-    p_values = p_values.iloc[:trial_lag * 2]  # From p_values
+    # params = params.iloc[:trial_lag * 2]  # From params
+    params_rminus = params.iloc[:trial_lag]  # From params
+    shuffles_rminus = get_shuffles_GLM(endog, exog, iterations, kind='hk_rminus')
+    shuffles_rminus = [shuffles_rminus[i].iloc[:trial_lag] for i in range(len(shuffles_rminus))]  # From shuffles
+    params_rplus = params.iloc[trial_lag:trial_lag * 2]  # From params
+    shuffles_rplus = get_shuffles_GLM(endog, exog, iterations, kind='hk_rplus')
+    shuffles_rplus = [shuffles_rplus[i].iloc[trial_lag:trial_lag * 2] for i in range(len(shuffles_rplus))]  # From shuffles
+    # bse = bse.iloc[:trial_lag * 2]  # From bse
+    bse_rminus = bse.iloc[:trial_lag]  # From bse
+    bse_rplus = bse.iloc[trial_lag:trial_lag * 2]  # From bse
+    # p_values = p_values.iloc[:trial_lag * 2]  # From p_values
+    p_values_rminus = p_values.iloc[:trial_lag]  # From p_values
+    p_values_rplus = p_values.iloc[trial_lag:trial_lag * 2]  # From p_values
+
+    # Session index
+    params_session_index = params.iloc[20:-4]
+    bse_session_index = bse.iloc[20:-4]
+    p_values_session_index = p_values.iloc[20:-4]
+    shuffles_session_index = get_shuffles_GLM(endog, exog, iterations, kind='hk_session_index')
+    shuffles_session_index = [shuffles_session_index[i].iloc[20:-4] for i in range(len(shuffles_session_index))]  # From shuffles
+
+    # Net ILD
+    params_net_stim = params.iloc[-4:]
+    bse_net_stim = bse.iloc[-4:]
+    p_values_net_stim = p_values.iloc[-4:]
+    shuffles_net_stim = get_shuffles_GLM(endog, exog, iterations, kind='hk_net_stim')
+    shuffles_net_stim = [shuffles_net_stim[i].iloc[-4:] for i in range(len(shuffles_net_stim))]  # From shuffles
 
     # Store results in a namedtuple
-    HK = namedtuple('HK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'trial_lag', 'experiment',
-                           'animal', 'drug', 'iterations'])
-    hk = HK(params=params, std_err=beta_std_err, p_values=p_values, shuffles=shuffles, n_trials=n_trials,
-            trial_lag=trial_lag, experiment=experiment, animal=animal, drug=drug, iterations=iterations)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
+    HK = namedtuple('HK', ['params_rminus',
+                           'params_rplus',
+                           'params_session_index',
+                           'params_net_stim',
+                           'std_err_rminus',
+                           'std_err_rplus',
+                           'std_err_session_index',
+                           'shuffles_net_stim',
+                           'std_err_net_stim',
+                           'p_values_rminus',
+                           'p_values_rplus',
+                           'p_values_session_index',
+                           'p_values_net_stim',
+                           'shuffles_rminus',
+                           'shuffles_rplus',
+                           'shuffles_session_index',
+                           'n_trials',
+                           'trial_lag',
+                           'experiment',
+                           'animal',
+                           'drug',
+                           'iterations'])
+    hk = HK(params_rminus=params_rminus,
+            params_rplus=params_rplus,
+            params_session_index=params_session_index,
+            params_net_stim=params_net_stim,
+            std_err_rminus=bse_rminus,
+            std_err_rplus=bse_rplus,
+            std_err_session_index=bse_session_index,
+            std_err_net_stim=bse_net_stim,
+            p_values_rminus=p_values_rminus,
+            p_values_rplus=p_values_rplus,
+            p_values_session_index=p_values_session_index,
+            p_values_net_stim=p_values_net_stim,
+            shuffles_rminus=shuffles_rminus,
+            shuffles_rplus=shuffles_rplus,
+            shuffles_session_index=shuffles_session_index,
+            shuffles_net_stim=shuffles_net_stim,
+            n_trials=n_trials,
+            trial_lag=trial_lag,
+            experiment=experiment,
+            animal=animal,
+            drug=drug,
+            iterations=iterations)
 
     return hk
 
@@ -187,15 +250,15 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     :return:
     """
 
-    time_start = time.time()
-
     if type(experiment) == list:
         hk = get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial_lag=trial_lag,
                          iterations=iterations)
         title = f'N={len(hk.animal)}, {hk.n_trials} trials'
+        filename_prefix = 'mean_'
     else:
         hk = get_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
         title = f'Mouse {hk.animal}, {hk.n_trials} trials'
+        filename_prefix = ''
 
     # Default plotting parameters
     color = 'k'
@@ -206,20 +269,29 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
 
     for _ in range(1, 3):
 
-        if _ == 1:
+        if _ == 1:  # R+
             xlabel = 'Trial lag (' + '$r^{-}$)'
-            params_indexes = np.arange(trial_lag * _)
-            filename = f'{hk.animal} r- HK, trial lag: {hk.trial_lag}'  # + '.' + format
-        elif _ == 2:
+            # params_indexes = np.arange(trial_lag * _)
+            filename = f'{hk.animal} r- HK, trial lag {hk.trial_lag}'
+            y = hk.params_rminus
+            yerr = hk.std_err_rminus
+            shuffles = hk.shuffles_rminus
+        elif _ == 2:  # R-
             xlabel = 'Trial lag (' + '$r^{+}$)'
-            params_indexes = np.arange(trial_lag, trial_lag * _)
-            filename = f'{hk.animal} r+ HK, trial lag: {hk.trial_lag}'  # + '.' + format
+            # params_indexes = np.arange(trial_lag, trial_lag * _)
+            filename = f'{hk.animal} r+ HK, trial lag {hk.trial_lag}'
+            y = hk.params_rplus
+            yerr = hk.std_err_rplus
+            shuffles = hk.shuffles_rplus
 
-        # Plot history kernel (responses lag beta weights)
+        ################################################################################################################
+
+        # PLOT HISTORY KERNEL
+
         plt.figure(constrained_layout=True)
         x = np.arange(1, trial_lag + 1)
-        y = hk.params.iloc[params_indexes]
-        yerr = hk.std_err.iloc[params_indexes]
+        # y = hk.params.iloc[params_indexes]
+        # yerr = hk.std_err.iloc[params_indexes]
         plt.plot(x, y, color=color, marker='o', label=label)
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
         plt.title(title)
@@ -240,23 +312,82 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
         #                      color=color, va='center', ha='center', fontsize='medium')
 
-        shuffles_mean = np.mean(hk.shuffles, axis=0)  # Get the mean of all the shuffles
-        percentiles2_5 = np.percentile(hk.shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
-        percentiles97_5 = np.percentile(hk.shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
-        plt.plot(x, shuffles_mean[params_indexes], color='tab:gray', ls='--', zorder=1.8)
-        plt.plot(x, percentiles2_5[params_indexes], color=color_upper_shuffle, ls=':', zorder=1.9)
-        plt.plot(x, percentiles97_5[params_indexes], color=color_upper_shuffle, ls=':', zorder=2)
+        shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
+        percentiles2dot5 = np.percentile(shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97dot5 = np.percentile(shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':', zorder=1.9)
+        plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':', zorder=2)
 
         sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
 
         if save:
+            filename = filename_prefix + 'prev_resp' + filename
             folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
             save_fig(folder_out, filename)
             plt.close()
 
-        time_end = time.time()
-        runtime = time_end - time_start
-        print('The script took', round(runtime, 2), 'seconds to run')
+    ################################################################################################################
+
+    # PLOT NET STIMULUS KERNEL
+
+    plt.figure(constrained_layout=True)
+    x = hk.params_net_stim.index.astype(int).values
+    x[-1] = 16  # Trick to zoom in
+    y = hk.params_net_stim
+    yerr = hk.std_err_net_stim
+    plt.plot(x, y, color=color, marker='o')
+    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+    plt.title(title)
+    plt.xlabel('Net stimuli')
+    plt.ylabel('GLM weight')
+    # plt.legend(frameon=False)
+    plt.xticks(x, ['2', '4', '8', '70'])
+
+    shuffles_mean = np.mean(hk.shuffles_net_stim, axis=0)  # Get the mean of all the shuffles
+    percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+    plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+    sns.despine(trim=True)
+
+    if save:
+        filename = filename_prefix + 'net_stim' + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT SESSION INDEX KERNEL
+
+    if type(experiment) == str:  # Don't do it for the mean kernel
+
+        plt.figure(constrained_layout=True)
+        x = hk.params_session_index.index.values
+        y = hk.params_session_index
+        yerr = hk.std_err_session_index
+        plt.plot(x, y, color=color, marker='o')
+        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xlabel('Session index')
+        plt.ylabel('GLM weight')
+        # plt.legend(frameon=False)
+        # plt.xticks(x, ['2', '4', '8', '70'])
+        shuffles_mean = np.mean(hk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
+        percentiles2dot5 = np.percentile(hk.shuffles_session_index, 2.5,
+                                         axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97dot5 = np.percentile(hk.shuffles_session_index, 97.5,
+                                          axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
+        plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
+        sns.despine(trim=True)
+
+        if save:
+            filename = 'session_index' + filename
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
+            save_fig(folder_out, filename)
+            plt.close()
 
 
 def plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], drug=None,
@@ -272,9 +403,10 @@ def plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
     :return:
     """
 
-    time_start = time.time()
 
-    experiment = get_experiment(experiment)
+    # experiment = get_experiment(experiment)
+    experiment, folder_in = get_experiment(experiment, path_session='glue_sessions')
+
 
     # folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment  # Where the data for all animals is
 
@@ -284,10 +416,6 @@ def plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
         print(f'Plotting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
         plot_hk(experiment=experiment, animal=animals[i], drug=drug, trial_lag=trial_lag, iterations=iterations,
                 save=save)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
 
 
 def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial_lag=10, iterations=1000):
@@ -301,12 +429,18 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
     :return:
     """
 
-    time_start = time.time()
-
     experiments_across_batches = []
     animals_across_batches = []
-    params_across_animals = []
-    shuffles_across_animals = []
+
+    params_rminus_across_animals = []
+    params_rplus_across_animals = []
+    params_session_index_across_animals = []
+    params_net_stim_across_animals = []
+
+    shuffles_rminus_across_animals = []
+    shuffles_rplus_across_animals = []
+    shuffles_net_stim_across_animals = []
+
     n_trials_across_animals = []
     pks = []
 
@@ -317,6 +451,7 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
 
         if experiments[j] == '2AFC_2':
             animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            # animals = ['332', '333', '337']  # Drug experiments
         elif experiments[j] == '2AFC_3':
             animals = ['419', '420', '422', '616', '619', '623']
 
@@ -328,46 +463,112 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
             print(f'Getting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
             hk = get_hk(experiment=experiment, animal=animals[i], drug=drug, trial_lag=trial_lag, iterations=iterations)
             animals_across_batches.append(hk.animal)
-            params_across_animals.append(hk.params)
-            shuffles_across_animals.append(hk.shuffles)
+
+            params_rminus_across_animals.append(hk.params_rminus)
+            params_rplus_across_animals.append(hk.params_rplus)
+            params_session_index_across_animals.append(hk.params_session_index)
+            params_net_stim_across_animals.append(hk.params_net_stim)
+
+            shuffles_rminus_across_animals.append(hk.shuffles_rminus)
+            shuffles_rplus_across_animals.append(hk.shuffles_rplus)
+            shuffles_net_stim_across_animals.append(hk.shuffles_net_stim)
+
+
             n_trials_across_animals.append(hk.n_trials)
             pks.append(hk)
         experiments_across_batches.append(experiment)
 
     n_trials = sum(n_trials_across_animals)
 
-    # Get mean and sem of the parameters across animals
-    params_across_animals = np.array(params_across_animals)
-    params_mean_across_animals = np.mean(params_across_animals, 0)
-    params_sem_across_animals = stats.sem(params_across_animals, 0)
+    # Get mean and sem of the R+ and R- across animals
+    params_rminus_across_animals = np.array(params_rminus_across_animals)
+    params_rminus_mean_across_animals = np.mean(params_rminus_across_animals, 0)
+    params_rminus_sem_across_animals = stats.sem(params_rminus_across_animals, 0)
+    params_rplus_across_animals = np.array(params_rplus_across_animals)
+    params_rplus_mean_across_animals = np.mean(params_rplus_across_animals, 0)
+    params_rplus_sem_across_animals = stats.sem(params_rplus_across_animals, 0)
+
+    # Get the session index parameters across animals
+    params_session_index_across_animals = np.array(params_session_index_across_animals)
+
+    # Get mean and sem of the net stimuli parameters across animals
+    params_net_stim_across_animals = np.array(params_net_stim_across_animals)
+    params_net_stim_mean_across_animals = np.mean(params_net_stim_across_animals, 0)
+    params_net_stim_sem_across_animals = stats.sem(params_net_stim_across_animals, 0)
+
 
     # Get the mean and percentile 95 of the shuffles across animals
-    shuffles_across_animals = np.array(shuffles_across_animals)  # Convert list of lists to 3 dim array (animal x
+    shuffles_rminus_across_animals = np.array(shuffles_rminus_across_animals)  # Convert list of lists to 3 dim array (animal x
     # iterations x params)
-    shuffles_means_across_animals = np.mean(shuffles_across_animals, 0)
+    shuffles_rminus_means_across_animals = np.mean(shuffles_rminus_across_animals, 0)
+    shuffles_rplus_across_animals = np.array(shuffles_rplus_across_animals)  # Convert list of lists to 3 dim array (animal x
+    # iterations x params)
+    shuffles_rplus_means_across_animals = np.mean(shuffles_rplus_across_animals, 0)
+    shuffles_net_stim_across_animals = np.array(shuffles_net_stim_across_animals)
+    shuffles_net_stim_means_across_animals = np.mean(shuffles_net_stim_across_animals, 0)
+
+
 
     # Store results in a namedtuple
-    params_mean_across_animals = pd.Series(params_mean_across_animals)
-    params_sem_across_animals = pd.Series(params_sem_across_animals)
+    params_rminus_mean_across_animals = pd.Series(params_rminus_mean_across_animals)
+    params_rminus_sem_across_animals = pd.Series(params_rminus_sem_across_animals)
+    params_rplus_mean_across_animals = pd.Series(params_rplus_mean_across_animals)
+    params_rplus_sem_across_animals = pd.Series(params_rplus_sem_across_animals)
+    params_rplus_sem_across_animals = pd.Series(params_rplus_sem_across_animals)
+    params_net_stim_mean_across_animals = pd.Series(params_net_stim_mean_across_animals)
+    params_net_stim_sem_across_animals = pd.Series(params_net_stim_sem_across_animals)
+
 
     # Transform suffles_means_across_animals into a list of pd.Series
-    shuffles_means_across_animals = [pd.Series(shuffles_means_across_animals[i, :]) for i in
-                                     range(len(shuffles_means_across_animals))]
+    shuffles_rminus_means_across_animals = [pd.Series(shuffles_rminus_means_across_animals[i, :]) for i in
+                                            range(len(shuffles_rminus_means_across_animals))]
+    shuffles_rplus_means_across_animals = [pd.Series(shuffles_rplus_means_across_animals[i, :]) for i in
+                                            range(len(shuffles_rplus_means_across_animals))]
+    shuffles_net_stim_means_across_animals = [pd.Series(shuffles_net_stim_means_across_animals[i, :]) for i in
+                                            range(len(shuffles_net_stim_means_across_animals))]
+
     # Rename the first element of each pd.Series as 'const' instead of '0'
-    # shuffles_means_across_animals = [shuffles_means_across_animals[i].rename({0: 'const'}) for i in
-    #                                  range(len(shuffles_means_across_animals))]
+    # shuffles_rminus_means_across_animals = [shuffles_rminus_means_across_animals[i].rename({0: 'const'}) for i in
+    #                                  range(len(shuffles_rminus_means_across_animals))]
 
     # Store results in a namedtuple
-    MeanHK = namedtuple('MeanPK', ['params', 'std_err', 'p_values', 'shuffles', 'n_trials', 'experiment', 'animal',
-                                   'drug', 'trial_lag', 'iterations'])
+    MeanHK = namedtuple('MeanPK', ['params_rminus',
+                                   'params_rplus',
+                                   'params_session_index',
+                                   'params_net_stim',
+                                   'std_err_rminus',
+                                   'std_err_rplus',
+                                   'std_err_session_index',
+                                   'std_err_net_stim',
+                                   'p_values',
+                                   'shuffles_rminus',
+                                   'shuffles_rplus',
+                                   'shuffles_net_stim',
+                                   'n_trials',
+                                   'experiment',
+                                   'animal',
+                                   'drug',
+                                   'trial_lag',
+                                   'iterations'])
 
-    mean_hk = MeanHK(params=params_mean_across_animals, std_err=params_sem_across_animals, p_values=None,
-                     shuffles=shuffles_means_across_animals, n_trials=n_trials, experiment=experiments_across_batches,
-                     animal=animals_across_batches, drug=drug, trial_lag=trial_lag, iterations=iterations)
-
-    time_end = time.time()
-    runtime = time_end - time_start
-    print('The script took', round(runtime, 2), 'seconds to run')
+    mean_hk = MeanHK(params_rminus=params_rminus_mean_across_animals,
+                     params_rplus=params_rplus_mean_across_animals,
+                     params_session_index=None,
+                     params_net_stim=params_net_stim_mean_across_animals,
+                     std_err_rminus=params_rminus_sem_across_animals,
+                     std_err_rplus=params_rplus_sem_across_animals,
+                     std_err_session_index=None,
+                     std_err_net_stim=params_net_stim_sem_across_animals,
+                     p_values=None,
+                     shuffles_rminus=shuffles_rminus_means_across_animals,
+                     shuffles_rplus=shuffles_rplus_means_across_animals,
+                     shuffles_net_stim=shuffles_net_stim_means_across_animals,
+                     n_trials=n_trials,
+                     experiment=experiments_across_batches,
+                     animal=animals_across_batches,
+                     drug=drug,
+                     trial_lag=trial_lag,
+                     iterations=iterations)
 
     return mean_hk
 
@@ -376,14 +577,141 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
 
 # Debugging
 experiment = '2AFC_2'
-experiments = ['2AFC_2', '2AFC_3']
+# experiments = ['2AFC_2', '2AFC_3']
 animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
-target_ilds = None
 drug = None
-residuals = True
-iterations = 100
-save = False
 trial_lag = 10
+iterations = 1
+save = False
+
+# hk = get_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
+plot_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations, save=save)
+# plot_hks(experiment=experiment, animals=animals, drug=drug, trial_lag=trial_lag, iterations=iterations, save=save)
+# hk = get_mean_hk(experiments=experiments, animals=None, drug=None, trial_lag=trial_lag, iterations=iterations)
+
+# plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], drug=None,
+#              trial_lag=trial_lag, iterations=iterations, save=save)
+# plot_hks(experiment='2AFC_3', animals=['419', '420', '422', '616', '619', '623'], drug=None,
+#              trial_lag=trial_lag, iterations=iterations, save=save)
+
+
+# Drug analyses
+def plot_hk_drug():
+    mean_hk_saline = get_mean_hk(experiments=experiments, animals=None, drug='saline', trial_lag=trial_lag, iterations=iterations)
+    mean_hk_drug = get_mean_hk(experiments=experiments, animals=None, drug='MK801', trial_lag=trial_lag, iterations=iterations)
+
+    title = f'N={len(mean_hk_drug.animal)}, {mean_hk_drug.n_trials + mean_hk_saline.n_trials} trials'
+
+    # Default plotting parameters
+    filename_prefix = 'drug_'
+    color_saline = 'tab:gray'
+    color_drug = 'tab:pink'
+
+    trial_lag = mean_hk_saline.trial_lag
+
+    for _ in range(1, 3):
+
+        if _ == 1:  # R+
+            xlabel = 'Trial lag (' + '$r^{-}$)'
+            # params_indexes = np.arange(trial_lag * _)
+            filename = f'{mean_hk_saline.animal} r- HK, trial lag {mean_hk_saline.trial_lag}'
+            filename = filename_prefix + filename
+            y_saline = mean_hk_saline.params_rminus
+            yerr_saline = mean_hk_saline.std_err_rminus
+            y_drug = mean_hk_drug.params_rminus
+            yerr_drug = mean_hk_drug.std_err_rminus
+            # shuffles = hk.shuffles_rminus
+        elif _ == 2:  # R-
+            xlabel = 'Trial lag (' + '$r^{+}$)'
+            # params_indexes = np.arange(trial_lag, trial_lag * _)
+            filename = f'{mean_hk_drug.animal} r+ HK, trial lag {mean_hk_drug.trial_lag}'
+            filename = filename_prefix + filename
+            y_saline = mean_hk_saline.params_rplus
+            yerr_saline = mean_hk_saline.std_err_rplus
+            y_drug = mean_hk_drug.params_rplus
+            yerr_drug = mean_hk_drug.std_err_rplus
+            # shuffles = mean_hk_drug.shuffles_rplus
+
+        ################################################################################################################
+
+        # PLOT HISTORY KERNEL
+
+        plt.figure(constrained_layout=True)
+        x = np.arange(1, trial_lag + 1)
+        # y = hk.params.iloc[params_indexes]
+        # yerr = hk.std_err.iloc[params_indexes]
+        plt.plot(x, y_saline, color=color_saline, marker='o', label='saline')
+        plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
+        plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
+        plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xticks(x, x[::-1])
+        plt.xlabel(xlabel)
+        ylabel = 'GLM weight'
+        plt.ylabel(ylabel)
+        plt.legend(frameon=False)
+        # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+
+        # if hk.p_values is not None:
+        #     for i in range(n_trials_lag):
+        #         if hk.p_values[i] <= 0.05:
+        #             text = '*'
+        #         else:
+        #             # text = 'ns'
+        #             text = ''
+        #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+        #                      color=color, va='center', ha='center', fontsize='medium')
+
+        # shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
+        # percentiles2dot5 = np.percentile(shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # percentiles97dot5 = np.percentile(shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        # plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':', zorder=1.9)
+        # plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':', zorder=2)
+
+        sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
+
+        if save:
+            filename = filename_prefix + 'prev_resp' + filename
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / 'drug'
+            save_fig(folder_out, filename)
+            plt.close()
+
+        ################################################################################################################
+
+        # PLOT NET STIMULUS KERNEL
+
+        plt.figure(constrained_layout=True)
+        x = mean_hk_saline.params_net_stim.index.values
+        x[-1] = 16  # Trick to zoom in
+        x = [2, 4, 8, 16]
+        y_saline = mean_hk_saline.params_net_stim
+        yerr_saline = mean_hk_saline.std_err_net_stim
+        y_drug = mean_hk_drug.params_net_stim
+        yerr_drug = mean_hk_drug.std_err_net_stim
+
+        plt.plot(x, y_saline, color=color_saline, marker='o', label='saline')
+        plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
+
+        plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
+        plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+        plt.title(title)
+        plt.xlabel('Net stimuli')
+        plt.ylabel('GLM weight')
+        plt.legend(frameon=False)
+        plt.xticks(x, ['2', '4', '8', '70'])
+
+        # shuffles_mean = np.mean(hk.shuffles_net_stim, axis=0)  # Get the mean of all the shuffles
+        # percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+        # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
+        # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
+        sns.despine(trim=True)
+
+        if save:
+            filename = filename_prefix + 'net_stim' + filename
+            folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / 'drug'
+            save_fig(folder_out, filename)
+            plt.close()
