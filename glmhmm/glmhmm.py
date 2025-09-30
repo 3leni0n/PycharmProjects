@@ -7,6 +7,126 @@ import seaborn as sns
 import ssm
 
 
+# From my_fun and kernels_tools, but can import them because would need to install libraries in this environment
+def get_ild(stim_set=6):
+    # Load sounds
+    if stim_set == 1:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
+    if stim_set == 2:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    elif stim_set == 6:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
+
+    sounds = pd.read_csv(sounds_path)
+    n_frames = sounds.n_frames.unique()[0]
+
+    # Left frames
+    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
+    frames_left = sounds[left_frames_column_names].values
+
+    # Right frames
+    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
+    frames_right = sounds[right_frames_column_names].values
+
+    # Frames ILD (elementwise substraction)
+    frames_ild = frames_right - frames_left
+    frames_ild = pd.DataFrame(frames_ild)
+    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
+
+    return frames_ild
+
+
+def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
+
+    # Load sounds
+    if stim_set == 1:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
+    if stim_set == 2:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
+    elif stim_set == 6:
+        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
+
+    sounds = pd.read_csv(sounds_path)
+    n_frames = sounds.n_frames.unique()[0]
+    frames_ild = get_ild(stim_set=stim_set)
+
+    # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
+    if residuals:
+        sounds_ild = sounds.ILD
+        first_frame = frames_ild[0]
+        first_frame = first_frame.copy()
+        first_frame.iloc[0] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
+        first_frame.iloc[-1] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
+        if stim_set == 6:
+            frames_ild = frames_ild.drop(['filename', 0], axis=1).sub(sounds_ild, axis='rows')
+            frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
+            frames_ild.insert(1, column=0, value=first_frame)  # Insert back first_frame in 2nd column
+        else:
+            frames_ild = frames_ild.drop('filename', axis=1).sub(sounds_ild, axis='rows')
+            frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
+
+    filenames = df.Filename.tolist()
+
+    # Get frames per trial
+    stim_strength = frames_ild.loc[
+        [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
+        columns=['filename'])
+    stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
+
+    # Zscore
+    if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
+        if zscore:
+            stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
+            # returns same result, but not axis 1). 0 along trials that's what I want to do :)
+
+    design_matrix = stim_strength
+
+    return design_matrix, n_frames
+
+
+def make_net_ild_dm(df):
+    """
+    Make a design matrix with the net ILDs. There is a column for each absolute, unique ILD value (except 0). It
+    transforms the nominal ILD into ILD net magnitude (2, 4, 8 , 70 dB) that take values +1, 0 or -1. In each trial,
+    only one of these regressors is non-zero.
+    When separating the stimuli S_k =  nominal_ILD + residuals and give a separate beta for the nominal and for each
+    residual frame, you are somehow assuming that the impact of the nominal ILD grows linearly with ILD. But this is
+    probably not the case. Particularly if spanning a range from ILD 0 to 70 dB. One simple way to not assume anything
+    about how the impact of the stimuli grows with ILD is to define separate regressors for each absolute value of the
+    ILD, that is 2, 4, 8 and 70. Each of this ILDs will define a regressor e.g. ILD_8 =  +1 (if ILD was +8 dB), -1 (if
+    ILD was -8 db) and 0 (if ILD was other than +- 8dB). This way, you should be able to include ALL stimuli in the
+    analysis (maximum evidence too).
+    :param df:
+    :return: Design matrix
+    """
+    ilds = df.ILD.astype('int')
+    net_ilds = np.sort(df.ILD.abs().unique().astype('int'))[1:]
+    design_matrix = np.zeros((len(df), len(net_ilds)), dtype=int)
+    # columns = [str(_) for _ in net_ilds]
+    design_matrix = pd.DataFrame(design_matrix, columns=net_ilds)
+    for i, ild in enumerate(ilds):
+        if ild != 0:
+            design_matrix.loc[i, abs(ild)] = np.sign(ild)
+    return design_matrix
+
+
+def make_session_index_dm(df, column='Date'):
+    """
+    # Make a design matrix in which there are as many columns as unique dates. Then, for each column, there is a 1 if
+    the trial belongs to that session and a 0 otherwise
+    :param df: Input DataFrame
+    :param column: Column of the DataFrame that contains the dates
+    :return: Design matrix
+    """
+    dates = df[column].unique()
+    design_matrix = np.zeros((len(df), len(dates)), dtype=int)
+    for i, date in enumerate(dates):
+        design_matrix[df[column] == date, i] = 1
+    design_matrix = pd.DataFrame(design_matrix)
+    return design_matrix
+
+########################################################################################################################
+
 # Define a function to parse the data for GLM-HMM
 def parse_glmhmm(df, at=False):
     """
@@ -37,9 +157,77 @@ def parse_glmhmm(df, at=False):
     return inputs, choices
 
 
+# Define a function to parse the data for GLM-HMM
+def parse_glmhmm_full(df, at=False):
+    """
+    Parse the data for GLM-HMM.
+    :param df: DataFrame containing the data (one or many sessions concatenated).
+    :return: inputs, choices
+    """
+
+    dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
+
+    experiment = df.Experiment.unique()[0]
+
+    # Set stimuli set
+    if experiment == '2AFC_6':
+        stim_set = 6
+    elif experiment == '2AFC':
+        stim_set = 1
+    else:
+        stim_set = 2
+
+    inputs = []
+    choices = []
+
+    for session_id, df_session in df.groupby('Session'):
+
+        n_trials = len(df_session)
+
+        # Make stimulus strength design matrix
+        stim_strength, n_frames = make_frames_dm(df_session, stim_set=stim_set, residuals=True, zscore=False)
+        stim_strength = stim_strength / stim_strength.values.max()  # Normalize ILD to [-1, 1]
+
+        # Make net ILD design matrix
+        dm_net_ild = make_net_ild_dm(df_session)
+
+        # stim_vals = df_session.ILD.values
+        # stim_vals = stim_vals / abs(df.ILD.max())  # Normalize ILD to [-1, 1]
+
+        # bias = np.ones(n_trials)
+        dm_session_index_sess = dm_session_index.iloc[df_session.index.values, :]
+
+        if at:
+            action_trace = get_action_trace(df_session)
+            session_input = np.column_stack((
+                # stim_vals,
+                # stim_strength,
+                dm_net_ild,
+                action_trace,
+                # bias,
+                dm_session_index_sess
+            ))
+        else:
+            session_input = np.column_stack((
+                # stim_vals,
+                # stim_strength,
+                dm_net_ild,
+                # bias,
+                dm_session_index_sess
+            ))
+
+        session_choices = df_session.Choice.values.astype(int)[:, None]
+        inputs.append(session_input)
+        choices.append(session_choices)
+
+    return inputs, choices
+
+
 def get_action_trace(df, max_trial_lag=10, tau=2):
     """
-    Computes the action trace for each trial in the DataFrame. The action trace is an exponentially weighted sum of past choices, where more recent choices have a greater influence. The weights decay exponentially with a time constant tau. Output is normalized between -1 and +1.
+    Computes the action trace for each trial in the DataFrame. The action trace is an exponentially weighted sum of past
+    choices, where more recent choices have a greater influence. The weights decay exponentially with a time constant
+    tau. Output is normalized between -1 and +1.
     :param df: DataFrame containing the data with a 'Choice' column (0=left;1=right)
     :param max_trial_lag: Number of past trials to consider
     :param tau: Decay constant

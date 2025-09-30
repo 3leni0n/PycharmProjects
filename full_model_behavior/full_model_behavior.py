@@ -684,16 +684,16 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
 ########################################################################################################################
 
 # Debugging
-# experiment = '2AFC_2'
+experiment = '2AFC_2'
 # experiments = ['2AFC_2', '2AFC_3']
-# animal = '333'
+animal = '333'
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
-# drug = None
-# trial_lag = 10
-# iterations = 1
-# save = False
+drug = None
+trial_lag = 10
+iterations = 1
+save = False
 
 # hk = get_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
 # plot_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations, save=save)

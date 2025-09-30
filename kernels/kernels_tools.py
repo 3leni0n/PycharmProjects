@@ -90,9 +90,10 @@ def make_net_ild_dm(df):
     ILD, that is 2, 4, 8 and 70. Each of this ILDs will define a regressor e.g. ILD_8 =  +1 (if ILD was +8 dB), -1 (if
     ILD was -8 db) and 0 (if ILD was other than +- 8dB). This way, you should be able to include ALL stimuli in the
     analysis (maximum evidence too).
-    :param df:
+    :param df: Input DataFrame
     :return: Design matrix
     """
+
     ilds = df.ILD.astype('int')
     net_ilds = np.sort(df.ILD.abs().unique().astype('int'))[1:]
     design_matrix = np.zeros((len(df), len(net_ilds)), dtype=int)
@@ -113,7 +114,6 @@ def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
         sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
     elif stim_set == 6:
         sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
-    print(sounds_path)
 
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
