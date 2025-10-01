@@ -7,7 +7,7 @@ from my_fun.my_fun import get_ild
 
 
 # Define functions to make design matrices
-def make_choice_history_dm(df, k):
+def make_choice_history_dm(df, k=10):
     """
     Make a design matrix with the choice history. There is a column for each previous trial (up to k). In each trial,
     only one of these regressors is non-zero.

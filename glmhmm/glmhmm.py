@@ -125,9 +125,121 @@ def make_session_index_dm(df, column='Date'):
     design_matrix = pd.DataFrame(design_matrix)
     return design_matrix
 
+
+def make_choice_history_dm(df, k=10):
+    """
+    Make a design matrix with the choice history. There is a column for each previous trial (up to k). In each trial,
+    only one of these regressors is non-zero.
+    :param df: DataFrame with hit and choice data
+    :param k: Number of trials to look back
+    :return: Design matrix
+    """
+    def get_choice_history(df, k):
+        """
+        Get the choice history for a trial number k.
+        :param df: DataFrame with hit and choice data
+        :param k: Number of trials to look back
+        :return:  r_minus, r_plus
+        """
+        r_minus = []
+        r_plus = []
+        for _ in range(len(df)):
+            if _ < k:
+                r_minus.append(np.nan)
+                r_plus.append(np.nan)
+            else:
+                # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
+                if df.Hit[_ - k] == 0 and df.Choice[_ - k] == 1:
+                    r_minus.append(1)
+                elif df.Hit[_ - k] == 0 and df.Choice[_ - k] == 0:
+                    r_minus.append(-1)
+                elif df.Hit[_ - k] == 1:
+                    r_minus.append(0)
+                # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
+                if df.Hit[_ - k] == 1 and df.Choice[_ - k] == 1:
+                    r_plus.append(1)
+                elif df.Hit[_ - k] == 1 and df.Choice[_ - k] == 0:
+                    r_plus.append(-1)
+                elif df.Hit[_ - k] == 0:
+                    r_plus.append(0)
+
+        return r_minus, r_plus
+
+    design_matrix = pd.DataFrame()  # Create empty DataFrame to store previous choices
+
+    for _ in reversed(range(1, k + 1)):
+        print(f'Getting choice history of trial lag {_}')
+        r_minus, r_plus = get_choice_history(df, _)
+        design_matrix['Rminus' + str(_)] = r_minus
+        design_matrix['Rplus' + str(_)] = r_plus
+
+    # Reorder exog columns, so I can split later in half the params for plotting r+ or r-
+    r_minus_columns = ['Rminus' + str(_) for _ in reversed(range(1, k + 1))]
+    r_plus_columns = ['Rplus' + str(_) for _ in reversed(range(1, k + 1))]
+    design_matrix = design_matrix[r_minus_columns + r_plus_columns]
+
+    return design_matrix
+
+
 ########################################################################################################################
 
 # Define a function to parse the data for GLM-HMM
+
+def get_action_trace(df, col='Choice', max_trial_lag=10, tau=2):
+    """
+    Computes the action trace for each trial in the DataFrame. The action trace is an exponentially weighted sum of past
+    choices, where more recent choices have a greater influence. The weights decay exponentially with a time constant
+    tau. Output is normalized between -1 and +1.
+    :param df: DataFrame containing the data with a column of interest (0=left; 1=right)
+    :param col: Column name to compute the action trace from
+    :param max_trial_lag: Number of past trials to consider
+    :param tau: Decay constant
+    :return: List of action trace values for each trial
+    """
+
+    lags = np.arange(1, max_trial_lag + 1)  # Lags from 1 to k
+    weights = np.exp(-lags / tau)  # Exponential decay weights
+    Z = np.sum(weights)  # Fixed normalizer
+
+    action_trace = []
+    for t in range(len(df)):
+        # past_trials = df.loc[max(0, t-max_trial_lag):t-1, col]
+        past_trials = df.iloc[max(0, t - max_trial_lag):t][col]
+        past_signed_trials = 2 * past_trials.to_numpy() - 1  # map 0→-1, 1→+1
+        effective_weights = weights[:len(past_signed_trials)]
+        weighted_sum = np.sum(past_signed_trials * effective_weights)
+        # action_trace.append(weighted_sum / np.sum(effective_weights))  # Artifact
+        action_trace.append(weighted_sum / Z)
+
+    return action_trace
+
+
+def get_action_trace_split(df, max_trial_lag=10, tau=2):
+    """
+    Compute action traces for Rplus and Rminus from a session DataFrame.
+
+    :param df: DataFrame with columns 'Choice', 'Hit', and 'Punish'
+    :param max_trial_lag: number of past trials to consider
+    :param tau: decay constant
+    :return: DataFrame with columns ['trace_rplus', 'trace_rminus']
+    """
+
+    # Convert choice to ±1
+    r = 2 * df['Choice'] - 1
+
+    # Compute R- and R+
+    Rminus = r * df['Punish']
+    Rplus = r * df['Hit']
+
+    # Compute action traces using get_action_trace
+    action_trace_rminus = get_action_trace(pd.DataFrame({'Rminus': Rminus}), col='Rminus',
+                                    max_trial_lag=max_trial_lag, tau=tau)
+    action_trace_rplus = get_action_trace(pd.DataFrame({'Rplus': Rplus}), col='Rplus',
+                                   max_trial_lag=max_trial_lag, tau=tau)
+
+    return action_trace_rminus, action_trace_rplus
+
+
 def parse_glmhmm(df, covariates=None):
     """
     Parse the data for GLM-HMM with flexible covariates.
@@ -137,12 +249,15 @@ def parse_glmhmm(df, covariates=None):
         'stim_strength',
         'net_ild',
         'action_trace',
+        'action_trace_error',
+        'action_trace_correct',
         'bias',
         'session_index'
     :return: inputs, choices
     """
 
-    accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'action_trace', 'bias', 'session_index']
+    accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'action_trace', 'action_trace_error',
+                           'action_trace_correct', 'bias', 'session_index']
     if covariates is None:
         covariates = ['net_ild', 'bias', 'action_trace']  # Default model
     else:
@@ -196,6 +311,11 @@ def parse_glmhmm(df, covariates=None):
             action_trace = get_action_trace(df_session)
             session_cols.append(action_trace)
 
+        if 'action_trace_error' and 'action_trace_correct' in covariates:
+            action_trace_rminus, action_trace_rplus = get_action_trace_split(df_session)
+            session_cols.append(action_trace_rminus)
+            session_cols.append(action_trace_rplus)
+
         # Combine selected covariates
         session_input = np.column_stack(session_cols)
         session_choices = df_session.Choice.values.astype(int)[:, None]
@@ -206,33 +326,6 @@ def parse_glmhmm(df, covariates=None):
         choices.append(session_choices)
 
     return inputs, choices
-
-
-def get_action_trace(df, max_trial_lag=10, tau=2):
-    """
-    Computes the action trace for each trial in the DataFrame. The action trace is an exponentially weighted sum of past
-    choices, where more recent choices have a greater influence. The weights decay exponentially with a time constant
-    tau. Output is normalized between -1 and +1.
-    :param df: DataFrame containing the data with a 'Choice' column (0=left;1=right)
-    :param max_trial_lag: Number of past trials to consider
-    :param tau: Decay constant
-    :return: List of action trace values for each trial
-    """
-
-    lags = np.arange(1, max_trial_lag + 1)  # Lags from 1 to k
-    weights = np.exp(-lags / tau)  # Exponential decay weights
-    Z = np.sum(weights)  # Fixed normalizer
-
-    action_trace = []
-    for t in range(len(df)):
-        past_choices = df.loc[max(0, t-max_trial_lag):t-1, 'Choice']
-        past_signed_choices = 2 * past_choices.to_numpy() - 1  # map 0→-1, 1→+1
-        effective_weights = weights[:len(past_signed_choices)]
-        weighted_sum = np.sum(past_signed_choices * effective_weights)
-        # action_trace.append(weighted_sum / np.sum(effective_weights))
-        action_trace.append(weighted_sum / Z)
-
-    return action_trace
 
 
 def compute_window(data, win_length=20):
@@ -418,3 +511,5 @@ def main(experiment):
             print(f'Error fitting GLM-HMM for subject {animal}: {e}')
             continue
         print('\n')
+
+
