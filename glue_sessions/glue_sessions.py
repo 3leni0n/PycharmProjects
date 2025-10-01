@@ -239,3 +239,25 @@ def glue_groups(groups=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6']):
     df.reset_index(drop=True, inplace=True)
 
     return df
+
+
+def add_drug_column(experiment):
+    """
+    Add a 'Drug' column filled with NaNs to the glued sessions .csv files so they match group 6 (pharma)
+    :param experiment: group of animals
+    :return:
+    """
+
+    experiment, folder_in = get_experiment(experiment)
+    animals = os.listdir(folder_in)  # List animals
+    animals.sort()  # Sort them by name
+    animals = [x for x in animals if not 'corrupted_sessions' in x]  # Get rid of the corrupted sessions csv files
+
+    for _ in range(len(animals)):
+        df = pd.read_csv(Path(folder_in / animals[_]), low_memory=False)
+        if 'Drug' not in df.columns:
+            print(f'Adding drug column to animal {animals[_]}...')
+            df['Drug'] = np.nan
+            df.to_csv(Path(folder_in / animals[_]), index=False)  # index=False to avoid the 'Unnamed: 0' column
+        else:
+            print(f'Drug column already exists in animal {animals[_]}. Skipping to next animal...')
