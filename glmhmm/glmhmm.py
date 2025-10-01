@@ -128,48 +128,33 @@ def make_session_index_dm(df, column='Date'):
 ########################################################################################################################
 
 # Define a function to parse the data for GLM-HMM
-def parse_glmhmm(df, at=False):
+def parse_glmhmm(df, covariates=None):
     """
-    Parse the data for GLM-HMM.
-    :param df: DataFrame containing the data (one or many sessions concatenated).
+    Parse the data for GLM-HMM with flexible covariates.
+    :param df: DataFrame containing the data (one or many sessions concatenated)
+    :param covariates: List of covariates to include. Options:
+        'stim_vals',
+        'stim_strength',
+        'net_ild',
+        'action_trace',
+        'bias',
+        'session_index'
     :return: inputs, choices
     """
 
-    inputs = []
-    choices = []
+    accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'action_trace', 'bias', 'session_index']
+    if covariates is None:
+        covariates = ['net_ild', 'bias', 'action_trace']  # Default model
+    else:
+        for cov in covariates:
+            if cov not in accepted_covariates:
+                raise ValueError(f'Covariate {cov} not recognized. Accepted covariates are: {accepted_covariates}')
 
-    for session_id, df_session in df.groupby('Session'):
-        n_trials = len(df_session)
-        stim_vals = df_session.ILD.values
-        stim_vals = stim_vals / abs(df.ILD.max())  # Normalize ILD to [-1, 1]
-        bias = np.ones(n_trials)
-
-        if at:
-            action_trace = get_action_trace(df_session)
-            session_input = np.column_stack((stim_vals, bias, action_trace))
-        else:
-            session_input = np.column_stack((stim_vals, bias))
-
-        session_choices = df_session.Choice.values.astype(int)[:, None]
-        inputs.append(session_input)
-        choices.append(session_choices)
-
-    return inputs, choices
-
-
-# Define a function to parse the data for GLM-HMM
-def parse_glmhmm_full(df, at=False):
-    """
-    Parse the data for GLM-HMM.
-    :param df: DataFrame containing the data (one or many sessions concatenated).
-    :return: inputs, choices
-    """
-
+    df.reset_index(drop=True)  # Reset index to ensure consistent slicing
     dm_session_index = make_session_index_dm(df)  # Add bias (constant) per session
 
-    experiment = df.Experiment.unique()[0]
-
     # Set stimuli set
+    experiment = df.Experiment.unique()[0]
     if experiment == '2AFC_6':
         stim_set = 6
     elif experiment == '2AFC':
@@ -177,47 +162,47 @@ def parse_glmhmm_full(df, at=False):
     else:
         stim_set = 2
 
+    # inputs and choices must be lists of arrays, one per session
     inputs = []
     choices = []
 
     for session_id, df_session in df.groupby('Session'):
 
         n_trials = len(df_session)
+        session_cols = []
 
-        # Make stimulus strength design matrix
-        stim_strength, n_frames = make_frames_dm(df_session, stim_set=stim_set, residuals=True, zscore=False)
-        stim_strength = stim_strength / stim_strength.values.max()  # Normalize ILD to [-1, 1]
+        if 'stim_vals' in covariates:
+            stim_vals = df_session.ILD.values
+            stim_vals = stim_vals / abs(df.ILD.max())  # Normalize ILD to [-1, 1]
+            session_cols.append(stim_vals)
 
-        # Make net ILD design matrix
-        dm_net_ild = make_net_ild_dm(df_session)
+        if 'stim_strength' in covariates:
+            stim_strength, n_frames = make_frames_dm(df_session, stim_set=stim_set, residuals=True, zscore=False)
+            stim_strength = stim_strength / stim_strength.values.max()  # Normalize ILD to [-1, 1]
+            session_cols.append(stim_strength)
 
-        # stim_vals = df_session.ILD.values
-        # stim_vals = stim_vals / abs(df.ILD.max())  # Normalize ILD to [-1, 1]
+        if 'net_ild' in covariates:
+            dm_net_ild = make_net_ild_dm(df_session)
+            session_cols.append(dm_net_ild)
 
-        # bias = np.ones(n_trials)
-        dm_session_index_sess = dm_session_index.iloc[df_session.index.values, :]
+        if 'bias' in covariates:
+            session_cols.append(np.ones(n_trials))
 
-        if at:
+        if 'session_index' in covariates:
+            dm_session_index_sess = dm_session_index.iloc[df_session.index.values, :]
+            session_cols.append(dm_session_index_sess)
+
+        if 'action_trace' in covariates:
             action_trace = get_action_trace(df_session)
-            session_input = np.column_stack((
-                # stim_vals,
-                # stim_strength,
-                dm_net_ild,
-                action_trace,
-                # bias,
-                dm_session_index_sess
-            ))
-        else:
-            session_input = np.column_stack((
-                # stim_vals,
-                # stim_strength,
-                dm_net_ild,
-                # bias,
-                dm_session_index_sess
-            ))
+            session_cols.append(action_trace)
 
+        # Combine selected covariates
+        session_input = np.column_stack(session_cols)
         session_choices = df_session.Choice.values.astype(int)[:, None]
+
         inputs.append(session_input)
+        input_dim = inputs[0].shape[1]
+        assert all(sess.shape[1] == input_dim for sess in inputs), 'Not all sessions have the same number of inputs'
         choices.append(session_choices)
 
     return inputs, choices
