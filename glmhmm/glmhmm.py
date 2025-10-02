@@ -181,63 +181,102 @@ def make_choice_history_dm(df, k=10):
     return design_matrix
 
 
+def get_experiment(experiment=None, path_session='glue_sessions'):
+    """
+    Get experiment
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
+    :param path_session: if glue_sessions look for individual sessions, elif intersession look for intersessions
+    :return: experiment, path_experiment: experiment (user input), path to the experiment folder
+    """
+
+    if experiment is None:
+
+        path_experiment = Path.home() / 'PycharmProjects' / path_session  # Where the data for all animals is
+        experiments = list(path_experiment.iterdir())  # List experiments
+        experiments.sort()  # Sort them by name
+        experiments = [x.name for x in path_experiment.iterdir() if x.is_dir()]  # Get rid of non folders
+
+        try:
+            experiments.remove('__pycache__')  # Pycharm's file
+        except ValueError:
+            pass
+
+        print('Experiments:\n ' + str(experiments)[1:-1])  # Remove square brackets
+        experiment = input('Enter experiment name')
+        path_experiment = Path.home() / 'PycharmProjects' / path_session / experiment  # Where the data for the animal is
+
+    else:
+        path_experiment = Path.home() / 'PycharmProjects' / path_session / experiment
+
+    return experiment, path_experiment
+
+
+def get_animal(experiment=None, path_session='glue_sessions', animal=None):
+    """
+    Get animal
+    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input
+    :param path_session: if glue_sessions look for individual sessions, elif intersession look for intersessions
+    :param animal: If not None, animal=animal. Else, show possible animals and ask for user input
+    :return: animal
+    """
+
+    if experiment is None:
+        experiment, folder_in = get_experiment(experiment, path_session)
+
+    if animal is None:
+        animals = list(folder_in.iterdir())  # List animals
+        # animals = os.listdir(folder_in)  # List animals
+        animals = [x.name for x in animals]  # Get rid of non folders
+        animals.sort()  # Sort them by name
+        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
+        animals = [i for i in animals if '_corrupted_sessions' not in i]  # Remove '_corrupted_sessions'.csv files
+
+        print('Animals: ' + str(animals))  # Remove square brackets
+        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
+
+    return animal
+
+
 ########################################################################################################################
 
 # Define a function to parse the data for GLM-HMM
 
-def get_action_trace(df, col='Choice', max_trial_lag=10, tau=2):
+def get_action_trace(df, max_trial_lag=10, tau=2):
     """
     Computes the action trace for each trial in the DataFrame. The action trace is an exponentially weighted sum of past
     choices, where more recent choices have a greater influence. The weights decay exponentially with a time constant
     tau. Output is normalized between -1 and +1.
     :param df: DataFrame containing the data with a column of interest (0=left; 1=right)
-    :param col: Column name to compute the action trace from
     :param max_trial_lag: Number of past trials to consider
     :param tau: Decay constant
-    :return: List of action trace values for each trial
+    :return: List of action trace values for each trial for choices, errors and correct trials
     """
 
     lags = np.arange(1, max_trial_lag + 1)  # Lags from 1 to k
     weights = np.exp(-lags / tau)  # Exponential decay weights
     Z = np.sum(weights)  # Fixed normalizer
 
-    action_trace = []
+    # Precompute signed choice
+    signed_choice = 2 * df['Choice'].to_numpy() - 1  # Map 0→-1, 1→+1
+    r_minus = signed_choice * df['Punish'].to_numpy()
+    r_plus = signed_choice * df['Hit'].to_numpy()
+
+    at_choice = []  # Action trace for choices
+    at_error = []  # Action trace for error choices
+    at_correct = []  # Action trace for correct choices
+
     for t in range(len(df)):
-        # past_trials = df.loc[max(0, t-max_trial_lag):t-1, col]
-        past_trials = df.iloc[max(0, t - max_trial_lag):t][col]
-        past_signed_trials = 2 * past_trials.to_numpy() - 1  # map 0→-1, 1→+1
-        effective_weights = weights[:len(past_signed_trials)]
-        weighted_sum = np.sum(past_signed_trials * effective_weights)
-        # action_trace.append(weighted_sum / np.sum(effective_weights))  # Artifact
-        action_trace.append(weighted_sum / Z)
+        past_choice = signed_choice[max(0, t - max_trial_lag):t]
+        past_rminus = r_minus[max(0, t - max_trial_lag):t]
+        past_rplus = r_plus[max(0, t - max_trial_lag):t]
 
-    return action_trace
+        effective_weights = weights[:len(past_choice)]
 
+        at_choice.append(np.sum(past_choice * effective_weights) / Z)
+        at_error.append(np.sum(past_rminus * effective_weights) / Z)
+        at_correct.append(np.sum(past_rplus * effective_weights) / Z)
 
-def get_action_trace_split(df, max_trial_lag=10, tau=2):
-    """
-    Compute action traces for Rplus and Rminus from a session DataFrame.
-
-    :param df: DataFrame with columns 'Choice', 'Hit', and 'Punish'
-    :param max_trial_lag: number of past trials to consider
-    :param tau: decay constant
-    :return: DataFrame with columns ['trace_rplus', 'trace_rminus']
-    """
-
-    # Convert choice to ±1
-    r = 2 * df['Choice'] - 1
-
-    # Compute R- and R+
-    Rminus = r * df['Punish']
-    Rplus = r * df['Hit']
-
-    # Compute action traces using get_action_trace
-    action_trace_rminus = get_action_trace(pd.DataFrame({'Rminus': Rminus}), col='Rminus',
-                                    max_trial_lag=max_trial_lag, tau=tau)
-    action_trace_rplus = get_action_trace(pd.DataFrame({'Rplus': Rplus}), col='Rplus',
-                                   max_trial_lag=max_trial_lag, tau=tau)
-
-    return action_trace_rminus, action_trace_rplus
+    return at_choice, at_error, at_correct
 
 
 def parse_glmhmm(df, covariates=None):
@@ -256,10 +295,10 @@ def parse_glmhmm(df, covariates=None):
     :return: inputs, choices
     """
 
-    accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'action_trace', 'action_trace_error',
-                           'action_trace_correct', 'bias', 'session_index']
+    accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'at_choice', 'at_error', 'at_correct', 'bias',
+                           'session_index']
     if covariates is None:
-        covariates = ['net_ild', 'bias', 'action_trace']  # Default model
+        covariates = ['net_ild', 'bias', 'at_choice']  # Default model
     else:
         for cov in covariates:
             if cov not in accepted_covariates:
@@ -307,14 +346,14 @@ def parse_glmhmm(df, covariates=None):
             dm_session_index_sess = dm_session_index.iloc[df_session.index.values, :]
             session_cols.append(dm_session_index_sess)
 
-        if 'action_trace' in covariates:
-            action_trace = get_action_trace(df_session)
-            session_cols.append(action_trace)
-
-        if 'action_trace_error' and 'action_trace_correct' in covariates:
-            action_trace_rminus, action_trace_rplus = get_action_trace_split(df_session)
-            session_cols.append(action_trace_rminus)
-            session_cols.append(action_trace_rplus)
+        if any(x in covariates for x in ['at_choice', 'at_error', 'at_correct']):
+            at_choice, at_error, at_correct = get_action_trace(df_session)
+            if 'at_choice' in covariates:
+                session_cols.append(np.array(at_choice))
+            if 'at_error' in covariates:
+                session_cols.append(np.array(at_error))
+            if 'at_correct' in covariates:
+                session_cols.append(np.array(at_correct))
 
         # Combine selected covariates
         session_input = np.column_stack(session_cols)
@@ -513,3 +552,279 @@ def main(experiment):
         print('\n')
 
 
+
+
+
+
+def test_full_model(experiments=['2AFC_2', '2AFC_3']):
+
+    weights = []
+
+    for j in range(len(experiments)):
+
+        if experiments[j] == '2AFC_2':
+            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            # animals = ['332', '333', '337']  # Drug experiments
+        elif experiments[j] == '2AFC_3':
+            animals = ['419', '420', '422', '616', '619', '623']
+
+        for i in range(len(animals)):
+
+            experiment, folder_in = get_experiment(experiments[j], path_session='glue_sessions')
+            print(f'Getting GLM-HMM {animals[i]} ({i + 1}/{len(animals)} of Experiment {experiment})')
+
+            folder_in = Path(folder_in / animals[i]).with_suffix('.csv')
+            print(f'Loading data from {folder_in}')
+
+            # Load behavioral data
+            df = pd.read_csv(folder_in)
+
+
+            # Filters for groups 1-3
+            df = df[df.Stage == 4].reset_index(drop=True)
+            df = df[df.Motor == 4].reset_index(drop=True)
+            # df = df[df.StimDur == 1].reset_index(drop=True)
+            df = df[df.P > 0].reset_index(drop=True)
+
+            # Drop misses (Choice == NaN)
+            df = df.dropna(subset=['Choice']).reset_index(drop=True)
+
+            # Add session index per trial for plotting accuracy
+            session_index = pd.factorize(df['Session'])[0]  # Get session index per trial
+            loc = df.columns.get_loc('Session') + 1  # To the right of Session column
+            df.insert(loc, 'SessionIndex', session_index)  # Add session index column
+
+            # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
+            bad_sessions = []
+            # Count number of trials per session
+            for session_id, df_session in df.groupby('Session'):
+                if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
+                    print(f'Session {session_id} does not have enough trials, skipping...')
+                    bad_sessions.append(session_id)
+
+            # Remove bad sessions from df
+            df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
+
+            # Parse the data
+            inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_choice'])
+            # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_error', 'at_correct'])
+
+            # Set the parameters of the GLM-HMM
+            n_states = 2  # number of discrete states (from Ashwood et al. 2020)
+            obs_dim = 1  # number of observed dimensions (1 for binary choice)
+            n_categories = 2  # number of categories for output (2 for binary choice)
+            input_dim = inputs[0].shape[1]
+
+            glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
+                             observation_kwargs=dict(C=n_categories), transitions='standard')
+
+            # Fitting with stop earlier if increase in LL is below tolerance specified by tolerance parameter
+            method = 'em'  # Expectation Maximization method
+            num_iters = 200  # Max number of EM iterations
+            tolerance = 1e-4  # tolerance for stopping criterion
+            fit_ll = glmhmm.fit(choices, inputs=inputs, method='em', num_iters=num_iters, tolerance=tolerance)
+
+            weights_subject = glmhmm.observations.params
+            weights_subject = -weights_subject  # Flip sign of weights
+            weights.append(weights_subject)
+
+    return weights
+
+
+def interpret_weights(weights, cov_index=3):
+    """
+    Interpret the HMM latent states (zt) of one or several subjects based on the GLM weights of its covariates.
+    Assign engaged (larger) and disengaged (smaller) depending on the weight of the stimulus covariate (cov_index).
+    Work for 2 states only.
+    :param weights: GLM weights of shape (n_states, obs_dim, input_dim)
+    :param cov_index: Index of the covariate to use for interpretation
+    :return: remapped_weights, remap_indices
+    """
+
+    def _interpret_single(weights):
+        cov = weights[:, 0, cov_index]
+        disengaged_index = np.argmin(cov)
+        engaged_index = np.argmax(cov)
+        remap_indices = [disengaged_index, engaged_index]
+        remapped_weights = weights[remap_indices]
+        print(f"Remapped weights (dis., eng.): {remapped_weights[:, 0, cov_index]}")
+        return remapped_weights, remap_indices
+
+    # Check if input is a list (multiple subjects) or a single array
+    if isinstance(weights, list):
+        remapped_weights_subjects = []
+        remap_indices_subjects = []
+        for w in weights:
+            remapped_weights, remap_indices = _interpret_single(w)
+            remapped_weights_subjects.append(remapped_weights)
+            remap_indices_subjects.append(remap_indices)
+        return remapped_weights_subjects, remap_indices_subjects
+    else:
+        return _interpret_single(weights)
+
+
+def plot_GLMHMM_kernel(remapped_weights, **kwargs):
+    """
+    Plot GLM remapped weights for one subject for each state. Requires weight remapping first according to
+    interpretation.
+    :param weights_remapped: np.array with GLM weights of shape (n_states, obs_dim, input_dim) already remapped
+    (0 = disengaged, 1 = engaged)
+    :param kwargs: Additional keyword arguments for plt.plot(). E.g. alpha=0.5
+    :return: None
+    """
+
+    weights_disengaged = remapped_weights[0, 0, :]
+    weights_engaged = remapped_weights[1, 0, :]
+
+    bias_index = 3
+    weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
+    weights_engaged[bias_index] = abs(weights_engaged[bias_index])
+
+    plt.plot(weights_disengaged, color='tab:gray', marker='o', **kwargs)
+    plt.plot(weights_engaged, color='tab:blue', marker='o', **kwargs)
+    plt.axhline(0, color='black', linestyle='--')
+    plt.xticks(np.arange(w.shape[2]), ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$'])
+    plt.xlabel('Covariate')
+    plt.ylabel(f'Weight')
+    plt.title(f'GLM-HMM kernel')
+    sns.despine()
+
+
+def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
+    """
+    Plot GLM remapped weights for all subjects for each state. Requires weight remapping first according to
+    interpretation.
+    :param weights_remapped: List GLM weights per subject of shape (n_states, obs_dim, input_dim) already remapped
+    (0 = disengaged, 1 = engaged)
+    :return: None
+    """
+
+    plt.figure(constrained_layout=True)
+
+    mean_weights_engaged = []
+    mean_weights_disengaged = []
+    for i, w in enumerate(remapped_weights_subjects):
+        weights_disengaged = w[0, 0, :]
+        weights_engaged = w[1, 0, :]
+
+        bias_index = 3
+        weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
+        weights_engaged[bias_index] = abs(weights_engaged[bias_index])
+
+        if weights_disengaged[3] > 10 or weights_engaged[3] > 10:
+            print(f'Skipping animal {animals[i]} with weights {weights_disengaged[3]}, {weights_engaged[3]}')
+            continue
+
+        mean_weights_disengaged.append(weights_disengaged)
+        mean_weights_engaged.append(weights_engaged)
+        plot_GLMHMM_kernel(remapped_weights_subjects[i], alpha=0.1)
+
+    # convert to arrays
+    mean_weights_disengaged = np.array(mean_weights_disengaged)
+    mean_weights_engaged = np.array(mean_weights_engaged)
+
+    # Compute the mean across animals
+    mean_weights_disengaged = np.mean(mean_weights_disengaged, axis=0)
+    mean_weights_engaged = np.mean(mean_weights_engaged, axis=0)
+
+    plt.plot(mean_weights_disengaged, color='tab:gray', marker='o', label='Disengaged')
+    plt.plot(mean_weights_engaged, color='tab:blue', marker='o', label='Engaged')
+
+    plt.xticks(np.arange(w.shape[2]), ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$'])
+    plt.xlabel('Covariate')
+    plt.ylabel(f'Weight')
+    plt.title(f'GLM-HMM kernel')
+    plt.legend(frameon=False)
+    sns.despine()
+
+
+def plot_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals=None):
+    """
+    Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
+
+    :param remapped_weights_subjects: list of arrays (n_states, 1, n_covariates) already remapped
+                                       (0 = disengaged, 1 = engaged)
+    :param animals: optional list of animal identifiers for logging skipped animals
+    """
+    all_disengaged = []
+    all_engaged = []
+
+    for i, w in enumerate(remapped_weights_subjects):
+        # Copy to avoid modifying original
+        weights_disengaged = w[0, 0, :].copy()
+        weights_engaged = w[1, 0, :].copy()
+
+        # Absolute value for covariate 3
+        bias_index = 3
+        weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
+        weights_engaged[bias_index] = abs(weights_engaged[bias_index])
+
+        # Skip extreme values
+        if weights_disengaged[bias_index] > 10 or weights_engaged[bias_index] > 10:
+            if animals is not None:
+                print(f"Skipping animal {animals[i]} with weights {weights_disengaged[bias_index]}, {weights_engaged[bias_index]}")
+            continue
+
+        all_disengaged.append(weights_disengaged)
+        all_engaged.append(weights_engaged)
+
+    all_disengaged = np.array(all_disengaged)
+    all_engaged = np.array(all_engaged)
+
+    n_cov = all_disengaged.shape[1]
+    cov_labels = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
+
+    plt.figure(figsize=(12, 6), constrained_layout=True)
+
+    # For each covariate, plot a pair of boxplots
+    for cov in range(n_cov):
+        data = [all_disengaged[:, cov], all_engaged[:, cov]]
+        plt.boxplot(
+            data,
+            positions=[cov * 2, cov * 2 + 1],
+            widths=0.6,
+            patch_artist=True,
+            boxprops=dict(facecolor='tab:gray'),
+            medianprops=dict(color='black')
+        )
+        plt.boxplot(
+            [all_engaged[:, cov]],
+            positions=[cov * 2 + 1],
+            widths=0.6,
+            patch_artist=True,
+            boxprops=dict(facecolor='tab:blue'),
+            medianprops=dict(color='black')
+        )
+
+    # Set x-ticks in the center of each pair
+    plt.xticks([cov * 2 + 0.5 for cov in range(n_cov)], cov_labels)
+    plt.ylabel("Weight")
+    plt.title("GLM-HMM kernel (paired boxplots)")
+    sns.despine()
+
+
+
+
+
+# remapped_weights_subjects: list of arrays, each shape (2, 1, 7)
+# animals: list of animal IDs (same length)
+
+data_list = []
+
+for animal_id, w in zip(animals, remapped_weights_subjects):
+    for state_idx in range(w.shape[0]):  # 0 = disengaged, 1 = engaged
+        for cov_idx in range(w.shape[2]):
+            data_list.append({
+                'Animal': animal_id,
+                'State': state_idx,           # 0 = disengaged, 1 = engaged
+                'Covariate': cov_idx,         # index of covariate
+                'Weight': w[state_idx, 0, cov_idx]
+            })
+
+df_plot = pd.DataFrame(data_list)
+
+plt.figure(figsize=(12, 6))
+sns.boxplot(x='Covariate', y='Weight', hue='State', data=df_plot,
+            palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
+sns.despine()
+plt.show()

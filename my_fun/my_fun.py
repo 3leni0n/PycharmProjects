@@ -1115,3 +1115,8 @@ def save_notebook_files(notebook_path='notebook.ipynb'):
                         f.write(img_bytes)
 
     print(f'Saved {img_count} images to {folder}/')
+
+
+
+acc = compute_window(df_session.Hit)
+plt.plot(acc, c='k', label='acc')
