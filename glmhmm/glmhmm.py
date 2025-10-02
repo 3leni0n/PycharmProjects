@@ -552,38 +552,33 @@ def main(experiment):
         print('\n')
 
 
-
-
+########################################################################################################################
 
 
 def test_full_model(experiments=['2AFC_2', '2AFC_3']):
 
     weights = []
 
-    for j in range(len(experiments)):
+    for experiment in experiments:
 
-        if experiments[j] == '2AFC_2':
+        if experiment == '2AFC_2':
             animals = ['325', '327', '329', '330', '332', '333', '335', '337']
-            # animals = ['332', '333', '337']  # Drug experiments
-        elif experiments[j] == '2AFC_3':
+        elif experiment == '2AFC_3':
             animals = ['419', '420', '422', '616', '619', '623']
 
-        for i in range(len(animals)):
-
-            experiment, folder_in = get_experiment(experiments[j], path_session='glue_sessions')
-            print(f'Getting GLM-HMM {animals[i]} ({i + 1}/{len(animals)} of Experiment {experiment})')
-
-            folder_in = Path(folder_in / animals[i]).with_suffix('.csv')
-            print(f'Loading data from {folder_in}')
+        for i, animal in enumerate(animals):
 
             # Load behavioral data
-            df = pd.read_csv(folder_in)
-
+            experiment, folder_in = get_experiment(experiment, path_session='glue_sessions')
+            print(f'Getting GLM-HMM {animal} ({i + 1}/{len(animals)} of Experiment {experiment})')
+            folder_in = Path(folder_in / animal).with_suffix('.csv')
+            print(f'Loading data from {folder_in}')
+            df = pd.read_csv(folder_in, low_memory=False)
 
             # Filters for groups 1-3
-            df = df[df.Stage == 4].reset_index(drop=True)
-            df = df[df.Motor == 4].reset_index(drop=True)
-            # df = df[df.StimDur == 1].reset_index(drop=True)
+            # df = df[df.Stage == 4].reset_index(drop=True)
+            # df = df[df.Motor == 4].reset_index(drop=True)
+            # # df = df[df.StimDur == 1].reset_index(drop=True)
             df = df[df.P > 0].reset_index(drop=True)
 
             # Drop misses (Choice == NaN)
@@ -601,7 +596,6 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3']):
                 if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
                     print(f'Session {session_id} does not have enough trials, skipping...')
                     bad_sessions.append(session_id)
-
             # Remove bad sessions from df
             df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
 
@@ -610,9 +604,9 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3']):
             # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_error', 'at_correct'])
 
             # Set the parameters of the GLM-HMM
-            n_states = 2  # number of discrete states (from Ashwood et al. 2020)
-            obs_dim = 1  # number of observed dimensions (1 for binary choice)
-            n_categories = 2  # number of categories for output (2 for binary choice)
+            n_states = 2  # Number of discrete states
+            obs_dim = 1  # Number of observed dimensions (1 for binary choice)
+            n_categories = 2  # Number of categories for output (2 for binary choice)
             input_dim = inputs[0].shape[1]
 
             glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
@@ -642,6 +636,8 @@ def interpret_weights(weights, cov_index=3):
     """
 
     def _interpret_single(weights):
+        if weights.shape[0] != 2:
+            raise ValueError('Currently only supports 2 states')
         cov = weights[:, 0, cov_index]
         disengaged_index = np.argmin(cov)
         engaged_index = np.argmax(cov)
@@ -676,14 +672,16 @@ def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     weights_disengaged = remapped_weights[0, 0, :]
     weights_engaged = remapped_weights[1, 0, :]
 
-    bias_index = 3
+    bias_index = 4
     weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
     weights_engaged[bias_index] = abs(weights_engaged[bias_index])
 
     plt.plot(weights_disengaged, color='tab:gray', marker='o', **kwargs)
     plt.plot(weights_engaged, color='tab:blue', marker='o', **kwargs)
     plt.axhline(0, color='black', linestyle='--')
-    plt.xticks(np.arange(w.shape[2]), ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$'])
+    cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
+    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
+    plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('Covariate')
     plt.ylabel(f'Weight')
     plt.title(f'GLM-HMM kernel')
@@ -707,13 +705,13 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
         weights_disengaged = w[0, 0, :]
         weights_engaged = w[1, 0, :]
 
-        bias_index = 3
+        bias_index = 4
         weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
         weights_engaged[bias_index] = abs(weights_engaged[bias_index])
 
-        if weights_disengaged[3] > 10 or weights_engaged[3] > 10:
-            print(f'Skipping animal {animals[i]} with weights {weights_disengaged[3]}, {weights_engaged[3]}')
-            continue
+        # if weights_disengaged[3] > 10 or weights_engaged[3] > 10:
+        #     print(f'Skipping animal {animals[i]} with weights {weights_disengaged[3]}, {weights_engaged[3]}')
+        #     continue
 
         mean_weights_disengaged.append(weights_disengaged)
         mean_weights_engaged.append(weights_engaged)
@@ -729,8 +727,9 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
 
     plt.plot(mean_weights_disengaged, color='tab:gray', marker='o', label='Disengaged')
     plt.plot(mean_weights_engaged, color='tab:blue', marker='o', label='Engaged')
-
-    plt.xticks(np.arange(w.shape[2]), ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$'])
+    cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
+    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
+    plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('Covariate')
     plt.ylabel(f'Weight')
     plt.title(f'GLM-HMM kernel')
@@ -738,93 +737,49 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
     sns.despine()
 
 
-def plot_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals=None):
+def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals):
     """
     Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
-
-    :param remapped_weights_subjects: list of arrays (n_states, 1, n_covariates) already remapped
-                                       (0 = disengaged, 1 = engaged)
-    :param animals: optional list of animal identifiers for logging skipped animals
     """
-    all_disengaged = []
-    all_engaged = []
 
-    for i, w in enumerate(remapped_weights_subjects):
-        # Copy to avoid modifying original
-        weights_disengaged = w[0, 0, :].copy()
-        weights_engaged = w[1, 0, :].copy()
+    data = []
+    for animal_id, w in zip(animals, remapped_weights_subjects):
+        for state_idx in range(w.shape[0]):
+            for cov_idx in range(w.shape[2]):
+                data.append({
+                    'Animal': animal_id,
+                    'State': state_idx,
+                    # 'Label': 'Disengaged' if state_idx == 0 else 'Engaged',
+                    'Covariate': cov_idx,
+                    'Weight': w[state_idx, 0, cov_idx]
+                })
+    data = pd.DataFrame(data)
+    data.loc[data['Covariate'] == 4, 'Weight'] = data.loc[data['Covariate'] == 4, 'Weight'].abs()  # Absolute  bias
 
-        # Absolute value for covariate 3
-        bias_index = 3
-        weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
-        weights_engaged[bias_index] = abs(weights_engaged[bias_index])
-
-        # Skip extreme values
-        if weights_disengaged[bias_index] > 10 or weights_engaged[bias_index] > 10:
-            if animals is not None:
-                print(f"Skipping animal {animals[i]} with weights {weights_disengaged[bias_index]}, {weights_engaged[bias_index]}")
-            continue
-
-        all_disengaged.append(weights_disengaged)
-        all_engaged.append(weights_engaged)
-
-    all_disengaged = np.array(all_disengaged)
-    all_engaged = np.array(all_engaged)
-
-    n_cov = all_disengaged.shape[1]
-    cov_labels = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
-
-    plt.figure(figsize=(12, 6), constrained_layout=True)
-
-    # For each covariate, plot a pair of boxplots
-    for cov in range(n_cov):
-        data = [all_disengaged[:, cov], all_engaged[:, cov]]
-        plt.boxplot(
-            data,
-            positions=[cov * 2, cov * 2 + 1],
-            widths=0.6,
-            patch_artist=True,
-            boxprops=dict(facecolor='tab:gray'),
-            medianprops=dict(color='black')
-        )
-        plt.boxplot(
-            [all_engaged[:, cov]],
-            positions=[cov * 2 + 1],
-            widths=0.6,
-            patch_artist=True,
-            boxprops=dict(facecolor='tab:blue'),
-            medianprops=dict(color='black')
-        )
-
-    # Set x-ticks in the center of each pair
-    plt.xticks([cov * 2 + 0.5 for cov in range(n_cov)], cov_labels)
-    plt.ylabel("Weight")
-    plt.title("GLM-HMM kernel (paired boxplots)")
+    plt.figure(constrained_layout=True)
+    ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
+                palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
+    plt.axhline(0, color='black', linestyle='--')
+    cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
+    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
+    plt.xticks(np.arange(len(cov_names)), cov_names)
+    plt.title(f'GLM-HMM kernel')
+    handles, labels = ax.get_legend_handles_labels()  # Get legend
+    ax.legend(handles, ['Disengaged', 'Engaged'], frameon=False, title='State')  # Rename legend labels
     sns.despine()
 
+    # Draw paired lines of subjects between boxes (states)
+    for cov in data['Covariate'].unique():
+        for animal in data['Animal'].unique():
+            subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
+            x0 = cov - 0.2  # disengaged box (gray)
+            x1 = cov + 0.2  # engaged box (blue)
+            y0 = subset[subset['State'] == 0]['Weight'].values[0]
+            y1 = subset[subset['State'] == 1]['Weight'].values[0]
+            ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
 
 
-
-
-# remapped_weights_subjects: list of arrays, each shape (2, 1, 7)
-# animals: list of animal IDs (same length)
-
-data_list = []
-
-for animal_id, w in zip(animals, remapped_weights_subjects):
-    for state_idx in range(w.shape[0]):  # 0 = disengaged, 1 = engaged
-        for cov_idx in range(w.shape[2]):
-            data_list.append({
-                'Animal': animal_id,
-                'State': state_idx,           # 0 = disengaged, 1 = engaged
-                'Covariate': cov_idx,         # index of covariate
-                'Weight': w[state_idx, 0, cov_idx]
-            })
-
-df_plot = pd.DataFrame(data_list)
-
-plt.figure(figsize=(12, 6))
-sns.boxplot(x='Covariate', y='Weight', hue='State', data=df_plot,
-            palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
-sns.despine()
-plt.show()
+# weights_subjects = test_full_model(experiments=['2AFC_2', '2AFC_3'])
+remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects, cov_index=3)
+animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
+plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals)
