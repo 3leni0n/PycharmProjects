@@ -15,13 +15,7 @@ import seaborn as sns
 from collections import namedtuple
 from my_fun.my_fun import get_experiment, get_animal, save_fig, timer
 from kernels.kernels_tools import *
-
-
-# Plotting parameters
-sns.set_theme()
-sns.set_style('white')
-sns.set_style('ticks')
-sns.set_context('poster')
+from plotting_style import *
 
 
 # GLM weights of previously rewarded (r+) and previously unrewarded (r-) responses. These kernels quantify the
@@ -337,8 +331,8 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         ################################################################################################################
 
         # PLOT HISTORY KERNEL
-
-        plt.figure(constrained_layout=True)
+        figsize = fig_size(n_cols=2)
+        plt.figure(figsize=figsize, constrained_layout=True)
         x = np.arange(1, trial_lag + 1)
         # y = hk.params.iloc[params_indexes]
         # yerr = hk.std_err.iloc[params_indexes]
@@ -369,7 +363,7 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':', zorder=1.9)
         plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':', zorder=2)
 
-        sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
+        sns.despine()
 
         if save:
             filename = filename_prefix + 'prev_resp' + filename
@@ -380,10 +374,9 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     ################################################################################################################
 
     # PLOT NET STIMULUS KERNEL
-
-    plt.figure(constrained_layout=True)
-    x = hk.params_net_stim.index.astype(int).values
-    x[-1] = 16  # Trick to zoom in
+    figsize = fig_size(n_cols=2)
+    plt.figure(figsize=figsize, constrained_layout=True)
+    x = np.arange(len(hk.params_net_stim.index.astype(int).values))
     y = hk.params_net_stim
     yerr = hk.std_err_net_stim
     plt.plot(x, y, color=color, marker='o')
@@ -398,7 +391,7 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
     plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
     plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
-    sns.despine(trim=True)
+    sns.despine()
 
     if save:
         filename = filename_prefix + 'net_stim' + filename
@@ -412,7 +405,8 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
 
     if type(experiment) == str:  # Don't do it for the mean kernel
 
-        plt.figure(constrained_layout=True)
+        figsize = (fig_size(n_cols=1)[0], fig_size(n_cols=2)[1])
+        plt.figure(figsize=figsize, constrained_layout=True)
         x = hk.params_session_index.index.values
         y = hk.params_session_index
         yerr = hk.std_err_session_index
@@ -431,7 +425,7 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
         plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
         plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
-        sns.despine(trim=True)
+        sns.despine()
 
         if save:
             filename = 'session_index' + filename
@@ -443,7 +437,8 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
 
     # PLOT STIMULUS FRAMES KERNEL
 
-    plt.figure(constrained_layout=True)
+    figsize = fig_size(n_cols=2)
+    plt.figure(figsize=figsize, constrained_layout=True)
 
     n_frames = hk.n_frames
     ylabel = 'GLM weight (residuals)'
@@ -684,16 +679,11 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
 ########################################################################################################################
 
 # Debugging
-experiment = '2AFC_2'
-# experiments = ['2AFC_2', '2AFC_3']
-animal = '333'
+
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337']  # Bach 2 (with ILDs) -326, -334
 # animals = ['419', '420', '422', '616', '619', '623']  # Batch 3 (with ILDs)  -617, -620
 # animals = ['332', '333', '337']  # Drug experiments
-drug = None
-trial_lag = 10
-iterations = 1
-save = False
+
 
 # hk = get_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
 # plot_hk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations, save=save)
@@ -780,7 +770,7 @@ def plot_hk_drug():
         # plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':', zorder=1.9)
         # plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':', zorder=2)
 
-        sns.despine(trim=True)  # Despine top and right axes triming them to their min/max tick
+        sns.despine()
 
         if save:
             filename = filename_prefix + 'prev_resp' + filename
@@ -816,7 +806,7 @@ def plot_hk_drug():
         # percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
         # plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
         # plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
-        sns.despine(trim=True)
+        sns.despine()
 
         if save:
             filename = filename_prefix + 'net_stim' + filename

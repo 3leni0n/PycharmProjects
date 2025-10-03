@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-# import statsmodels.api as sm
+import statsmodels.api as sm
 from pathlib import Path
 from scipy import stats
 from my_fun.my_fun import get_ild
@@ -222,6 +222,10 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
             net_stim_shuffled = exog.iloc[:, -4:].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog
             exog_shuffled.iloc[:, -4:] = net_stim_shuffled
+        elif kind == 'hk_frames':
+            frames_shuffled = exog.iloc[:, -4 - n_frames:-4].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog
+            exog_shuffled.iloc[:, -4 - n_frames:-4] = frames_shuffled
 
         # model_shuffled = sm.GLM(endog_shuffled, exog,  # Shuffled choices
         #                         family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link

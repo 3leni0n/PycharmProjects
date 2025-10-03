@@ -452,7 +452,7 @@ def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     plt.plot(weights_disengaged, color='tab:gray', marker='o', **kwargs)
     plt.plot(weights_engaged, color='tab:blue', marker='o', **kwargs)
     plt.axhline(0, color='black', linestyle='--')
-    cov_names = ['stim.', 'bias', '$A_t$']
+    cov_names = ['stim.', '|bias|', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
@@ -501,7 +501,7 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
 
     plt.plot(mean_weights_disengaged, color='tab:gray', marker='o', label='Disengaged')
     plt.plot(mean_weights_engaged, color='tab:blue', marker='o', label='Engaged')
-    cov_names = ['stim.', 'bias', '$A_t$']
+    cov_names = ['stim.', '|bias|', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
@@ -535,7 +535,7 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
     ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
                 palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
     plt.axhline(0, color='black', linestyle='--')
-    cov_names = ['stim.', 'bias', '$A_t$']
+    cov_names = ['stim.', '|bias|', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
@@ -556,24 +556,30 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
 
 
 # cherries = main()  # Absolute import due to another main function in this script
-weights_subjects, all_animals = test_full_model()
-remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects)
+# weights_subjects, all_animals = test_full_model()
+# remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects)
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
 # plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals)
 
-# Save list of arrays with the weights
-path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'remapped_weights_subjects.pkl'
-with open(path, 'wb') as f:
-    pickle.dump(remapped_weights_subjects, f)
-    print(f'Saved weights to {path}')
-
-path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'all_animals.pkl'
-with open(path, 'wb') as f:
-    pickle.dump(all_animals, f)
-    print(f'Saved weights to {path}')
-
-
+# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'remapped_weights_subjects.pkl'
+# # Save list of arrays with the weights
+# # with open(path, 'wb') as f:
+# #     pickle.dump(remapped_weights_subjects, f)
+# #     print(f'Saved weights to {path}')
+#
 # # Load list of arrays with the weights
 # with open(path, 'rb') as f:
 #     remapped_weights_subjects = pickle.load(f)
+#     print(f'Loaded weights from {path}')
+#
+#
+# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'all_animals.pkl'
+# # Save list of all animals
+# # with open(path, 'wb') as f:
+# #     pickle.dump(all_animals, f)
+# #     print(f'Saved weights to {path}')
+#
+# # Load list of arrays with the weights
+# with open(path, 'rb') as f:
+#     all_animals = pickle.load(f)
 #     print(f'Loaded weights from {path}')
