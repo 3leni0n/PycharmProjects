@@ -1,245 +1,13 @@
 import os
-from pathlib import Path
-import pandas as pd
-import numpy as np
-from matplotlib import pyplot as plt
 import seaborn as sns
 import ssm
+from pathlib import Path
+import pickle
 
+from my_fun import get_experiment
+from cherry.cherry import *
+from kernels.kernels_tools import *
 
-# From my_fun and kernels_tools, but can import them because would need to install libraries in this environment
-def get_ild(stim_set=6):
-    # Load sounds
-    if stim_set == 1:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
-    if stim_set == 2:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    elif stim_set == 6:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
-
-    sounds = pd.read_csv(sounds_path)
-    n_frames = sounds.n_frames.unique()[0]
-
-    # Left frames
-    left_frames_column_names = [f'EL{n:01}' for n in range(n_frames)]
-    frames_left = sounds[left_frames_column_names].values
-
-    # Right frames
-    right_frames_column_names = [f'ER{n:01}' for n in range(n_frames)]
-    frames_right = sounds[right_frames_column_names].values
-
-    # Frames ILD (elementwise substraction)
-    frames_ild = frames_right - frames_left
-    frames_ild = pd.DataFrame(frames_ild)
-    frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert behavior_filenames in first column
-
-    return frames_ild
-
-
-def make_frames_dm(df, stim_set=6, residuals=True, zscore=False):
-
-    # Load sounds
-    if stim_set == 1:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds.csv'
-    if stim_set == 2:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_2.csv'
-    elif stim_set == 6:
-        sounds_path = Path.home() / 'PycharmProjects' / 'create_sounds' / 'sounds_6.1.csv'
-
-    sounds = pd.read_csv(sounds_path)
-    n_frames = sounds.n_frames.unique()[0]
-    frames_ild = get_ild(stim_set=stim_set)
-
-    # Residuals (https://www-nature-com.sire.ub.edu/articles/nature08275)
-    if residuals:
-        sounds_ild = sounds.ILD
-        first_frame = frames_ild[0]
-        first_frame = first_frame.copy()
-        first_frame.iloc[0] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
-        first_frame.iloc[-1] = 0  # Set to 0 to avoid artifact of net ILD 70 having 0 weight
-        if stim_set == 6:
-            frames_ild = frames_ild.drop(['filename', 0], axis=1).sub(sounds_ild, axis='rows')
-            frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
-            frames_ild.insert(1, column=0, value=first_frame)  # Insert back first_frame in 2nd column
-        else:
-            frames_ild = frames_ild.drop('filename', axis=1).sub(sounds_ild, axis='rows')
-            frames_ild.insert(0, column='filename', value=sounds.filename)  # Insert back filenames in 1st column
-
-    filenames = df.Filename.tolist()
-
-    # Get frames per trial
-    stim_strength = frames_ild.loc[
-        [np.where(sounds.filename == np.array(filenames[i]))[0][0] for i in range(len(filenames))]].drop(
-        columns=['filename'])
-    stim_strength.reset_index(drop=True, inplace=True)  # Indices must match for modeling
-
-    # Zscore
-    if not residuals:  # To not do both (otherwise I'd be subtracting the mean twice)
-        if zscore:
-            stim_strength = pd.DataFrame(stats.zscore(stim_strength, axis=0))  # Z-score the ILDs (along axis 0 or None
-            # returns same result, but not axis 1). 0 along trials that's what I want to do :)
-
-    design_matrix = stim_strength
-
-    return design_matrix, n_frames
-
-
-def make_net_ild_dm(df):
-    """
-    Make a design matrix with the net ILDs. There is a column for each absolute, unique ILD value (except 0). It
-    transforms the nominal ILD into ILD net magnitude (2, 4, 8 , 70 dB) that take values +1, 0 or -1. In each trial,
-    only one of these regressors is non-zero.
-    When separating the stimuli S_k =  nominal_ILD + residuals and give a separate beta for the nominal and for each
-    residual frame, you are somehow assuming that the impact of the nominal ILD grows linearly with ILD. But this is
-    probably not the case. Particularly if spanning a range from ILD 0 to 70 dB. One simple way to not assume anything
-    about how the impact of the stimuli grows with ILD is to define separate regressors for each absolute value of the
-    ILD, that is 2, 4, 8 and 70. Each of this ILDs will define a regressor e.g. ILD_8 =  +1 (if ILD was +8 dB), -1 (if
-    ILD was -8 db) and 0 (if ILD was other than +- 8dB). This way, you should be able to include ALL stimuli in the
-    analysis (maximum evidence too).
-    :param df:
-    :return: Design matrix
-    """
-    ilds = df.ILD.astype('int')
-    net_ilds = np.sort(df.ILD.abs().unique().astype('int'))[1:]
-    design_matrix = np.zeros((len(df), len(net_ilds)), dtype=int)
-    # columns = [str(_) for _ in net_ilds]
-    design_matrix = pd.DataFrame(design_matrix, columns=net_ilds)
-    for i, ild in enumerate(ilds):
-        if ild != 0:
-            design_matrix.loc[i, abs(ild)] = np.sign(ild)
-    return design_matrix
-
-
-def make_session_index_dm(df, column='Date'):
-    """
-    # Make a design matrix in which there are as many columns as unique dates. Then, for each column, there is a 1 if
-    the trial belongs to that session and a 0 otherwise
-    :param df: Input DataFrame
-    :param column: Column of the DataFrame that contains the dates
-    :return: Design matrix
-    """
-    dates = df[column].unique()
-    design_matrix = np.zeros((len(df), len(dates)), dtype=int)
-    for i, date in enumerate(dates):
-        design_matrix[df[column] == date, i] = 1
-    design_matrix = pd.DataFrame(design_matrix)
-    return design_matrix
-
-
-def make_choice_history_dm(df, k=10):
-    """
-    Make a design matrix with the choice history. There is a column for each previous trial (up to k). In each trial,
-    only one of these regressors is non-zero.
-    :param df: DataFrame with hit and choice data
-    :param k: Number of trials to look back
-    :return: Design matrix
-    """
-    def get_choice_history(df, k):
-        """
-        Get the choice history for a trial number k.
-        :param df: DataFrame with hit and choice data
-        :param k: Number of trials to look back
-        :return:  r_minus, r_plus
-        """
-        r_minus = []
-        r_plus = []
-        for _ in range(len(df)):
-            if _ < k:
-                r_minus.append(np.nan)
-                r_plus.append(np.nan)
-            else:
-                # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
-                if df.Hit[_ - k] == 0 and df.Choice[_ - k] == 1:
-                    r_minus.append(1)
-                elif df.Hit[_ - k] == 0 and df.Choice[_ - k] == 0:
-                    r_minus.append(-1)
-                elif df.Hit[_ - k] == 1:
-                    r_minus.append(0)
-                # r+(t-k): correct right = +1, correct left = -1, no correct (error) = 0
-                if df.Hit[_ - k] == 1 and df.Choice[_ - k] == 1:
-                    r_plus.append(1)
-                elif df.Hit[_ - k] == 1 and df.Choice[_ - k] == 0:
-                    r_plus.append(-1)
-                elif df.Hit[_ - k] == 0:
-                    r_plus.append(0)
-
-        return r_minus, r_plus
-
-    design_matrix = pd.DataFrame()  # Create empty DataFrame to store previous choices
-
-    for _ in reversed(range(1, k + 1)):
-        print(f'Getting choice history of trial lag {_}')
-        r_minus, r_plus = get_choice_history(df, _)
-        design_matrix['Rminus' + str(_)] = r_minus
-        design_matrix['Rplus' + str(_)] = r_plus
-
-    # Reorder exog columns, so I can split later in half the params for plotting r+ or r-
-    r_minus_columns = ['Rminus' + str(_) for _ in reversed(range(1, k + 1))]
-    r_plus_columns = ['Rplus' + str(_) for _ in reversed(range(1, k + 1))]
-    design_matrix = design_matrix[r_minus_columns + r_plus_columns]
-
-    return design_matrix
-
-
-def get_experiment(experiment=None, path_session='glue_sessions'):
-    """
-    Get experiment
-    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input.
-    :param path_session: if glue_sessions look for individual sessions, elif intersession look for intersessions
-    :return: experiment, path_experiment: experiment (user input), path to the experiment folder
-    """
-
-    if experiment is None:
-
-        path_experiment = Path.home() / 'PycharmProjects' / path_session  # Where the data for all animals is
-        experiments = list(path_experiment.iterdir())  # List experiments
-        experiments.sort()  # Sort them by name
-        experiments = [x.name for x in path_experiment.iterdir() if x.is_dir()]  # Get rid of non folders
-
-        try:
-            experiments.remove('__pycache__')  # Pycharm's file
-        except ValueError:
-            pass
-
-        print('Experiments:\n ' + str(experiments)[1:-1])  # Remove square brackets
-        experiment = input('Enter experiment name')
-        path_experiment = Path.home() / 'PycharmProjects' / path_session / experiment  # Where the data for the animal is
-
-    else:
-        path_experiment = Path.home() / 'PycharmProjects' / path_session / experiment
-
-    return experiment, path_experiment
-
-
-def get_animal(experiment=None, path_session='glue_sessions', animal=None):
-    """
-    Get animal
-    :param experiment: If not None, experiment=experiment. Else, show possible experiments and ask for user input
-    :param path_session: if glue_sessions look for individual sessions, elif intersession look for intersessions
-    :param animal: If not None, animal=animal. Else, show possible animals and ask for user input
-    :return: animal
-    """
-
-    if experiment is None:
-        experiment, folder_in = get_experiment(experiment, path_session)
-
-    if animal is None:
-        animals = list(folder_in.iterdir())  # List animals
-        # animals = os.listdir(folder_in)  # List animals
-        animals = [x.name for x in animals]  # Get rid of non folders
-        animals.sort()  # Sort them by name
-        animals = [x[:-4] for x in animals]  # Get rid of .csv extension
-        animals = [i for i in animals if '_corrupted_sessions' not in i]  # Remove '_corrupted_sessions'.csv files
-
-        print('Animals: ' + str(animals))  # Remove square brackets
-        animal = input('Enter animal')  # Ask user to input animal to glue sessions from
-
-    return animal
-
-
-########################################################################################################################
-
-# Define a function to parse the data for GLM-HMM
 
 def get_action_trace(df, max_trial_lag=10, tau=2):
     """
@@ -298,7 +66,7 @@ def parse_glmhmm(df, covariates=None):
     accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'at_choice', 'at_error', 'at_correct', 'bias',
                            'session_index']
     if covariates is None:
-        covariates = ['net_ild', 'bias', 'at_choice']  # Default model
+        covariates = ['stim_vals', 'bias', 'at_choice']  # Default model
     else:
         for cov in covariates:
             if cov not in accepted_covariates:
@@ -527,7 +295,7 @@ def fit_glm_hmm(df, save=False):
     return df, weights, trans_mat, state_labels
 
 
-def main(experiment):
+def fit_all(experiment):
     """
     Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
     :return: None
@@ -555,22 +323,26 @@ def main(experiment):
 ########################################################################################################################
 
 
-def test_full_model(experiments=['2AFC_2', '2AFC_3']):
+def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
 
+    all_animals = []
     weights = []
+    cherries = main(experiments)  # Get good subjects from cherry
 
     for experiment in experiments:
+        animals = cherries[experiment]
+        all_animals.extend(animals)
 
-        if experiment == '2AFC_2':
-            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
-        elif experiment == '2AFC_3':
-            animals = ['419', '420', '422', '616', '619', '623']
+        # if experiment == '2AFC_2':
+        #     animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+        # elif experiment == '2AFC_3':
+        #     animals = ['419', '420', '422', '616', '619', '623']
 
         for i, animal in enumerate(animals):
 
             # Load behavioral data
             experiment, folder_in = get_experiment(experiment, path_session='glue_sessions')
-            print(f'Getting GLM-HMM {animal} ({i + 1}/{len(animals)} of Experiment {experiment})')
+            print(f'Fitting GLM-HMM for subject {animal} ({i + 1}/{len(animals)} of Experiment {experiment})')
             folder_in = Path(folder_in / animal).with_suffix('.csv')
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
@@ -600,7 +372,8 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3']):
             df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
 
             # Parse the data
-            inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_choice'])
+            inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])
+            # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_choice'])
             # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_error', 'at_correct'])
 
             # Set the parameters of the GLM-HMM
@@ -622,10 +395,10 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3']):
             weights_subject = -weights_subject  # Flip sign of weights
             weights.append(weights_subject)
 
-    return weights
+    return weights, all_animals
 
 
-def interpret_weights(weights, cov_index=3):
+def interpret_weights(weights, cov_index=0):
     """
     Interpret the HMM latent states (zt) of one or several subjects based on the GLM weights of its covariates.
     Assign engaged (larger) and disengaged (smaller) depending on the weight of the stimulus covariate (cov_index).
@@ -672,14 +445,15 @@ def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     weights_disengaged = remapped_weights[0, 0, :]
     weights_engaged = remapped_weights[1, 0, :]
 
-    bias_index = 4
+    bias_index = 1
     weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
     weights_engaged[bias_index] = abs(weights_engaged[bias_index])
 
     plt.plot(weights_disengaged, color='tab:gray', marker='o', **kwargs)
     plt.plot(weights_engaged, color='tab:blue', marker='o', **kwargs)
     plt.axhline(0, color='black', linestyle='--')
-    cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
+    cov_names = ['stim.', 'bias', '$A_t$']
+    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('Covariate')
@@ -705,7 +479,7 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
         weights_disengaged = w[0, 0, :]
         weights_engaged = w[1, 0, :]
 
-        bias_index = 4
+        bias_index = 1
         weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
         weights_engaged[bias_index] = abs(weights_engaged[bias_index])
 
@@ -727,7 +501,8 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
 
     plt.plot(mean_weights_disengaged, color='tab:gray', marker='o', label='Disengaged')
     plt.plot(mean_weights_engaged, color='tab:blue', marker='o', label='Engaged')
-    cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
+    cov_names = ['stim.', 'bias', '$A_t$']
+    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('Covariate')
@@ -737,13 +512,13 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
     sns.despine()
 
 
-def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals):
+def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
     """
     Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
     """
 
     data = []
-    for animal_id, w in zip(animals, remapped_weights_subjects):
+    for animal_id, w in zip(all_animals, remapped_weights_subjects):
         for state_idx in range(w.shape[0]):
             for cov_idx in range(w.shape[2]):
                 data.append({
@@ -754,13 +529,14 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals):
                     'Weight': w[state_idx, 0, cov_idx]
                 })
     data = pd.DataFrame(data)
-    data.loc[data['Covariate'] == 4, 'Weight'] = data.loc[data['Covariate'] == 4, 'Weight'].abs()  # Absolute  bias
+    data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
 
     plt.figure(constrained_layout=True)
     ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
                 palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
     plt.axhline(0, color='black', linestyle='--')
-    cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
+    cov_names = ['stim.', 'bias', '$A_t$']
+    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.title(f'GLM-HMM kernel')
@@ -779,7 +555,25 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals):
             ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
 
 
-weights_subjects = test_full_model(experiments=['2AFC_2', '2AFC_3'])
-remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects, cov_index=3)
-animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
-plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals)
+# cherries = main()  # Absolute import due to another main function in this script
+weights_subjects, all_animals = test_full_model()
+remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects)
+# animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
+# plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals)
+
+# Save list of arrays with the weights
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'remapped_weights_subjects.pkl'
+with open(path, 'wb') as f:
+    pickle.dump(remapped_weights_subjects, f)
+    print(f'Saved weights to {path}')
+
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'all_animals.pkl'
+with open(path, 'wb') as f:
+    pickle.dump(all_animals, f)
+    print(f'Saved weights to {path}')
+
+
+# # Load list of arrays with the weights
+# with open(path, 'rb') as f:
+#     remapped_weights_subjects = pickle.load(f)
+#     print(f'Loaded weights from {path}')

@@ -12,7 +12,7 @@ from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, timer
 from parse.parse_v2 import parse_v2
 
 # Aesthetic parameters
-sns.set_theme()
+# sns.set_theme()
 sns.set_style('white')
 sns.set_style('ticks')
 sns.set_context('poster')

@@ -1,5 +1,6 @@
 import numpy as np
 from matplotlib import pyplot as plt
+
 from glue_sessions import glue_groups
 from psychometric_curves import plot_pc
 
@@ -126,19 +127,24 @@ def cherry_pick(df_behavior, experiment, plot=False):
     return good_subjects
 
 
-def main(main):
+def main(experiments=None):
     """
-    Main function to cherry-pick subjects for all experiments
-    :return:
+    Main function to cherry-pick subjects from experiments.
+    :param experiments: List of experiment names or single experiment name as string.
+    If None, defaults to all experiments.
+    :return: Dictionary with good subjects per experiment
     """
 
-    experiments = [
-        '2AFC_2',
-        '2AFC_3',
-        '2AFC_4',    # Ephys pilot group (loads of infections). FSM changes (0.15s motor in). 0.5s delay introduced
-        # '2AFC_5',    # Ephys group (no evidences)
-        '2AFC_6',    # Pharma group. 11th frame with 0 evidence
-    ]
+    if experiments is None:
+        experiments = [
+            '2AFC_2',
+            '2AFC_3',
+            '2AFC_4',    # Ephys pilot group (loads of infections). FSM changes (0.15s motor in). 0.5s delay introduced
+            # '2AFC_5',    # Ephys group (no evidences)
+            '2AFC_6',    # Pharma group. 11th frame with 0 evidence
+        ]
+    elif isinstance(experiments, str):
+        experiments = [experiments]  # Wrap single string into list
 
     df_behavior = glue_groups(experiments)
 
