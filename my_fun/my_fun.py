@@ -7,7 +7,7 @@ from string import ascii_lowercase
 # from matplotlib import pyplot as plt
 # from sympy import symbols, Eq, log, nsolve  # Not installed in setup PCs
 from scipy.optimize import fsolve
-import slack
+# import slack
 import os
 import csv
 import random
@@ -79,9 +79,9 @@ def sine_wave(length=1, fs=44100, cycles=10, amp=1, phase=0, v_shift=0, plot=Fal
     if plot:
         plt.plot(x, y)
         plt.title('Sine wave')
-        plt.xlabel('$\it{t}$ (s)')
+        plt.xlabel(r'$\it{t}$ (s)')
         plt.xticks(np.linspace(0, length, cycles + 1))
-        plt.ylabel('$\it{y}$ (t)')
+        plt.ylabel(r'$\it{y}$ (t)')
 
     return x, y
 
