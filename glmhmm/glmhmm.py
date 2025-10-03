@@ -779,7 +779,7 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals):
             ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
 
 
-# weights_subjects = test_full_model(experiments=['2AFC_2', '2AFC_3'])
+weights_subjects = test_full_model(experiments=['2AFC_2', '2AFC_3'])
 remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects, cov_index=3)
 animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
 plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, animals)
