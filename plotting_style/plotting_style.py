@@ -25,3 +25,12 @@ def fig_size(n_cols=1, ratio=None):
     figsize = (fig_width, fig_height)
 
     return figsize
+
+
+current = sns.plotting_context()
+for name in ["paper", "notebook", "talk", "poster"]:
+    if current == sns.plotting_context(name):
+        print(name)
+        break
+else:
+    print("custom")

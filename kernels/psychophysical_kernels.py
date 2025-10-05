@@ -49,13 +49,10 @@ from scipy import stats
 import seaborn as sns
 from collections import namedtuple
 from my_fun.my_fun import get_experiment, get_animal, save_fig, timer, filter_drug_sessions
+from cherry.cherry import *
 from kernels.kernels_tools import *
+from plotting_style import *
 
-# Plotting parameters
-sns.set_theme()
-sns.set_style('white')
-sns.set_style('ticks')
-sns.set_context('poster')
 
 
 @timer
@@ -317,9 +314,6 @@ def get_pk(experiment='2AFC_6', animal=None, target_ilds=None, drug=None, residu
         p_values = results.pvalues
         summary = results.summary()
         # print(summary)
-
-        # Get shuffles
-        # shuffles = get_shuffles_GLM(choices, stim_strength, iterations=iterations)  # Only frames
 
         ################################################################################################################
 

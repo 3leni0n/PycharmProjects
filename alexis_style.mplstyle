@@ -1,7 +1,7 @@
 # Figure resolution
-figure.figsize : 6.4, 4.8
-figure.dpi : 100
-savefig.dpi : 300
+figure.figsize: 6.4, 4.8
+figure.dpi: 100
+savefig.dpi: 300
 
 # Axes properties
 axes.edgecolor: black
@@ -12,8 +12,8 @@ ytick.direction: out
 legend.frameon: False
 
 # Despine (remove right and top spines)
-axes.spines.right : False
-axes.spines.top : False
+axes.spines.right: False
+axes.spines.top: False
 
 # Save figure
 savefig.format: svg

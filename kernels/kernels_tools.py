@@ -101,7 +101,8 @@ def make_net_ild_dm(df):
     design_matrix = pd.DataFrame(design_matrix, columns=net_ilds)
     for i, ild in enumerate(ilds):
         if ild != 0:
-            design_matrix.loc[i, abs(ild)] = np.sign(ild)
+            col = int(abs(ild))
+            design_matrix.loc[i, col] = np.sign(ild)
     return design_matrix
 
 
@@ -177,6 +178,7 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
 
     sounds = pd.read_csv(sounds_path)
     n_frames = sounds.n_frames.unique()[0]
+    trial_lag = n_frames
     net_ilds = list(sounds.ILD.abs().unique())
     net_ilds.sort()
     net_ilds = net_ilds[1:]  # Remove 0
@@ -185,7 +187,6 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
     for _ in range(iterations):
 
         # print(f'Iteration {_}/{iterations}')  # Prints make it slower
-
         # Shuffling the endog or the exog doesn't matter if there's only one regressor. When there's more, shuffling
         # needs regressor precision
         # endog_shuffled = endog.sample(frac=1).reset_index(drop=True)  # Shuffle endog
@@ -194,38 +195,38 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
         # Pshychophysical kernels
         if kind == 'pk_frames':
             frames_shuffled = exog.iloc[:, 0:n_frames].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
+            exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, 0:n_frames] = frames_shuffled
         elif kind == 'pk_session_index':
             session_indexes_shuffled = exog.iloc[:, n_frames:-len_net_ilds].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
+            exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, n_frames:-len_net_ilds] = session_indexes_shuffled
         elif kind == 'pk_net_stim':
             net_stim_shuffled = exog.iloc[:, -len_net_ilds:].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
+            exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, -len_net_ilds:] = net_stim_shuffled
 
-        # History kernels
+        # History kernels/Full model
         elif kind == 'hk_rminus':
-            prev_resp_shuffled = exog.iloc[:, 0:10].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, 0:10] = prev_resp_shuffled
+            prev_resp_shuffled = exog.iloc[:, 0:trial_lag].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog.copy()
+            exog_shuffled.iloc[:, 0:trial_lag] = prev_resp_shuffled
         elif kind == 'hk_rplus':
-            prev_resp_shuffled = exog.iloc[:, 10:20].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, 10:20] = prev_resp_shuffled
+            prev_resp_shuffled = exog.iloc[:, trial_lag:trial_lag*2].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog.copy()
+            exog_shuffled.iloc[:, trial_lag:trial_lag*2] = prev_resp_shuffled
         elif kind == 'hk_session_index':
-            session_indexes_shuffled = exog.iloc[:, 20:-4].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, 20:-4] = session_indexes_shuffled
+            session_indexes_shuffled = exog.iloc[:, trial_lag*2:-len_net_ilds-n_frames].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog.copy()
+            exog_shuffled.iloc[:, trial_lag*2:-len_net_ilds-n_frames] = session_indexes_shuffled
         elif kind == 'hk_net_stim':
-            net_stim_shuffled = exog.iloc[:, -4:].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, -4:] = net_stim_shuffled
+            net_stim_shuffled = exog.iloc[:, -14:-10].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog.copy()
+            exog_shuffled.iloc[:, -14:-10] = net_stim_shuffled
         elif kind == 'hk_frames':
-            frames_shuffled = exog.iloc[:, -4 - n_frames:-4].sample(frac=1).reset_index(drop=True)
-            exog_shuffled = exog
-            exog_shuffled.iloc[:, -4 - n_frames:-4] = frames_shuffled
+            frames_shuffled = exog.iloc[:, -n_frames:].sample(frac=1).reset_index(drop=True)
+            exog_shuffled = exog.copy()
+            exog_shuffled.iloc[:, -n_frames:] = frames_shuffled
 
         # model_shuffled = sm.GLM(endog_shuffled, exog,  # Shuffled choices
         #                         family=sm.families.Binomial(), missing='drop')  # GLM with Binomial family and Logit link

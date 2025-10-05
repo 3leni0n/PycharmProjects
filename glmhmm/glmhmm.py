@@ -4,9 +4,10 @@ import ssm
 from pathlib import Path
 import pickle
 
-from my_fun import get_experiment
+from my_fun import get_experiment, save_notebook_files
 from cherry.cherry import *
 from kernels.kernels_tools import *
+from plotting_style import *
 
 
 def get_action_trace(df, max_trial_lag=10, tau=2):
@@ -462,7 +463,7 @@ def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     sns.despine()
 
 
-def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
+def plot_mean_GLMHMM_kernel(remapped_weights_subjects, n_cols=2):
     """
     Plot GLM remapped weights for all subjects for each state. Requires weight remapping first according to
     interpretation.
@@ -471,7 +472,8 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
     :return: None
     """
 
-    plt.figure(constrained_layout=True)
+    figsize = fig_size(n_cols=n_cols)
+    plt.figure(figsize=figsize, constrained_layout=True)
 
     mean_weights_engaged = []
     mean_weights_disengaged = []
@@ -512,7 +514,7 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects):
     sns.despine()
 
 
-def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
+def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals, n_cols=2):
     """
     Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
     """
@@ -531,7 +533,8 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
     data = pd.DataFrame(data)
     data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
 
-    plt.figure(constrained_layout=True)
+    figsize = fig_size(n_cols=n_cols)
+    plt.figure(figsize=figsize, constrained_layout=True)
     ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
                 palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
     plt.axhline(0, color='black', linestyle='--')
@@ -554,6 +557,8 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
             y1 = subset[subset['State'] == 1]['Weight'].values[0]
             ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
 
+    return ax
+
 
 # cherries = main()  # Absolute import due to another main function in this script
 # weights_subjects, all_animals = test_full_model()
@@ -561,25 +566,26 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals):
 # animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
 # plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals)
 
-# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'remapped_weights_subjects.pkl'
-# # Save list of arrays with the weights
-# # with open(path, 'wb') as f:
-# #     pickle.dump(remapped_weights_subjects, f)
-# #     print(f'Saved weights to {path}')
-#
-# # Load list of arrays with the weights
-# with open(path, 'rb') as f:
-#     remapped_weights_subjects = pickle.load(f)
-#     print(f'Loaded weights from {path}')
-#
-#
-# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'all_animals.pkl'
-# # Save list of all animals
-# # with open(path, 'wb') as f:
-# #     pickle.dump(all_animals, f)
-# #     print(f'Saved weights to {path}')
-#
-# # Load list of arrays with the weights
-# with open(path, 'rb') as f:
-#     all_animals = pickle.load(f)
-#     print(f'Loaded weights from {path}')
+
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'remapped_weights_subjects.pkl'
+# Save list of arrays with the weights
+# with open(path, 'wb') as f:
+#     pickle.dump(remapped_weights_subjects, f)
+#     print(f'Saved weights to {path}')
+
+# Load list of arrays with the weights
+with open(path, 'rb') as f:
+    remapped_weights_subjects = pickle.load(f)
+    print(f'Loaded weights from {path}')
+
+
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'all_animals.pkl'
+# Save list of all animals
+# with open(path, 'wb') as f:
+#     pickle.dump(all_animals, f)
+#     print(f'Saved weights to {path}')
+
+# Load list of arrays with the weights
+with open(path, 'rb') as f:
+    all_animals = pickle.load(f)
+    print(f'Loaded weights from {path}')

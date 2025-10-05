@@ -13,7 +13,8 @@ from matplotlib import pyplot as plt
 from scipy import stats
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_experiment, get_animal, save_fig, timer
+from my_fun.my_fun import get_experiment, get_animal, save_fig, timer, filter_drug_sessions
+from cherry.cherry import *
 from kernels.kernels_tools import *
 from plotting_style import *
 
@@ -43,113 +44,126 @@ def get_hk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
     animal = get_animal(experiment=experiment, animal=animal)
     folder_in = Path(folder_in / animal).with_suffix('.csv')
 
-    ####################################################################################################################
-
     # Load behavioral data
     df = pd.read_csv(folder_in)
 
     ####################################################################################################################
 
     # Load intersession data
-    # path_intersession = '/home/alexis/PycharmProjects/intersession/' + experiment + '/' + animal + '_intersession.csv'
-    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (animal + '_intersession.csv')
+    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (str(int(animal)) + '_intersession.csv')
+    # str(int(animal)) to remove the 0 padding in ID
     df_intersession = pd.read_csv(path_intersession)
-
-    # There are some short, corrupted sessions (dates) for which there is no intersession data because one of the values
-    # for some of the columns is empty. Remove them from trial data
-    dates_trials = df.Date.unique()
-    dates_intersession = df_intersession.Dates.unique()
-    dates_to_remove = [x for x in dates_trials if x not in dates_intersession]
-    df = df[~df.Date.isin(dates_to_remove)]
-
-    # Add intersession data to df. Needs to be done before filtering out trials so lengths match
-    session_index = []
-    accuracy = []
-    accuracy_left = []
-    accuracy_right = []
-    for i in range(len(df_intersession)):
-        session_index += [df_intersession.index.values[i]] * df_intersession.Trials[i]
-        accuracy += [df_intersession.Accuracy[i]] * df_intersession.Trials[i]
-        accuracy_left += [df_intersession.AccuracyLeft[i]] * df_intersession.Trials[i]
-        accuracy_right += [df_intersession.AccuracyRight[i]] * df_intersession.Trials[i]
-    df['SessionIndex'] = session_index
-    df['Accuracy'] = accuracy
-    df['AccuracyLeft'] = accuracy_left
-    df['AccuracyRight'] = accuracy_right
 
     ####################################################################################################################
 
     # Filter trials
     df = df[df.Choice.notna()]  # Drop misses (nan in choices), otherwise the code crashes
-    df = df[df.P>0]
-    # ilds = np.sort(df.ILD.unique())
-    # df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
-    # # df = df[df.Hit == 1]  # Only correct trials
-    accuracy_threshold = 0.5
-    df = df[(df.AccuracyLeft >= accuracy_threshold) & (df.AccuracyRight >= accuracy_threshold)]  # Select only trials
-    # with accuracy >= threshold
+    df = df[df.P > 0]  # Only trials/sessions with P > 0
+    # if target_ilds is not None:
+    #     df = df[df.ILD.isin(target_ilds)]  # Select only trials with the desired ILDs
+
+    threshold = 0.5  # Accuracy threshold to remove bad sessions
+    # mask = df_intersession.Accuracy < threshold
+    mask = (df_intersession.AccuracyLeft < threshold) | (df_intersession.AccuracyRight < threshold)
+
+    # Remove bad sessions based on intersession data
+    if drug is None:
+        dates_to_remove = df_intersession[mask].Dates
+        df = df[~df.Date.isin(dates_to_remove)].reset_index(drop=True)
+
+    # # Engagement
+    # engaged = [1 if state == 0 else 0 for state in df.State]
+    # df['Engaged'] = engaged
+    # df = df[df.Engaged == 1]  # Only engaged trials
 
     ####################################################################################################################
 
     # Drug sessions/trials
-    if drug is not None:  # Select drug session trials
-        df_drug = pd.read_csv(Path.home() / 'PycharmProjects' / 'drugs' / 'Mouse injections MK801.csv')  # Load drug data
-        df = df[df.Drug.notnull()]
-        df_intersession = df_intersession[df_intersession.Drug.notnull()]
-        # drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
+    if drug is not None:  # Select drug session/trials
 
-        # Get paired rest sessions prior to drug inyection
-        if drug == 'rest':
-            mk801_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
-            n_mk801_indexes = len(mk801_indexes)
-            paired_rest_indexes = df_intersession[df_intersession.Drug == 'rest'].Dates.index.values
-            paired_rest_indexes = np.random.choice(paired_rest_indexes, n_mk801_indexes, False)
-            paired_rest_dates = df_intersession.Dates[paired_rest_indexes]
-            df = df[df.Date.isin(paired_rest_dates)]
+        if experiment == '2AFC_2':
+            df_drug = pd.read_csv(Path.home() / 'PycharmProjects' / 'drugs' / 'Mouse injections MK801.csv')  # Load drug data
+            df = df[df.Drug.notnull()]
+            df_intersession = df_intersession[df_intersession.Drug.notnull()]
+            # drug_session_dates = df_intersession[df_intersession.Drug == drug].Dates
 
-        # Get paired saline sessions prior to drug inyection
-        if drug == 'saline':
-            mk801_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
-            paired_saline_indexes = mk801_indexes - 1
-            paired_saline_dates = df_intersession.Dates[paired_saline_indexes]
-            df = df[df.Date.isin(paired_saline_dates)]
+            # Get paired rest sessions prior to drug inyection
+            if drug == 'rest':
+                mk801_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
+                n_mk801_indexes = len(mk801_indexes)
+                paired_rest_indexes = df_intersession[df_intersession.Drug == 'rest'].Dates.index.values
+                paired_rest_indexes = np.random.choice(paired_rest_indexes, n_mk801_indexes, False)
+                paired_rest_dates = df_intersession.Dates[paired_rest_indexes]
+                df = df[df.Date.isin(paired_rest_dates)]
 
-        df = df[df.Drug == drug]
+            # Get paired saline sessions prior to drug inyection
+            if drug == 'saline':
+                mk801_indexes = df_intersession[df_intersession.Drug == 'MK801'].Dates.index.values
+                paired_saline_indexes = mk801_indexes - 1
+                paired_saline_dates = df_intersession.Dates[paired_saline_indexes]
+                df = df[df.Date.isin(paired_saline_dates)]
+
+            df = df[df.Drug == drug]
+
+        # Drop sessions in which the animal didn't do the task. This can be achieved by using an accuracy threshold of 0.5
+        # df.drop(index=df[(df.Date == '2022-05-24') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 4%
+        # df.drop(index=df[(df.Date == '2022-05-25') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 3%
+        # df.drop(index=df[(df.Date == '2022-06-01') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 43%
+        # df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)  # Miss rate 50%
+        # df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)  # Miss rate 83%
+
+        elif experiment == '2AFC_6':
+            if drug in [0, 1]:
+                # Filter out saline sessions that are not paired to drug sessions
+                df = filter_drug_sessions(df)
+                df_intersession = filter_drug_sessions(df_intersession)
+
+                # Remove bad sessions
+
+                # Add paired session index
+                n_paired_sessions = len(df_intersession) // 2
+                # print(f'{n_paired_sessions:.0f} paired sessions')
+                paired_sessions = np.repeat(np.arange(n_paired_sessions), 2)
+                df_intersession['PairedSession'] = paired_sessions
+
+                # Remove from intersession data
+                bad_paired_sessions = df_intersession[mask].PairedSession
+                # print(f'Bad sessions: {bad_paired_sessions}')
+                bad_paired_dates = df_intersession[df_intersession.PairedSession.isin(bad_paired_sessions)].Dates
+                df_intersession = df_intersession[~df_intersession.Dates.isin(bad_paired_dates)].reset_index(
+                    drop=True)
+                # print(f'Dropped {len(bad_paired_sessions)}/{n_paired_sessions} ({(len(bad_paired_sessions) / n_paired_sessions) * 100:.0f}%) paired sessions')
+
+                # Remove from trial data
+                df = df[~df.Date.isin(bad_paired_dates)].reset_index(drop=True)
+
+                df = df[df.Drug == drug]
+
     else:  # Don't select drug session trials
         try:
             df = df[df.Drug.isnull()]  # Remove drug experimental sessions
         except AttributeError:
             pass
 
-    # Drop sessions in which the animal didn't do the task. This can be achieved by using an accuracy threshold of 0.5
-    # df.drop(index=df[(df.Date == '2022-05-24') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 4%
-    # df.drop(index=df[(df.Date == '2022-05-25') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 3%
-    # df.drop(index=df[(df.Date == '2022-06-01') & (df.Setup == 337)].index, inplace=True)  # Left accuracy 43%
-    # df.drop(index=df[(df.Date == '2022-05-26') & (df.Setup == 332)].index, inplace=True)  # Miss rate 50%
-    # df.drop(index=df[(df.Date == '2022-05-27') & (df.Setup == 333)].index, inplace=True)  # Miss rate 83%
-
     ####################################################################################################################
 
     # Make design matrix
-    #
+
     df = df.reset_index(drop=True)
     n_trials = len(df)
-
-    # Make stimulus strength design matrix
 
     # Set stimuli set
     if experiment == '2AFC_6':
         stim_set = 6
-    elif experiment == '2AFC':
-        stim_set = 1
     else:
         stim_set = 2
 
+    # Make stimulus strength design matrix
     stim_strength, n_frames = make_frames_dm(df, stim_set=stim_set, residuals=residuals, zscore=zscore)
 
-    dm_choice_history = make_choice_history_dm(df, trial_lag)
-    dm_session_index = make_session_index_dm(df)
-    dm_ild = make_net_ild_dm(df)
+    dm_choice_history = make_choice_history_dm(df, trial_lag)  # Make history design matrix
+    dm_session_index = make_session_index_dm(df)  # Make session index design matrix
+    dm_ild = make_net_ild_dm(df)  # Make net ILD design matrix
     exog = pd.concat([dm_choice_history, dm_session_index, dm_ild, stim_strength], axis=1)
     exog = exog.iloc[trial_lag:, :].reset_index(drop=True)  # To remove the nans
 
@@ -167,14 +181,14 @@ def get_hk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
 
     # Rpminus
     params_rminus = params.iloc[:trial_lag]  # From params
-    shuffles_rminus = get_shuffles_GLM(endog, exog, iterations, kind='hk_rminus')
+    shuffles_rminus = get_shuffles_GLM(endog, exog, iterations, kind='hk_rminus', stim_set=stim_set)
     shuffles_rminus = [shuffles_rminus[i].iloc[:trial_lag] for i in range(len(shuffles_rminus))]  # From shuffles
     bse_rminus = bse.iloc[:trial_lag]  # From bse
     p_values_rminus = p_values.iloc[:trial_lag]  # From p_values
 
     # Rplus
     params_rplus = params.iloc[trial_lag:trial_lag * 2]  # From params
-    shuffles_rplus = get_shuffles_GLM(endog, exog, iterations, kind='hk_rplus')
+    shuffles_rplus = get_shuffles_GLM(endog, exog, iterations, kind='hk_rplus', stim_set=stim_set)
     shuffles_rplus = [shuffles_rplus[i].iloc[trial_lag:trial_lag * 2] for i in range(len(shuffles_rplus))]  # From shuffles
     bse_rplus = bse.iloc[trial_lag:trial_lag * 2]  # From bse
     p_values_rplus = p_values.iloc[trial_lag:trial_lag * 2]  # From p_values
@@ -183,21 +197,21 @@ def get_hk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
     params_session_index = params.iloc[trial_lag * 2:-4 - n_frames]
     bse_session_index = bse.iloc[trial_lag * 2:-4 - n_frames]
     p_values_session_index = p_values.iloc[trial_lag * 2:-4 - n_frames]
-    shuffles_session_index = get_shuffles_GLM(endog, exog, iterations, kind='hk_session_index')
+    shuffles_session_index = get_shuffles_GLM(endog, exog, iterations, kind='hk_session_index', stim_set=stim_set)
     shuffles_session_index = [shuffles_session_index[i].iloc[trial_lag * 2:-4 - n_frames] for i in range(len(shuffles_session_index))]  # From shuffles
 
     # Net ILD
-    params_net_stim = params.iloc[-4 - n_frames:-n_frames]
-    bse_net_stim = bse.iloc[-4 - n_frames:-n_frames]
-    p_values_net_stim = p_values.iloc[-4 - n_frames:-n_frames]
-    shuffles_net_stim = get_shuffles_GLM(endog, exog, iterations, kind='hk_net_stim')
-    shuffles_net_stim = [shuffles_net_stim[i].iloc[-4 - n_frames:-n_frames] for i in range(len(shuffles_net_stim))]  # From shuffles
+    params_net_stim = params.iloc[-4-n_frames:-n_frames]
+    bse_net_stim = bse.iloc[-4-n_frames:-n_frames]
+    p_values_net_stim = p_values.iloc[-4-n_frames:-n_frames]
+    shuffles_net_stim = get_shuffles_GLM(endog, exog, iterations, kind='hk_net_stim', stim_set=stim_set)
+    shuffles_net_stim = [shuffles_net_stim[i].iloc[-4-n_frames:-n_frames] for i in range(len(shuffles_net_stim))]  # From shuffles
 
     # Stimulus strength
     params_frames = params[-n_frames:]
     bse_frames = bse[-n_frames:]
     p_values_frames = p_values[-n_frames:]
-    shuffles_frames = get_shuffles_GLM(endog, exog, iterations, kind='pk_frames')
+    shuffles_frames = get_shuffles_GLM(endog, exog, iterations, kind='hk_frames', stim_set=stim_set)
     shuffles_frames = [shuffles_frames[i].iloc[-n_frames:] for i in range(len(shuffles_frames))]  # From shuffles
 
     # Store results in a namedtuple
@@ -282,7 +296,7 @@ def get_hk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
     return hk
 
 
-def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000, save=False):
+def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000, save=False, **kwargs):
     """
     Plot the history kernel of a given animal.
     :param experiment: str, name of the experiment
@@ -295,7 +309,7 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     """
 
     if type(experiment) == list:
-        hk = get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial_lag=trial_lag,
+        hk = get_mean_hk(experiments=experiment, animals=None, drug=None, trial_lag=trial_lag,
                          iterations=iterations)
         title = f'N={len(hk.animal)}, {hk.n_trials} trials'
         filename_prefix = 'mean_'
@@ -309,10 +323,83 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     color_upper_shuffle = 'tab:red'
     label = ''
 
+    ####################################################################################################################
+
+    # PLOT STIMULUS FRAMES KERNEL
+
+    plt.figure(**kwargs, constrained_layout=True)
+    n_frames = hk.n_frames
+    x = np.arange(1, n_frames + 1)
+
+    shuffles_mean = np.mean(hk.shuffles_frames, axis=0)  # Get the mean of all the shuffles
+    percentiles95 = np.percentile(hk.shuffles_frames, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    plt.plot(x, shuffles_mean, color='tab:gray', ls='--')
+    plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':')
+
+    y = hk.params_frames
+    yerr = hk.std_err_frames
+    plt.plot(x, y, color=color, marker='o', label=label)
+    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+    # plt.title(title)
+    plt.xlabel('Stimulus frame')
+    plt.ylabel('Weight')
+    sns.despine()
+
+    # if pk.p_values is not None:
+    #     for i in range(n_frames):
+    #         if pk.p_values[i] <= 0.05:
+    #             text = '*'
+    #         else:
+    #             # text = 'ns'
+    #             text = ''
+    #         plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
+    #                      color=color, va='center', ha='center', fontsize='medium')
+
+    if save:
+        filename = f'{hk.animal}_PK_ILDs'
+        filename = filename_prefix + filename
+        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'kernels' / 'PK' / experiment
+        if not folder_out.exists():
+            folder_out.mkdir(parents=True, exist_ok=True)
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT NET STIMULUS KERNEL
+
+    plt.figure(**kwargs, constrained_layout=True)
+    x = np.arange(len(hk.params_net_stim.index.astype(int).values))
+
+    # Plot shuffles
+    shuffles_mean = np.mean(hk.shuffles_net_stim, axis=0)  # Get the mean of all the shuffles
+    percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
+    plt.plot(x, shuffles_mean, color='tab:gray', ls='--')
+    plt.plot(x, percentiles95, color='tab:red', ls=':')
+    sns.despine()
+
+    # Plot kernel
+    y = hk.params_net_stim
+    yerr = hk.std_err_net_stim
+    plt.plot(x, y, color=color, marker='o')
+    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+    # plt.title(title)
+    plt.xlabel('Net stimuli (dB)')
+    plt.ylabel('Weight')
+    plt.xticks(x, ['2', '4', '8', '70'])
+
+    if save:
+        filename = filename_prefix + 'net_stim' + filename
+        folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
+        save_fig(folder_out, filename)
+        plt.close()
+
+    ####################################################################################################################
+
+    # PLOT HISTORY KERNEL
+
     trial_lag = hk.trial_lag
-
     for _ in range(1, 3):
-
         if _ == 1:  # R+
             xlabel = 'Trial lag (' + '$r^{-}$)'
             # params_indexes = np.arange(trial_lag * _)
@@ -328,24 +415,29 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
             yerr = hk.std_err_rplus
             shuffles = hk.shuffles_rplus
 
-        ################################################################################################################
-
-        # PLOT HISTORY KERNEL
-        figsize = fig_size(n_cols=2)
-        plt.figure(figsize=figsize, constrained_layout=True)
+        plt.figure(**kwargs, constrained_layout=True)
         x = np.arange(1, trial_lag + 1)
-        # y = hk.params.iloc[params_indexes]
-        # yerr = hk.std_err.iloc[params_indexes]
+
+        # Plot shuffles
+        shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
+        percentiles2dot5 = np.percentile(shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        percentiles97dot5 = np.percentile(shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--')
+        plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':')
+        plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':')
+
+        # plot kernel
         plt.plot(x, y, color=color, marker='o', label=label)
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
-        plt.xticks(x, x[::-1])
+        # plt.title(title)
+        # plt.xticks(x, x[::-1])
+        plt.xticks(x[::5], x[::-1][::5])
         plt.xlabel(xlabel)
-        ylabel = 'GLM weight'
+        ylabel = 'Weight'
         plt.ylabel(ylabel)
-        plt.legend(frameon=False)
-        # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
+        sns.despine()
 
+        # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
         # if hk.p_values is not None:
         #     for i in range(n_trials_lag):
         #         if hk.p_values[i] <= 0.05:
@@ -356,48 +448,11 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         #         plt.annotate(text, xy=(i + 1, yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
         #                      color=color, va='center', ha='center', fontsize='medium')
 
-        shuffles_mean = np.mean(shuffles, axis=0)  # Get the mean of all the shuffles
-        percentiles2dot5 = np.percentile(shuffles, 2.5, axis=0)  # Get upper 5 percentile of the shuffled_var
-        percentiles97dot5 = np.percentile(shuffles, 97.5, axis=0)  # Get upper 5 percentile of the shuffled_var
-        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-        plt.plot(x, percentiles2dot5, color=color_upper_shuffle, ls=':', zorder=1.9)
-        plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':', zorder=2)
-
-        sns.despine()
-
         if save:
             filename = filename_prefix + 'prev_resp' + filename
             folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
             save_fig(folder_out, filename)
             plt.close()
-
-    ################################################################################################################
-
-    # PLOT NET STIMULUS KERNEL
-    figsize = fig_size(n_cols=2)
-    plt.figure(figsize=figsize, constrained_layout=True)
-    x = np.arange(len(hk.params_net_stim.index.astype(int).values))
-    y = hk.params_net_stim
-    yerr = hk.std_err_net_stim
-    plt.plot(x, y, color=color, marker='o')
-    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-    plt.title(title)
-    plt.xlabel('Net stimuli')
-    plt.ylabel('GLM weight')
-    # plt.legend(frameon=False)
-    plt.xticks(x, ['2', '4', '8', '70'])
-
-    shuffles_mean = np.mean(hk.shuffles_net_stim, axis=0)  # Get the mean of all the shuffles
-    percentiles95 = np.percentile(hk.shuffles_net_stim, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(x, percentiles95, color='tab:red', ls=':', zorder=1.9)
-    sns.despine()
-
-    if save:
-        filename = filename_prefix + 'net_stim' + filename
-        folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
-        save_fig(folder_out, filename)
-        plt.close()
 
     ####################################################################################################################
 
@@ -405,26 +460,30 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
 
     if type(experiment) == str:  # Don't do it for the mean kernel
 
-        figsize = (fig_size(n_cols=1)[0], fig_size(n_cols=2)[1])
-        plt.figure(figsize=figsize, constrained_layout=True)
+        kwargs['figsize'] = (4 * kwargs['figsize'][0], kwargs['figsize'][1])
+        plt.figure(**kwargs, constrained_layout=True)
         x = hk.params_session_index.index.values
-        y = hk.params_session_index
-        yerr = hk.std_err_session_index
-        plt.plot(x, y, color=color, marker='o')
-        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
-        plt.xlabel('Session index')
-        plt.ylabel('GLM weight')
-        # plt.legend(frameon=False)
-        # plt.xticks(x, ['2', '4', '8', '70'])
+
+        # Plot shuffles
         shuffles_mean = np.mean(hk.shuffles_session_index, axis=0)  # Get the mean of all the shuffles
         percentiles2dot5 = np.percentile(hk.shuffles_session_index, 2.5,
                                          axis=0)  # Get upper 5 percentile of the shuffled_var
         percentiles97dot5 = np.percentile(hk.shuffles_session_index, 97.5,
                                           axis=0)  # Get upper 5 percentile of the shuffled_var
-        plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-        plt.plot(x, percentiles2dot5, color='tab:red', ls=':', zorder=1.85)
-        plt.plot(x, percentiles97dot5, color='tab:red', ls=':', zorder=1.9)
+        plt.plot(x, shuffles_mean, color='tab:gray', ls='--')
+        plt.plot(x, percentiles2dot5, color='tab:red', ls=':')
+        plt.plot(x, percentiles97dot5, color='tab:red', ls=':')
+
+        # Plot kernel
+        y = hk.params_session_index
+        yerr = hk.std_err_session_index
+        plt.plot(x, y, color=color, marker='o')
+        plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
+        # plt.title(title)
+        ax = plt.gca()
+        ax.set_xlim(x[0]-1, x[-1]+1)
+        plt.xlabel('Session index')
+        plt.ylabel('Weight')
         sns.despine()
 
         if save:
@@ -432,52 +491,6 @@ def plot_hk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
             folder_out = Path.home() / 'Documentos' / 'kernels' / 'HK' / experiment
             save_fig(folder_out, filename)
             plt.close()
-
-    ####################################################################################################################
-
-    # PLOT STIMULUS FRAMES KERNEL
-
-    figsize = fig_size(n_cols=2)
-    plt.figure(figsize=figsize, constrained_layout=True)
-
-    n_frames = hk.n_frames
-    ylabel = 'GLM weight (residuals)'
-
-    x = np.arange(1, n_frames + 1)
-    y = hk.params_frames
-    yerr = hk.std_err_frames
-    plt.plot(x, y, color=color, marker='o', label=label)
-    plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-    plt.title(title)
-    plt.xlabel('Stimulus frame')
-    plt.ylabel(ylabel)
-    plt.legend(frameon=False)
-
-    # if pk.p_values is not None:
-    #     for i in range(n_frames):
-    #         if pk.p_values[i] <= 0.05:
-    #             text = '*'
-    #         else:
-    #             # text = 'ns'
-    #             text = ''
-    #         plt.annotate(text, xy=(i + 1 + int(residuals), yticks[1]), xytext=(i + 1 + int(residuals), yticks[1]),
-    #                      color=color, va='center', ha='center', fontsize='medium')
-
-    shuffles_mean = np.mean(hk.shuffles_frames, axis=0)  # Get the mean of all the shuffles
-    percentiles95 = np.percentile(hk.shuffles_frames, 95, axis=0)  # Get upper 5 percentile of the shuffled_var
-    plt.plot(x, shuffles_mean, color='tab:gray', ls='--', zorder=1.8)
-    plt.plot(x, percentiles95, color=color_upper_shuffle, ls=':', zorder=1.9)
-
-    sns.despine()
-
-    if save:
-        filename = f'{hk.animal}_PK_ILDs'
-        filename = filename_prefix + filename
-        folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'kernels' / 'PK' / experiment
-        if not folder_out.exists():
-            folder_out.mkdir(parents=True, exist_ok=True)
-        save_fig(folder_out, filename)
-        plt.close()
 
 
 def plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '333', '335', '337'], drug=None,
@@ -500,7 +513,7 @@ def plot_hks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
                 save=save)
 
 
-def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial_lag=10, iterations=1000):
+def get_mean_hk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], animals=None, drug=None, trial_lag=10, iterations=1000):
     """
     Get the mean peak of the history kernel of all animals of a given batch.
     :param experiments: list of str, name of the experiments
@@ -533,13 +546,17 @@ def get_mean_hk(experiments=['2AFC_2', '2AFC_3'], animals=None, drug=None, trial
         experiment, folder_in = get_experiment(experiments[j], path_session='glue_sessions')
 
         if experiments[j] == '2AFC_2':
-            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
+            animals = ['325', '326', '327', '329', '330', '332', '333', '335', '337']
             # animals = ['332', '333', '337']  # Drug experiments
         elif experiments[j] == '2AFC_3':
-            animals = ['419', '420', '422', '616', '619', '623']
+            animals = ['419', '420', '422', '616', '617', '619', '623']
+        elif experiments[j] == '2AFC_4':
+            animals = ['561', '807', '820', '821', '873', '875', '907', '909', '911']
 
         for i in range(len(animals)):
+
             print(f'Getting kernel of animal {animals[i]} ({i + 1}/{len(animals)})')
+
             hk = get_hk(experiment=experiment, animal=animals[i], drug=drug, trial_lag=trial_lag, iterations=iterations)
             animals_across_batches.append(hk.animal)
 
@@ -745,10 +762,10 @@ def plot_hk_drug():
         plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
         plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
         plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
+        # plt.title(title)
         plt.xticks(x, x[::-1])
         plt.xlabel(xlabel)
-        ylabel = 'GLM weight'
+        ylabel = 'Weight'
         plt.ylabel(ylabel)
         plt.legend(frameon=False)
         # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
@@ -796,9 +813,9 @@ def plot_hk_drug():
 
         plt.plot(x, y_drug, color=color_drug, marker='o', label='MK801')
         plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
+        # plt.title(title)
         plt.xlabel('Net stimuli')
-        plt.ylabel('GLM weight')
+        plt.ylabel('Weight')
         plt.legend(frameon=False)
         plt.xticks(x, ['2', '4', '8', '70'])
 
