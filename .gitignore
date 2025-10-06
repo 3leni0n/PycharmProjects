@@ -211,5 +211,5 @@ fabric.properties
 .DS_Store
 
 # Figures
-*.png
-*.svg
+#*.png
+#*.svg

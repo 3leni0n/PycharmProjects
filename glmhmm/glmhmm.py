@@ -1,8 +1,6 @@
 import os
-import seaborn as sns
-import ssm
-from pathlib import Path
 import pickle
+import ssm
 
 from my_fun import get_experiment, save_notebook_files
 from cherry.cherry import *
@@ -327,7 +325,13 @@ def fit_all(experiment):
 def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
 
     all_animals = []
+    fit_ll = []
     weights = []
+    trans_mat = []
+    posterior_probs = []
+    log_likelihood = []
+    # log_probability = []
+
     cherries = main(experiments)  # Get good subjects from cherry
 
     for experiment in experiments:
@@ -383,6 +387,7 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
             n_categories = 2  # Number of categories for output (2 for binary choice)
             input_dim = inputs[0].shape[1]
 
+            #
             glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
                              observation_kwargs=dict(C=n_categories), transitions='standard')
 
@@ -390,16 +395,22 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
             method = 'em'  # Expectation Maximization method
             num_iters = 200  # Max number of EM iterations
             tolerance = 1e-4  # tolerance for stopping criterion
-            fit_ll = glmhmm.fit(choices, inputs=inputs, method='em', num_iters=num_iters, tolerance=tolerance)
+            fit_ll.append(glmhmm.fit(choices, inputs=inputs, method='em', num_iters=num_iters, tolerance=tolerance))
 
-            weights_subject = glmhmm.observations.params
-            weights_subject = -weights_subject  # Flip sign of weights
-            weights.append(weights_subject)
+            weights.append(-glmhmm.observations.params)  # Flip sign of weights
+            trans_mat.append(glmhmm.transitions.transition_matrix)
 
-    return weights, all_animals
+            # Get expected states
+            posterior_probs.append([glmhmm.expected_states(data=data, input=input)[0]
+                               for data, input in zip(choices, inputs)])
+
+            log_likelihood.append(glmhmm.log_likelihood(choices, inputs=inputs))
+            # log_probability.append(glmhmm.log_probabilities(choices, inputs=inputs))
+
+    return all_animals, fit_ll, weights, trans_mat, posterior_probs, log_likelihood
 
 
-def interpret_weights(weights, cov_index=0):
+def interpret_weights(weights, trans_mat, posterior_probs, cov_index=0):
     """
     Interpret the HMM latent states (zt) of one or several subjects based on the GLM weights of its covariates.
     Assign engaged (larger) and disengaged (smaller) depending on the weight of the stimulus covariate (cov_index).
@@ -409,28 +420,40 @@ def interpret_weights(weights, cov_index=0):
     :return: remapped_weights, remap_indices
     """
 
-    def _interpret_single(weights):
+    def _interpret_single(weights, trans_mat, posterior_probs):
+
         if weights.shape[0] != 2:
             raise ValueError('Currently only supports 2 states')
+
         cov = weights[:, 0, cov_index]
         disengaged_index = np.argmin(cov)
         engaged_index = np.argmax(cov)
         remap_indices = [disengaged_index, engaged_index]
         remapped_weights = weights[remap_indices]
-        print(f"Remapped weights (dis., eng.): {remapped_weights[:, 0, cov_index]}")
-        return remapped_weights, remap_indices
+        remapped_trans_mat = trans_mat[np.ix_(remap_indices, remap_indices)]
+        remapped_posterior_probs = [p[:, remap_indices] for p in posterior_probs]
+        print(f'Remapped weights (dis., eng.): {remapped_weights[:, 0, cov_index]}')
+
+        return remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices
 
     # Check if input is a list (multiple subjects) or a single array
-    if isinstance(weights, list):
+    if isinstance(weights, list) and isinstance(trans_mat, list) and isinstance(posterior_probs, list):
+
         remapped_weights_subjects = []
+        remapped_trans_mat_subjects = []
+        remapped_posterior_probs_subjects = []
         remap_indices_subjects = []
-        for w in weights:
-            remapped_weights, remap_indices = _interpret_single(w)
+
+        for w, t, p in zip(weights, trans_mat, posterior_probs):
+            remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices = _interpret_single(w, t, p)
             remapped_weights_subjects.append(remapped_weights)
+            remapped_trans_mat_subjects.append(remapped_trans_mat)
+            remapped_posterior_probs_subjects.append(remapped_posterior_probs)
             remap_indices_subjects.append(remap_indices)
-        return remapped_weights_subjects, remap_indices_subjects
+        return remapped_weights_subjects, remapped_trans_mat_subjects, remapped_posterior_probs_subjects, remap_indices_subjects
+
     else:
-        return _interpret_single(weights)
+        return _interpret_single(weights, trans_mat, posterior_probs)
 
 
 def plot_GLMHMM_kernel(remapped_weights, **kwargs):
@@ -439,7 +462,7 @@ def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     interpretation.
     :param weights_remapped: np.array with GLM weights of shape (n_states, obs_dim, input_dim) already remapped
     (0 = disengaged, 1 = engaged)
-    :param kwargs: Additional keyword arguments for plt.plot(). E.g. alpha=0.5
+    :param kwargs: Additional keyword arguments for plt.plot()
     :return: None
     """
 
@@ -463,21 +486,21 @@ def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     sns.despine()
 
 
-def plot_mean_GLMHMM_kernel(remapped_weights_subjects, n_cols=2):
+def plot_mean_GLMHMM_kernel(remapped_weights, **kwargs):
     """
     Plot GLM remapped weights for all subjects for each state. Requires weight remapping first according to
     interpretation.
-    :param weights_remapped: List GLM weights per subject of shape (n_states, obs_dim, input_dim) already remapped
+    :param remapped_weights: List GLM weights per subject of shape (n_states, obs_dim, input_dim) already remapped
     (0 = disengaged, 1 = engaged)
+    :param kwargs: Additional keyword arguments for plt.plot()
     :return: None
     """
 
-    figsize = fig_size(n_cols=n_cols)
-    plt.figure(figsize=figsize, constrained_layout=True)
+    plt.figure(**kwargs, constrained_layout=True)
 
     mean_weights_engaged = []
     mean_weights_disengaged = []
-    for i, w in enumerate(remapped_weights_subjects):
+    for i, w in enumerate(remapped_weights):
         weights_disengaged = w[0, 0, :]
         weights_engaged = w[1, 0, :]
 
@@ -491,7 +514,7 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects, n_cols=2):
 
         mean_weights_disengaged.append(weights_disengaged)
         mean_weights_engaged.append(weights_engaged)
-        plot_GLMHMM_kernel(remapped_weights_subjects[i], alpha=0.1)
+        plot_GLMHMM_kernel(remapped_weights[i], alpha=0.1)
 
     # convert to arrays
     mean_weights_disengaged = np.array(mean_weights_disengaged)
@@ -514,13 +537,18 @@ def plot_mean_GLMHMM_kernel(remapped_weights_subjects, n_cols=2):
     sns.despine()
 
 
-def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals, n_cols=2):
+def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, **kwargs):
     """
     Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
+    :param remapped_weights: List GLM weights per subject of shape (n_states, obs_dim, input_dim) already remapped
+    (0 = disengaged, 1 = engaged)
+    :param all_animals: List of animal IDs corresponding to remapped_weights
+    :param kwargs: Additional keyword arguments for plt.plot()
+    :return: None
     """
 
     data = []
-    for animal_id, w in zip(all_animals, remapped_weights_subjects):
+    for animal_id, w in zip(all_animals, remapped_weights):
         for state_idx in range(w.shape[0]):
             for cov_idx in range(w.shape[2]):
                 data.append({
@@ -533,8 +561,7 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals, n_
     data = pd.DataFrame(data)
     data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
 
-    figsize = fig_size(n_cols=n_cols)
-    plt.figure(figsize=figsize, constrained_layout=True)
+    plt.figure(**kwargs, constrained_layout=True)
     ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
                 palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
     plt.axhline(0, color='black', linestyle='--')
@@ -560,32 +587,180 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals, n_
     return ax
 
 
+def plot_trans_mat(trans_mat, **kwargs):
+    """
+    Plot transition matrix of one or several subjects.
+    :param trans_mat: np.array with transition matrix of shape (n_states, n_states)
+    :param kwargs: Additional keyword arguments for plt.plot()
+    :return: None
+    """
+
+    # If trans_mat is a list of arrays, average them
+    if isinstance(trans_mat, list):
+        trans_mat = np.mean(np.stack(trans_mat, axis=0), axis=0)  # Stack and average
+
+    n_states = int(np.mean(trans_mat.shape))
+    plt.figure(**kwargs, constrained_layout=True)
+
+    # gen_trans_mat = np.exp(log_trans_mat)[0]
+    plt.imshow(trans_mat, vmin=-1, vmax=1, cmap='bone', origin='lower')
+
+    for i in range(trans_mat.shape[0]):
+        for j in range(trans_mat.shape[1]):
+            # text = str(np.around(trans_mat[i, j], decimals=2))
+            text = f"{trans_mat[i, j]:.2f}".lstrip('0').replace('-0.', '-.').rstrip('0').rstrip('.')
+            plt.text(j, i, text, ha='center', va='center', color='k')
+
+    # plt.xlim(-0.5, n_states + 0.5)
+    ticks = range(0, n_states)
+    ticklabels = [str(i) for i in range(n_states)]
+    plt.xticks(ticks, ticklabels)
+    plt.yticks(ticks, ticklabels)
+    # plt.ylim(n_states - 0.5, -0.5)
+    plt.ylabel('state $t$')
+    plt.xlabel('state $t+1$')
+    # plt.title('Transition matrix')
+
+    # Ensure all spines are visible, even if despine() was called outside
+    ax = plt.gca()
+    for spine in ax.spines.values():
+        spine.set_visible(True)
+
+
+def plot_occupancy(posterior_probs, **kwargs):
+    """
+    Plot state occupancies for one or several subjects based on posterior probabilities.
+    :param posterior_probs: List of posterior probabilities (np.array of shape (n_trials, n_states)) per subject
+    :param kwargs: Additional keyword arguments for plt.plot()
+    :return: None
+    """
+
+    # Normalize input to list of lists of arrays
+    if isinstance(posterior_probs[0], np.ndarray):
+        posterior_probs = [posterior_probs]  # Single animal
+    # else:
+    #     posterior_probs = posterior_probs  # Multiple animals
+
+    n_states = posterior_probs[0][0].shape[1]
+    colors = ['tab:gray', 'tab:blue']
+    labels = ['D.', 'E.']
+
+    occupancies = []
+
+    for p in posterior_probs:
+
+        # Concatenate posterior probabilities across sessions
+        posterior_probs_concat = np.concatenate(p)
+
+        # Get state with maximum posterior probability at particular trial
+        state_max_posterior = np.argmax(posterior_probs_concat, axis=1)
+        # df['State'] = state_max_posterior  # Add state column to df
+
+        # Obtain state fractional occupancies
+        _, state_occupancies = np.unique(state_max_posterior, return_counts=True)
+        state_occupancies = state_occupancies / np.sum(state_occupancies)
+        occupancies.append(state_occupancies)
+
+    occupancies = np.array(occupancies)
+    mean_occupancy = np.mean(occupancies, axis=0)
+
+    # Plot fractional occupancies
+    plt.figure(**kwargs, constrained_layout=True)
+
+    # # Plot individual animals in semi-transparent bars
+    # if len(posterior_probs) > 1:
+    #     for occ in occupancies:
+    #         for z in range(n_states):
+    #             plt.bar(z, occ[z], color=colors[z], alpha=0.1, edgecolor='k')
+
+    for z, occ in enumerate(mean_occupancy):
+        print(f'State {z} occupancy: {occ:.2f}')
+        plt.bar(z, occ, color=colors[z], edgecolor='k')
+
+    plt.xticks(range(len(labels)), labels)
+    plt.ylim((0, 1))
+    plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
+    plt.xlabel('State')
+    plt.ylabel('Occ.')
+    # plt.title('Occupancy')
+    sns.despine()
+
+
+def plot_log_likelihood(log_likelihood, posterior_probs, to_bits=True, **kwargs):
+    """
+    Plot log likelihood of one or several subjects.
+    :param log_likelihood: List of log likelihoods (float) per subject
+    :param posterior_probs: List of posterior probabilities (np.array of shape (n_trials, n_states)) per subject. Used
+    to compute number of trials for normalization.
+    :param to_bits: If True, normalize log likelihood by log(2) to convert to bits
+    :param kwargs: Additional keyword arguments for plt.plot()
+    :return:
+    """
+
+    plt.figure(**kwargs, constrained_layout=True)
+
+    if to_bits:
+        n_trials = [sum(p.shape[0] for p in pp) for pp in posterior_probs]
+
+        log_likelihood = [
+            (ll / n) / np.log(2) if to_bits else ll / n
+            for ll, n in zip(log_likelihood, n_trials)
+        ]
+        print(f'Log likelihood (normalized by number of trials): '
+              f'{np.mean(log_likelihood):.2f} ± {np.std(log_likelihood):.2f} (mean ± SD across subjects)')
+        ylabel = 'LL per trial (bits)' if to_bits else 'LL per trial (nats)'
+    else:
+        print(f'Log likelihood: {np.mean(log_likelihood):.2f} ± {np.std(log_likelihood):.2f} (mean ± SD across subjects)')
+        ylabel = 'LL (nats)'
+
+    # Plot boxplot
+    if len(log_likelihood) > 1:
+        sns.boxplot(y=log_likelihood, color='tab:blue', showfliers=True)
+        plt.scatter(np.zeros(len(log_likelihood)), log_likelihood, color='k', alpha=0.1)
+    else:
+        plt.bar(0, log_likelihood[0], color='tab:blue', edgecolor='k')
+
+    # plt.title('Log Likelihood')
+    plt.xlabel('GLM-HMM')
+    plt.ylabel(ylabel)
+    sns.despine()
+
+
+def tickle_pickle(var_names, action='load', vars=None):
+    """
+    Save or load GLM-HMM results to/from pickle files in the glmhmm directory.
+    :param action: 'save' or 'load' to save or load variables
+    :param var_names: List of variable names (strings)
+    :param vars: List of variables to save (only for action='save')
+    :return: Dictionary of loaded variables (only for action='load')
+    """
+
+    results = {}
+    base_path = Path.home() / 'PycharmProjects' / 'glmhmm'
+
+    if action == 'save':
+        if vars is None:
+            raise ValueError('vars must be provided for saving')
+
+        for var, var_name in zip(vars, var_names):
+            path = (base_path / var_name).with_suffix('.pkl')
+            with open(path, 'wb') as f:
+                pickle.dump(var, f)
+                print(f'Saved {var_name} to {path}')
+
+    elif action == 'load':
+        for var_name in var_names:
+            path = (base_path / var_name).with_suffix('.pkl')
+            with open(path, 'rb') as f:
+                results[var_name] = pickle.load(f)
+                print(f'Loaded {var_name} from {path}')
+        return results
+
+    else:
+        raise ValueError("action must be 'save' or 'load'")
+
 # cherries = main()  # Absolute import due to another main function in this script
-# weights_subjects, all_animals = test_full_model()
-# remapped_weights_subjects, remap_indices_subjects = interpret_weights(weights_subjects)
-# animals = ['325', '327', '329', '330', '332', '333', '335', '337', '419', '420', '422', '616', '619', '623']
-# plot_paired_boxplot_GLMHMM_kernel(remapped_weights_subjects, all_animals)
-
-
-path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'remapped_weights_subjects.pkl'
-# Save list of arrays with the weights
-# with open(path, 'wb') as f:
-#     pickle.dump(remapped_weights_subjects, f)
-#     print(f'Saved weights to {path}')
-
-# Load list of arrays with the weights
-with open(path, 'rb') as f:
-    remapped_weights_subjects = pickle.load(f)
-    print(f'Loaded weights from {path}')
-
-
-path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'all_animals.pkl'
-# Save list of all animals
-# with open(path, 'wb') as f:
-#     pickle.dump(all_animals, f)
-#     print(f'Saved weights to {path}')
-
-# Load list of arrays with the weights
-with open(path, 'rb') as f:
-    all_animals = pickle.load(f)
-    print(f'Loaded weights from {path}')
+# all_animals, fit_ll, weights, trans_mat, posterior_probs, log_likelihood  = test_full_model()
+# remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
+# plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals)
+# var_names = ['all_animals', 'fit_ll', 'weights', 'trans_mat', 'posterior_probs', 'log_likelihood']
