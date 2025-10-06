@@ -1,6 +1,7 @@
 import os
 import pickle
 import ssm
+from matplotlib import cm
 
 from my_fun import get_experiment, save_notebook_files
 from cherry.cherry import *
@@ -638,8 +639,6 @@ def plot_occupancy(posterior_probs, **kwargs):
     # Normalize input to list of lists of arrays
     if isinstance(posterior_probs[0], np.ndarray):
         posterior_probs = [posterior_probs]  # Single animal
-    # else:
-    #     posterior_probs = posterior_probs  # Multiple animals
 
     n_states = posterior_probs[0][0].shape[1]
     colors = ['tab:gray', 'tab:blue']
@@ -654,7 +653,6 @@ def plot_occupancy(posterior_probs, **kwargs):
 
         # Get state with maximum posterior probability at particular trial
         state_max_posterior = np.argmax(posterior_probs_concat, axis=1)
-        # df['State'] = state_max_posterior  # Add state column to df
 
         # Obtain state fractional occupancies
         _, state_occupancies = np.unique(state_max_posterior, return_counts=True)
@@ -666,12 +664,6 @@ def plot_occupancy(posterior_probs, **kwargs):
 
     # Plot fractional occupancies
     plt.figure(**kwargs, constrained_layout=True)
-
-    # # Plot individual animals in semi-transparent bars
-    # if len(posterior_probs) > 1:
-    #     for occ in occupancies:
-    #         for z in range(n_states):
-    #             plt.bar(z, occ[z], color=colors[z], alpha=0.1, edgecolor='k')
 
     for z, occ in enumerate(mean_occupancy):
         print(f'State {z} occupancy: {occ:.2f}')
@@ -726,6 +718,42 @@ def plot_log_likelihood(log_likelihood, posterior_probs, to_bits=True, **kwargs)
     sns.despine()
 
 
+def plot_trans_mat_box_plots(trans_mat, **kwargs):
+    """
+    Plot box plots of transition matrix probabilities across subjects.
+    :param trans_mat: List of transition matrices (np.array of shape (n_states, n_states)) per subject
+    :param kwargs: Additional keyword arguments for plt.plot()
+    :return: None
+    """
+
+    if not isinstance(trans_mat, list):
+        print('trans_mat must be a list')
+        return
+
+    trans_mat = np.array([m.flatten() for m in trans_mat])
+    columns = ['D→D', 'D→E', 'E→D', 'E→E']
+    df = pd.DataFrame(trans_mat, columns=columns)
+    df = df[['D→D', 'E→E']]  # Keep only D→D and E→E (the other two are redundant)
+    df_melt = df.melt(var_name='Transition', value_name='Probability')
+
+    # Create a color palette based on mean probabilities
+    means = df.mean().to_dict()  # Compute mean probability for each transition
+    norm = plt.Normalize(vmin=-1, vmax=1)  # Normalize to 0–1 for colormap sampling
+    cmap = cm.get_cmap('bone')
+    palette = {k: cmap(norm(v)) for k, v in means.items()}  # Sample bone color according to mean probability
+
+    plt.figure(**kwargs, constrained_layout=True)
+    # plt.figure(**kwargs, constrained_layout=True)
+    sns.boxplot(x='Transition', y='Probability', data=df_melt, palette=palette, showfliers=False)
+    sns.stripplot(x='Transition', y='Probability', data=df_melt,
+                  color='k', alpha=0.1, jitter=False)
+    # plt.ylim(0, 1)
+    plt.ylabel('Probability')
+    plt.xlabel('Transition')
+    plt.title('Matrix')
+    sns.despine()
+
+
 def tickle_pickle(var_names, action='load', vars=None):
     """
     Save or load GLM-HMM results to/from pickle files in the glmhmm directory.
@@ -763,4 +791,56 @@ def tickle_pickle(var_names, action='load', vars=None):
 # all_animals, fit_ll, weights, trans_mat, posterior_probs, log_likelihood  = test_full_model()
 # remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
 # plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals)
-# var_names = ['all_animals', 'fit_ll', 'weights', 'trans_mat', 'posterior_probs', 'log_likelihood']
+
+# Load results
+var_names = ['all_animals', 'fit_ll', 'remapped_weights', 'remapped_trans_mat', 'remapped_posterior_probs', 'log_likelihood']
+results = tickle_pickle(var_names, action='load', vars=None)
+
+# Unpack results
+all_animals = results['all_animals']
+fit_ll = results['fit_ll']
+weights = results['remapped_weights']
+trans_mat = results['remapped_trans_mat']
+posterior_probs = results['remapped_posterior_probs']
+log_likelihood = results['log_likelihood']
+
+
+def plot_occupancy_boxplot(posterior_probs, **kwargs):
+    """
+    Plot state occupancies across subjects as boxplots.
+
+    :param posterior_probs: List of posterior probabilities (np.array of shape n_trials × n_states) per subject
+    :param kwargs: Additional keyword arguments for plt.figure()
+    """
+    # Normalize input to list of subjects
+    if isinstance(posterior_probs[0], np.ndarray) and posterior_probs[0].ndim == 2:
+        posterior_probs = [posterior_probs]  # single animal
+
+    occupancies = []
+    for p in posterior_probs:
+        posterior_concat = np.concatenate(p)  # combine sessions if multiple
+        state_max = np.argmax(posterior_concat, axis=1)
+        _, counts = np.unique(state_max, return_counts=True)
+        counts = counts / np.sum(counts)  # fractional occupancy
+        occupancies.append(counts)
+
+    occupancies = np.array(occupancies)
+    df = pd.DataFrame(occupancies, columns=[0, 1])
+    df.rename(columns={0: 'Disengaged', 1: 'Engaged'}, inplace=True)
+
+    # Melt for seaborn
+    df_melt = df.melt(var_name='State', value_name='Occupancy')
+
+    plt.figure(**kwargs, constrained_layout=True)
+    sns.boxplot(x='State', y='Occupancy', data=df_melt,
+                palette=['tab:gray', 'tab:blue'], showfliers=False)
+    sns.stripplot(x='State', y='Occupancy', data=df_melt,
+                  color='k', alpha=0.1)
+    plt.xlabel('State')
+    plt.ylim(0, 1)
+    plt.ylabel('Fractional Occupancy')
+    sns.despine()
+
+
+
+
