@@ -8,8 +8,10 @@ from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
 import seaborn as sns
-from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, timer, filter_drug_sessions
+from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, filter_drug_sessions
 from parse.parse_v2 import parse_v2
+from cherry import *  # Potential circular import with cherry (uses plot_pc)
+from plotting_style import *
 
 # Good animals for psychometric curves
 # experiment = '2AFC_X'
@@ -19,7 +21,7 @@ from parse.parse_v2 import parse_v2
 #     animals = ['419', '420', '422', '616', '619', '623']
 
 
-def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save=False, format='png', transparent=False):
+def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save=False, **kwargs):
     """Plot psychometric curve
     :param experiment: str, name of the experiment
     :param animal: str, animal name
@@ -35,7 +37,7 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
         psych_curves = []
         for a in animal:
             psych_curves.append(plot_pc(experiment=experiment, animal=a, kind=kind,
-                                   drug=drug, save=save, format=format, transparent=transparent))
+                                   drug=drug, save=save, **kwargs))
         return psych_curves
 
     # Get the path to the data
@@ -71,9 +73,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     ilds = np.sort(df.ILD.unique())
 
     # Plot psychometric curves
-    plt.figure(constrained_layout=True)
-
-    fontsize = 'medium'
+    plt.figure(constrained_layout=True, **kwargs)
+    fmt = kwargs.get('format', 'png')
 
     if kind == 'prob_right':
 
@@ -87,19 +88,22 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
 
         # Plot params
         color = 'tab:orange'
-        xlabel = 'Stimulus ILD (dB)'
-        ylabel = 'Prob. choose right'
+        # xlabel = 'Stimulus ILD (dB)'
+        xlabel = 'ILD (dB)'
+        # ylabel = 'Prob. choose right'
+        ylabel = 'P. right'
+
 
         # Annotation params
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = 'LR_R='
+        upper_lapse = 'LR_L='
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
         ha = 'left'
         loc = 'lower right'
 
-        filename = f'{animal}_PC_prob_right.{format}'
+        filename = f'{animal}_PC_prob_right.{fmt}'
 
     elif kind == 'prob_rep':
 
@@ -113,19 +117,20 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
 
         # Plot params
         color = 'tab:brown'
-        xlabel = 'Repeating stimulus ILD (dB)'
-        ylabel = 'Prob. choose repeat'
+        xlabel = 'Rep. ILD (dB)'
+        # ylabel = 'Prob. choose repeat'
+        ylabel = 'P. rep.'
 
         # Annotate params
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = 'LR_Rep='
+        upper_lapse = 'LR_Alt='
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
         ha = 'right'
         loc = 'upper left'
 
-        filename = f'{animal}_PC_prob_rep.{format}'
+        filename = f'{animal}_PC_prob_rep.{fmt}'
 
     # Plot psychometric curve and errorbars
     x = np.linspace(np.min(ilds), np.max(ilds), n_points)
@@ -135,14 +140,15 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
                  fmt='o', mfc=color)
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                 xy=xy, xytext=xytext, color=color,
-                 va=va, ha=ha, fontsize=fontsize)
+    # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+    #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
+    #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+    #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+    #              xy=xy, xytext=xytext, color=color,
+    #              va=va, ha=ha)
 
-    plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
+    # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
+    plt.title(f'#{df.Setup.unique()[0]}')
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0, color='tab:gray', ls='--')
 
@@ -161,11 +167,12 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     ilds[0] = psych_curve.xdata[0]
     ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
-    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
+    # plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
+    plt.gca().set_xticklabels(['-70', '', '', '', '0', '', '', '', '70'])
     # plt.ylim([-0.025, 1.025])
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    # plt.xlabel(xlabel)
+    # plt.ylabel(ylabel)
     sns.despine()
 
     if save:
@@ -173,7 +180,7 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
+        plt.savefig(Path(folder_out / filename), **kwargs)
         plt.close()
 
     # return psych_curve, pc0_bias0, pc0_lapses0
@@ -181,8 +188,7 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     return psych_curve
 
 
-def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'], save=True,
-                 kind='prob_right', drug=np.nan, format='png', transparent=False):
+def plot_mean_pc(experiment='2AFC_6', animals=None, kind='prob_right', drug=np.nan, save=False, **kwargs):
     """Plot psychometric curves across animals
     :param experiment: str, name of the experiment
     :param animals: list, list of animal names
@@ -196,6 +202,9 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
     # Get the path to the data
     experiment, folder_in = get_experiment(experiment)
 
+    if animals is None:
+        animals = main(experiment)[experiment]
+
     fit = []
     fit_error = []
     params = []
@@ -205,8 +214,8 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
     animals_removed = 0
     n_points = 100
 
-    plt.figure(constrained_layout=True)
-    fontsize = 'medium'
+    plt.figure(constrained_layout=True, **kwargs)
+    fmt = kwargs.get('format', 'png')
 
     for i in range(len(animals)):
 
@@ -260,32 +269,32 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
         ylabel = 'Prob. choose right'
 
         # Annotation params
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = 'LR_R='
+        upper_lapse = 'LR_L='
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
         ha = 'left'
 
-        filename = f'{experiment}_PC_prob_right.{format}'
+        filename = f'{experiment}_PC_prob_right.{fmt}'
 
     elif kind == 'prob_rep':
 
         # Plot params
         color = 'tab:brown'
         label = 'Prob. repeat'
-        xlabel = 'Repeating stimulus ILD (dB)'
+        xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = 'LR_Rep='
+        upper_lapse = 'LR_Alt='
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
         ha = 'right'
 
-        filename = f'{experiment}_PC_prob_rep.{format}'
+        filename = f'{experiment}_PC_prob_rep.{fmt}'
 
     plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
              label=label)
@@ -309,25 +318,27 @@ def plot_mean_pc(experiment='2AFC_6', animals=['014', '016', '017', '020', '021'
     sns.despine()
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                 'B=' + str(round(bias, 2)) + '\n' +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                 xy=xy, xytext=xytext, color=color,
-                 va=va, ha=ha, fontsize=fontsize)
+    # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+    #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
+    #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+    #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+    #              xy=xy, xytext=xytext, color=color,
+    #              va=va, ha=ha)
 
     if save:
         folder_out = Path.home() / 'OneDrive' / 'Imágenes' / 'Figures' / 'psych curves'
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
+        plt.savefig(Path(folder_out / filename), **kwargs)
         plt.close()
 
     params = np.array(params)
+
     return psych_curve, params
 
-def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
+
+def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right', **kwargs):
     """
     Plot psychometric curves across animals for saline and drug conditions
     :param experiment: str, name of the experiment
@@ -341,26 +352,24 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = 'LR_R='
+        upper_lapse = 'LR_L='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:brown'
-        xlabel = 'Repeating stimulus ILD (dB)'
+        xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = 'LR_Rep='
+        upper_lapse = 'LR_Alt='
 
     df_params = pd.DataFrame(columns=columns)
-    plt.figure(constrained_layout=True)
-    fontsize = 'medium'
+    plt.figure(constrained_layout=True, **kwargs)
 
     for drug in range(2):
 
-        psych_curve = plot_pc(experiment=experiment, animal=animal, kind='prob_right', drug=drug, save=False, format='png',
-                              transparent=False)
+        psych_curve = plot_pc(experiment=experiment, animal=animal, kind='prob_right', drug=drug, save=False, **kwargs)
 
         params = psych_curve.params
         plt.close()
@@ -402,7 +411,7 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
                      lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                      upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                      xy=xy, xytext=xytext, color=color,
-                     va=va, ha=ha, fontsize=fontsize)
+                     va=va, ha=ha)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
@@ -423,8 +432,7 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right'):
     return df_params
 
 
-def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', '021', '022', '023', '024', '025'],
-                      kind='prob_right'):
+def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kwargs):
     """
     Plot psychometric curves across animals for saline and drug conditions
     :param experiment: str, name of the experiment
@@ -433,31 +441,33 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
     :return:
     """
 
+    if animals is None:
+        animals = main(experiment)[experiment]
+
     if kind == 'prob_right':
         color = 'tab:orange'
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = 'LR_R='
+        upper_lapse = 'LR_L='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:brown'
-        xlabel = 'Repeating stimulus ILD (dB)'
+        xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = 'LR_Rep='
+        upper_lapse = 'LR_Alt='
 
     df_params = pd.DataFrame(columns=columns)
-    plt.figure(constrained_layout=True)
-    fontsize = 'medium'
+    plt.figure(constrained_layout=True, **kwargs)
 
     for drug in range(2):
 
         psych_curve, params = plot_mean_pc(experiment=experiment, animals=animals, save=False, kind=kind, drug=drug,
-                                                    format='png', transparent=False)
+                                                    **kwargs)
         plt.close()
 
         if drug == 0:
@@ -496,7 +506,7 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
                      lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                      upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                      xy=xy, xytext=xytext, color=color,
-                     va=va, ha=ha, fontsize=fontsize)
+                     va=va, ha=ha)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
@@ -520,8 +530,15 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=['014', '016', '017', '020', 
 
 # Across batches
 
-def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
-                           save=False, kind='prob_right', format='svg', transparent=False):
+def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kwargs):
+
+    if experiments is None:
+        experiments = ['2AFC_2', '2AFC_3', '2AFC_4']
+    all_animals = main(experiments)
+
+    plt.figure(constrained_layout=True, **kwargs)
+    n_points = 100
+    fmt = kwargs.get('format', 'png')
 
     fit = []
     fit_error = []
@@ -529,30 +546,21 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
     xdata = []
     ydata = []
     trials = 0
+    n_animals = 0
 
-    n_points = 100
-
-    plt.figure(constrained_layout=True)
-
-    for k in range(len(experiments)):
+    for experiment in experiments:
 
         # Get the path to the data
-        # experiment = get_experiment(experiment[experiments[k]])
-        experiment = experiments[k]
         folder_in = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
 
-        if experiment == '2AFC_2':
-            animals = ['325', '327', '329', '330', '332', '333', '335', '337']
-            n_animals_batch2 = len(animals)
-        elif experiment == '2AFC_3':
-            animals = ['419', '420', '422', '616', '619', '623']
-            n_animals_batch3 = len(animals)
+        animals = all_animals[experiment]
+        n_animals += len(animals)
 
         ####################################################################################################################
 
         for i in range(len(animals)):
             df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
-            # df = df[df.P > 0]  # Only those sessions with ilds
+            df = df[df.P > 0]  # Only those sessions with ilds
             ilds = np.sort(df.ILD.unique())
 
             if kind == 'prob_right':
@@ -561,7 +569,7 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
                 psych_curve = compute_psych_curve(df.ILDRep, df.RepChoice, n_points)
 
             plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color='tab:grey', marker=None,
-                     mfc='none', mec='none', mew=0, ms=0, alpha=0.25)
+                     mfc='none', mec='none', mew=0, ms=0, alpha=0.1)
             # mec='none, mew=0 and ms=0 to not plot markers in individual animals
             # plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color='tab:grey', fmt='o',
             #              mfc='none', alpha=0.25)  # Don't plot the errorbars in individual animals
@@ -577,8 +585,6 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
     ydata = np.array(ydata).flatten()
     psych_curve = compute_psych_curve(xdata, ydata, n_points)
 
-    n_animals = n_animals_batch2 + n_animals_batch3
-
     if kind == 'prob_right':
 
         # Plot params
@@ -588,29 +594,28 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
         ylabel = 'Prob. choose right'
 
         # Annotation params
-        lower_lapse = "LR_R="
-        upper_lapse = "LR_L="
+        lower_lapse = 'LR_R='
+        upper_lapse = 'LR_L='
         # xy = (ilds[0], 1)
         # xytext = (ilds[0], 1)
         xy = (-20, 1)
         xytext = (-20, 1)
         va = 'top'
         ha = 'left'
-        fontsize = 'medium'
 
-        filename = ' PC_prob_right_all_animals' + '.' + format
+        filename = ' PC_prob_right_all_animals' + '.' + fmt
 
     elif kind == 'prob_rep':
 
         # Plot params
         color = 'tab:brown'
         label = 'Prob. repeat'
-        xlabel = 'Repeating stimulus ILD (dB)'
+        xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        lower_lapse = "LR_Rep="
-        upper_lapse = "LR_Alt="
+        lower_lapse = 'LR_Rep='
+        upper_lapse = 'LR_Alt='
         # xy = (ilds[-1], 0)
         # xytext = (ilds[-1], 0)
         xy = (20, 0)
@@ -618,9 +623,8 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
         color = 'tab:brown'
         va = 'bottom'
         ha = 'right'
-        fontsize = 'medium'
 
-        filename = ' PC_prob_rep_all_animals' + '.' + format
+        filename = ' PC_prob_rep_all_animals' + '.' + fmt
 
     plt.plot(np.linspace(np.min(ilds), np.max(ilds), n_points), psych_curve.fit, color=color, mfc=color,
              label=label)
@@ -636,17 +640,14 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
     # plt.minorticks_off()  # Remove minor ticks
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
-    # plt.title(f'N={len(animals)}, {trials} trials')
     plt.title(f'N={n_animals}, {trials} trials')
-    # plt.title(f'N={len(df.Setup.unique())}, {len(df)} trials')
-    # plt.xlim([ilds[0] - 7, ilds[-1] + 7])
     plt.xlim([-21, 21])  # To chop the extreme values
     ilds[0] = -20
     ilds[-1] = 20
     plt.xticks(ilds)
     plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
     plt.ylim([-0.025, 1.025])
-    plt.yticks([0, 0.5, 1])
+    plt.yticks([0, 0.5, 1], [0, 0.5, 1])
     # plt.legend(loc='lower center')
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -654,19 +655,19 @@ def plot_pc_across_batches(experiments=['2AFC_2', '2AFC_3'], animals=None,
     plt.gca().spines['right'].set_visible(False)
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    plt.annotate("S=" + str(round(sensitivity, 2)) + "\n" +  # Sensitivity
-                 "B=" + str(round(bias, 2)) + "\n" +  # Bias
-                 lower_lapse + str(round(lr_lower, 2)) + "\n" +  # Upper lapse rate
-                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                 xy=xy, xytext=xytext, color=color,
-                 va=va, ha=ha, fontsize=fontsize)
+    # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+    #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
+    #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+    #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+    #              xy=xy, xytext=xytext, color=color,
+    #              va=va, ha=ha)
 
     if save:
         folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment
         if not folder_out.exists():
             folder_out.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_out)
-        plt.savefig(Path(folder_out / filename), format=format, transparent=transparent)
+        plt.savefig(Path(folder_out / filename), **kwargs)
         plt.close()
 
     return np.array(params)
@@ -759,7 +760,7 @@ def plot_pc_session(path, kind='prob_right', annotation_loc='upper left', color=
         # Plot params
         # color = 'tab:brown'
         # label = 'Prob. repeat'
-        plt.xlabel('Repeating stimulus ILD (dB)')
+        plt.xlabel('Rep. stim. ILD (dB)')
         plt.ylabel('Prob. choose repeat')
 
         # Annotate params
@@ -1059,7 +1060,7 @@ def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337
         # Plot params
         # color = 'tab:brown'
         # label = 'Prob. repeat'
-        xlabel = 'Repeating stimulus ILD (dB)'
+        xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
 
         # Annotate params

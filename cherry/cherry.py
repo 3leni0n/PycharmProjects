@@ -1,8 +1,7 @@
 import numpy as np
 from matplotlib import pyplot as plt
-
 from glue_sessions import glue_groups
-from psychometric_curves import plot_pc
+# from psychometric_curves import plot_pc  # Potential circular import with plot_pc
 
 
 def check_valid_trials(df):
@@ -81,6 +80,8 @@ def cherry_pick(df_behavior, experiment, plot=False):
     :return: Psychometric curve plots for the good subjects
     """
 
+    from psychometric_curves import plot_pc  # Import here to avoid circular import
+
     # Find bad subjects
     df = df_behavior[df_behavior.Experiment == experiment]
     subjects = df.Subject.unique().astype(list)
@@ -98,8 +99,7 @@ def cherry_pick(df_behavior, experiment, plot=False):
     # print(f'Remaining subjects: {animals}')
 
     # Plot psychometric curves
-    psych_curves = plot_pc(experiment=experiment, animal=animals, kind='prob_right', drug=None, save=False, format='png',
-                           transparent=False)
+    psych_curves = plot_pc(experiment=experiment, animal=animals, kind='prob_right')
     plt.close('all')
 
     # Find bad subjects (returns indices of bad curves)
@@ -121,9 +121,7 @@ def cherry_pick(df_behavior, experiment, plot=False):
 
     if plot:
         # Plot psychometric curves
-        psych_curves = plot_pc(experiment=experiment, animal=good_subjects, kind='prob_right', drug=None, save=False,
-                               format='png', transparent=False)
-
+        psych_curves = plot_pc(experiment=experiment, animal=good_subjects, kind='prob_right')
     return good_subjects
 
 
