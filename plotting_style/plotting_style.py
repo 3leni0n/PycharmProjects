@@ -16,12 +16,16 @@ def fig_size(n_cols=1, ratio=None):
     # All measurements are in inches
     A4_size = np.array((8.27, 11.69))  # A4 measurements
     margins = 1  # On all sides
-    effective_size = A4_size - 2*margins  # Effective size after margins removal (2 per dimension)
-    effective_width = effective_size[0]
-    effective_height = effective_size[1]
+    size = A4_size - (2 * margins)  # Effective size after margins removal (2 per dimension)
+    width = size[0]
+    height = size[1]
 
-    fig_width = effective_width / n_cols
-    fig_height = fig_width / ratio
-    figsize = (fig_width, fig_height)
+    # Full page (minus margins)
+    if n_cols == 0:
+        return size
 
-    return figsize
+    else:
+        fig_width = width / n_cols
+        fig_height = fig_width / ratio
+        figsize = (fig_width, fig_height)
+        return figsize

@@ -73,7 +73,7 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     ilds = np.sort(df.ILD.unique())
 
     # Plot psychometric curves
-    plt.figure(constrained_layout=True, **kwargs)
+    # plt.figure(constrained_layout=True, **kwargs)
     fmt = kwargs.get('format', 'png')
 
     if kind == 'prob_right':
@@ -186,6 +186,81 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     # return psych_curve, pc0_bias0, pc0_lapses0
     # return psych_curve, fit_bias0, fit_lapses0
     return psych_curve
+
+
+def plot_all_pcs(experiment=None, animals=None, kind='prob_right', ncols=5):
+    """Plot psychometric curves for multiple animals on a grid. Requires NOT creating a figure in the calling function.
+    :param experiment: str or list of str, experiment name(s) to include. If None, defaults to a predefined list.
+    :param animals: list of str, specific animal IDs to include. If None, includes all animals from the experiment(s).
+    :param kind: str, type of psychometric curve to plot ('prob_right' or 'prob_rep').
+    :param ncols: int, number of columns in the grid layout.
+    :param kwargs: additional keyword arguments passed to the plotting function.
+    """
+
+    figsize = fig_size(n_cols=0, ratio=None)  # Full size (minus margins)
+
+    if experiment is None:
+        experiment = [
+            '2AFC_2',
+            '2AFC_3',
+            '2AFC_4',    # Ephys pilot group (loads of infections). FSM changes (0.15s motor in). 0.5s delay introduced
+            # '2AFC_5',    # Ephys group (no evidences)
+            # '2AFC_6',    # Pharma group. 11th frame with 0 evidence
+        ]
+
+    if animals is None:
+        animals = main(experiment)
+    else:
+        animals = main(experiment)[experiment]
+
+    # Flatten dict: list of (experiment, animal) tuples
+    pairs = [(exp, animal) for exp, group in animals.items() for animal in group]
+
+    all_animals = [v for values in animals.values() for v in values]  # Unpack cherries
+
+    n_animals = len(all_animals)
+    nrows = -(-n_animals // ncols)  # Ceiling division to get number of rows
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, sharex=True, sharey=True, constrained_layout=True)
+
+    axes = axes.flatten()
+    for i, (experiment, animal) in enumerate(pairs):
+        ax = axes[i]
+        plt.sca(ax)
+        # ax.set_aspect('equal', adjustable='box')
+        ax.set_box_aspect(1)  # make axes square in figure space
+        plot_pc(experiment=experiment, animal=animal, kind=kind)
+        ax.set_title(f'#{animal}')
+
+    if kind == 'prob_right':
+        suptitle = 'Probability right'
+        supxlabel = 'Stimulus ILD (dB)'
+        supylabel = 'Probability right'
+    elif kind == 'prob_rep':
+        suptitle = 'Probability repeat'
+        supxlabel = 'Repeating stimulus ILD (dB)'
+        supylabel = 'Probability repeat'
+
+    # fig.suptitle(suptitle + ' psychometric curves')
+    fig.supxlabel(supxlabel)
+    fig.supylabel(supylabel)
+
+    # # Remove yticklabels for all subplots but last row
+    # for i, ax in enumerate(axes):
+    #     if i // ncols != nrows - 1:
+    #         ax.set_xticklabels([])
+    #
+    # # Remove yticklabels for all subplots but first column
+    # for i, ax in enumerate(axes):
+    #     if i % ncols != 0:
+    #         ax.set_yticklabels([])
+
+    # Remove legends if any
+    if ax.get_legend() is not None:
+        ax.get_legend().remove()
+
+    # Remove empty subplots
+    for ax in axes.flatten()[n_animals:]:
+        ax.remove()
 
 
 def plot_mean_pc(experiment='2AFC_6', animals=None, kind='prob_right', drug=np.nan, save=False, **kwargs):
@@ -1202,3 +1277,5 @@ def plot_pc_across_animals_drug(experiment='2AFC_2', animals=['332', '333', '337
 # path1 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220531-103028/337_stage_training_v2_20220531-103028.csv'
 # path2 = '/home/alexis/pv_nmdar_eranet/experiments/2AFC_2/setups/337/sessions/337_stage_training_v2_20220601-125410/337_stage_training_v2_20220601-125410.csv'
 # pc_session_comparison(path1, path2, kind='prob_right', color='tab:orange', save=True, format='png', transparent=False)
+
+

@@ -139,7 +139,7 @@ def main(experiments=None):
             '2AFC_3',
             '2AFC_4',    # Ephys pilot group (loads of infections). FSM changes (0.15s motor in). 0.5s delay introduced
             # '2AFC_5',    # Ephys group (no evidences)
-            '2AFC_6',    # Pharma group. 11th frame with 0 evidence
+            # '2AFC_6',    # Pharma group. 11th frame with 0 evidence
         ]
     elif isinstance(experiments, str):
         experiments = [experiments]  # Wrap single string into list
