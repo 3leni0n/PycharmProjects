@@ -1,10 +1,13 @@
 import pandas as pd
 import numpy as np
 import ast
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
 import seaborn as sns
+from plotting_style import *
 
 
 # Define functions to get lick variables: RTs, N licks, ILI
@@ -224,6 +227,136 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     df_behavior['RT2'] = rt2
 
     return df_behavior
+
+
+def model_licks(df_behavior, var='RT', me=True):
+
+    if var == 'RT' or var == 'ILI':
+        family = sm.families.Gaussian()
+        print(f'Fitting GLM with Gaussian family for {var}...')
+    elif var == 'nLicks':
+        family = sm.families.Poisson()
+        me = False  # No mixed effects for Poisson
+        print(f'Fitting GLM with Gaussian family for {var}...')
+    else:
+        raise ValueError('Variable must be RT, ILI, or nLicks')
+
+    subjects = df_behavior.Subject.unique()
+
+    # Prepare containers
+    all_params = []
+    all_pvals = []
+
+    for subj in subjects:
+
+        df_subj = df_behavior[df_behavior.Subject == subj].copy()
+        print(f'Fitting model for subject {subj} ({len(df_subj)})...')
+
+        # Transform Choice: 0→-1, 1→1
+        df_subj['Choice'] = df_subj['Choice'] * 2 - 1
+
+        # Normalize absILD
+        df_subj['absILD'] = df_subj['absILD'] / df_subj['absILD'].max()
+
+        # Add normalized trial index per session
+        df_subj['NormTrial'] = df_subj.groupby('Session')['Trial'].transform(
+            lambda x: (x - x.min()) / (x.max() - x.min()))
+        df_subj['NormTrial2'] = df_subj['NormTrial'] ** 2  # Squared term
+        df_subj['NormTrial'] = df_subj['NormTrial'].astype(float)
+        df_subj['NormTrial2'] = df_subj['NormTrial2'].astype(float)
+
+        # Drop rows with NaNs in any of the formula columns (also remove the misses)
+        formula_cols = ['Choice', 'Hit', 'AfterHit', 'absILD', 'NormTrial', 'NormTrial2']
+        formula_cols.append(var)
+        df_subj = df_subj.dropna(subset=formula_cols)
+        df_subj.reset_index(drop=True, inplace=True)
+
+        # Define formula
+        formula = f'{var} ~ Choice + Hit + AfterHit + absILD + absILD:Hit + NormTrial + NormTrial2'
+
+        # Yet to include:
+        # Session index (included with tne mixed effects model)
+        # p(engaged) from HMM
+        # Drug for drug analyses
+
+        # Mixed effects model with random intercepts for sessions
+        if me:
+            model = smf.mixedlm(formula=formula, data=df_subj, groups=df_subj.Session)
+            result = model.fit()
+            params = result.fe_params
+
+        # Fit GLM (Gaussian family for continuous RTs)
+        else:
+            model = smf.glm(formula=formula, data=df_subj, family=family)
+            # model = smf.ols(formula=formula, data=df_subj)  # Much faster for Gaussian than GLM
+            result = model.fit()
+            params = result.params  # Different attribute name for mixedlm
+
+        print(result.summary())
+
+        # Store fixed-effect estimates and p-values
+        params.name = subj
+        all_params.append(params)
+        pvals = result.pvalues
+        pvals.name = subj
+        all_pvals.append(pvals)
+
+    # Convert to DataFrames
+    df_params = pd.DataFrame(all_params)
+    df_p = pd.DataFrame(all_pvals)
+
+    return df_params, df_p
+
+
+def plot_model_licks(df_params, df_p, kind='box', drop_intercept=True, **kwargs):
+
+    from scipy.stats import combine_pvalues
+
+    combined_pvalues = {}
+    for col in df_p.columns:
+        res, pval = combine_pvalues(df_p[col], method='fisher')
+        combined_pvalues[col] = {'stat': res, 'pval': pval}
+
+    # Drop intercept column
+    if drop_intercept:
+        df_params = df_params.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
+        df_p = df_p.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
+
+    # Compute mean, SEM and p values across mice
+    params_mean = df_params.mean()
+    params_sem = df_params.sem()
+    p_mean = df_p.mean()
+    print(params_mean)
+    print(params_sem)
+    print(p_mean)
+
+    # Highlight effects where mean p-value < 0.05
+    # colors = ['red' if df_p[col].mean() < 0.05 else 'gray' for col in df_p.columns]
+    colors = ['red' if combined_pvalues[col]['pval'] < 0.05 else 'gray' for col in df_p.columns]
+
+    plt.figure(constrained_layout=True, **kwargs)
+    plt.axhline(0, color='black', linestyle='--')
+
+    # Box plots
+    if kind == 'box':
+        bp = plt.boxplot([df_params[col] for col in df_params.columns], showfliers=False, labels=df_params.columns,
+                         patch_artist=True, medianprops=dict(color='black'))
+        plt.xticks(rotation=45, ha='right')
+        plt.ylabel('Weights')
+
+        # Color the boxes
+        for patch, color in zip(bp['boxes'], colors):
+            patch.set_facecolor(color)
+
+    # Bar plots
+    else:
+        plt.bar(range(len(params_mean)), params_mean, yerr=params_sem, color=colors)
+        plt.xticks(range(len(params_mean)), params_mean.index, rotation=45, ha='right')
+        plt.ylabel('Weights\n(mean ± SEM)')
+
+    # plt.axhline(0, color='black', linestyle='--')
+    plt.title('Kernel')
+    sns.despine()
 
 
 ########################################################################################################################
@@ -546,7 +679,7 @@ def plot_ild_dist_mean(df_behavior, var='RT'):
     sns.despine()
 
 
-def plot_licks_per_subject(df_behavior, plot_func, format='A4', **kwargs):
+def plot_licks_per_subject(df_behavior, plot_func, ncols=5, format='A4', **kwargs):
     """
     Plot a subplot per subject of a given plotting function. Adjust automatically the figure grid to fit all subjects.
     :param df_behavior: DataFrame containing the behavioral data.
@@ -559,33 +692,60 @@ def plot_licks_per_subject(df_behavior, plot_func, format='A4', **kwargs):
     n_subj = len(subjects)
 
     # Layout: N columns, enough rows
-    ncols = 3
     nrows = -(-n_subj // ncols)  # Ceiling division
 
-    # Paper size (format)
-    if format == 'A4':
-        figsize = (8.27, 11.69)
-    if format == 'A3':
-        figsize = (11.69, 16.54)
+    # # Paper size (format)
+    # margins = 2
+    # if format == 'A4':
+    #     figsize = np.array((8.27, 11.69))
+    # if format == 'A3':
+    #     figsize = np.array((11.69, 16.54))
+    # figsize = figsize - margins
+    # figsize = (figsize[0], figsize[0])  # Make square figure
 
-    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False, sharex=True, sharey=True)
+    figsize = fig_size(n_cols=0, ratio=1)
+
+    fig, axes = plt.subplots(nrows, ncols, sharex=True, sharey=True, squeeze=False, figsize=figsize, constrained_layout=True)
 
     for ax, subject in zip(axes.flatten(), subjects):
         df_subject = df_behavior[df_behavior['Subject'] == subject]
         plt.sca(ax)  # Make ax current
+        ax.set_box_aspect(1)  # Make axes square
         plot_func(df_subject, **kwargs)
-        title = (f'{df_behavior.Subject.unique()[0]}, {len(df_behavior) / 1000:.1f}k trials')
+        # title = (f'#{subject}, {len(df_behavior) / 1000:.1f}k trials')
+        title = (f'#{subject}')
         ax.set_title(title)
 
+        # Remove legends if any
         if ax.get_legend() is not None:
             ax.get_legend().remove()
 
-    # remove unused axes if any
+    # Remove unused axes if any
     for ax in axes.flatten()[len(subjects):]:
         ax.remove()
 
-    # fig.suptitle(var)
-    fig.tight_layout()
+    # Remove subplots' axes labels
+    for ax in axes.flatten():
+        ax.set_xlabel('')
+        ax.set_ylabel('')
+
+    # Recover kwargs for labeling
+    var = kwargs.get('var', None)
+    density = kwargs.get('density', None)
+
+    if var == 'RT' or var == 'ILI':
+        supxlabel = 'Time (s)'
+    else:
+        supxlabel = 'N licks'
+
+    if density:
+        supylabel = 'Density'
+    else:
+        supylabel = 'Frequency'
+
+    fig.suptitle(var)
+    fig.supxlabel(supxlabel)
+    fig.supylabel(supylabel)
 
 
 def plot_chrono_curve(df_behavior, absolute=True):
@@ -691,6 +851,26 @@ def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
     plt.grid()
     sns.despine()
 
+
+
+
+
+def tukey_fence(arr, k=1.5):
+    """
+    Apply Tukey's fences to identify non-outlier data points in a 1D array (designed for RTs).
+    :param arr: 1D array of data points (e.g., RTs)
+    :param k: Multiplier for the interquartile range (IQR) to define the fences (default: 1.5)
+    :return: Boolean mask indicating non-outlier data points
+    """
+
+    Q1 = np.percentile(arr, 25)
+    Q3 = np.percentile(arr, 75)
+    IQR = Q3 - Q1
+    lower_fence = Q1 - (k * IQR)
+    upper_fence = Q3 +(k * IQR)
+    mask = (arr >= lower_fence) & (arr <= upper_fence)
+
+    return mask
 
 ########################################################################################################################
 

@@ -171,8 +171,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     plt.gca().set_xticklabels(['-70', '', '', '', '0', '', '', '', '70'])
     # plt.ylim([-0.025, 1.025])
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
-    # plt.xlabel(xlabel)
-    # plt.ylabel(ylabel)
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     sns.despine()
 
     if save:
@@ -197,7 +197,7 @@ def plot_all_pcs(experiment=None, animals=None, kind='prob_right', ncols=5):
     :param kwargs: additional keyword arguments passed to the plotting function.
     """
 
-    figsize = fig_size(n_cols=0, ratio=None)  # Full size (minus margins)
+    figsize = fig_size(n_cols=0, ratio=1)  # Full size (minus margins)
 
     if experiment is None:
         experiment = [
@@ -220,16 +220,19 @@ def plot_all_pcs(experiment=None, animals=None, kind='prob_right', ncols=5):
 
     n_animals = len(all_animals)
     nrows = -(-n_animals // ncols)  # Ceiling division to get number of rows
-    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, sharex=True, sharey=True, constrained_layout=True)
+    fig, axes = plt.subplots(nrows=nrows, ncols=ncols, sharex=True, sharey=True, squeeze=False, figsize=figsize, constrained_layout=True)
 
     axes = axes.flatten()
     for i, (experiment, animal) in enumerate(pairs):
         ax = axes[i]
         plt.sca(ax)
-        # ax.set_aspect('equal', adjustable='box')
-        ax.set_box_aspect(1)  # make axes square in figure space
+        ax.set_box_aspect(1)  # Make axes square
         plot_pc(experiment=experiment, animal=animal, kind=kind)
         ax.set_title(f'#{animal}')
+
+        # Remove legends if any
+        if ax.get_legend() is not None:
+            ax.get_legend().remove()
 
     if kind == 'prob_right':
         suptitle = 'Probability right'
@@ -240,27 +243,18 @@ def plot_all_pcs(experiment=None, animals=None, kind='prob_right', ncols=5):
         supxlabel = 'Repeating stimulus ILD (dB)'
         supylabel = 'Probability repeat'
 
-    # fig.suptitle(suptitle + ' psychometric curves')
-    fig.supxlabel(supxlabel)
-    fig.supylabel(supylabel)
-
-    # # Remove yticklabels for all subplots but last row
-    # for i, ax in enumerate(axes):
-    #     if i // ncols != nrows - 1:
-    #         ax.set_xticklabels([])
-    #
-    # # Remove yticklabels for all subplots but first column
-    # for i, ax in enumerate(axes):
-    #     if i % ncols != 0:
-    #         ax.set_yticklabels([])
-
-    # Remove legends if any
-    if ax.get_legend() is not None:
-        ax.get_legend().remove()
+    # Remove subplots' axes labels
+    for ax in axes.flatten():
+        ax.set_xlabel('')
+        ax.set_ylabel('')
 
     # Remove empty subplots
     for ax in axes.flatten()[n_animals:]:
         ax.remove()
+
+    fig.suptitle(suptitle + ' psychometric curves')
+    fig.supxlabel(supxlabel)
+    fig.supylabel(supylabel)
 
 
 def plot_mean_pc(experiment='2AFC_6', animals=None, kind='prob_right', drug=np.nan, save=False, **kwargs):
