@@ -351,7 +351,7 @@ def tukey_fence(arr, k=1.5):
 # Plotting functions
 
 
-def plot_licks_dist(df_behavior, var='RT', density=False, **kwargs):
+def plot_licks_dist(df_behavior, var='RT', bin_size=0.01, density=False, **kwargs):
     """
     Plot the licks distribution for a variable of interest.
     :param df_behavior: DataFrame with the behavioral data
@@ -365,14 +365,23 @@ def plot_licks_dist(df_behavior, var='RT', density=False, **kwargs):
 
     # Continuous variables
     if var == 'RT' or var == 'ILI':
-        bins =
+
+        bin_edges = (0, df_behavior.RespWin.unique()[0])
+        n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
+        bins = np.linspace(0, 1, n_bins + 1)
+        bin_centers = (bins[:-1] + bins[1:]) / 2
+
         if density:
             ylabel = 'Density'
             sns.kdeplot(df_behavior[var], color=color, **kwargs)
         else:
-            ylabel = 'Frequency'
-            plt.hist(df_behavior[var], bins=1000, density=True, color=color, edgecolor=color, **kwargs)
+            ylabel = 'Fraction'
+            hist, _ = np.histogram(df_behavior[var], bins=bins, density=False)
+            hist = hist / hist.sum()  # Normalize to sum 1
+            plt.step(bin_centers, hist, color=color)
+            # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
         plt.xlim(0, 0.5)
+        # plt.ylim(0, None)
         plt.xlabel('Time (s)')
 
     # Discrete variable
@@ -406,11 +415,10 @@ def plot_licks_dist(df_behavior, var='RT', density=False, **kwargs):
         plt.legend()
 
 
-def plot_mean_RT(df_behavior, bin_size=0.001, **kwargs):
+def plot_mean_RT(df_behavior, bin_size=0.01, **kwargs):
 
-    t_start = 0
-    t_end = 1
-    n_bins = int((t_end - t_start) / bin_size)
+    bin_edges = (0, df_behavior.RespWin.unique()[0])
+    n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
     bins = np.linspace(0, 1, n_bins + 1)
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
@@ -429,7 +437,7 @@ def plot_mean_RT(df_behavior, bin_size=0.001, **kwargs):
 
     # Plot mean + shaded SEM
     plt.figure(constrained_layout=True, **kwargs)
-    plt.plot(bin_centers, mean_hist, color='k', lw=2, label='Mean across mice')
+    plt.plot(bin_centers, mean_hist, color='k', label='Mean across mice')
     plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color='k', alpha=0.25, edgecolor='none', linewidth=0)
     plt.xlim(0, 0.5)
     # plt.xticks(np.arange(0, 0.6, 0.1))
@@ -532,7 +540,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
     sns.despine()
 
 
-def plot_ild_dist(df_behavior, var='RT', insets=True):
+def plot_ild_dist(df_behavior, var='RT', insets=False):
     """
     Plot the licks distribution of a variable of interest split by absolute ILD levels.
     :param df_behavior: DataFrame with the behavioral data of a session
@@ -554,9 +562,21 @@ def plot_ild_dist(df_behavior, var='RT', insets=True):
 
         # Continuous variables
         if var == 'RT' or var == 'ILI':
+
+            # # Histogram per ILD
+            # bin_size = 0.001
+            # bin_edges = (0, df_behavior.RespWin.unique()[0])
+            # n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
+            # bins = np.linspace(0, 1, n_bins + 1)
+            # bin_centers = (bins[:-1] + bins[1:]) / 2
+            # df_ild = df_behavior[df_behavior.absILD == ild]
+            # hist, _ = np.histogram(df_ild[var], bins=bins, density=False)
+            # hist = hist / hist.sum()  # normalize to sum 1
+
             # Plot and capture the Line2D object
             sns.kdeplot(df_ild[var], color=color, label=ild)
             # sns.histplot(df_ild[var], stat='density', element='step', fill=False, kde=False, color=color, label=ild)
+            # plt.plot(bin_centers, hist, color=color, label=ild)
             plt.xlim(0, 0.5)
             loc = 'upper center'
 
@@ -574,7 +594,7 @@ def plot_ild_dist(df_behavior, var='RT', insets=True):
             min_val = df_ild[var].min()
             max_val = df_ild[var].max()
             bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
-            plt.hist(df_ild[var], bins=bins, density=True, histtype='step', linewidth=1.5, color=color, label=ild)
+            plt.hist(df_ild[var], bins=bins, density=True, histtype='step', color=color, label=ild)
             ax = plt.gca()
             ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
             plt.xlim(0, 20)
@@ -683,18 +703,9 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     # Layout: N columns, enough rows
     nrows = -(-n_subj // ncols)  # Ceiling division
 
-    # # Paper size (format)
-    # margins = 2
-    # if format == 'A4':
-    #     figsize = np.array((8.27, 11.69))
-    # if format == 'A3':
-    #     figsize = np.array((11.69, 16.54))
-    # figsize = figsize - margins
-    # figsize = (figsize[0], figsize[0])  # Make square figure
-
     figsize = fig_size(n_cols=0, ratio=1)
 
-    fig, axes = plt.subplots(nrows, ncols, sharex=True, sharey=True, squeeze=False, figsize=figsize, constrained_layout=True)
+    fig, axes = plt.subplots(nrows, ncols, sharex=True, sharey=False, squeeze=False, figsize=figsize, constrained_layout=True)
 
     for ax, subject in zip(axes.flatten(), subjects):
         df_subject = df_behavior[df_behavior['Subject'] == subject]
@@ -708,6 +719,17 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
         # Remove legends if any
         if ax.get_legend() is not None:
             ax.get_legend().remove()
+
+    # Collect all y-limits and apply the same ylim to all subplots
+    max_y = max(ax.get_ylim()[1] for ax in axes.flatten())
+    for ax in axes.flatten():
+        ax.set_ylim(0, max_y)
+
+    # Remove y-ticks and labels for all axes except first column
+    for i, ax in enumerate(axes.flatten()):
+        if i % ncols != 0:  # not first column
+            ax.set_yticklabels([])
+            ax.set_ylabel('')
 
     # Remove unused axes if any
     for ax in axes.flatten()[len(subjects):]:
@@ -730,7 +752,7 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     if density:
         supylabel = 'Density'
     else:
-        supylabel = 'Frequency'
+        supylabel = 'Frequency (normalized)'
 
     fig.suptitle(var)
     fig.supxlabel(supxlabel)
@@ -915,101 +937,65 @@ def plot_model_licks(df_params, df_p, kind='box', drop_intercept=True, **kwargs)
 
 # DEVELOPPING:
 
-import os
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import seaborn as sns
-from glue_sessions.glue_sessions import *
-from cherry import *
-from licks import *
-from plotting_style import *
-from my_fun.my_fun import save_notebook_files
-# Plotting style
-default_figsize = np.array(plt.rcParams['figure.figsize'])
-style_path = os.path.expanduser('~/PycharmProjects/alexis_style.mplstyle')
-plt.style.use(style_path)
-
-
-experiments = [
-    '2AFC_2',
-    '2AFC_3',
-    '2AFC_4',
-    # '2AFC_5',
-    # '2AFC_6',
-]
-df_behavior = glue_groups(experiments)
-df_behavior = df_behavior[df_behavior.Miss == 0].reset_index(drop=True)
-df_behavior = df_behavior[df_behavior.P > 0].reset_index(drop=True)
-
-# Save old columns for comparison later
-old_columns = list(df_behavior.columns)
-
-# Add lick data to the DataFrame
-df_behavior = add_lick_data(df_behavior)
-
-# Add session half index (0 for the 1st and 1 for the 2nd)
-df_behavior['SessionHalf'] = (df_behavior.Trial >= df_behavior.groupby('Session').Trial.transform('max') / 2).astype(int)
-# Add absolute ILD
-loc = df_behavior.columns.get_loc('ILD') + 1  # To the right of ILD column
-df_behavior.insert(loc, 'absILD', df_behavior['ILD'].abs())  # Add previous stimulus side column
-
-# Print new columns added to the DataFrame
-new_columns = list(df_behavior.columns)
-new_columns = [col for col in new_columns if col not in old_columns]
-print(new_columns)
-
-# Sometimes pandas doesn't recognize all nans as actual nans. Force it and remove them
-df_behavior['RT'] = pd.to_numeric(df_behavior['RT'], errors='coerce')
-df_behavior = df_behavior.dropna(subset=['RT']).reset_index(drop=True)
-assert len(df_behavior) == len(df_behavior['RT'].dropna().values.reshape(-1, 1))
-
-if '2AFC_4' in experiments:
-    df_behavior.loc[df_behavior.Experiment == '2AFC_4', 'RT'] -= 0.15
-if '2AFC_5' in experiments:
-    df_behavior.loc[df_behavior.Experiment == '2AFC_5', 'RT'] -= 0.15
-if '2AFC_6' in experiments:
-    df_behavior.loc[df_behavior.Experiment == '2AFC_6', 'RT'] -= 0.15
-
-df_behavior.Subject = df_behavior.Subject.astype(int).astype(str).str.zfill(3)  # 0 padd subjects for consistent XXX ID and ensure string format
-animals = main(experiments)  # Cherry pick
-all_animals = [a for expt in ['2AFC_2', '2AFC_3', '2AFC_4'] for a in animals[expt]]  # Unpack cherries
-print(f'{len(all_animals)} mice: {all_animals}')
-df_behavior = df_behavior[df_behavior['Subject'].isin(all_animals)]  # Filter cherries
-
-#######################################################################################################################
-
-
-
-n_bins = 1000
-minRT = df_behavior.RT.min()
-maxRT = df_behavior.RT.max()
-bins=np.linspace(minRT, maxRT, n_bins)
-
-# Store normalized histograms
-norm_hists = []
-
-for mouse, df_mouse in df_behavior.groupby('Subject'):
-    hist, _ = np.histogram(df_mouse['RT'], bins=bins, density=False)
-    hist = hist / hist.sum()  # normalize to sum=1
-    norm_hists.append(hist)
-
-# Convert to array for easy averaging
-norm_hists = np.array(norm_hists)
-mean_hist = norm_hists.mean(axis=0)
-sem_hist = norm_hists.std(axis=0) / np.sqrt(norm_hists.shape[0])
-
-# Midpoints of bins for plotting
-bin_centers = (bins[:-1] + bins[1:]) / 2
-
-# Plot mean + shaded SEM
-figsize = fig_size(n_cols=2)
-plt.figure(figsize=figsize, constrained_layout=True)
-plt.plot(bin_centers, mean_hist, color='k', lw=2, label='Mean across mice')
-plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color='k', alpha=0.25, edgecolor='none')
-plt.xlim(0, 0.5)
-plt.xlabel('RT (s)')
-plt.ylabel('Normalized frequency')
-plt.title(f'Mean RT distribution across {df_behavior.Subject.nunique()} mice')
-sns.despine()
+# import os
+# import pandas as pd
+# import numpy as np
+# import matplotlib.pyplot as plt
+# from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+# import seaborn as sns
+# from glue_sessions.glue_sessions import *
+# from cherry import *
+# from licks import *
+# from plotting_style import *
+# from my_fun.my_fun import save_notebook_files
+# # Plotting style
+# default_figsize = np.array(plt.rcParams['figure.figsize'])
+# style_path = os.path.expanduser('~/PycharmProjects/alexis_style.mplstyle')
+# plt.style.use(style_path)
+#
+#
+# experiments = [
+#     '2AFC_2',
+#     '2AFC_3',
+#     '2AFC_4',
+#     # '2AFC_5',
+#     # '2AFC_6',
+# ]
+# df_behavior = glue_groups(experiments)
+# df_behavior = df_behavior[df_behavior.Miss == 0].reset_index(drop=True)
+# df_behavior = df_behavior[df_behavior.P > 0].reset_index(drop=True)
+#
+# # Save old columns for comparison later
+# old_columns = list(df_behavior.columns)
+#
+# # Add lick data to the DataFrame
+# df_behavior = add_lick_data(df_behavior)
+#
+# # Add session half index (0 for the 1st and 1 for the 2nd)
+# df_behavior['SessionHalf'] = (df_behavior.Trial >= df_behavior.groupby('Session').Trial.transform('max') / 2).astype(int)
+# # Add absolute ILD
+# loc = df_behavior.columns.get_loc('ILD') + 1  # To the right of ILD column
+# df_behavior.insert(loc, 'absILD', df_behavior['ILD'].abs())  # Add previous stimulus side column
+#
+# # Print new columns added to the DataFrame
+# new_columns = list(df_behavior.columns)
+# new_columns = [col for col in new_columns if col not in old_columns]
+# print(new_columns)
+#
+# # Sometimes pandas doesn't recognize all nans as actual nans. Force it and remove them
+# df_behavior['RT'] = pd.to_numeric(df_behavior['RT'], errors='coerce')
+# df_behavior = df_behavior.dropna(subset=['RT']).reset_index(drop=True)
+# assert len(df_behavior) == len(df_behavior['RT'].dropna().values.reshape(-1, 1))
+#
+# if '2AFC_4' in experiments:
+#     df_behavior.loc[df_behavior.Experiment == '2AFC_4', 'RT'] -= 0.15
+# if '2AFC_5' in experiments:
+#     df_behavior.loc[df_behavior.Experiment == '2AFC_5', 'RT'] -= 0.15
+# if '2AFC_6' in experiments:
+#     df_behavior.loc[df_behavior.Experiment == '2AFC_6', 'RT'] -= 0.15
+#
+# df_behavior.Subject = df_behavior.Subject.astype(int).astype(str).str.zfill(3)  # 0 padd subjects for consistent XXX ID and ensure string format
+# animals = main(experiments)  # Cherry pick
+# all_animals = [a for expt in ['2AFC_2', '2AFC_3', '2AFC_4'] for a in animals[expt]]  # Unpack cherries
+# print(f'{len(all_animals)} mice: {all_animals}')
+# df_behavior = df_behavior[df_behavior['Subject'].isin(all_animals)]  # Filter cherries
