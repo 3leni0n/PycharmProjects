@@ -3,6 +3,7 @@ import numpy as np
 import ast
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from scipy.stats import ttest_1samp
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
@@ -96,7 +97,7 @@ def compute_psth(peri_stim_licks, time_win=[-1, 3], bin_size=0.1):
     return bins, psth
 
 
-def inter_lick_interval(licks: pd.Series) -> list:
+def inter_lick_interval(licks: pd.Series, method: str='first') -> list:
     """
     Compute the mean inter-lick interval (ILI) of the licks of a behavioral session.
     :return: Inter-lick interval (ILI) of the licks per trial
@@ -112,8 +113,12 @@ def inter_lick_interval(licks: pd.Series) -> list:
             ili.append(np.nan)
         else:
             intervals = np.diff(licks_trial)
-            # ili.append(intervals[0])  # First ili (interval between 1st-2nd lick)
-            ili.append(np.mean(intervals))  # Mean ili
+            if method == 'first':
+                ili.append(intervals[0])  # First ili (interval between 1st-2nd lick)
+            elif method == 'mean':
+                ili.append(np.mean(intervals))  # Mean ili
+            else:
+                raise ValueError("method must be 'first' or 'mean'")
 
     return ili
 
@@ -229,21 +234,28 @@ def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
     return df_behavior
 
 
-def model_licks(df_behavior, var='RT', me=True):
+def model_licks(df_behavior, var='RT', me=False):
+
+    # Create column for after error trials (invert AfterHit)
+    df_behavior['AfterError'] = 1 - df_behavior['AfterHit']
 
     if var == 'RT' or var == 'ILI':
+        formula_cols = ['Choice', 'Hit', 'AfterError', 'absILD', 'NormTrial', 'NormTrial2']
+        formula = f'{var} ~ Choice + Hit + AfterError + absILD + absILD:Hit + NormTrial + NormTrial2'
         family = sm.families.Gaussian()
         print(f'Fitting GLM with Gaussian family for {var}...')
     elif var == 'nLicks':
+        # Remove Hit and AfterHit for nLicks as will fit only correct trials
+        formula_cols = ['Choice', 'absILD', 'NormTrial', 'NormTrial2']
+        formula = f'{var} ~ Choice + absILD + NormTrial + NormTrial2'
         family = sm.families.Poisson()
         me = False  # No mixed effects for Poisson
-        print(f'Fitting GLM with Gaussian family for {var}...')
+        print(f'Fitting GLM with Poisson family for {var}...')
     else:
         raise ValueError('Variable must be RT, ILI, or nLicks')
+    formula_cols.append(var)
 
     subjects = df_behavior.Subject.unique()
-
-    # Prepare containers
     all_params = []
     all_pvals = []
 
@@ -252,13 +264,26 @@ def model_licks(df_behavior, var='RT', me=True):
         df_subj = df_behavior[df_behavior.Subject == subj].copy()
         print(f'Fitting model for subject {subj} ({len(df_subj)})...')
 
+        # For nLicks, fit only correct trials
+        if var == 'nLicks':
+            df_subj = df_subj[df_subj.Hit == 1]
+
+        # Keep only sessions with at least 50 trials
+        min_trials_session = 50
+        trials_session = df_subj.groupby('Session').size()  # Count trials per session after subsetting
+        to_drop = trials_session[trials_session < min_trials_session]  # Identify sessions to drop
+        print(f'Dropping {len(to_drop)} sessions with <50 trials:')
+        for sess_id, n_trials in to_drop.items():
+            print(f'Session {sess_id}: {n_trials} trials')
+        df_subj = df_subj.groupby('Session').filter(lambda x: len(x) >= min_trials_session)
+
         # Transform Choice: 0→-1, 1→1
         df_subj['Choice'] = df_subj['Choice'] * 2 - 1
 
         # Normalize absILD
         df_subj['absILD'] = df_subj['absILD'] / df_subj['absILD'].max()
 
-        # Add normalized trial index per session
+        # Normalize within session and zscore within subject
         df_subj['NormTrial'] = df_subj.groupby('Session')['Trial'].transform(
             lambda x: (x - x.min()) / (x.max() - x.min()))
         df_subj['NormTrial2'] = df_subj['NormTrial'] ** 2  # Squared term
@@ -266,13 +291,8 @@ def model_licks(df_behavior, var='RT', me=True):
         df_subj['NormTrial2'] = df_subj['NormTrial2'].astype(float)
 
         # Drop rows with NaNs in any of the formula columns (also remove the misses)
-        formula_cols = ['Choice', 'Hit', 'AfterHit', 'absILD', 'NormTrial', 'NormTrial2']
-        formula_cols.append(var)
         df_subj = df_subj.dropna(subset=formula_cols)
         df_subj.reset_index(drop=True, inplace=True)
-
-        # Define formula
-        formula = f'{var} ~ Choice + Hit + AfterHit + absILD + absILD:Hit + NormTrial + NormTrial2'
 
         # Yet to include:
         # Session index (included with tne mixed effects model)
@@ -308,60 +328,28 @@ def model_licks(df_behavior, var='RT', me=True):
     return df_params, df_p
 
 
-def plot_model_licks(df_params, df_p, kind='box', drop_intercept=True, **kwargs):
+def tukey_fence(arr, k=1.5):
+    """
+    Apply Tukey's fences to identify non-outlier data points in a 1D array (designed for RTs).
+    :param arr: 1D array of data points (e.g., RTs)
+    :param k: Multiplier for the interquartile range (IQR) to define the fences (default: 1.5)
+    :return: Boolean mask indicating non-outlier data points
+    """
 
-    from scipy.stats import combine_pvalues
+    Q1 = np.percentile(arr, 25)
+    Q3 = np.percentile(arr, 75)
+    IQR = Q3 - Q1
+    lower_fence = Q1 - (k * IQR)
+    upper_fence = Q3 +(k * IQR)
+    mask = (arr >= lower_fence) & (arr <= upper_fence)
 
-    combined_pvalues = {}
-    for col in df_p.columns:
-        res, pval = combine_pvalues(df_p[col], method='fisher')
-        combined_pvalues[col] = {'stat': res, 'pval': pval}
-
-    # Drop intercept column
-    if drop_intercept:
-        df_params = df_params.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
-        df_p = df_p.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
-
-    # Compute mean, SEM and p values across mice
-    params_mean = df_params.mean()
-    params_sem = df_params.sem()
-    p_mean = df_p.mean()
-    print(params_mean)
-    print(params_sem)
-    print(p_mean)
-
-    # Highlight effects where mean p-value < 0.05
-    # colors = ['red' if df_p[col].mean() < 0.05 else 'gray' for col in df_p.columns]
-    colors = ['red' if combined_pvalues[col]['pval'] < 0.05 else 'gray' for col in df_p.columns]
-
-    plt.figure(constrained_layout=True, **kwargs)
-    plt.axhline(0, color='black', linestyle='--')
-
-    # Box plots
-    if kind == 'box':
-        bp = plt.boxplot([df_params[col] for col in df_params.columns], showfliers=False, labels=df_params.columns,
-                         patch_artist=True, medianprops=dict(color='black'))
-        plt.xticks(rotation=45, ha='right')
-        plt.ylabel('Weights')
-
-        # Color the boxes
-        for patch, color in zip(bp['boxes'], colors):
-            patch.set_facecolor(color)
-
-    # Bar plots
-    else:
-        plt.bar(range(len(params_mean)), params_mean, yerr=params_sem, color=colors)
-        plt.xticks(range(len(params_mean)), params_mean.index, rotation=45, ha='right')
-        plt.ylabel('Weights\n(mean ± SEM)')
-
-    # plt.axhline(0, color='black', linestyle='--')
-    plt.title('Kernel')
-    sns.despine()
+    return mask
 
 
 ########################################################################################################################
 
 # Plotting functions
+
 
 def plot_licks_dist(df_behavior, var='RT', density=False, **kwargs):
     """
@@ -377,12 +365,13 @@ def plot_licks_dist(df_behavior, var='RT', density=False, **kwargs):
 
     # Continuous variables
     if var == 'RT' or var == 'ILI':
+        bins =
         if density:
             ylabel = 'Density'
             sns.kdeplot(df_behavior[var], color=color, **kwargs)
         else:
             ylabel = 'Frequency'
-            plt.hist(df_behavior[var], bins=1000, color=color, edgecolor=color, **kwargs)
+            plt.hist(df_behavior[var], bins=1000, density=True, color=color, edgecolor=color, **kwargs)
         plt.xlim(0, 0.5)
         plt.xlabel('Time (s)')
 
@@ -679,7 +668,7 @@ def plot_ild_dist_mean(df_behavior, var='RT'):
     sns.despine()
 
 
-def plot_licks_per_subject(df_behavior, plot_func, ncols=5, format='A4', **kwargs):
+def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     """
     Plot a subplot per subject of a given plotting function. Adjust automatically the figure grid to fit all subjects.
     :param df_behavior: DataFrame containing the behavioral data.
@@ -852,127 +841,175 @@ def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
     sns.despine()
 
 
+def plot_model_licks(df_params, df_p, kind='box', drop_intercept=True, **kwargs):
 
+    # Drop intercept column
+    if drop_intercept:
+        df_params = df_params.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
+        df_p = df_p.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
 
+    # Drop Trial and Trial^2 columns if present
+    df_params = df_params.drop(['NormTrial', 'NormTrial2'], axis=1, errors='ignore')
 
-def tukey_fence(arr, k=1.5):
-    """
-    Apply Tukey's fences to identify non-outlier data points in a 1D array (designed for RTs).
-    :param arr: 1D array of data points (e.g., RTs)
-    :param k: Multiplier for the interquartile range (IQR) to define the fences (default: 1.5)
-    :return: Boolean mask indicating non-outlier data points
-    """
+    n_tests = len(df_params.columns)
+    t_test_results = {}
+    for col in df_params.columns:
+        t_stat, p_val = ttest_1samp(df_params[col], 0, nan_policy='omit')
+        p_bonf = min(p_val * n_tests, 1)  # Bonferroni correction (cap at 1)
+        t_test_results[col] = {'t': t_stat, 'p': p_val, 'p_bonf': p_bonf}
+        print(f'Test {col}: t={t_stat:.3f}, p={p_bonf:.3f}')
 
-    Q1 = np.percentile(arr, 25)
-    Q3 = np.percentile(arr, 75)
-    IQR = Q3 - Q1
-    lower_fence = Q1 - (k * IQR)
-    upper_fence = Q3 +(k * IQR)
-    mask = (arr >= lower_fence) & (arr <= upper_fence)
+    # Compute mean, SEM and p values across mice
+    params_mean = df_params.mean()
+    params_sem = df_params.sem()
+    p_mean = df_p.mean()
+    print(params_mean)
+    print(params_sem)
+    print(p_mean)
 
-    return mask
+    # Highlight effects where mean p-value < 0.05
+    # colors = ['red' if df_p[col].mean() < 0.05 else 'gray' for col in df_p.columns]
+    colors = ['red' if t_test_results[col]['p_bonf'] < 0.05 else 'gray' for col in df_params.columns]
+
+    # Define the labels you want to rename
+    label_map = {
+        'Hit': 'Correct',
+        'AfterError': 'After error',
+        'absILD': "|ILD|'",
+        'absILD:Hit': "|ILD|':Correct",
+        'NormTrial': "Trial'",
+        'NormTrial2': "Trial'²"
+    }
+
+    plt.figure(constrained_layout=True, **kwargs)
+    plt.axhline(0, color='black', linestyle='--')
+
+    # Box plots
+    if kind == 'box':
+        bp = plt.boxplot([df_params[col] for col in df_params.columns],
+                         showfliers=False,
+                         labels=[label_map.get(col, col) for col in df_params.columns],
+                         patch_artist=True,
+                         medianprops=dict(color='black'))
+        plt.xticks(rotation=0, ha='center')
+        plt.ylabel('Weights')
+
+        # Color the boxes
+        for patch, color in zip(bp['boxes'], colors):
+            patch.set_facecolor(color)
+
+    # Bar plots
+    else:
+        plt.bar(range(len(params_mean)), params_mean, yerr=params_sem, color=colors)
+        plt.xticks(range(len(params_mean)), [label_map.get(col, col) for col in params_mean.index], rotation=0, ha='center')
+        plt.ylabel('Weights\n(mean ± SEM)')
+
+    # plt.axhline(0, color='black', linestyle='--')
+    plt.title('Kernel')
+    sns.despine()
+
+    return t_test_results
+
 
 ########################################################################################################################
 
 # DEVELOPPING:
 
-# import os
-# import pandas as pd
-# import numpy as np
-# import matplotlib.pyplot as plt
-# from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-# import seaborn as sns
-# from glue_sessions.glue_sessions import *
-# from cherry import *
-# from licks import *
-# from plotting_style import *
-# from my_fun.my_fun import save_notebook_files
-# # Plotting style
-# default_figsize = np.array(plt.rcParams['figure.figsize'])
-# style_path = os.path.expanduser('~/PycharmProjects/alexis_style.mplstyle')
-# plt.style.use(style_path)
-#
-#
-# experiments = [
-#     '2AFC_2',
-#     '2AFC_3',
-#     '2AFC_4',
-#     # '2AFC_5',
-#     # '2AFC_6',
-# ]
-# df_behavior = glue_groups(experiments)
-# df_behavior = df_behavior[df_behavior.Miss == 0].reset_index(drop=True)
-# df_behavior = df_behavior[df_behavior.P > 0].reset_index(drop=True)
-#
-# # Save old columns for comparison later
-# old_columns = list(df_behavior.columns)
-#
-# # Add lick data to the DataFrame
-# df_behavior = add_lick_data(df_behavior)
-#
-# # Add session half index (0 for the 1st and 1 for the 2nd)
-# df_behavior['SessionHalf'] = (df_behavior.Trial >= df_behavior.groupby('Session').Trial.transform('max') / 2).astype(int)
-# # Add absolute ILD
-# loc = df_behavior.columns.get_loc('ILD') + 1  # To the right of ILD column
-# df_behavior.insert(loc, 'absILD', df_behavior['ILD'].abs())  # Add previous stimulus side column
-#
-# # Print new columns added to the DataFrame
-# new_columns = list(df_behavior.columns)
-# new_columns = [col for col in new_columns if col not in old_columns]
-# print(new_columns)
-#
-# # Sometimes pandas doesn't recognize all nans as actual nans. Force it and remove them
-# df_behavior['RT'] = pd.to_numeric(df_behavior['RT'], errors='coerce')
-# df_behavior = df_behavior.dropna(subset=['RT']).reset_index(drop=True)
-# assert len(df_behavior) == len(df_behavior['RT'].dropna().values.reshape(-1, 1))
-#
-# if '2AFC_4' in experiments:
-#     df_behavior.loc[df_behavior.Experiment == '2AFC_4', 'RT'] -= 0.15
-# if '2AFC_5' in experiments:
-#     df_behavior.loc[df_behavior.Experiment == '2AFC_5', 'RT'] -= 0.15
-# if '2AFC_6' in experiments:
-#     df_behavior.loc[df_behavior.Experiment == '2AFC_6', 'RT'] -= 0.15
-#
-# df_behavior.Subject = df_behavior.Subject.astype(int).astype(str).str.zfill(3)  # 0 padd subjects for consistent XXX ID and ensure string format
-# animals = main(experiments)  # Cherry pick
-# all_animals = [a for expt in ['2AFC_2', '2AFC_3', '2AFC_4'] for a in animals[expt]]  # Unpack cherries
-# print(f'{len(all_animals)} mice: {all_animals}')
-# df_behavior = df_behavior[df_behavior['Subject'].isin(all_animals)]  # Filter cherries
-
-########################################################################################################################
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+import seaborn as sns
+from glue_sessions.glue_sessions import *
+from cherry import *
+from licks import *
+from plotting_style import *
+from my_fun.my_fun import save_notebook_files
+# Plotting style
+default_figsize = np.array(plt.rcParams['figure.figsize'])
+style_path = os.path.expanduser('~/PycharmProjects/alexis_style.mplstyle')
+plt.style.use(style_path)
 
 
+experiments = [
+    '2AFC_2',
+    '2AFC_3',
+    '2AFC_4',
+    # '2AFC_5',
+    # '2AFC_6',
+]
+df_behavior = glue_groups(experiments)
+df_behavior = df_behavior[df_behavior.Miss == 0].reset_index(drop=True)
+df_behavior = df_behavior[df_behavior.P > 0].reset_index(drop=True)
 
-# n_bins = 1000
-# minRT = df_behavior.RT.min()
-# maxRT = df_behavior.RT.max()
-# bins=np.linspace(minRT, maxRT, n_bins)
-#
-# # Store normalized histograms
-# norm_hists = []
-#
-# for mouse, df_mouse in df_behavior.groupby('Subject'):
-#     hist, _ = np.histogram(df_mouse['RT'], bins=bins, density=False)
-#     hist = hist / hist.sum()  # normalize to sum=1
-#     norm_hists.append(hist)
-#
-# # Convert to array for easy averaging
-# norm_hists = np.array(norm_hists)
-# mean_hist = norm_hists.mean(axis=0)
-# sem_hist = norm_hists.std(axis=0) / np.sqrt(norm_hists.shape[0])
-#
-# # Midpoints of bins for plotting
-# bin_centers = (bins[:-1] + bins[1:]) / 2
-#
-# # Plot mean + shaded SEM
-# figsize = fig_size(n_cols=2)
-# plt.figure(figsize=figsize, constrained_layout=True)
-# plt.plot(bin_centers, mean_hist, color='k', lw=2, label='Mean across mice')
-# plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color='k', alpha=0.25, edgecolor='none')
-# plt.xlim(0, 0.5)
-# plt.xlabel('RT (s)')
-# plt.ylabel('Normalized frequency')
-# plt.title(f'Mean RT distribution across {df_behavior.Subject.nunique()} mice')
-# sns.despine()
+# Save old columns for comparison later
+old_columns = list(df_behavior.columns)
+
+# Add lick data to the DataFrame
+df_behavior = add_lick_data(df_behavior)
+
+# Add session half index (0 for the 1st and 1 for the 2nd)
+df_behavior['SessionHalf'] = (df_behavior.Trial >= df_behavior.groupby('Session').Trial.transform('max') / 2).astype(int)
+# Add absolute ILD
+loc = df_behavior.columns.get_loc('ILD') + 1  # To the right of ILD column
+df_behavior.insert(loc, 'absILD', df_behavior['ILD'].abs())  # Add previous stimulus side column
+
+# Print new columns added to the DataFrame
+new_columns = list(df_behavior.columns)
+new_columns = [col for col in new_columns if col not in old_columns]
+print(new_columns)
+
+# Sometimes pandas doesn't recognize all nans as actual nans. Force it and remove them
+df_behavior['RT'] = pd.to_numeric(df_behavior['RT'], errors='coerce')
+df_behavior = df_behavior.dropna(subset=['RT']).reset_index(drop=True)
+assert len(df_behavior) == len(df_behavior['RT'].dropna().values.reshape(-1, 1))
+
+if '2AFC_4' in experiments:
+    df_behavior.loc[df_behavior.Experiment == '2AFC_4', 'RT'] -= 0.15
+if '2AFC_5' in experiments:
+    df_behavior.loc[df_behavior.Experiment == '2AFC_5', 'RT'] -= 0.15
+if '2AFC_6' in experiments:
+    df_behavior.loc[df_behavior.Experiment == '2AFC_6', 'RT'] -= 0.15
+
+df_behavior.Subject = df_behavior.Subject.astype(int).astype(str).str.zfill(3)  # 0 padd subjects for consistent XXX ID and ensure string format
+animals = main(experiments)  # Cherry pick
+all_animals = [a for expt in ['2AFC_2', '2AFC_3', '2AFC_4'] for a in animals[expt]]  # Unpack cherries
+print(f'{len(all_animals)} mice: {all_animals}')
+df_behavior = df_behavior[df_behavior['Subject'].isin(all_animals)]  # Filter cherries
+
+#######################################################################################################################
 
 
+
+n_bins = 1000
+minRT = df_behavior.RT.min()
+maxRT = df_behavior.RT.max()
+bins=np.linspace(minRT, maxRT, n_bins)
+
+# Store normalized histograms
+norm_hists = []
+
+for mouse, df_mouse in df_behavior.groupby('Subject'):
+    hist, _ = np.histogram(df_mouse['RT'], bins=bins, density=False)
+    hist = hist / hist.sum()  # normalize to sum=1
+    norm_hists.append(hist)
+
+# Convert to array for easy averaging
+norm_hists = np.array(norm_hists)
+mean_hist = norm_hists.mean(axis=0)
+sem_hist = norm_hists.std(axis=0) / np.sqrt(norm_hists.shape[0])
+
+# Midpoints of bins for plotting
+bin_centers = (bins[:-1] + bins[1:]) / 2
+
+# Plot mean + shaded SEM
+figsize = fig_size(n_cols=2)
+plt.figure(figsize=figsize, constrained_layout=True)
+plt.plot(bin_centers, mean_hist, color='k', lw=2, label='Mean across mice')
+plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color='k', alpha=0.25, edgecolor='none')
+plt.xlim(0, 0.5)
+plt.xlabel('RT (s)')
+plt.ylabel('Normalized frequency')
+plt.title(f'Mean RT distribution across {df_behavior.Subject.nunique()} mice')
+sns.despine()
