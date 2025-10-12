@@ -3,6 +3,7 @@ import numpy as np
 import ast
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from scipy.ndimage import gaussian_filter1d
 from scipy.stats import ttest_1samp
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
@@ -351,7 +352,7 @@ def tukey_fence(arr, k=1.5):
 # Plotting functions
 
 
-def plot_licks_dist(df_behavior, var='RT', bin_size=0.01, density=False, **kwargs):
+def plot_licks_dist_old(df_behavior, var='RT', bin_size=0.001, density=False, **kwargs):
     """
     Plot the licks distribution for a variable of interest.
     :param df_behavior: DataFrame with the behavioral data
@@ -375,13 +376,18 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.01, density=False, **kwarg
             ylabel = 'Density'
             sns.kdeplot(df_behavior[var], color=color, **kwargs)
         else:
-            ylabel = 'Fraction'
+            ylabel = 'Frequency'
             hist, _ = np.histogram(df_behavior[var], bins=bins, density=False)
             hist = hist / hist.sum()  # Normalize to sum 1
-            plt.step(bin_centers, hist, color=color)
+            window = 20  # For thes smoothie
+            # hist = np.convolve(hist, np.ones(window)/window, mode='same')  # Moving average
+            hist = gaussian_filter1d(hist, sigma=window/2)  # Gaussian filter
+            # plt.step(bin_centers, hist, color=color)
+            plt.plot(bin_centers, hist, color=color)
             # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
+
         plt.xlim(0, 0.5)
-        # plt.ylim(0, None)
+        plt.ylim(0, None)
         plt.xlabel('Time (s)')
 
     # Discrete variable
@@ -415,40 +421,96 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.01, density=False, **kwarg
         plt.legend()
 
 
-def plot_mean_RT(df_behavior, bin_size=0.01, **kwargs):
+def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, **kwargs):
+    """
+    Plot the licks distribution for a variable of interest.
+    :param df_behavior: DataFrame with the behavioral data
+    :param var: Variable to plot (e.g., 'RT', 'nLicks', 'ILI')
+    :param density: If True, plot density instead of frequency (default: False)
+    :return: None
+    """
 
-    bin_edges = (0, df_behavior.RespWin.unique()[0])
-    n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
-    bins = np.linspace(0, 1, n_bins + 1)
-    bin_centers = (bins[:-1] + bins[1:]) / 2
+    # plt.figure(constrained_layout=True, **kwargs)
+    color = kwargs.pop('color', 'k')  # Default black
+    label = kwargs.pop('label', None)  # Default None
+    subjects = df_behavior.Subject.unique()
 
-    # Store normalized histograms
-    hists = []
+    # Continuous variables
+    if var == 'RT' or var == 'ILI':
 
-    for mouse, df_mouse in df_behavior.groupby('Subject'):
-        hist, _ = np.histogram(df_mouse['RT'], bins=bins, density=False)
-        hist = hist / hist.sum()  # Normalize to sum=1 (each subjects weights equally in the mean, independently of the number of trials)
-        hists.append(hist)
+        bin_edges = (0, df_behavior.RespWin.unique()[0])
+        n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
+        bins = np.linspace(0, 1, n_bins + 1)
+        bin_centers = (bins[:-1] + bins[1:]) / 2
 
-    # Convert to array for easy averaging
-    hists = np.array(hists)
-    mean_hist = hists.mean(axis=0)
-    sem_hist = hists.std(axis=0) / np.sqrt(hists.shape[0])
+        if density:
+            ylabel = 'Density'
+            sns.kdeplot(df_behavior[var], color=color, **kwargs)
+        else:
+            ylabel = 'Freq. (norm.)'
+            window = bin_size * 10  # 0.01
+            sigma = window / bin_size
+            # Average across them (mean and sem)
+            if len(subjects) > 1:
+                hists = []
+                for subj in subjects:
+                    hist, _ = np.histogram(df_behavior.loc[df_behavior.Subject == subj, var], bins=bins, density=False)
+                    hist = hist / hist.sum()  # Normalize per subject
+                    hists.append(hist)
+                hists = np.array(hists)
+                mean_hist = np.mean(hists, axis=0)
+                sem_hist = hists.std(axis=0) / np.sqrt(hists.shape[0])
+                mean_hist = gaussian_filter1d(mean_hist, sigma=sigma)
+                mean_hist = mean_hist / mean_hist.sum()
+                sem_hist = gaussian_filter1d(sem_hist, sigma=sigma)
+                plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color=color, alpha=0.25,
+                                 edgecolor='none')
+                plt.plot(bin_centers, mean_hist, color=color, label=label)
+            else:
+                hist, _ = np.histogram(df_behavior[var], bins=bins, density=False)
+                # hist = np.convolve(hist, np.ones(window)/window, mode='same')  # Moving average
+                hist = gaussian_filter1d(hist, sigma=sigma)  # Gaussian filter
+                # plt.step(bin_centers, hist, color=color)
+                hist = hist / hist.sum()  # Normalize to sum 1
+                plt.plot(bin_centers, hist, color=color, label=label)
+                # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
 
-    # Plot mean + shaded SEM
-    plt.figure(constrained_layout=True, **kwargs)
-    plt.plot(bin_centers, mean_hist, color='k', label='Mean across mice')
-    plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color='k', alpha=0.25, edgecolor='none', linewidth=0)
-    plt.xlim(0, 0.5)
-    # plt.xticks(np.arange(0, 0.6, 0.1))
-    plt.ylim(0, None)
-    plt.xlabel('RT (s)')
-    plt.ylabel('Freq. (norm.)')
-    # plt.title(f'Mean RT dist. (N={df_behavior.Subject.nunique()})')
+        plt.xlim(0, 0.5)
+        plt.ylim(0, None)
+        plt.xlabel('Time (s)')
+
+    # Discrete variable
+    elif var == 'nLicks':
+        min_val = df_behavior[var].min()
+        max_val = df_behavior[var].max()
+        bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
+        plt.hist(df_behavior[var], bins=bins, color=color, density=True, **kwargs)
+        ax = plt.gca()
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+        plt.xlim(0, 20)
+        # plt.xlim(min_val - 0.5, max_val + 0.5)
+        plt.xlabel(var)
+        if density:
+            ylabel = 'Density'
+        else:
+            ylabel = 'Freq. (norm.)'
+
+    if df_behavior.Subject.unique().size > 1:
+        title = (f'{var}\n'
+                 f'N={len(df_behavior.Subject.unique())}, {len(df_behavior)/1000:.1f}k trials')
+    else:
+        title = (f'{var}\n'
+                 f'{df_behavior.Subject.unique()[0]}, {len(df_behavior)/1000:.1f}k trials')
+
+    # plt.title(title)
+    plt.ylabel(ylabel)
     sns.despine()
 
+    # if 'label' in kwargs:
+    #     plt.legend()
 
-def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
+
+def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwargs):
     """
     Plot the licks distribution of a variable of interest split by condition.
     :param df_behavior: DataFrame with the behavioral data
@@ -462,7 +524,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
     if split == 'outcome':
         split_var_name = 'Hit'
         colors = ['tab:red', 'tab:green']
-        labels = ['Error', 'Hit']
+        labels = ['Error', 'Correct']
     elif split == 'choice':
         split_var_name = 'Choice'
         colors = ['tab:blue', 'tab:orange']
@@ -482,17 +544,17 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
     elif split == 'prev_out':
         split_var_name = 'AfterHit'
         colors = ['tab:red', 'tab:green']
-        labels = ['Error', 'Hit']
+        labels = ['After error', 'After correct']
     elif split == 'half':
         split_var_name = 'SessionHalf'
-        colors = ['tab:blue', 'tab:orange']
+        colors = ['tab:gray', 'k']
         labels = ['1st half', '2nd half']
     elif split == 'drug':
         split_var_name = 'Drug'
         colors = ['tab:gray', 'tab:pink']
         labels = ['Saline', 'Drug']
 
-    # plt.figure(constrained_layout=True)
+    # plt.figure(constrained_layout=True, **kwargs)
 
     for i in range(2):
 
@@ -501,9 +563,10 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
         # Continuous variables
         if var == 'RT' or var == 'ILI':
             if kind == 'hist':
-                plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
-                         edgecolor='none', alpha=0.5)
-                ylabel = 'Frequency'
+                # plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
+                #          edgecolor='none', alpha=0.5)
+                plot_licks_dist(df_behavior[df_behavior[split_var_name] == i], var=var, label=labels[i], color=colors[i], **kwargs)
+                ylabel = 'Freq. (norm.)'
             elif kind == 'kde':
                 sns.kdeplot(split_var, color=colors[i], label=labels[i])
                 ylabel = 'Density'
@@ -525,7 +588,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='kde'):
             if kind == 'kde':
                 ylabel = 'Density'
             else:
-                ylabel = 'Frequency'
+                ylabel = 'Freq. (norm.)'
 
         if df_behavior.Subject.unique().size > 1:
             title = (f'{var}\n'
@@ -863,31 +926,34 @@ def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
     sns.despine()
 
 
-def plot_model_licks(df_params, df_p, kind='box', drop_intercept=True, **kwargs):
+def plot_model_licks(df_params, df_p, kind='box', **kwargs):
+
+    # Compute mean, SEM and p values across mice
+    params_mean = df_params.mean()
+    params_sem = df_params.sem()
+
+    for name in params_mean.index:
+        mean_val = params_mean[name]
+        sem_val = params_sem[name]
+        print(f'{name}: {mean_val:.5f} ± {sem_val:.5f}')
 
     # Drop intercept column
-    if drop_intercept:
-        df_params = df_params.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
-        df_p = df_p.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
+    df_params = df_params.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
+    df_p = df_p.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
 
     # Drop Trial and Trial^2 columns if present
     df_params = df_params.drop(['NormTrial', 'NormTrial2'], axis=1, errors='ignore')
 
+    # Apply Bonferroni correction
     n_tests = len(df_params.columns)
     t_test_results = {}
     for col in df_params.columns:
         t_stat, p_val = ttest_1samp(df_params[col], 0, nan_policy='omit')
         p_bonf = min(p_val * n_tests, 1)  # Bonferroni correction (cap at 1)
         t_test_results[col] = {'t': t_stat, 'p': p_val, 'p_bonf': p_bonf}
-        print(f'Test {col}: t={t_stat:.3f}, p={p_bonf:.3f}')
+        print(f'Test {col}: t={t_stat:.2f}, p={p_bonf:.3f}')
 
-    # Compute mean, SEM and p values across mice
-    params_mean = df_params.mean()
-    params_sem = df_params.sem()
-    p_mean = df_p.mean()
-    print(params_mean)
-    print(params_sem)
-    print(p_mean)
+    print(t_test_results)
 
     # Highlight effects where mean p-value < 0.05
     # colors = ['red' if df_p[col].mean() < 0.05 else 'gray' for col in df_p.columns]
