@@ -73,7 +73,7 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     ilds = np.sort(df.ILD.unique())
 
     # Plot psychometric curves
-    # plt.figure(constrained_layout=True, **kwargs)
+    plt.figure(constrained_layout=True, **kwargs)
     fmt = kwargs.get('format', 'png')
 
     if kind == 'prob_right':
@@ -90,8 +90,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
         color = 'tab:orange'
         # xlabel = 'Stimulus ILD (dB)'
         xlabel = 'ILD (dB)'
-        # ylabel = 'Prob. choose right'
-        ylabel = 'P. right'
+        ylabel = 'Prob. choose right'
+        # ylabel = 'P. right'
 
 
         # Annotation params
@@ -118,8 +118,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
         # Plot params
         color = 'tab:brown'
         xlabel = 'Rep. ILD (dB)'
-        # ylabel = 'Prob. choose repeat'
-        ylabel = 'P. rep.'
+        ylabel = 'Prob. choose repeat'
+        # ylabel = 'P. rep.'
 
         # Annotate params
         lower_lapse = 'LR_Rep='

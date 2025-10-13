@@ -4,7 +4,9 @@ import ast
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
 from scipy.ndimage import gaussian_filter1d
+from scipy.stats import sem
 from scipy.stats import ttest_1samp
+from scipy.stats import median_abs_deviation
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
@@ -352,76 +354,7 @@ def tukey_fence(arr, k=1.5):
 # Plotting functions
 
 
-def plot_licks_dist_old(df_behavior, var='RT', bin_size=0.001, density=False, **kwargs):
-    """
-    Plot the licks distribution for a variable of interest.
-    :param df_behavior: DataFrame with the behavioral data
-    :param var: Variable to plot (e.g., 'RT', 'nLicks', 'ILI')
-    :param density: If True, plot density instead of frequency (default: False)
-    :return: None
-    """
-
-    # plt.figure(constrained_layout=True)
-    color = kwargs.pop('color', 'k')  # Default black, removed from kwargs
-
-    # Continuous variables
-    if var == 'RT' or var == 'ILI':
-
-        bin_edges = (0, df_behavior.RespWin.unique()[0])
-        n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
-        bins = np.linspace(0, 1, n_bins + 1)
-        bin_centers = (bins[:-1] + bins[1:]) / 2
-
-        if density:
-            ylabel = 'Density'
-            sns.kdeplot(df_behavior[var], color=color, **kwargs)
-        else:
-            ylabel = 'Frequency'
-            hist, _ = np.histogram(df_behavior[var], bins=bins, density=False)
-            hist = hist / hist.sum()  # Normalize to sum 1
-            window = 20  # For thes smoothie
-            # hist = np.convolve(hist, np.ones(window)/window, mode='same')  # Moving average
-            hist = gaussian_filter1d(hist, sigma=window/2)  # Gaussian filter
-            # plt.step(bin_centers, hist, color=color)
-            plt.plot(bin_centers, hist, color=color)
-            # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
-
-        plt.xlim(0, 0.5)
-        plt.ylim(0, None)
-        plt.xlabel('Time (s)')
-
-    # Discrete variable
-    elif var == 'nLicks':
-        min_val = df_behavior[var].min()
-        max_val = df_behavior[var].max()
-        bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
-        plt.hist(df_behavior[var], bins=bins, color=color, density=True, **kwargs)
-        ax = plt.gca()
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
-        plt.xlim(0, 20)
-        # plt.xlim(min_val - 0.5, max_val + 0.5)
-        plt.xlabel(var)
-        if density:
-            ylabel = 'Density'
-        else:
-            ylabel = 'Frequency'
-
-    if df_behavior.Subject.unique().size > 1:
-        title = (f'{var}\n'
-                 f'N={len(df_behavior.Subject.unique())}, {len(df_behavior)/1000:.1f}k trials')
-    else:
-        title = (f'{var}\n'
-                 f'{df_behavior.Subject.unique()[0]}, {len(df_behavior)/1000:.1f}k trials')
-
-    plt.title(title)
-    plt.ylabel(ylabel)
-    sns.despine()
-
-    if 'label' in kwargs:
-        plt.legend()
-
-
-def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, **kwargs):
+def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, sem=True, **kwargs):
     """
     Plot the licks distribution for a variable of interest.
     :param df_behavior: DataFrame with the behavioral data
@@ -438,6 +371,13 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, **kwar
     # Continuous variables
     if var == 'RT' or var == 'ILI':
 
+        if var == 'RT':
+            xlim = (0, 0.5)
+        elif var == 'ILI':
+            mean_ILI = df_behavior.ILI.mean()
+            std_ILI = df_behavior.ILI.std()
+            xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
+
         bin_edges = (0, df_behavior.RespWin.unique()[0])
         n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
         bins = np.linspace(0, 1, n_bins + 1)
@@ -448,7 +388,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, **kwar
             sns.kdeplot(df_behavior[var], color=color, **kwargs)
         else:
             ylabel = 'Freq. (norm.)'
-            window = bin_size * 10  # 0.01
+            window = 0.01  # bin_size * 10
             sigma = window / bin_size
             # Average across them (mean and sem)
             if len(subjects) > 1:
@@ -459,12 +399,13 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, **kwar
                     hists.append(hist)
                 hists = np.array(hists)
                 mean_hist = np.mean(hists, axis=0)
-                sem_hist = hists.std(axis=0) / np.sqrt(hists.shape[0])
                 mean_hist = gaussian_filter1d(mean_hist, sigma=sigma)
                 mean_hist = mean_hist / mean_hist.sum()
-                sem_hist = gaussian_filter1d(sem_hist, sigma=sigma)
-                plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color=color, alpha=0.25,
-                                 edgecolor='none')
+                if sem:
+                    sem_hist = hists.std(axis=0) / np.sqrt(hists.shape[0])
+                    sem_hist = gaussian_filter1d(sem_hist, sigma=sigma)
+                    plt.fill_between(bin_centers, mean_hist - sem_hist, mean_hist + sem_hist, color=color, alpha=0.25,
+                                     edgecolor='none')
                 plt.plot(bin_centers, mean_hist, color=color, label=label)
             else:
                 hist, _ = np.histogram(df_behavior[var], bins=bins, density=False)
@@ -475,7 +416,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, **kwar
                 plt.plot(bin_centers, hist, color=color, label=label)
                 # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
 
-        plt.xlim(0, 0.5)
+        plt.xlim(xlim)
         plt.ylim(0, None)
         plt.xlabel('Time (s)')
 
@@ -562,6 +503,16 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
 
         # Continuous variables
         if var == 'RT' or var == 'ILI':
+
+            if var == 'RT':
+                xlim = (0, 0.5)
+                loc = 'upper right'
+            elif var == 'ILI':
+                mean_ILI = df_behavior.ILI.mean()
+                std_ILI = df_behavior.ILI.std()
+                xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
+                loc = 'lower center'
+
             if kind == 'hist':
                 # plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
                 #          edgecolor='none', alpha=0.5)
@@ -570,7 +521,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
             elif kind == 'kde':
                 sns.kdeplot(split_var, color=colors[i], label=labels[i])
                 ylabel = 'Density'
-            plt.xlim(0, 0.5)
+            plt.xlim(xlim)
             plt.xlabel('Time (s)')
 
         # Discrete variable
@@ -597,13 +548,13 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
             title = (f'{var}\n'
                      f'{df_behavior.Subject.unique()[0]}, {len(df_behavior)/1000:.1f}k trials')
 
-    plt.legend(frameon=False)
+    plt.legend(loc=loc, frameon=False)
     plt.title(title)
     plt.ylabel(ylabel)
     sns.despine()
 
 
-def plot_ild_dist(df_behavior, var='RT', insets=False):
+def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
     """
     Plot the licks distribution of a variable of interest split by absolute ILD levels.
     :param df_behavior: DataFrame with the behavioral data of a session
@@ -626,22 +577,21 @@ def plot_ild_dist(df_behavior, var='RT', insets=False):
         # Continuous variables
         if var == 'RT' or var == 'ILI':
 
-            # # Histogram per ILD
-            # bin_size = 0.001
-            # bin_edges = (0, df_behavior.RespWin.unique()[0])
-            # n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
-            # bins = np.linspace(0, 1, n_bins + 1)
-            # bin_centers = (bins[:-1] + bins[1:]) / 2
-            # df_ild = df_behavior[df_behavior.absILD == ild]
-            # hist, _ = np.histogram(df_ild[var], bins=bins, density=False)
-            # hist = hist / hist.sum()  # normalize to sum 1
+            if var == 'RT':
+                xlim = (0, 0.5)
+                loc = 'upper center'
+            elif var == 'ILI':
+                mean_ILI = df_behavior.ILI.mean()
+                std_ILI = df_behavior.ILI.std()
+                xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
+                loc = 'upper left'
 
             # Plot and capture the Line2D object
-            sns.kdeplot(df_ild[var], color=color, label=ild)
+            # sns.kdeplot(df_ild[var], color=color, label=ild)
+            plot_licks_dist(df_behavior[df_behavior.absILD == ild], var=var, sem=False, color=color, label=ild, **kwargs)
             # sns.histplot(df_ild[var], stat='density', element='step', fill=False, kde=False, color=color, label=ild)
             # plt.plot(bin_centers, hist, color=color, label=ild)
-            plt.xlim(0, 0.5)
-            loc = 'upper center'
+            plt.xlim(xlim)
 
             # Extract x and y data from the plotted line
             line = plt.gca().lines[-1]
@@ -702,21 +652,21 @@ def plot_ild_dist(df_behavior, var='RT', insets=False):
         ax_inset.set_yticks([])
         sns.despine(ax=ax_inset)
 
-        # Zoomed inset on the second peak of the distribution
-        ax_inset = inset_axes(ax, width='30%', height='30%', loc='center right')
-        xlim = (0.15, 0.2)
-
-        for i, line in enumerate(ax.lines):
-            x = line.get_xdata()
-            y = line.get_ydata()
-            mask = (x >= xlim[0]) & (x <= xlim[1])
-            color = palette[i]
-            ax_inset.plot(x[mask], y[mask], label=line.get_label(), color=color)
-
-        ax_inset.set_xlim(xlim)
-        ax_inset.set_xticks([])
-        ax_inset.set_yticks([])
-        sns.despine(ax=ax_inset)
+        # # Zoomed inset on the second peak of the distribution
+        # ax_inset = inset_axes(ax, width='30%', height='30%', loc='center right')
+        # xlim = (0.15, 0.2)
+        #
+        # for i, line in enumerate(ax.lines):
+        #     x = line.get_xdata()
+        #     y = line.get_ydata()
+        #     mask = (x >= xlim[0]) & (x <= xlim[1])
+        #     color = palette[i]
+        #     ax_inset.plot(x[mask], y[mask], label=line.get_label(), color=color)
+        #
+        # ax_inset.set_xlim(xlim)
+        # ax_inset.set_xticks([])
+        # ax_inset.set_yticks([])
+        # sns.despine(ax=ax_inset)
 
 
 def plot_ild_dist_mean(df_behavior, var='RT'):
@@ -724,30 +674,49 @@ def plot_ild_dist_mean(df_behavior, var='RT'):
     Plot the mean ± SEM of a variable for each absolute ILD level as a categorical bar plot.
     """
     abs_ilds = sorted(df_behavior.absILD.unique().astype(int))
+    subjects = df_behavior.Subject.unique()
     palette = list(sns.color_palette('tab10', len(abs_ilds)))
 
-    means = []
-    sems = []
+    centers = []
+    errors = []
 
     # Compute means and SEMs
     for ild in abs_ilds:
-        df_ild = df_behavior[df_behavior.absILD == ild][var]
-        mean_ild = df_ild.mean()
-        sem_ild = df_ild.sem()
-        means.append(mean_ild)
-        sems.append(sem_ild)
 
-    y_min = min(means) - 0.25 * (max(means) - min(means))
+        per_subject_vals = []
+        for subj in subjects:
+            df_subj_ild = df_behavior[(df_behavior.Subject == subj)&(df_behavior.absILD == ild)]
+
+            if var == 'RT':
+                val = df_subj_ild[var].median()  # per-subject median
+            else:
+                val = df_subj_ild[var].mean()    # per-subject mean
+            per_subject_vals.append(val)
+        per_subject_vals = np.array(per_subject_vals)
+
+        if var == 'RT':
+            center = np.median(per_subject_vals)
+            error = median_abs_deviation(per_subject_vals, scale='normal') / np.sqrt(len(per_subject_vals))
+            ylabel = 'Median ± MAD/√N (s)'
+        else:
+            center = per_subject_vals.mean()
+            error = sem(per_subject_vals)
+            ylabel = 'Mean ± SEM'
+
+        centers.append(center)
+        errors.append(error)
+
+    y_min = min(centers) - 0.25 * (max(centers) - min(centers))
     x = np.arange(len(abs_ilds))  # positions for the bars
-    # plt.bar(x, means, yerr=sems, color=palette)
-    plt.bar(x, means - y_min, bottom=y_min, yerr=sems, color=palette)
+    plt.bar(x, centers, yerr=errors, color=palette)
+    # plt.bar(x, centers - y_min, bottom=y_min, yerr=errors, color=palette)
     # plt.errorbar(x, means, sems, fmt='-o', color=color, label=label)
 
     plt.ylim(y_min, None)
     plt.xticks(x, abs_ilds)  # ILD values as category labels
     plt.xlabel('|ILD|')
-    plt.ylabel(var)
-    plt.title(f'Mean {var}')
+    plt.ylabel(ylabel)
+    plt.title(f'{var}')
     sns.despine()
 
 
