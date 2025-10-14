@@ -7,7 +7,7 @@ from string import ascii_lowercase
 # from matplotlib import pyplot as plt
 # from sympy import symbols, Eq, log, nsolve  # Not installed in setup PCs
 from scipy.optimize import fsolve
-# import slack
+import slack
 import os
 import csv
 import random
