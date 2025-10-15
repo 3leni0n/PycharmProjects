@@ -33,7 +33,7 @@ from parse.parse_v2 import *  # Or from parse.parse_v2 import parse_v2
 ########################################################################################################################
 
 # Define function
-def daily_report_v2(path, send_slack=False):
+def daily_report_v2(path, save=False, send_slack=False):
     # Register time
     time_start_total = time.time()
 
@@ -812,13 +812,13 @@ def daily_report_v2(path, send_slack=False):
 
         ################################################################################################################
 
-        time_start_savepag1 = time.time()
-        pdf.savefig()  # saves the current figure into a pdf page
-        time_end_savepag1 = time.time()
-        runtime_savepag1 = time_end_savepag1 - time_start_savepag1
-        print("'Saving 1st page in pdf' took", round(runtime_savepag1, 2), 'seconds to run')
-
-        plt.close()
+        if save:
+            time_start_savepag1 = time.time()
+            pdf.savefig()  # saves the current figure into a pdf page
+            time_end_savepag1 = time.time()
+            runtime_savepag1 = time_end_savepag1 - time_start_savepag1
+            print("'Saving 1st page in pdf' took", round(runtime_savepag1, 2), 'seconds to run')
+            plt.close()
 
         ################################################################################################################
         ################################################################################################################
@@ -1130,13 +1130,13 @@ def daily_report_v2(path, send_slack=False):
         print("'Plot 7: peristimulus lick histogram (first licks)' took", round(runtime_psth_first, 2),
               'seconds to run')
 
-        time_start_savepag2 = time.time()
-        pdf.savefig()  # saves the current figure into a pdf page
-        time_end_savepag2 = time.time()
-        runtime_savepag2 = time_end_savepag2 - time_start_savepag2
-        print("'Saving 2nd page in pdf' took", round(runtime_savepag2, 2), 'seconds to run')
-
-        plt.close()
+        if save:
+            time_start_savepag2 = time.time()
+            pdf.savefig()  # saves the current figure into a pdf page
+            time_end_savepag2 = time.time()
+            runtime_savepag2 = time_end_savepag2 - time_start_savepag2
+            print("'Saving 2nd page in pdf' took", round(runtime_savepag2, 2), 'seconds to run')
+            plt.close()
 
     ####################################################################################################################
 

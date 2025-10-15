@@ -6,11 +6,11 @@
   <rdf:RDF xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:cc="http://creativecommons.org/ns#" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
    <cc:Work>
     <dc:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
-    <dc:date>2025-10-14T18:45:50.856457</dc:date>
+    <dc:date>2025-10-15T17:22:44.950127</dc:date>
     <dc:format>image/svg+xml</dc:format>
     <dc:creator>
      <cc:Agent>
-      <dc:title>Matplotlib v3.10.5, https://matplotlib.org/</dc:title>
+      <dc:title>Matplotlib v3.10.6, https://matplotlib.org/</dc:title>
      </cc:Agent>
     </dc:creator>
    </cc:Work>
@@ -337,7 +337,7 @@ L 214.495415 40.354936
 L 215.89955 40.691747 
 L 216.932269 40.769711 
 L 216.932269 40.769711 
-" clip-path="url(#p361e10304a)" style="fill: none; stroke: #ff7f0e; stroke-width: 1.5; stroke-linecap: round"/>
+" clip-path="url(#p665290ceef)" style="fill: none; stroke: #ff7f0e; stroke-width: 1.5; stroke-linecap: round"/>
    </g>
    <g id="line2d_2">
     <path d="M 17.187251 40.769712 
@@ -567,7 +567,7 @@ L 216.334379 40.558642
 L 216.819032 40.761623 
 L 216.932269 40.7697 
 L 216.932269 40.7697 
-" clip-path="url(#p361e10304a)" style="fill: none; stroke: #1f77b4; stroke-width: 1.5; stroke-linecap: round"/>
+" clip-path="url(#p665290ceef)" style="fill: none; stroke: #1f77b4; stroke-width: 1.5; stroke-linecap: round"/>
    </g>
    <g id="patch_3">
     <path d="M 7.2 42.36827 
@@ -582,7 +582,7 @@ L 226.91952 42.36827
   </g>
  </g>
  <defs>
-  <clipPath id="p361e10304a">
+  <clipPath id="p665290ceef">
    <rect x="7.2" y="7.2" width="219.71952" height="35.16827"/>
   </clipPath>
  </defs>
