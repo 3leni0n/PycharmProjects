@@ -31,9 +31,6 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
 
     # Import dates_indexes
     # Group by date (not session as animals sometimes do several dates_indexes within a day)
-    # df = glue_sessions()
-    # path = '/home/alexis/PycharmProjects//' + str(animal) + '.csv'  # Where the data for all animals is
-    # path = Path.home() / 'PycharmProjects' / 'glue_sessions' / '2AFC_X' / str(animal).csv  # Where the data for all animals is
     df = pd.read_csv(path)
     experiment = df.Experiment.unique()[0]
     # setup = str(df.Setup.unique()[0])  # Animal ID  # This returns an array in the case that I trained the wrong mouse
@@ -41,12 +38,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     setup = str(df.Setup.mode()[0])  # Animal ID
     df = df[df.Setup == int(setup)]  # Exclude those sessions with other mice by mistake
     print(f'Doing the intersession of animal {setup} from experiment {experiment}...')
-    # df.reset_index(drop=True, inplace=True)  # Don't create index column and modify it on the go
     # df_grouped = df.groupby('Date')  # Group by date instead of session
-
-    # dates_indexes = df.groupby('Date').ngroup().unique()  # Array with number of dates: x-axis
-    # n_dates = dates_indexes.max()
-
     dates = df.Date.dropna().unique()  # Dropna because there's some corrupted trials in which the date is nan
     dates_indexes = np.arange(len(dates))
     n_dates = len(dates)
@@ -192,6 +184,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     hits_rep = df[df.RepTrial == 1].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0) # Include in daily_report
     hits_alt = df[df.RepTrial == 0].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0) # Include in daily_report
     hits_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0)
+    hits_non_max_evi = df[(df.ILD != df.ILD.min()) & (df.ILD != df.ILD.max())].groupby('Date').Hit.sum().astype('int').reindex(dates, fill_value=0)
 
     # Errors
     errors = df.groupby('Date').WrongLick.sum().astype(int) + df.groupby('Date').Punish.sum().astype(int).reindex(dates, fill_value=0)
@@ -210,6 +203,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     responses_left = df[df.Side == 0].groupby('Date').Response.sum().reindex(dates, fill_value=0)
     responses_right = df[df.Side == 1].groupby('Date').Response.sum().reindex(dates, fill_value=0)
     responses_max_evi = df[(df.ILD == df.ILD.min()) | (df.ILD == df.ILD.max())].groupby('Date').Response.sum().reindex(dates, fill_value=0)
+    responses_non_max_evi = df[(df.ILD != df.ILD.min()) & (df.ILD != df.ILD.max())].groupby('Date').Response.sum().reindex(dates, fill_value=0)
 
     # Response rate
     response_rate = responses / trials
@@ -233,6 +227,7 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
     accuracy_left = hits_left / responses_left
     accuracy_right = hits_right / responses_right
     accuracy_max_evi = hits_max_evi / responses_max_evi
+    accuracy_non_max_evi = hits_non_max_evi / responses_non_max_evi
     lateral_bias = accuracy_right - accuracy_left
     accuracy_rep = hits_rep / repetitions  # Include in daily_report
     accuracy_alt = hits_alt / alternations  # Include in daily_report
@@ -1118,26 +1113,26 @@ def intersession_within_animal(path, alignment='n_sessions', to_csv=False, send_
                    'Performance', 'PerformanceLeft', 'PerformanceRight', 'Responses', 'ResponsesLeft', 'ResponsesRight',
                    'Repetitions', 'RepsLeft', 'RepsRight', 'RepRateLeft', 'RepRateRight', 'Alternations', 'AltsLeft',
                    'AltsRight', 'AltRateLeft', 'AltRateRight', 'Accuracy', 'AccuracyLeft', 'AccuracyRight', 'AccMaxEvi',
-                   'LateralBias', 'AccuracyRep', 'AccuracyAlt', 'RepBias', 'CorrRepBias', 'CorrAltBias', 'Misses',
-                   'MissesLeft', 'MissesRight', 'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards', 'RewardsLeft',
-                   'RewardsRight', 'Water', 'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch', 'NoSound',
-                   'MessageCount', 'P', 'VarDelay', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight', 'FitErrorPCRight',
-                   'ParamsPCRight', 'SensitivityPCRight', 'BiasPCRight', 'LapseRight', 'LapseLeft', 'PCRep', 'xPCRep',
-                   'yPCRep', 'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep', 'BiasPCRep', 'LapseRep',
-                   'LapseAlt', 'Drug']
+                   'AccNonMaxEvi', 'LateralBias', 'AccuracyRep', 'AccuracyAlt', 'RepBias', 'CorrRepBias', 'CorrAltBias',
+                   'Misses', 'MissesLeft', 'MissesRight', 'MissRate', 'MissRateLeft', 'MissRateRight', 'Rewards',
+                   'RewardsLeft', 'RewardsRight', 'Water', 'WaterLeft', 'WaterRight', 'Stage', 'SoundsMismatch',
+                   'NoSound', 'MessageCount', 'P', 'VarDelay', 'PCRight', 'xPCRight', 'yPCRight', 'FitPCRight',
+                   'FitErrorPCRight', 'ParamsPCRight', 'SensitivityPCRight', 'BiasPCRight', 'LapseRight', 'LapseLeft',
+                   'PCRep', 'xPCRep', 'yPCRep', 'FitPCRep', 'FitErrorPCRep', 'ParamsPCRep', 'SensitivityPCRep',
+                   'BiasPCRep', 'LapseRep', 'LapseAlt', 'Drug']
 
         data = list(
             zip(dates, dow, age, subject, board, trials, trials_left, trials_right, chose_left, chose_right, hits,
                 hits_left, hits_right, hits_rep, hits_alt, errors, errors_left, errors_right, performance,
-                performance_left, performance_right, responses, responses_left, responses_right, repetitions,
-                reps_left, reps_right, rep_rate_left, rep_rate_right, alternations, alts_left, alts_right,
-                alt_rate_left, alt_rate_right, accuracy, accuracy_left, accuracy_right, accuracy_max_evi,
-                lateral_bias, accuracy_rep, accuracy_alt, rep_bias, corr_rep_bias, corr_alt_bias, misses,
-                misses_left, misses_right, miss_rate, miss_rate_left, miss_rate_right, rewards, rewards_left,
-                rewards_right, water, water_left, water_right, stage, sounds_mismatch, no_sound, message_count, p,
-                var_delay, pc_right, xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right,
-                sensitivity_pc_right, bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep, ydata_pc_rep,
-                fit_pc_rep, fit_error_pc_rep, params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt, drug))
+                performance_left, performance_right, responses, responses_left, responses_right, repetitions, reps_left,
+                reps_right, rep_rate_left, rep_rate_right, alternations, alts_left, alts_right, alt_rate_left,
+                alt_rate_right, accuracy, accuracy_left, accuracy_right, accuracy_max_evi, accuracy_non_max_evi,
+                lateral_bias, accuracy_rep, accuracy_alt, rep_bias, corr_rep_bias, corr_alt_bias, misses, misses_left,
+                misses_right, miss_rate, miss_rate_left, miss_rate_right, rewards, rewards_left, rewards_right, water,
+                water_left, water_right, stage, sounds_mismatch, no_sound, message_count, p, var_delay, pc_right,
+                xdata_pc_right, ydata_pc_right, fit_pc_right, fit_error_pc_right, params_pc_right, sensitivity_pc_right,
+                bias_pc_right, lapse_right, lapse_left, pc_rep, xdata_pc_rep, ydata_pc_rep, fit_pc_rep, fit_error_pc_rep,
+                params_pc_rep, sensitivity_pc_rep, bias_pc_rep, lapse_rep, lapse_alt, drug))
 
         df_intersession = pd.DataFrame(data=data, columns=columns)
 

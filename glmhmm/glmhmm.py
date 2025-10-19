@@ -1,9 +1,9 @@
 import os
+from scipy.stats import ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-
-from my_fun import get_experiment, save_notebook_files
+from my_fun import get_experiment, save_notebook_files, add_star_between
 from cherry.cherry import *
 from kernels.kernels_tools import *
 from plotting_style import *
@@ -323,7 +323,7 @@ def fit_all(experiment):
 ########################################################################################################################
 
 
-def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
+def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, interpret=True):
 
     all_animals = []
     fit_ll = []
@@ -338,11 +338,6 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
     for experiment in experiments:
         animals = cherries[experiment]
         all_animals.extend(animals)
-
-        # if experiment == '2AFC_2':
-        #     animals = ['325', '327', '329', '330', '332', '333', '335', '337']
-        # elif experiment == '2AFC_3':
-        #     animals = ['419', '420', '422', '616', '619', '623']
 
         for i, animal in enumerate(animals):
 
@@ -367,15 +362,21 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
             loc = df.columns.get_loc('Session') + 1  # To the right of Session column
             df.insert(loc, 'SessionIndex', session_index)  # Add session index column
 
-            # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
-            bad_sessions = []
-            # Count number of trials per session
-            for session_id, df_session in df.groupby('Session'):
-                if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
-                    print(f'Session {session_id} does not have enough trials, skipping...')
-                    bad_sessions.append(session_id)
-            # Remove bad sessions from df
-            df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
+            # # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
+            # bad_sessions = []
+            # # Count number of trials per session
+            # for session_id, df_session in df.groupby('Session'):
+            #     if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
+            #         print(f'Session {session_id} does not have enough trials, skipping...')
+            #         bad_sessions.append(session_id)
+            # # Remove bad sessions from df
+            # df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
+
+            # Drug sessions
+            if drug is None:
+                df = df[df.Drug.isnull()].reset_index(drop=True)
+            elif drug in [0, 1] and experiment == '2AFC_6':
+                df = df[df.Drug == drug].reset_index(drop=True)
 
             # Parse the data
             inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])
@@ -388,7 +389,7 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
             n_categories = 2  # Number of categories for output (2 for binary choice)
             input_dim = inputs[0].shape[1]
 
-            #
+            # Initialize GLM-HMM
             glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
                              observation_kwargs=dict(C=n_categories), transitions='standard')
 
@@ -396,7 +397,7 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
             method = 'em'  # Expectation Maximization method
             num_iters = 200  # Max number of EM iterations
             tolerance = 1e-4  # tolerance for stopping criterion
-            fit_ll.append(glmhmm.fit(choices, inputs=inputs, method='em', num_iters=num_iters, tolerance=tolerance))
+            fit_ll.append(glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance))
 
             weights.append(-glmhmm.observations.params)  # Flip sign of weights
             trans_mat.append(glmhmm.transitions.transition_matrix)
@@ -408,7 +409,22 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
             log_likelihood.append(glmhmm.log_likelihood(choices, inputs=inputs))
             # log_probability.append(glmhmm.log_probabilities(choices, inputs=inputs))
 
-    return all_animals, fit_ll, weights, trans_mat, posterior_probs, log_likelihood
+    if interpret:
+        weights, trans_mat, posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
+
+    results = {
+        'all_animals': all_animals,
+        'fit_ll': fit_ll,
+        'weights': weights,
+        'trans_mat': trans_mat,
+        'posterior_probs': posterior_probs,
+        'log_likelihood': log_likelihood,
+        'remap_indices': remap_indices if interpret else None,
+        'drug': drug,
+        'interpret': interpret
+    }
+
+    return results
 
 
 def interpret_weights(weights, trans_mat, posterior_probs, cov_index=0):
@@ -456,6 +472,8 @@ def interpret_weights(weights, trans_mat, posterior_probs, cov_index=0):
     else:
         return _interpret_single(weights, trans_mat, posterior_probs)
 
+
+# Plotting functions
 
 def plot_GLMHMM_kernel(remapped_weights, **kwargs):
     """
@@ -562,10 +580,10 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, **kwargs):
     data = pd.DataFrame(data)
     data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
 
-    plt.figure(**kwargs, constrained_layout=True)
+    plt.figure(constrained_layout=True, **kwargs)
+    plt.axhline(0, color='black', linestyle='--')
     ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
                 palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
-    plt.axhline(0, color='black', linestyle='--')
     cov_names = ['stim.', '|bias|', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
@@ -576,14 +594,22 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, **kwargs):
     sns.despine()
 
     # Draw paired lines of subjects between boxes (states)
-    for cov in data['Covariate'].unique():
-        for animal in data['Animal'].unique():
+    for cov in sorted(data['Covariate'].unique()):
+        for animal in sorted(data['Animal'].unique()):
             subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
             x0 = cov - 0.2  # disengaged box (gray)
             x1 = cov + 0.2  # engaged box (blue)
             y0 = subset[subset['State'] == 0]['Weight'].values[0]
             y1 = subset[subset['State'] == 1]['Weight'].values[0]
             ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
+
+    # Compute paired-samples t-tests for each covariate between states
+    for cov in sorted(data['Covariate'].unique()):
+        cov_disengaged = data[(data['Covariate'] == cov) & (data['State'] == 0)].sort_values('Animal')['Weight']
+        cov_engaged = data[(data['Covariate'] == cov) & (data['State'] == 1)].sort_values('Animal')['Weight']
+        t_stat, p_val = ttest_rel(cov_engaged, cov_disengaged)
+        print(f'Covariate {cov}: t={t_stat:.3f}, p={p_val:.4f}')
+        add_star_between(p_val, x1=cov - 0.2, x2=cov + 0.2)
 
     return ax
 
@@ -678,6 +704,43 @@ def plot_occupancy(posterior_probs, **kwargs):
     sns.despine()
 
 
+def plot_occupancy_boxplot(posterior_probs, **kwargs):
+    """
+    Plot state occupancies across subjects as boxplots.
+
+    :param posterior_probs: List of posterior probabilities (np.array of shape n_trials × n_states) per subject
+    :param kwargs: Additional keyword arguments for plt.figure()
+    """
+    # Normalize input to list of subjects
+    if isinstance(posterior_probs[0], np.ndarray) and posterior_probs[0].ndim == 2:
+        posterior_probs = [posterior_probs]  # single animal
+
+    occupancies = []
+    for p in posterior_probs:
+        posterior_concat = np.concatenate(p)  # combine sessions if multiple
+        state_max = np.argmax(posterior_concat, axis=1)
+        _, counts = np.unique(state_max, return_counts=True)
+        counts = counts / np.sum(counts)  # fractional occupancy
+        occupancies.append(counts)
+
+    occupancies = np.array(occupancies)
+    df = pd.DataFrame(occupancies, columns=[0, 1])
+    df.rename(columns={0: 'Disengaged', 1: 'Engaged'}, inplace=True)
+
+    # Melt for seaborn
+    df_melt = df.melt(var_name='State', value_name='Occupancy')
+
+    plt.figure(**kwargs, constrained_layout=True)
+    sns.boxplot(x='State', y='Occupancy', data=df_melt,
+                palette=['tab:gray', 'tab:blue'], showfliers=False)
+    sns.stripplot(x='State', y='Occupancy', data=df_melt,
+                  color='k', alpha=0.1)
+    plt.xlabel('State')
+    plt.ylim(0, 1)
+    plt.ylabel('Fractional Occupancy')
+    sns.despine()
+
+
 def plot_log_likelihood(log_likelihood, posterior_probs, to_bits=True, **kwargs):
     """
     Plot log likelihood of one or several subjects.
@@ -754,93 +817,22 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
     sns.despine()
 
 
-def tickle_pickle(var_names, action='load', vars=None):
-    """
-    Save or load GLM-HMM results to/from pickle files in the glmhmm directory.
-    :param action: 'save' or 'load' to save or load variables
-    :param var_names: List of variable names (strings)
-    :param vars: List of variables to save (only for action='save')
-    :return: Dictionary of loaded variables (only for action='load')
-    """
+# # Save results
+# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
+# with open(path, 'wb') as f:
+#     pickle.dump(results, f)
 
-    results = {}
-    base_path = Path.home() / 'PycharmProjects' / 'glmhmm'
-
-    if action == 'save':
-        if vars is None:
-            raise ValueError('vars must be provided for saving')
-
-        for var, var_name in zip(vars, var_names):
-            path = (base_path / var_name).with_suffix('.pkl')
-            with open(path, 'wb') as f:
-                pickle.dump(var, f)
-                print(f'Saved {var_name} to {path}')
-
-    elif action == 'load':
-        for var_name in var_names:
-            path = (base_path / var_name).with_suffix('.pkl')
-            with open(path, 'rb') as f:
-                results[var_name] = pickle.load(f)
-                print(f'Loaded {var_name} from {path}')
-        return results
-
-    else:
-        raise ValueError("action must be 'save' or 'load'")
-
-# cherries = main()  # Absolute import due to another main function in this script
-# all_animals, fit_ll, weights, trans_mat, posterior_probs, log_likelihood  = test_full_model()
-# remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
-# plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals)
-
-# Load results
-var_names = ['all_animals', 'fit_ll', 'remapped_weights', 'remapped_trans_mat', 'remapped_posterior_probs', 'log_likelihood']
-results = tickle_pickle(var_names, action='load', vars=None)
-
-# Unpack results
-all_animals = results['all_animals']
-fit_ll = results['fit_ll']
-weights = results['remapped_weights']
-trans_mat = results['remapped_trans_mat']
-posterior_probs = results['remapped_posterior_probs']
-log_likelihood = results['log_likelihood']
-
-
-def plot_occupancy_boxplot(posterior_probs, **kwargs):
-    """
-    Plot state occupancies across subjects as boxplots.
-
-    :param posterior_probs: List of posterior probabilities (np.array of shape n_trials × n_states) per subject
-    :param kwargs: Additional keyword arguments for plt.figure()
-    """
-    # Normalize input to list of subjects
-    if isinstance(posterior_probs[0], np.ndarray) and posterior_probs[0].ndim == 2:
-        posterior_probs = [posterior_probs]  # single animal
-
-    occupancies = []
-    for p in posterior_probs:
-        posterior_concat = np.concatenate(p)  # combine sessions if multiple
-        state_max = np.argmax(posterior_concat, axis=1)
-        _, counts = np.unique(state_max, return_counts=True)
-        counts = counts / np.sum(counts)  # fractional occupancy
-        occupancies.append(counts)
-
-    occupancies = np.array(occupancies)
-    df = pd.DataFrame(occupancies, columns=[0, 1])
-    df.rename(columns={0: 'Disengaged', 1: 'Engaged'}, inplace=True)
-
-    # Melt for seaborn
-    df_melt = df.melt(var_name='State', value_name='Occupancy')
-
-    plt.figure(**kwargs, constrained_layout=True)
-    sns.boxplot(x='State', y='Occupancy', data=df_melt,
-                palette=['tab:gray', 'tab:blue'], showfliers=False)
-    sns.stripplot(x='State', y='Occupancy', data=df_melt,
-                  color='k', alpha=0.1)
-    plt.xlabel('State')
-    plt.ylim(0, 1)
-    plt.ylabel('Fractional Occupancy')
-    sns.despine()
-
-
-
-
+# # Load results
+# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
+# with open(path, 'rb') as f:
+#     results = pickle.load(f)
+#
+# # Unpack results
+# all_animals = results['all_animals']
+# fit_ll = results['fit_ll']
+# weights = results['weights']
+# trans_mat = results['trans_mat']
+# posterior_probs = results['posterior_probs']
+# log_likelihood = results['log_likelihood']
+# remap_indices = results['remap_indices']
+# interpret = results['interpret']

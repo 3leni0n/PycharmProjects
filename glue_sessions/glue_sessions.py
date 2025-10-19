@@ -188,7 +188,7 @@ def update_glued_sessions(experiment='2AFC_6'):
         glue_sessions(animal=animals[i], protocol=protocol, experiment=experiment, to_csv=True)
 
 
-def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=False, update=True, to_csv=False):
+def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=False, update=False, to_csv=False):
     """
     Glue all the sessions from all the animals of a given batch.
     :param experiment: batch of animals
@@ -212,7 +212,8 @@ def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=
 
     for i in range(len(animals)):
         df_animal = pd.read_csv(Path(folder / animals[i]), low_memory=False)
-        if filter_drug:
+        # if filter_drug:
+        if experiment == '2AFC_6':
             df_animal = filter_drug_sessions(df_animal)
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
@@ -224,7 +225,7 @@ def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=
     return df
 
 
-def glue_groups(groups=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6']):
+def glue_groups(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6']):
     """
     Glue all sessions from all animals from all groups.
     :param groups: Batches of animals to glue together
@@ -233,8 +234,8 @@ def glue_groups(groups=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6']):
 
     df = pd.DataFrame()
 
-    for i in range(len(groups)):
-        df_groups = glue_animals(experiment=groups[i], update=False)
+    for exp in experiments:
+        df_groups = glue_animals(experiment=exp, update=False, to_csv=False)
         df = pd.concat([df, df_groups])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 
