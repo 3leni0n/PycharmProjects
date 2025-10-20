@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 import time
 import os
-import slack
+# import slack
 
 from my_fun.my_fun import *  # Or from daily_report.daily_report import daily_report
 from parse.parse_v2 import *  # Or from parse.parse_v2 import parse_v2

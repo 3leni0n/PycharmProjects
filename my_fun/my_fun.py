@@ -1006,7 +1006,7 @@ def add_stars(pvals, y):
         plt.ylim(ylim[0], ylim[1] + star_offset)  # Enlarge ylim to make space for the stars
 
 
-def add_star_between(pval, x1=0, x2=1):
+def add_star_between(pval, x1=0, x2=1, y=None):
     """
     Add significance star to comparison between 2 points in existing plot.
     :param pval: p-value to convert to stars
@@ -1017,8 +1017,9 @@ def add_star_between(pval, x1=0, x2=1):
     color='k'
 
     # Get y max of the current axis
-    ax = plt.gca()
-    y = ax.get_ylim()[1]
+    if y is None:
+        ax = plt.gca()
+        y = ax.get_ylim()[1]
 
     # Plot horizontal line
     plt.plot([x1, x2], [y, y], c=color)

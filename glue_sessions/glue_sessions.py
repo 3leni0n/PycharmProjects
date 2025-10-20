@@ -113,8 +113,9 @@ def glue_sessions(animal=None, protocol='stage_training_v6', experiment='2AFC_6'
             try:
                 if protocol == 'stage_training':
                     df_session = parse(path)  # Parse session
-                elif (protocol == 'stage_training_v2' or 'stage_training_v3' or 'stage_training_v4' or 'stage_training_v5'
-                      or 'stage_training_v6'):
+
+                elif protocol in ['stage_training_v2', 'stage_training_v3', 'stage_training_v4', 'stage_training_v5',
+                                  'stage_training_v6']:
                     df_session = parse_v2(path)  # Parse session v2
                 df = pd.concat([df, df_session])  # Add parsed session to the bottom of the DataFrame
             except (IndexError, ValueError, FileNotFoundError, ZeroDivisionError):  # When passing 2 exceptions it must be in this syntax
@@ -215,6 +216,7 @@ def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=
         # if filter_drug:
         if experiment == '2AFC_6':
             df_animal = filter_drug_sessions(df_animal)
+            print(f'Filtering paired saline-drug sessions for experiment {experiment}')
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 

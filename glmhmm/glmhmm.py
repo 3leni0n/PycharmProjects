@@ -3,7 +3,7 @@ from scipy.stats import ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, save_notebook_files, add_star_between
+from my_fun import get_experiment, save_notebook_files, add_star_between, filter_drug_sessions
 from cherry.cherry import *
 from kernels.kernels_tools import *
 from plotting_style import *
@@ -326,6 +326,7 @@ def fit_all(experiment):
 def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, interpret=True):
 
     all_animals = []
+    experiment = []
     fit_ll = []
     weights = []
     trans_mat = []
@@ -335,15 +336,16 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, inter
 
     cherries = main(experiments)  # Get good subjects from cherry
 
-    for experiment in experiments:
-        animals = cherries[experiment]
+    for exp in experiments:
+        animals = cherries[exp]
         all_animals.extend(animals)
+        experiment.extend([exp] * len(animals))
 
         for i, animal in enumerate(animals):
 
             # Load behavioral data
-            experiment, folder_in = get_experiment(experiment, path_session='glue_sessions')
-            print(f'Fitting GLM-HMM for subject {animal} ({i + 1}/{len(animals)} of Experiment {experiment})')
+            exp, folder_in = get_experiment(exp, path_session='glue_sessions')
+            print(f'Fitting GLM-HMM for subject {animal} ({i + 1}/{len(animals)} of Experiment {exp})')
             folder_in = Path(folder_in / animal).with_suffix('.csv')
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
@@ -375,7 +377,8 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, inter
             # Drug sessions
             if drug is None:
                 df = df[df.Drug.isnull()].reset_index(drop=True)
-            elif drug in [0, 1] and experiment == '2AFC_6':
+            elif drug in [0, 1] and exp == '2AFC_6':
+                df = filter_drug_sessions(df)
                 df = df[df.Drug == drug].reset_index(drop=True)
 
             # Parse the data
@@ -414,6 +417,7 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, inter
 
     results = {
         'all_animals': all_animals,
+        'experiment': experiment,
         'fit_ll': fit_ll,
         'weights': weights,
         'trans_mat': trans_mat,
@@ -556,7 +560,26 @@ def plot_mean_GLMHMM_kernel(remapped_weights, **kwargs):
     sns.despine()
 
 
-def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, **kwargs):
+def results_2_df(all_animals, experiment, weights):
+    data = []
+    for animal_id, w, exp in zip(all_animals, weights, experiment):
+        for state_idx in range(w.shape[0]):
+            for cov_idx in range(w.shape[2]):
+                data.append({
+                    'Animal': animal_id,
+                    'Experiment': exp,
+                    'State': state_idx,
+                    'Label': 'Disengaged' if state_idx == 0 else 'Engaged',
+                    'Covariate': cov_idx,
+                    'Weight': w[state_idx, 0, cov_idx]
+                })
+    data = pd.DataFrame(data)
+    data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
+    return data
+
+
+# def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, drug=False, **kwargs):
+def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     """
     Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
     :param remapped_weights: List GLM weights per subject of shape (n_states, obs_dim, input_dim) already remapped
@@ -566,31 +589,46 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, **kwargs):
     :return: None
     """
 
-    data = []
-    for animal_id, w in zip(all_animals, remapped_weights):
-        for state_idx in range(w.shape[0]):
-            for cov_idx in range(w.shape[2]):
-                data.append({
-                    'Animal': animal_id,
-                    'State': state_idx,
-                    # 'Label': 'Disengaged' if state_idx == 0 else 'Engaged',
-                    'Covariate': cov_idx,
-                    'Weight': w[state_idx, 0, cov_idx]
-                })
-    data = pd.DataFrame(data)
-    data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
+    title = kwargs.pop('title', 'GLM-HMM kernel')
+    loc = kwargs.pop('loc', 'best')
+    bbox = kwargs.pop('bbox_to_anchor', None)
+
+    # data = []
+    # for animal_id, w in zip(all_animals, remapped_weights):
+    #     for state_idx in range(w.shape[0]):
+    #         for cov_idx in range(w.shape[2]):
+    #             data.append({
+    #                 'Animal': animal_id,
+    #                 'State': state_idx,
+    #                 # 'Label': 'Disengaged' if state_idx == 0 else 'Engaged',
+    #                 'Covariate': cov_idx,
+    #                 'Weight': w[state_idx, 0, cov_idx]
+    #             })
+    # data = pd.DataFrame(data)
+    # data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
+
+    # color scheme and legend labels
+    if drug:
+        palette = {0: 'tab:gray', 1: 'tab:pink'}
+        labels = ['Saline', 'Drug']
+        hue = 'Drug'
+    else:
+        palette = {0: 'tab:gray', 1: 'tab:blue'}
+        labels = ['Disengaged', 'Engaged']
+        hue = 'State'
 
     plt.figure(constrained_layout=True, **kwargs)
     plt.axhline(0, color='black', linestyle='--')
-    ax = sns.boxplot(x='Covariate', y='Weight', hue='State', data=data,
-                palette={0: 'tab:gray', 1: 'tab:blue'}, showfliers=False)
+    ax = sns.boxplot(x='Covariate', y='Weight', hue=hue, data=data,
+                palette=palette, showfliers=False)
     cov_names = ['stim.', '|bias|', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
     # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
     plt.xticks(np.arange(len(cov_names)), cov_names)
-    plt.title(f'GLM-HMM kernel')
-    handles, labels = ax.get_legend_handles_labels()  # Get legend
-    ax.legend(handles, ['Disengaged', 'Engaged'], frameon=False, title='State')  # Rename legend labels
+    plt.xlabel('')
+    plt.title(title)
+    handles, _ = ax.get_legend_handles_labels()  # Get legend
+    ax.legend(handles, labels, loc=loc,  bbox_to_anchor=bbox, frameon=False)  # Rename legend labels
     sns.despine()
 
     # Draw paired lines of subjects between boxes (states)
@@ -599,17 +637,37 @@ def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, **kwargs):
             subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
             x0 = cov - 0.2  # disengaged box (gray)
             x1 = cov + 0.2  # engaged box (blue)
-            y0 = subset[subset['State'] == 0]['Weight'].values[0]
-            y1 = subset[subset['State'] == 1]['Weight'].values[0]
+            y0 = subset[subset[hue] == 0]['Weight'].values[0]
+            y1 = subset[subset[hue] == 1]['Weight'].values[0]
             ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
 
     # Compute paired-samples t-tests for each covariate between states
+    y_star = ax.get_ylim()[1]
     for cov in sorted(data['Covariate'].unique()):
-        cov_disengaged = data[(data['Covariate'] == cov) & (data['State'] == 0)].sort_values('Animal')['Weight']
-        cov_engaged = data[(data['Covariate'] == cov) & (data['State'] == 1)].sort_values('Animal')['Weight']
+        cov_disengaged = data[(data['Covariate'] == cov) & (data[hue] == 0)].sort_values('Animal')['Weight']
+        cov_engaged = data[(data['Covariate'] == cov) & (data[hue] == 1)].sort_values('Animal')['Weight']
         t_stat, p_val = ttest_rel(cov_engaged, cov_disengaged)
         print(f'Covariate {cov}: t={t_stat:.3f}, p={p_val:.4f}')
-        add_star_between(p_val, x1=cov - 0.2, x2=cov + 0.2)
+        add_star_between(p_val, x1=cov - 0.2, x2=cov + 0.2, y=y_star)
+
+    # Collect all y positions of star lines or texts
+    ax = plt.gca()
+    ys = []
+    for line in ax.lines:
+        ys.extend(line.get_ydata())
+    for text in ax.texts:
+        ys.append(text.get_position()[1])
+
+    # Include legend top in data coordinates
+    legend = ax.get_legend()
+    if legend is not None:
+        ax.figure.canvas.draw()
+        bbox = legend.get_window_extent().transformed(ax.transData.inverted())
+        ys.append(bbox.y1)  # top of legend
+
+    # Find highest y among them and expand slightly
+    ymax = max(ys)
+    ax.set_ylim(top=ymax * 1.1)
 
     return ax
 
@@ -641,11 +699,12 @@ def plot_trans_mat(trans_mat, **kwargs):
     # plt.xlim(-0.5, n_states + 0.5)
     ticks = range(0, n_states)
     ticklabels = [str(i) for i in range(n_states)]
+    ticklabels = ['D', 'E']  # Short labels
     plt.xticks(ticks, ticklabels)
     plt.yticks(ticks, ticklabels)
     # plt.ylim(n_states - 0.5, -0.5)
-    plt.ylabel('state $t$')
-    plt.xlabel('state $t+1$')
+    plt.ylabel('State $t$')
+    plt.xlabel('State $t+1$')
     # plt.title('Transition matrix')
 
     # Ensure all spines are visible, even if despine() was called outside
@@ -698,7 +757,7 @@ def plot_occupancy(posterior_probs, **kwargs):
     plt.xticks(range(len(labels)), labels)
     plt.ylim((0, 1))
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
-    plt.xlabel('State')
+    # plt.xlabel('State')
     plt.ylabel('Occ.')
     # plt.title('Occupancy')
     sns.despine()
@@ -735,9 +794,15 @@ def plot_occupancy_boxplot(posterior_probs, **kwargs):
                 palette=['tab:gray', 'tab:blue'], showfliers=False)
     sns.stripplot(x='State', y='Occupancy', data=df_melt,
                   color='k', alpha=0.1)
-    plt.xlabel('State')
+
+    t_stat, p_val = ttest_rel(df.Engaged, df.Disengaged)
+    print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+    add_star_between(p_val)
+
+    # plt.xlabel('State')
+    plt.xlabel('')
     plt.ylim(0, 1)
-    plt.ylabel('Fractional Occupancy')
+    plt.ylabel('Fractional occupancy')
     sns.despine()
 
 
@@ -821,7 +886,7 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
 # path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
 # with open(path, 'wb') as f:
 #     pickle.dump(results, f)
-
+#
 # # Load results
 # path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
 # with open(path, 'rb') as f:
