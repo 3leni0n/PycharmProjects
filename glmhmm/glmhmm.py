@@ -590,7 +590,7 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     """
 
     title = kwargs.pop('title', 'GLM-HMM kernel')
-    loc = kwargs.pop('loc', 'best')
+    loc = kwargs.pop('loc', None)
     bbox = kwargs.pop('bbox_to_anchor', None)
 
     # data = []
@@ -727,7 +727,7 @@ def plot_occupancy(posterior_probs, **kwargs):
 
     n_states = posterior_probs[0][0].shape[1]
     colors = ['tab:gray', 'tab:blue']
-    labels = ['D.', 'E.']
+    labels = ['D', 'E']
 
     occupancies = []
 
@@ -901,3 +901,6 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
 # log_likelihood = results['log_likelihood']
 # remap_indices = results['remap_indices']
 # interpret = results['interpret']
+
+# results_saline = test_full_model(experiments=['2AFC_6'], drug=0, interpret=True)
+# results_drug = test_full_model(experiments=['2AFC_6'], drug=1, interpret=True)
