@@ -7,6 +7,7 @@ from scipy.ndimage import gaussian_filter1d
 from scipy.stats import sem
 from scipy.stats import ttest_1samp
 from scipy.stats import median_abs_deviation
+from scipy.stats import zscore
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
@@ -354,7 +355,7 @@ def tukey_fence(arr, k=1.5):
 # Plotting functions
 
 
-def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, sem=True, **kwargs):
+def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, z=False, density=False, sem=True, **kwargs):
     """
     Plot the licks distribution for a variable of interest.
     :param df_behavior: DataFrame with the behavioral data
@@ -372,15 +373,15 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, sem=Tr
     if var == 'RT' or var == 'ILI':
 
         if var == 'RT':
-            xlim = (0, 0.5)
+            xlim = (-4, 4) if z else (0, 0.5)
         elif var == 'ILI':
             mean_ILI = df_behavior.ILI.mean()
             std_ILI = df_behavior.ILI.std()
             xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
 
-        bin_edges = (0, df_behavior.RespWin.unique()[0])
+        bin_edges = (-4, 4) if z else (0, df_behavior.RespWin.unique()[0])
         n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
-        bins = np.linspace(0, 1, n_bins + 1)
+        bins = np.linspace(bin_edges[0], bin_edges[1], n_bins + 1)
         bin_centers = (bins[:-1] + bins[1:]) / 2
 
         if density:
@@ -394,7 +395,10 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, density=False, sem=Tr
             if len(subjects) > 1:
                 hists = []
                 for subj in subjects:
-                    hist, _ = np.histogram(df_behavior.loc[df_behavior.Subject == subj, var], bins=bins, density=False)
+                    data = df_behavior.loc[df_behavior.Subject == subj, var].copy()
+                    if z:
+                        data = zscore(data)
+                    hist, _ = np.histogram(data, bins=bins, density=False)
                     hist = hist / hist.sum()  # Normalize per subject
                     hists.append(hist)
                 hists = np.array(hists)

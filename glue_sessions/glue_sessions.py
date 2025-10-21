@@ -189,7 +189,7 @@ def update_glued_sessions(experiment='2AFC_6'):
         glue_sessions(animal=animals[i], protocol=protocol, experiment=experiment, to_csv=True)
 
 
-def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=False, update=False, to_csv=False):
+def glue_animals(experiment='2AFC_6', path_session='glue_sessions', update=False, to_csv=False):
     """
     Glue all the sessions from all the animals of a given batch.
     :param experiment: batch of animals
@@ -213,10 +213,9 @@ def glue_animals(experiment='2AFC_6', path_session='glue_sessions', filter_drug=
 
     for i in range(len(animals)):
         df_animal = pd.read_csv(Path(folder / animals[i]), low_memory=False)
-        # if filter_drug:
         if experiment == '2AFC_6':
             df_animal = filter_drug_sessions(df_animal)
-            print(f'Filtering paired saline-drug sessions for experiment {experiment}')
+            # print(f'Filtering paired saline-drug sessions for experiment {experiment}')
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 

@@ -592,6 +592,7 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     title = kwargs.pop('title', 'GLM-HMM kernel')
     loc = kwargs.pop('loc', None)
     bbox = kwargs.pop('bbox_to_anchor', None)
+    # palette = kwargs.pop('palette', None)
 
     # data = []
     # for animal_id, w in zip(all_animals, remapped_weights):
@@ -607,7 +608,7 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     # data = pd.DataFrame(data)
     # data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
 
-    # color scheme and legend labels
+    # Color scheme and legend labels
     if drug:
         palette = {0: 'tab:gray', 1: 'tab:pink'}
         labels = ['Saline', 'Drug']
@@ -616,6 +617,8 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
         palette = {0: 'tab:gray', 1: 'tab:blue'}
         labels = ['Disengaged', 'Engaged']
         hue = 'State'
+
+    palette = kwargs.pop('palette', palette)
 
     plt.figure(constrained_layout=True, **kwargs)
     plt.axhline(0, color='black', linestyle='--')
@@ -712,6 +715,8 @@ def plot_trans_mat(trans_mat, **kwargs):
     for spine in ax.spines.values():
         spine.set_visible(True)
 
+    return trans_mat
+
 
 def plot_occupancy(posterior_probs, **kwargs):
     """
@@ -726,7 +731,7 @@ def plot_occupancy(posterior_probs, **kwargs):
         posterior_probs = [posterior_probs]  # Single animal
 
     n_states = posterior_probs[0][0].shape[1]
-    colors = ['tab:gray', 'tab:blue']
+    colors = kwargs.pop('color', ['tab:gray', 'tab:blue'])
     labels = ['D', 'E']
 
     occupancies = []
@@ -770,6 +775,9 @@ def plot_occupancy_boxplot(posterior_probs, **kwargs):
     :param posterior_probs: List of posterior probabilities (np.array of shape n_trials × n_states) per subject
     :param kwargs: Additional keyword arguments for plt.figure()
     """
+
+    palette = kwargs.pop('palette', ['tab:gray', 'tab:blue'])
+
     # Normalize input to list of subjects
     if isinstance(posterior_probs[0], np.ndarray) and posterior_probs[0].ndim == 2:
         posterior_probs = [posterior_probs]  # single animal
@@ -783,17 +791,21 @@ def plot_occupancy_boxplot(posterior_probs, **kwargs):
         occupancies.append(counts)
 
     occupancies = np.array(occupancies)
-    df = pd.DataFrame(occupancies, columns=[0, 1])
-    df.rename(columns={0: 'Disengaged', 1: 'Engaged'}, inplace=True)
+    columns = ['Disengaged', 'Engaged']
+    df = pd.DataFrame(occupancies, columns=columns)
+    df['Subject'] = df.index
 
     # Melt for seaborn
-    df_melt = df.melt(var_name='State', value_name='Occupancy')
-
-    plt.figure(**kwargs, constrained_layout=True)
+    df_melt = df.melt(id_vars='Subject', var_name='State', value_name='Occupancy')
+    plt.figure(constrained_layout=True, **kwargs)
     sns.boxplot(x='State', y='Occupancy', data=df_melt,
-                palette=['tab:gray', 'tab:blue'], showfliers=False)
-    sns.stripplot(x='State', y='Occupancy', data=df_melt,
-                  color='k', alpha=0.1)
+                palette=palette, showfliers=False)
+
+    # sns.lineplot(data=df_melt,  # Paired lines per subject. Not needed because sums to 1
+    #     x='State', y='Occupancy',
+    #     units='Subject', estimator=None,
+    #     alpha=0.25, legend=False, color='k'
+    # )
 
     t_stat, p_val = ttest_rel(df.Engaged, df.Disengaged)
     print(f't = {t_stat:.3f}, p = {p_val:.3f}')
@@ -804,6 +816,8 @@ def plot_occupancy_boxplot(posterior_probs, **kwargs):
     plt.ylim(0, 1)
     plt.ylabel('Fractional occupancy')
     sns.despine()
+
+    return df
 
 
 def plot_log_likelihood(log_likelihood, posterior_probs, to_bits=True, **kwargs):
@@ -904,3 +918,43 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
 
 # results_saline = test_full_model(experiments=['2AFC_6'], drug=0, interpret=True)
 # results_drug = test_full_model(experiments=['2AFC_6'], drug=1, interpret=True)
+
+# Load results
+# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results_saline.pkl'
+# with open(path, 'rb') as f:
+#     results_saline = pickle.load(f)
+# posterior_probs_saline = results_saline['posterior_probs']
+# trans_mat_saline = results_saline['trans_mat']
+# df_occ_saline = plot_occupancy_boxplot(posterior_probs_saline)
+#
+# # Load results
+# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results_drug.pkl'
+# with open(path, 'rb') as f:
+#     results_drug = pickle.load(f)
+# posterior_probs_drug = results_drug['posterior_probs']
+# trans_mat_drug = results_drug['trans_mat']
+# df_occ_drug = plot_occupancy_boxplot(posterior_probs_drug)
+#
+# # Combine occupancy dataframes by state. So one df_engaged and one df_disengaged
+# df_occ_saline['Drug'] = 0
+# df_occ_drug['Drug'] = 1
+# df_occ = pd.concat([df_occ_saline, df_occ_drug], ignore_index=True)
+
+# # Engaged only
+# plt.figure()
+# sns.boxplot(data=df_occ, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
+# plt.xticks([0,1], ['Saline','Drug'])
+# plt.ylabel('Occupancy (Engaged)')
+# sns.despine()
+#
+# # Engaged only
+# plt.figure()
+# sns.boxplot(data=df_occ, x='Drug', y='Disengaged', palette=['tab:gray','tab:pink'], showfliers=False)
+# plt.xticks([0,1], ['Saline','Drug'])
+# plt.ylabel('Occupancy (Engaged)')
+# sns.despine()
+
+# trans_mat_saline = plot_trans_mat(trans_mat_saline)
+# trans_mat_drug = plot_trans_mat(trans_mat_drug)
+# trans_mat = np.mean([trans_mat_saline, trans_mat_drug], axis=0)
+# plot_trans_mat(trans_mat)

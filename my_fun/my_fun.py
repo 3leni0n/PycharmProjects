@@ -1116,3 +1116,27 @@ def save_notebook_files(notebook_path='notebook.ipynb'):
                         f.write(img_bytes)
 
     print(f'Saved {img_count} images to {folder}/')
+
+
+def clean_session_start(df):
+    """
+    Remove AW and WarmUp trials from one or multiple sessions.
+    :param df: DataFrame containing one or more sessions
+    :return: Cleaned DataFrame
+    """
+    def _clean(group):
+        aw = group['AW'].unique()[0]
+        warmup = group['WarmUp'].unique()[0]
+
+        warmup_len = 40
+        if warmup == 1:
+            cleaned = group.iloc[warmup_len:]
+        else:
+            cleaned = group.copy()
+
+        if warmup == 0 and aw > 0:
+            cleaned = cleaned.iloc[aw:]
+
+        return cleaned
+
+    return df.groupby('Session', group_keys=False).apply(_clean).reset_index(drop=True)
