@@ -807,9 +807,10 @@ def plot_occupancy_boxplot(posterior_probs, **kwargs):
     #     alpha=0.25, legend=False, color='k'
     # )
 
-    t_stat, p_val = ttest_rel(df.Engaged, df.Disengaged)
-    print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-    add_star_between(p_val)
+    # Paired t-test between states (not needed because sums to 1)
+    # t_stat, p_val = ttest_rel(df.Engaged, df.Disengaged)
+    # print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+    # add_star_between(p_val)
 
     # plt.xlabel('State')
     plt.xlabel('')
