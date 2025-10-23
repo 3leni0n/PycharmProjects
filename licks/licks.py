@@ -450,7 +450,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
             # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
 
         plt.xlim(xlim)
-        plt.xticks(xticks)
+        # plt.xticks(xticks)
         plt.ylim(0, None)
         plt.xlabel('Time (s)')
 
@@ -464,7 +464,8 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
         ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
         plt.xlim(0, 20)
         # plt.xlim(min_val - 0.5, max_val + 0.5)
-        plt.xlabel(var)
+        plt.xlabel('N licks')
+        plt.xticks((4, 8, 12, 16))
         loc = 'best'
         if density:
             ylabel = 'Density'
@@ -572,8 +573,9 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
             ax = plt.gca()
             ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
             plt.xlim(0, 20)
+            plt.xticks((4, 8, 12, 16))
             # plt.xlim(min_val - 0.5, max_val + 0.5)
-            plt.xlabel(var)
+            plt.xlabel('N licks')
             loc = 'best'
             if kind == 'kde':
                 ylabel = 'Density'
@@ -712,6 +714,7 @@ def plot_ild_dist_mean(df_behavior, var='RT'):
     """
     Plot the mean ± SEM of a variable for each absolute ILD level as a categorical bar plot.
     """
+
     abs_ilds = sorted(df_behavior.absILD.unique().astype(int))
     subjects = df_behavior.Subject.unique()
     palette = list(sns.color_palette('tab10', len(abs_ilds)))
@@ -817,16 +820,18 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     density = kwargs.get('density', None)
 
     if var == 'RT' or var == 'ILI':
+        title = 'Reaction time' if var == 'RT' else 'Inter-lick interval'
         supxlabel = 'Time (s)'
     else:
+        title = 'Number of licks'
         supxlabel = 'N licks'
 
-    if density:
-        supylabel = 'Density'
-    else:
-        supylabel = 'Frequency (normalized)'
+    # if density:
+    #     supylabel = 'Density'
+    # else:
+    supylabel = 'Frequency (normalized)'
 
-    fig.suptitle(var)
+    fig.suptitle(title)
     fig.supxlabel(supxlabel)
     fig.supylabel(supylabel)
 
