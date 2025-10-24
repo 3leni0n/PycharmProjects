@@ -53,7 +53,7 @@ from ephys.preprocessing import *
 
 # Define helper functions
 
-def get_ephys_sessions(subject: str) -> list:
+def get_ephys_sessions(subject):
     """
     Get the ephys sessions for a given subject by searching in both C: and D: drives.
     :param subject: str, subject number (format: '000')
@@ -67,8 +67,8 @@ def get_ephys_sessions(subject: str) -> list:
     if development == 'local':
 
         # Define the paths for ephys sessions on C: and D: drives on Ephys PC
-        C_drive = Path('C:/Users/Usuario\Documents/Open Ephys')
-        D_drive = Path('D:/')
+        C_drive = Path('C:/Users/Usuario/Documents/Open Ephys')
+        D_drive = Path(f'D:/{subject}')
 
         # Get all folders in C: and D: (non-recursive), excluding folders that do not match the expected length
         folders_C = [p.name for p in C_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]

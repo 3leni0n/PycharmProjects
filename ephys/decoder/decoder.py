@@ -17,15 +17,16 @@ import time
 import pickle
 import traceback
 
-sns.set_theme()
-sns.set_style('ticks')
-sns.set_context('talk')
+# sns.set_theme()
+# sns.set_style('ticks')
+# sns.set_context('talk')
 
 # Neuromatch tutorial: https://compneuro.neuromatch.io/tutorials/W1D5_DeepLearning/student/W1D5_Tutorial1.html
 
 ########################################################################################################################
 
-subject = '000'
+# subject = '000'
+subject = '007'
 folder_parent = Path.home() / 'data' / subject
 
 # ephys_ids = [

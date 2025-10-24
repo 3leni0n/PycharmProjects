@@ -77,7 +77,7 @@ def do_daily_reports(version=6, experiment='2AFC_6', index=-1, send_slack=False)
         remove_from_setup_ephys = []
 
     # Animals that died or that didn't learn the task and were retired from training
-    not_training = ['011', '014', '015', '016', '018']
+    not_training = ['000', '007', '011', '014', '015', '016', '018', '019', '020', '023', '024',]
 
     animals_to_remove = test_setups + Pycharm_folder + remove_from_setup1 + remove_from_setup2 + remove_from_setup_ephys \
                         + not_training
