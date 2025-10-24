@@ -25,9 +25,7 @@ import traceback
 
 ########################################################################################################################
 
-# subject = '000'
-subject = '007'
-folder_parent = Path.home() / 'data' / subject
+subject = '000'
 
 # ephys_ids = [
 #     '007_2024-06-22_10-48-57',
@@ -47,71 +45,63 @@ folder_parent = Path.home() / 'data' / subject
 #     '007_2024-07-12_13-29-26'
 # ]
 
-ephys_ids = get_ephys_sessions(subject)
-error_sessions = []
+def preprocess_subject(subject):
+    """
+    Preprocess all ephys sessions for a given subject and save the results in a folder.
+    :param subject: subject ID (str)
+    :return: None
+    """
 
-# Compute spike counts for all neurons of a session (bins, all_psth). If file doesn't exist, create it
-for i in range(len(ephys_ids)):
+    folder_parent = Path.home() / 'data' / subject
+    ephys_ids = get_ephys_sessions(subject)
+    error_sessions = []
 
-    print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+    # Compute spike counts for all neurons of a session (bins, all_psth). If file doesn't exist, create it
+    for _ in range(len(ephys_ids)):
 
-    # Create child folder within parent folder for each ephys_id with its name if it doesn't exist
-    folder_child = folder_parent / ephys_ids[i]
-    folder_child.mkdir(parents=True, exist_ok=True)
-    os.chdir(folder_child)
+        print(f'Processing session {_ + 1}/{len(ephys_ids)}: {ephys_ids[_]}')
 
-    # Get spike counts
-    if any(f.endswith('.npy') for f in os.listdir(folder_child)):
-        print('Files exist in folder. Skipping')
-        continue
-    else:
-        try:  # Some sessions crash preprocess
-            print('Files do not exist in folder. Proceeding')
-            df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-                preprocess(ephys_ids[i])
-            bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
+        # Create child folder within parent folder for each ephys_id with its name if it doesn't exist
+        folder_child = folder_parent / ephys_ids[_]
+        folder_child.mkdir(parents=True, exist_ok=True)
+        os.chdir(folder_child)
 
-            # Save bins and psth
-            np.save(folder_child / 'bins.npy', bins)
-            np.save(folder_child / 'all_psth.npy', all_psth)
-        except Exception as e:
-            print(f'An error occurred: {e}')
-            traceback.print_exc()
-            error_sessions.append(ephys_ids[i])
+        if any(f.endswith(('.npy', '.csv')) for f in os.listdir(folder_child)):
+            print('Files exist in folder. Skipping...')
             continue
+        else:
+            try:  # Some sessions crash preprocess
+                print('Files do not exist in folder. Proceeding...')
+
+                # Preprocess session
+                preprocessed = preprocess(ephys_ids[_])
+                df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = tuple(preprocessed)
+
+                # Get spike counts
+                bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, time_win=[-1, 3], bin_size=0.1)
+
+                # Save
+                filename = df_behavior.Session.unique()[0] + '.csv'
+                df_behavior.to_csv(folder_child / filename, index=False)
+                np.save(folder_child / 'bins.npy', bins)
+                np.save(folder_child / 'all_psth.npy', all_psth)
+            except Exception as e:
+                print(f'An error occurred: {e}')
+                traceback.print_exc()
+                error_sessions.append(ephys_ids[_])
+                continue
+
+    print(f'Sessions not preprocessed due to error: {error_sessions}')
 
 
-# Parse behavior of a session. If file doesn't exist, create it
-for i in range(len(ephys_ids)):
-
-    path_behavior = get_behavior_id(ephys_ids[i])
-    filename = path_behavior.name
-    print(f'Parsing behavioral session {i + 1}/{len(ephys_ids)}: {filename[:-4]}...')
-
-    # Create child folder within parent folder for each ephys_id with its name if it doesn't exist
-    folder_child = folder_parent / ephys_ids[i]
-    folder_child.mkdir(parents=True, exist_ok=True)
-    os.chdir(folder_child)
-
-    # Execute only if folder is empty
-    if any(f.endswith('.csv') for f in os.listdir(folder_child)):
-        print('File exist in folder. Skipping')
-        continue
-    else:
-        print('File does not exist in folder. Proceeding')
-        df_behavior = parse_v2(path_behavior)
-        df_behavior.to_csv(folder_child / filename, index=False)
-        # behavior.append(df_behavior)
-
-
-behavior = []
-for i in range(len(ephys_ids)):
-    path_behavior = get_behavior_id(ephys_ids[i])
-    filename = path_behavior.name
-    print(i, filename)
-    folder_child = folder_parent / ephys_ids[i]
-    df = pd.read_csv(folder_child / filename)
-    behavior.append(df)
+# behavior = []
+# for i in range(len(ephys_ids)):
+#     path_behavior = get_behavior_id(ephys_ids[i])
+#     filename = path_behavior.name
+#     print(i, filename)
+#     folder_child = folder_parent / ephys_ids[i]
+#     df = pd.read_csv(folder_child / filename)
+#     behavior.append(df)
 
 
 def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=False):

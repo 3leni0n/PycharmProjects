@@ -33,8 +33,8 @@ from ephys.preprocessing import *
 
 # # Run preprocessing
 # ephys_id = 'X'
-# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = \
-#     preprocess(ephys_id)
+# preprocessed = preprocess(ephys_id)
+# df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = preprocessed
 #
 # # Get behavioral events
 # stim_dur = df_behavior.StimDur.unique()[0]

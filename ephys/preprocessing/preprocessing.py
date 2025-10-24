@@ -10,6 +10,7 @@ from open_ephys.analysis import Session
 import runpy
 from matplotlib import pyplot as plt
 import seaborn as sns
+from collections import namedtuple
 
 # My libraries
 from my_fun.my_fun import do_sounds_dict_inv, timer
@@ -35,7 +36,7 @@ def dev():
     return development
 
 
-def get_behavior_id(ephys_id: str) -> Path:
+def get_behavior_id(ephys_id):
     """
     Takes an ephys session ID and finds the corresponding path to the matching .csv file in the behavior folder
     :return: Path to the behavior file
@@ -399,7 +400,7 @@ def print_timeline(continuous, events, df_behavior, df_spikes):
     print(f'The behavior lasted {round(len_behavior)} min.')
 
     print(f'The first spike was recorded at {round(first_spike) + round(first_timestamp)} min. of acquisition '
-          f' and the last spike was recorded at {round(last_spike) + round(first_timestamp)} min. of acquisition, '
+          f'and the last spike was recorded at {round(last_spike) + round(first_timestamp)} min. of acquisition, '
           f'lasting {round(len_spikes)} min.')
 
     # Check if the length of the behavioral session from behavioral and ephys data match
@@ -562,7 +563,7 @@ def preprocess(ephys_id):
 
     # Define the session ID and directory
     subject = ephys_id[:3]
-    directory = Path() / 'D:' / ephys_id  # Ephys PC extra SSD HD (C:)
+    directory = Path() / 'D:' / subject / ephys_id  # Ephys PC extra SSD HD (C:)
     directory2 = Path.home() / 'Documents/Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
     directory3 = Path('/archive/alexis/ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
     # directory3 = Path('/archive/mouse/Alexis ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
@@ -616,4 +617,36 @@ def preprocess(ephys_id):
     # Temporal alignment of ephys and behavior data (skip for now)
     # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
 
-    return df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges
+    Preprocessed = namedtuple('Preprocessed', [
+        'df_ttl',
+        'df_behavior',
+        'n_trials',
+        'df_spikes',
+        'cluster_info',
+        'x',
+        'height',
+        'labels',
+        'y',
+        'width',
+        'left',
+        'ts_edges',
+        'events_edges'
+    ])
+
+    preprocessed = Preprocessed(
+        df_ttl,
+        df_behavior,
+        n_trials,
+        df_spikes,
+        cluster_info,
+        x,
+        height,
+        labels,
+        y,
+        width,
+        left,
+        ts_edges,
+        events_edges
+    )
+
+    return preprocessed
