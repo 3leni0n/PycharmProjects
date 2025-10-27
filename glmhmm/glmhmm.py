@@ -3,10 +3,12 @@ from scipy.stats import ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, save_notebook_files, add_star_between, filter_drug_sessions
+from my_fun import get_experiment, add_star_between, filter_drug_sessions, save_notebook_files
 from cherry.cherry import *
 from kernels.kernels_tools import *
 from plotting_style import *
+import numpy as np
+np.random.seed(42)
 
 
 def get_action_trace(df, max_trial_lag=10, tau=2):
@@ -79,8 +81,6 @@ def parse_glmhmm(df, covariates=None):
     experiment = df.Experiment.unique()[0]
     if experiment == '2AFC_6':
         stim_set = 6
-    elif experiment == '2AFC':
-        stim_set = 1
     else:
         stim_set = 2
 
@@ -204,25 +204,6 @@ def apply_remap(remap, weights, trans_mat, posterior_probs, state_labels):
     return weights, trans_mat, posterior_probs, state_labels
 
 
-def filter_behavior(df):
-    """
-    Filter the behavior DataFrame for one subject.
-    :param df: DataFrame containing the data
-    :return: Filtered DataFrame
-    """
-
-    # Filters for groups 1-3
-    # df = df[df.Stage == 4].reset_index(drop=True)
-    # df = df[df.Motor == 4].reset_index(drop=True)
-    # df = df[df.StimDur == 1].reset_index(drop=True)
-    df = df[df.P > 0].reset_index(drop=True)
-
-    # Drop misses (Choice == NaN)
-    df = df.dropna(subset=['Choice']).reset_index(drop=True)
-
-    return df
-
-
 def fit_glm_hmm(df, save=False):
     """
     Fit GLM-HMM to the data of one subject.
@@ -244,7 +225,7 @@ def fit_glm_hmm(df, save=False):
     df = filter_behavior(df)
 
     # Parse data
-    inputs, choices = parse_glmhmm(df, at=False)
+    inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias'])
 
     # Set fitting parameters
     method = 'em'  # Expectation Maximization method
@@ -286,7 +267,7 @@ def fit_glm_hmm(df, save=False):
     if save:
         # Select the output folder and create it if it doesn't exist
         experiment = df.Experiment.unique()[0]
-        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / experiment
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '3_states' / experiment
         if not os.path.exists(folder_out):
             folder_out.mkdir(parents=True, exist_ok=True)
         subject = str(df.Subject.unique()[0])
@@ -323,7 +304,92 @@ def fit_all(experiment):
 ########################################################################################################################
 
 
-def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, interpret=True):
+def test(df, drug=None, save=False):
+
+    # Filter data
+    df = filter_behavior(df)
+
+    # # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
+    # bad_sessions = []
+    # # Count number of trials per session
+    # for session_id, df_session in df.groupby('Session'):
+    #     if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
+    #         print(f'Session {session_id} does not have enough trials, skipping...')
+    #         bad_sessions.append(session_id)
+    # # Remove bad sessions from df
+    # df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
+
+    # # Drug sessions
+    # experiment = df.Experiment.unique()[0]
+    # if drug is None:
+    #     df = df[df.Drug.isnull()].reset_index(drop=True)
+    # elif drug in [0, 1] and experiment == '2AFC_6':
+    #     df = filter_drug_sessions(df)
+    #     df = df[df.Drug == drug].reset_index(drop=True)
+
+    # Parse the data
+    inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])
+    # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_choice'])
+    # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_error', 'at_correct'])
+
+    # Set the parameters of the GLM-HMM
+    n_states = 2  # Number of discrete states
+    obs_dim = 1  # Number of observed dimensions (1 for binary choice)
+    n_categories = 2  # Number of categories for output (2 for binary choice)
+    input_dim = inputs[0].shape[1]  # len(covariates)
+
+    # Initialize GLM-HMM
+    glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
+                     observation_kwargs=dict(C=n_categories), transitions='standard')
+
+    # Fitting with stop earlier if increase in LL is below tolerance specified by tolerance parameter
+    method = 'em'  # Expectation Maximization method
+    num_iters = 200 # Max number of EM iterations
+    tolerance = 1e-4  # Tolerance for stopping criterion
+
+    glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
+    weights = -glmhmm.observations.params  # Flip sign of weights
+    trans_mat = glmhmm.transitions.transition_matrix
+    posterior_probs = [glmhmm.expected_states(data=data, input=input)[0]
+                       for data, input in zip(choices, inputs)]
+    log_likelihood = glmhmm.log_likelihood(choices, inputs=inputs)
+    # log_probability.append(glmhmm.log_probabilities(choices, inputs=inputs))
+
+    # Interpret states and remap
+    weights, trans_mat, posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
+
+    posterior_probs = np.concatenate(posterior_probs)
+    state_max_posterior = np.argmax(posterior_probs, axis=1)
+    # Parameters
+    df['Nstates'] = [n_states] * len(df)
+    df['ObservedDimensions'] = [obs_dim] * len(df)
+    df['Ncategories'] = [n_categories] * len(df)
+    df['InputDimensions'] = [input_dim] * len(df)
+    # Fitted results
+    weights = weights.flatten()
+    trans_mat = trans_mat.flatten()
+    df['Weights'] = [weights] * len(df)
+    df['TransMat'] = [trans_mat] * len(df)
+    df['p0'] = posterior_probs[:, 0]
+    df['p1'] = posterior_probs[:, 1]
+    df['State'] = state_max_posterior
+    df['StateLabel'] = df['State'].map({0: 'Disengaged', 1: 'Engaged'})
+    df['Remap'] = [remap_indices] * len(df)
+    df['LogLikelihood'] = [log_likelihood] * len(df)
+
+    if save:
+        # Select the output folder and create it if it doesn't exist
+        experiment = df.Experiment.unique()[0]
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states' / experiment
+        if not os.path.exists(folder_out):
+            folder_out.mkdir(parents=True, exist_ok=True)
+        subject = df['Subject'].astype(str).str.zfill(3).unique()[0]
+        df.to_csv((folder_out / subject).with_suffix('.csv'), index=False)
+
+    return df
+
+
+def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], drug=None, interpret=True):
 
     all_animals = []
     experiment = []
@@ -350,19 +416,13 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, inter
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
 
-            # Filters for groups 1-3
-            # df = df[df.Stage == 4].reset_index(drop=True)
-            # df = df[df.Motor == 4].reset_index(drop=True)
-            # # df = df[df.StimDur == 1].reset_index(drop=True)
-            df = df[df.P > 0].reset_index(drop=True)
+            # Filter data
+            df = filter_behavior(df)
 
-            # Drop misses (Choice == NaN)
-            df = df.dropna(subset=['Choice']).reset_index(drop=True)
-
-            # Add session index per trial for plotting accuracy
-            session_index = pd.factorize(df['Session'])[0]  # Get session index per trial
-            loc = df.columns.get_loc('Session') + 1  # To the right of Session column
-            df.insert(loc, 'SessionIndex', session_index)  # Add session index column
+            # # Add session index per trial for plotting accuracy
+            # session_index = pd.factorize(df['Session'])[0]  # Get session index per trial
+            # loc = df.columns.get_loc('Session') + 1  # To the right of Session column
+            # df.insert(loc, 'SessionIndex', session_index)  # Add session index column
 
             # # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
             # bad_sessions = []
@@ -374,12 +434,12 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], drug=None, inter
             # # Remove bad sessions from df
             # df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
 
-            # Drug sessions
-            if drug is None:
-                df = df[df.Drug.isnull()].reset_index(drop=True)
-            elif drug in [0, 1] and exp == '2AFC_6':
-                df = filter_drug_sessions(df)
-                df = df[df.Drug == drug].reset_index(drop=True)
+            # # Drug sessions
+            # if drug is None:
+            #     df = df[df.Drug.isnull()].reset_index(drop=True)
+            # elif drug in [0, 1] and exp == '2AFC_6':
+            #     df = filter_drug_sessions(df)
+            #     df = df[df.Drug == drug].reset_index(drop=True)
 
             # Parse the data
             inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])

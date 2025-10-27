@@ -1125,8 +1125,8 @@ def clean_session_start(df):
     :return: Cleaned DataFrame
     """
     def _clean(group):
-        aw = group['AW'].unique()[0]
-        warmup = group['WarmUp'].unique()[0]
+        aw = group['AW'].unique()[0].astype(int)
+        warmup = group['WarmUp'].unique()[0].astype(int)
 
         warmup_len = 40
         if warmup == 1:
@@ -1139,4 +1139,43 @@ def clean_session_start(df):
 
         return cleaned
 
-    return df.groupby('Session', group_keys=False).apply(_clean).reset_index(drop=True)
+    # Remove the AW and Warm Up trials
+    _ = len(df)
+    df = df.groupby('Session', group_keys=False).apply(_clean).reset_index(drop=True)
+    print(f'Removed {(_ - len(df))} trials from session start (AW and Warm Up trials)')
+
+    return df
+
+
+def filter_behavior(df, drop_miss=True, clean_start=True):
+    """
+    Filter the behavior DataFrame for one subject.
+    :param df: DataFrame containing the data
+    :return: Filtered DataFrame
+    """
+
+    # Filters for groups 1-3
+    # df = df[df.Stage == 4].reset_index(drop=True)
+    # df = df[df.Motor == 4].reset_index(drop=True)
+    # df = df[df.StimDur == 1].reset_index(drop=True)
+    # df = df[df.P > 0].reset_index(drop=True)
+
+    # Filters for groups 4-5 (otherwise bump in lick rate before stimulus onset)
+    # df = df[df.StimDur == 1].reset_index(drop=True)
+    # df = df[df.Task == 'FD'].reset_index(drop=True)
+    # df = df[df.Delay == 0.5].reset_index(drop=True)
+    df = df[df.P > 0].reset_index(drop=True)
+
+    # Drop misses (Choice == NaN)
+    if drop_miss:
+        df = df.dropna(subset=['Choice']).reset_index(drop=True)
+
+    # Remove AW and WarmUp trials
+    if clean_start:
+        df = clean_session_start(df)
+
+    # Filter drug data
+
+    print(f'{round(len(df) / 1000)}k trials')
+
+    return df

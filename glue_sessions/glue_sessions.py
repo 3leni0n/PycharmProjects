@@ -215,7 +215,7 @@ def glue_animals(experiment='2AFC_6', path_session='glue_sessions', update=False
         df_animal = pd.read_csv(Path(folder / animals[i]), low_memory=False)
         if experiment == '2AFC_6':
             df_animal = filter_drug_sessions(df_animal)
-            # print(f'Filtering paired saline-drug sessions for experiment {experiment}')
+            print(f'Filtering paired saline-drug sessions for experiment {experiment}')
         df = pd.concat([df, df_animal])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 

@@ -710,7 +710,7 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
         # sns.despine(ax=ax_inset)
 
 
-def plot_ild_dist_mean(df_behavior, var='RT'):
+def plot_ild_dist_mean(df_behavior, var='RT', **kwargs):
     """
     Plot the mean ± SEM of a variable for each absolute ILD level as a categorical bar plot.
     """
@@ -718,6 +718,9 @@ def plot_ild_dist_mean(df_behavior, var='RT'):
     abs_ilds = sorted(df_behavior.absILD.unique().astype(int))
     subjects = df_behavior.Subject.unique()
     palette = list(sns.color_palette('tab10', len(abs_ilds)))
+
+    color = kwargs.pop('color', 'k')  # Default black
+    label = kwargs.pop('label', None)  # Default None
 
     centers = []
     errors = []
@@ -736,30 +739,80 @@ def plot_ild_dist_mean(df_behavior, var='RT'):
             per_subject_vals.append(val)
         per_subject_vals = np.array(per_subject_vals)
 
-        if var == 'RT':
-            center = np.median(per_subject_vals)
-            error = median_abs_deviation(per_subject_vals, scale='normal') / np.sqrt(len(per_subject_vals))
-            ylabel = 'Median ± MAD/√N (s)'
-        else:
-            center = per_subject_vals.mean()
-            error = sem(per_subject_vals)
-            ylabel = 'Mean ± SEM'
+        center = np.mean(per_subject_vals, axis=0)
+        error = sem(per_subject_vals, axis=0)
+
+        # if var == 'RT':
+        #     center = np.median(per_subject_vals)
+        #     error = median_abs_deviation(per_subject_vals, scale='normal') / np.sqrt(len(per_subject_vals))
+        #     ylabel = 'Median ± MAD/√N (s)'
+        # else:
+        #     center = per_subject_vals.mean()
+        #     error = sem(per_subject_vals)
+        #     ylabel = 'Mean ± SEM'
 
         centers.append(center)
         errors.append(error)
 
-    y_min = min(centers) - 0.25 * (max(centers) - min(centers))
+    # y_min = min(centers) - 0.25 * (max(centers) - min(centers))
     x = np.arange(len(abs_ilds))  # positions for the bars
-    plt.bar(x, centers, yerr=errors, color=palette)
-    # plt.bar(x, centers - y_min, bottom=y_min, yerr=errors, color=palette)
-    # plt.errorbar(x, means, sems, fmt='-o', color=color, label=label)
+    # plt.bar(x, centers, yerr=errors, color=palette)
+    # # plt.bar(x, centers - y_min, bottom=y_min, yerr=errors, color=palette)
 
-    plt.ylim(y_min, None)
+    plt.errorbar(x, centers, errors , marker='o', color=color, label=label)
+
+    # plt.ylim(y_min, None)
     plt.xticks(x, abs_ilds)  # ILD values as category labels
     plt.xlabel('|ILD|')
-    plt.ylabel(ylabel)
+    plt.ylabel('Mean ± SEM')
     plt.title(f'{var}')
     sns.despine()
+
+
+def plot_ild_dist_mean_split(df_behavior, var='RT', split='outcome', **kwargs):
+    """
+    Plot the mean ± SEM of a variable for each absolute ILD level, split by condition.
+    """
+
+    # Split
+    if split == 'outcome':
+        split_var_name = 'Hit'
+        colors = ['tab:red', 'tab:green']
+        labels = ['Error', 'Correct']
+    elif split == 'choice':
+        split_var_name = 'Choice'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['Left', 'Right']
+    elif split == 'stim':
+        split_var_name = 'Side'
+        colors = ['tab:blue', 'tab:orange']
+        labels = ['Left', 'Right']
+    elif split == 'rep_choice':
+        split_var_name = 'RepChoice'
+        colors = ['tab:purple', 'tab:brown']
+        labels = ['Alt.', 'Rep.']
+    elif split == 'rep_trial':
+        split_var_name = 'RepTrial'
+        colors = ['tab:purple', 'tab:brown']
+        labels = ['Alt.', 'Rep.']
+    elif split == 'prev_out':
+        split_var_name = 'AfterHit'
+        colors = ['tab:red', 'tab:green']
+        labels = ['After error', 'After correct']
+    elif split == 'half':
+        split_var_name = 'SessionHalf'
+        colors = ['tab:gray', 'k']
+        labels = ['1st half', '2nd half']
+    elif split == 'drug':
+        split_var_name = 'Drug'
+        colors = ['tab:gray', 'tab:pink']
+        labels = ['Saline', 'Drug']
+
+    for _ in range(2):
+        df_split = df_behavior[df_behavior[split_var_name] == _]
+        plot_ild_dist_mean(df_split, var=var, color=colors[_], label=labels[_])
+
+    plt.legend()
 
 
 def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
