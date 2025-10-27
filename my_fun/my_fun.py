@@ -1147,7 +1147,7 @@ def clean_session_start(df):
     return df
 
 
-def filter_behavior(df, drop_miss=True, clean_start=True):
+def filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=True):
     """
     Filter the behavior DataFrame for one subject.
     :param df: DataFrame containing the data
@@ -1175,7 +1175,34 @@ def filter_behavior(df, drop_miss=True, clean_start=True):
         df = clean_session_start(df)
 
     # Filter drug data
+    if filter_drug:
+        df = filter_drug_sessions(df)
 
-    print(f'{round(len(df) / 1000)}k trials')
+    print(f'Total:{round(len(df) / 1000)}k trials')
+
+    return df
+
+
+def add_columns_behavior(df):
+    """
+    Add useful columns to the behavior DataFrame.
+    """
+
+    from licks.licks import add_lick_data
+
+    # Add session index per trial
+    session_index = (df.groupby('subject')['Session'].transform(lambda x: pd.factorize(x)[0]))
+    loc = df.columns.get_loc('Session') + 1  # To the right of Session column
+    df.insert(loc, 'SessionIndex', session_index)  # Add session index column
+
+    # Add lick data
+    df = add_lick_data(df)
+
+    # Add absolute ILD
+    loc = df.columns.get_loc('ILD') + 1  # To the right of ILD column
+    df.insert(loc, 'absILD', df['ILD'].abs())  # Add previous stimulus side column
+
+    # Add session half index (0 for the 1st and 1 for the 2nd)
+    df['SessionHalf'] = (df.Trial >= df.groupby('Session').Trial.transform('max') / 2).astype(int)
 
     return df

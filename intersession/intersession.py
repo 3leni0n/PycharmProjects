@@ -1227,7 +1227,7 @@ def do_intersessions(experiment='2AFC_6', alignment='n_sessions', to_csv=True,
                 print(f'Could not do intersession report of animal {i}')
 
 
-def glue_animals_intersessions(experiment='2AFC_6', update=True, to_csv=False):
+def glue_animals_intersessions(experiment='2AFC_6', filter_drug=False, update=True, to_csv=False):
     """
     Concatenate all intersession .csv files from each animal into a single .csv file
     :param update: If True update first the glued sessions
@@ -1251,7 +1251,7 @@ def glue_animals_intersessions(experiment='2AFC_6', update=True, to_csv=False):
 
     for i in range(len(intersessions)):
         df_intersession = pd.read_csv(path_experiment / intersessions[i])
-        if experiment == '2AFC_6':
+        if filter_drug:
             df_intersession = filter_drug_sessions(df_intersession)
         df = pd.concat([df, df_intersession])
 

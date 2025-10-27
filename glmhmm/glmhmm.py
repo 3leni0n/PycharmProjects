@@ -3,7 +3,7 @@ from scipy.stats import ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_star_between, filter_drug_sessions, save_notebook_files
+from my_fun import get_experiment, add_star_between, filter_behavior, filter_drug_sessions
 from cherry.cherry import *
 from kernels.kernels_tools import *
 from plotting_style import *
@@ -416,13 +416,15 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], drug=N
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
 
-            # Filter data
-            df = filter_behavior(df)
-
-            # # Add session index per trial for plotting accuracy
-            # session_index = pd.factorize(df['Session'])[0]  # Get session index per trial
-            # loc = df.columns.get_loc('Session') + 1  # To the right of Session column
-            # df.insert(loc, 'SessionIndex', session_index)  # Add session index column
+            # # Filter data
+            df = df[df.P > 0].reset_index(drop=True)
+            df = df.dropna(subset=['Choice']).reset_index(drop=True)
+            # df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
+            # if len(df) == 0:
+            #     print(f'No valid trials for subject {animal}, skipping...')
+            #     all_animals = all_animals[:-1]
+            #     experiment = experiment[:-1]
+            #     continue
 
             # # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
             # bad_sessions = []
@@ -434,12 +436,12 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], drug=N
             # # Remove bad sessions from df
             # df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
 
-            # # Drug sessions
-            # if drug is None:
-            #     df = df[df.Drug.isnull()].reset_index(drop=True)
-            # elif drug in [0, 1] and exp == '2AFC_6':
-            #     df = filter_drug_sessions(df)
-            #     df = df[df.Drug == drug].reset_index(drop=True)
+            # Drug sessions
+            if drug is None:
+                df = df[df.Drug.isnull()].reset_index(drop=True)
+            elif drug in [0, 1] and exp == '2AFC_6':
+                df = filter_drug_sessions(df)
+                df = df[df.Drug == drug].reset_index(drop=True)
 
             # Parse the data
             inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])
@@ -464,13 +466,50 @@ def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], drug=N
 
             weights.append(-glmhmm.observations.params)  # Flip sign of weights
             trans_mat.append(glmhmm.transitions.transition_matrix)
-
             # Get expected states
             posterior_probs.append([glmhmm.expected_states(data=data, input=input)[0]
                                for data, input in zip(choices, inputs)])
-
             log_likelihood.append(glmhmm.log_likelihood(choices, inputs=inputs))
             # log_probability.append(glmhmm.log_probabilities(choices, inputs=inputs))
+
+            ############################################################################################################
+            # TEST
+            weights_temp = -glmhmm.observations.params
+            trans_mat_temp = glmhmm.transitions.transition_matrix
+            posterior_probs_temp = [glmhmm.expected_states(data=data, input=input)[0]
+                               for data, input in zip(choices, inputs)]
+            log_likelihood_temp = glmhmm.log_likelihood(choices, inputs=inputs)
+
+            # Interpret states and remap
+            weights_temp, trans_mat_temp, posterior_probs_temp, remap_indices = (
+                interpret_weights(weights_temp, trans_mat_temp, posterior_probs_temp,                                                                                  cov_index=0))
+            posterior_probs_temp = np.concatenate(posterior_probs_temp)
+            state_max_posterior = np.argmax(posterior_probs_temp, axis=1)
+            # Parameters
+            df['Nstates'] = [n_states] * len(df)
+            df['ObservedDimensions'] = [obs_dim] * len(df)
+            df['Ncategories'] = [n_categories] * len(df)
+            df['InputDimensions'] = [input_dim] * len(df)
+            # Fitted results
+            weights_temp = weights_temp.flatten()
+            trans_mat_temp = trans_mat_temp.flatten()
+            df['Weights'] = [weights_temp] * len(df)
+            df['TransMat'] = [trans_mat_temp] * len(df)
+            df['p0'] = posterior_probs_temp[:, 0]
+            df['p1'] = posterior_probs_temp[:, 1]
+            df['State'] = state_max_posterior
+            df['StateLabel'] = df['State'].map({0: 'Disengaged', 1: 'Engaged'})
+            df['Remap'] = [remap_indices] * len(df)
+            df['LogLikelihood'] = [log_likelihood_temp] * len(df)
+
+            # Select the output folder and create it if it doesn't exist
+            experiment = df.Experiment.unique()[0]
+            folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states_drug' / experiment
+            if not os.path.exists(folder_out):
+                folder_out.mkdir(parents=True, exist_ok=True)
+            subject = df['Subject'].astype(str).str.zfill(3).unique()[0]
+            df.to_csv((folder_out / subject).with_suffix('.csv'), index=False)
+            ############################################################################################################
 
     if interpret:
         weights, trans_mat, posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
