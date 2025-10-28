@@ -150,6 +150,6 @@ def main(experiments=None):
     for experiment in experiments:
         print(f'Cherry picking for experiment: {experiment}')
         good_subjects = cherry_pick(df, experiment)
-        cherries[experiment] = (good_subjects)
+        cherries[experiment] = good_subjects
 
     return cherries

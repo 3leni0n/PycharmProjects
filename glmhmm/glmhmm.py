@@ -149,191 +149,93 @@ def compute_window(data, win_length=20):
     return roll_avg
 
 
-def interpret_states(weights):
+# New interpret function for 2 states
+def interpret_weights(weights, trans_mat, posterior_probs):
     """
-    Assigns labels to GLM-HMM states based on their weights.
-    :param weights: GLM-HMM weights of shape (n_states, obs_dim, input_dim)
-    :return: Dictionary mapping state index to label
+    Interpret the HMM latent states (zt) of one or several subjects based on the GLM weights of its covariates.
+    Assign engaged (larger) and disengaged (smaller) depending on the weight of the stimulus covariate (cov_index).
+    Work for 2 states only.
+    :param weights: GLM weights of shape (n_states, obs_dim, input_dim)
+    :param cov_index: Index of the covariate to use for interpretation
+    :return: remapped_weights, remap_indices
     """
 
+    n_states = weights.shape[0]
     stim_weights = weights[:, 0, 0]
-    bias_weights = weights[:, 0, 1]
+    engaged_index = np.argmax(stim_weights)  # Engaged = max(stim)
+    # engaged_index = np.argmax(np.abs(cov))
 
-    # Engaged = max |stim|
-    engaged = np.argmax(np.abs(stim_weights))
+    if n_states == 2:
+        disengaged_index = np.argmin(stim_weights)
+        remap_indices = [disengaged_index, engaged_index]
+    elif n_states == 3:
+        others = [s for s in range(len(weights)) if s != engaged_index]
+        bias_weights = weights[:, 0, 1]
+        biased_left = others[np.argmin(bias_weights[others])]
+        biased_right = others[np.argmax(bias_weights[others])]
+        remap_indices = [engaged_index, biased_left, biased_right]
+    else:
+        raise ValueError('Only 2 or 3 states supported for interpretation.')
 
-    # The other two states
-    others = [s for s in range(len(weights)) if s != engaged]
-    biased_left = others[np.argmin(bias_weights[others])]
-    biased_right = others[np.argmax(bias_weights[others])]
+    remapped_weights = weights[remap_indices]
+    remapped_trans_mat = trans_mat[np.ix_(remap_indices, remap_indices)]
+    remapped_posterior_probs = [p[:, remap_indices] for p in posterior_probs]
+    print(f'Remapped weights (states x covariates): {remapped_weights[:, 0, :]}')
 
-    # Labels dictionary (original indexing)
-    state_labels = {engaged: 'engaged',
-                    biased_left: 'left bias',
-                    biased_right: 'right bias'}
-
-    remap = np.array([engaged, biased_left, biased_right])
-
-    # Print state labels and weights
-    for state, label in state_labels.items():
-        print(f'State {state + 0}: {label} '
-              f'(stim. weight: {stim_weights[state]:.2f}, '
-              f'bias weight: {bias_weights[state]:.2f})')
-
-    return state_labels, remap
+    return remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices
 
 
-def apply_remap(remap, weights, trans_mat, posterior_probs, state_labels):
-    """
-    Remap posterior probabilities and most likely states to consistent labeling.
-
-    :param posterior_probs: N sessions list of np.ndarray of shape (n_trials, n_states)
-    :param state_max_posterior: np.ndarray of shape (n_trials,), argmax state indices
-    :param remap: np.ndarray of shape (n_states,), mapping old -> new
-    :param state_labels: dict, mapping old state idx -> label
-    :return: posterior_probs_remapped, state_max_posterior_remapped, ordered_labels
-    """
-
-    weights = weights[remap]  # Remap weights
-    trans_mat = trans_mat[remap][:, remap]  # Remap transition matrix
-    posterior_probs = [p[:, remap] for p in posterior_probs]  # Remap posterior probabilities
-    # posterior_probs_concat = posterior_probs_concat[:, remap]
-    # state_max_posterior = remap[state_max_posterior]  # Remap most likely state
-    state_labels = [state_labels[old] for old in remap]  # Remap labels
-
-    return weights, trans_mat, posterior_probs, state_labels
-
-
-def fit_glm_hmm(df, save=False):
+# New fitting function for 2 states (drug input, so slice sessions in saline vs drug)
+def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     """
     Fit GLM-HMM to the data of one subject.
     :param df: DataFrame containing the data of one subject
-    :return: DataFrame with added 'State' column indicating most likely state per trial
+    :param n_states: Number of discrete states (2 or 3)
+    :param drug: If None, fit rest sessions (no drug nor saline); if 0, fit saline sessions; if 1, fit drug sessions.
+    :param save: If True, save the fitted DataFrame to CSV.
+    :return: DataFrame with added columns for model fitting results.
     """
 
-    # Set GLM-HMM parameters
-    n_states = 3  # Number of discrete states (from Ashwood et al. 2020)
-    obs_dim = 1  # Number of observed dimensions (1 for binary choice)
-    n_categories = 2  # Number of categories for output (2 for binary choice)
-    input_dim = 2  # Input dimensions (stimulus and bias)
+    if n_states not in (2, 3):
+        raise ValueError('n_states must be 2 or 3')
 
-    # Initialize GLM-HMM
-    glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
-                     observation_kwargs=dict(C=n_categories), transitions='standard')
+    if covariates is None:
+        if n_states == 2:
+            covariates = ['stim_vals', 'bias', 'at_choice']
+            state_label_map = {0: 'Disengaged', 1: 'Engaged'}
+        elif n_states == 3:
+            covariates = ['stim_vals', 'bias']
+            state_label_map = {0: 'Disengaged', 1: 'BiasedLeft', 2: 'BiasedRight'}
+    else:
+        covariates = covariates
 
     # Filter data
-    df = filter_behavior(df)
+    # df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
+    df = df[df.P > 0].reset_index(drop=True)
+    df = df.dropna(subset=['Choice']).reset_index(drop=True)
 
-    # Parse data
-    inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias'])
-
-    # Set fitting parameters
-    method = 'em'  # Expectation Maximization method
-    num_iters = 200  # Max number of EM iterations
-    tolerance = 1e-4  # Tolerance for stopping criterion
-
-    # Fit GLM-HMM
-    fit_ll = glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
-
-    # Retrieve parameters
-    weights = glmhmm.observations.params
-    weights = -weights  # Flip sign of weights
-    trans_mat = glmhmm.transitions.transition_matrix  # Need to remap this
-
-    # Get posterior probabilities and most likely states
-    posterior_probs = [glmhmm.expected_states(data=data, input=input)[0]
-                       for data, input in zip(choices, inputs)]
-    posterior_probs_concat = np.concatenate(posterior_probs)
-    # state_max_posterior = np.argmax(posterior_probs_concat, axis=1)
-
-    # Interpret states and remap
-    state_labels, remap = interpret_states(weights)
-    weights = weights[remap]
-    trans_mat = trans_mat[remap][:, remap]
-    state_labels = [state_labels[old] for old in remap]
-    posterior_probs = [p[:, remap] for p in posterior_probs]
-    posterior_probs_concat = posterior_probs_concat[:, remap]
-    # state_max_posterior = remap[state_max_posterior]
-    state_max_posterior = np.argmax(posterior_probs_concat, axis=1)
-
-    # Add model outputs to DataFrame
-    df['State'] = state_max_posterior
-    df['StateLabel'] = df['State'].map({i: label for i, label in enumerate(state_labels)})
-    df['p0'] = posterior_probs_concat[:, 0]
-    df['p1'] = posterior_probs_concat[:, 1]
-    df['p2'] = posterior_probs_concat[:, 2]
-    df['Weights'] = [weights[s] for s in df['State']]
-
-    if save:
-        # Select the output folder and create it if it doesn't exist
-        experiment = df.Experiment.unique()[0]
-        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '3_states' / experiment
-        if not os.path.exists(folder_out):
-            folder_out.mkdir(parents=True, exist_ok=True)
-        subject = str(df.Subject.unique()[0])
-        df.to_csv((folder_out / subject).with_suffix('.csv'), index=False)
-
-    return df, weights, trans_mat, state_labels
-
-
-def fit_all(experiment):
-    """
-    Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
-    :return: None
-    """
-
-    folder = Path.home() / 'PycharmProjects' / 'glue_sessions' / experiment
-
-    animals = os.listdir(folder)  # List animals
-    animals.sort()  # Sort them by name
-    animals = [x for x in animals if not 'corrupted_sessions' in x]  # Get rid of the corrupted sessions csv files
-
-    for animal in animals:
-        print(f'Fitting the GLM-HMM for subject {animal[:3]}...')
-        path = folder / animal
-        df = pd.read_csv(path)
-
-        try:
-            df = fit_glm_hmm(df, save=True)
-        except Exception as e:
-            print(f'Error fitting GLM-HMM for subject {animal}: {e}')
-            continue
-        print('\n')
-
-
-########################################################################################################################
-
-
-def test(df, drug=None, save=False):
-
-    # Filter data
-    df = filter_behavior(df)
-
-    # # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
-    # bad_sessions = []
-    # # Count number of trials per session
-    # for session_id, df_session in df.groupby('Session'):
-    #     if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
-    #         print(f'Session {session_id} does not have enough trials, skipping...')
-    #         bad_sessions.append(session_id)
-    # # Remove bad sessions from df
-    # df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
+    experiment = df.Experiment.unique()[0]
 
     # # Drug sessions
-    # experiment = df.Experiment.unique()[0]
+    # df = filter_drug_sessions(df)
     # if drug is None:
+    #     # Keep the sessions where drug is NaN (rest sessions, no saline nor drug)
     #     df = df[df.Drug.isnull()].reset_index(drop=True)
+    #     condition = 'rest'
+    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states' / experiment
     # elif drug in [0, 1] and experiment == '2AFC_6':
-    #     df = filter_drug_sessions(df)
+    #     # Slice saline (0) or drug (1) sessions
+    #     # df = filter_drug_sessions(df)
+    #     df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=True)
     #     df = df[df.Drug == drug].reset_index(drop=True)
+    #     condition = 'saline' if drug == 0 else 'drug'
+    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states' / condition / experiment
+    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
 
     # Parse the data
-    inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])
-    # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_choice'])
-    # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_error', 'at_correct'])
+    inputs, choices = parse_glmhmm(df, covariates=covariates)
 
     # Set the parameters of the GLM-HMM
-    n_states = 2  # Number of discrete states
     obs_dim = 1  # Number of observed dimensions (1 for binary choice)
     n_categories = 2  # Number of categories for output (2 for binary choice)
     input_dim = inputs[0].shape[1]  # len(covariates)
@@ -342,7 +244,8 @@ def test(df, drug=None, save=False):
     glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
                      observation_kwargs=dict(C=n_categories), transitions='standard')
 
-    # Fitting with stop earlier if increase in LL is below tolerance specified by tolerance parameter
+    # Fit GLM-HMM
+    # Stop before completing the number of iterations if LL is below tolerance
     method = 'em'  # Expectation Maximization method
     num_iters = 200 # Max number of EM iterations
     tolerance = 1e-4  # Tolerance for stopping criterion
@@ -356,31 +259,32 @@ def test(df, drug=None, save=False):
     # log_probability.append(glmhmm.log_probabilities(choices, inputs=inputs))
 
     # Interpret states and remap
-    weights, trans_mat, posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
+    weights, trans_mat, posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs)
 
     posterior_probs = np.concatenate(posterior_probs)
     state_max_posterior = np.argmax(posterior_probs, axis=1)
-    # Parameters
-    df['Nstates'] = [n_states] * len(df)
-    df['ObservedDimensions'] = [obs_dim] * len(df)
-    df['Ncategories'] = [n_categories] * len(df)
-    df['InputDimensions'] = [input_dim] * len(df)
+
+    # Parameters  (to reshape weights and transition matrix later from DataFrame)
+    df['Nstates'] = n_states
+    df['ObservedDimensions'] = obs_dim
+    df['Ncategories'] = n_categories
+    df['InputDimensions'] = input_dim
+
     # Fitted results
     weights = weights.flatten()
     trans_mat = trans_mat.flatten()
     df['Weights'] = [weights] * len(df)
     df['TransMat'] = [trans_mat] * len(df)
-    df['p0'] = posterior_probs[:, 0]
-    df['p1'] = posterior_probs[:, 1]
     df['State'] = state_max_posterior
-    df['StateLabel'] = df['State'].map({0: 'Disengaged', 1: 'Engaged'})
+    df['StateLabel'] = df['State'].map(state_label_map)
     df['Remap'] = [remap_indices] * len(df)
     df['LogLikelihood'] = [log_likelihood] * len(df)
 
+    for i in range(n_states):
+        df[f'p{i}'] = posterior_probs[:, i]
+
     if save:
         # Select the output folder and create it if it doesn't exist
-        experiment = df.Experiment.unique()[0]
-        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states' / experiment
         if not os.path.exists(folder_out):
             folder_out.mkdir(parents=True, exist_ok=True)
         subject = df['Subject'].astype(str).str.zfill(3).unique()[0]
@@ -389,191 +293,33 @@ def test(df, drug=None, save=False):
     return df
 
 
-def test_full_model(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], drug=None, interpret=True):
-
-    all_animals = []
-    experiment = []
-    fit_ll = []
-    weights = []
-    trans_mat = []
-    posterior_probs = []
-    log_likelihood = []
-    # log_probability = []
-
+def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, drug=None, save=True):
+    """
+    Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
+    :return: None
+    """
+    df_fit_all = pd.DataFrame()
     cherries = main(experiments)  # Get good subjects from cherry
 
     for exp in experiments:
-        animals = cherries[exp]
-        all_animals.extend(animals)
-        experiment.extend([exp] * len(animals))
+        subjects = cherries[exp]
 
-        for i, animal in enumerate(animals):
-
+        for i, subj in enumerate(subjects):
             # Load behavioral data
             exp, folder_in = get_experiment(exp, path_session='glue_sessions')
-            print(f'Fitting GLM-HMM for subject {animal} ({i + 1}/{len(animals)} of Experiment {exp})')
-            folder_in = Path(folder_in / animal).with_suffix('.csv')
+            print(f'Fitting GLM-HMM for subject {subj} ({i + 1}/{len(subjects)} of Experiment {exp})')
+            folder_in = Path(folder_in / subj).with_suffix('.csv')
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
+            try:
+                df_fit = fit_glmhmm(df, n_states=n_states, covariates=None, drug=drug, save=save)
+                df_fit_all = pd.concat([df_fit_all, df_fit], ignore_index=True)
+            except Exception as e:
+                print(f'Error fitting GLM-HMM for subject {subj}: {e}')
+                continue
+            print('\n')
 
-            # # Filter data
-            df = df[df.P > 0].reset_index(drop=True)
-            df = df.dropna(subset=['Choice']).reset_index(drop=True)
-            # df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
-            # if len(df) == 0:
-            #     print(f'No valid trials for subject {animal}, skipping...')
-            #     all_animals = all_animals[:-1]
-            #     experiment = experiment[:-1]
-            #     continue
-
-            # # Remove bad sessions with few trials (and therefore missing at least one of the stimulus evidences)
-            # bad_sessions = []
-            # # Count number of trials per session
-            # for session_id, df_session in df.groupby('Session'):
-            #     if len(df_session.ILD.abs().unique()) != len(df.ILD.abs().unique()):  # Should be 5 (including 0)
-            #         print(f'Session {session_id} does not have enough trials, skipping...')
-            #         bad_sessions.append(session_id)
-            # # Remove bad sessions from df
-            # df = df[~df.Session.isin(bad_sessions)].reset_index(drop=True)
-
-            # Drug sessions
-            if drug is None:
-                df = df[df.Drug.isnull()].reset_index(drop=True)
-            elif drug in [0, 1] and exp == '2AFC_6':
-                df = filter_drug_sessions(df)
-                df = df[df.Drug == drug].reset_index(drop=True)
-
-            # Parse the data
-            inputs, choices = parse_glmhmm(df, covariates=['stim_vals', 'bias', 'at_choice'])
-            # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_choice'])
-            # inputs, choices = parse_glmhmm(df, covariates=['net_ild', 'bias', 'at_error', 'at_correct'])
-
-            # Set the parameters of the GLM-HMM
-            n_states = 2  # Number of discrete states
-            obs_dim = 1  # Number of observed dimensions (1 for binary choice)
-            n_categories = 2  # Number of categories for output (2 for binary choice)
-            input_dim = inputs[0].shape[1]
-
-            # Initialize GLM-HMM
-            glmhmm = ssm.HMM(n_states, obs_dim, input_dim, observations='input_driven_obs',
-                             observation_kwargs=dict(C=n_categories), transitions='standard')
-
-            # Fitting with stop earlier if increase in LL is below tolerance specified by tolerance parameter
-            method = 'em'  # Expectation Maximization method
-            num_iters = 200  # Max number of EM iterations
-            tolerance = 1e-4  # tolerance for stopping criterion
-            fit_ll.append(glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance))
-
-            weights.append(-glmhmm.observations.params)  # Flip sign of weights
-            trans_mat.append(glmhmm.transitions.transition_matrix)
-            # Get expected states
-            posterior_probs.append([glmhmm.expected_states(data=data, input=input)[0]
-                               for data, input in zip(choices, inputs)])
-            log_likelihood.append(glmhmm.log_likelihood(choices, inputs=inputs))
-            # log_probability.append(glmhmm.log_probabilities(choices, inputs=inputs))
-
-            ############################################################################################################
-            # TEST
-            weights_temp = -glmhmm.observations.params
-            trans_mat_temp = glmhmm.transitions.transition_matrix
-            posterior_probs_temp = [glmhmm.expected_states(data=data, input=input)[0]
-                               for data, input in zip(choices, inputs)]
-            log_likelihood_temp = glmhmm.log_likelihood(choices, inputs=inputs)
-
-            # Interpret states and remap
-            weights_temp, trans_mat_temp, posterior_probs_temp, remap_indices = (
-                interpret_weights(weights_temp, trans_mat_temp, posterior_probs_temp,                                                                                  cov_index=0))
-            posterior_probs_temp = np.concatenate(posterior_probs_temp)
-            state_max_posterior = np.argmax(posterior_probs_temp, axis=1)
-            # Parameters
-            df['Nstates'] = [n_states] * len(df)
-            df['ObservedDimensions'] = [obs_dim] * len(df)
-            df['Ncategories'] = [n_categories] * len(df)
-            df['InputDimensions'] = [input_dim] * len(df)
-            # Fitted results
-            weights_temp = weights_temp.flatten()
-            trans_mat_temp = trans_mat_temp.flatten()
-            df['Weights'] = [weights_temp] * len(df)
-            df['TransMat'] = [trans_mat_temp] * len(df)
-            df['p0'] = posterior_probs_temp[:, 0]
-            df['p1'] = posterior_probs_temp[:, 1]
-            df['State'] = state_max_posterior
-            df['StateLabel'] = df['State'].map({0: 'Disengaged', 1: 'Engaged'})
-            df['Remap'] = [remap_indices] * len(df)
-            df['LogLikelihood'] = [log_likelihood_temp] * len(df)
-
-            # Select the output folder and create it if it doesn't exist
-            experiment = df.Experiment.unique()[0]
-            folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states_drug' / experiment
-            if not os.path.exists(folder_out):
-                folder_out.mkdir(parents=True, exist_ok=True)
-            subject = df['Subject'].astype(str).str.zfill(3).unique()[0]
-            df.to_csv((folder_out / subject).with_suffix('.csv'), index=False)
-            ############################################################################################################
-
-    if interpret:
-        weights, trans_mat, posterior_probs, remap_indices = interpret_weights(weights, trans_mat, posterior_probs, cov_index=0)
-
-    results = {
-        'all_animals': all_animals,
-        'experiment': experiment,
-        'fit_ll': fit_ll,
-        'weights': weights,
-        'trans_mat': trans_mat,
-        'posterior_probs': posterior_probs,
-        'log_likelihood': log_likelihood,
-        'remap_indices': remap_indices if interpret else None,
-        'drug': drug,
-        'interpret': interpret
-    }
-
-    return results
-
-
-def interpret_weights(weights, trans_mat, posterior_probs, cov_index=0):
-    """
-    Interpret the HMM latent states (zt) of one or several subjects based on the GLM weights of its covariates.
-    Assign engaged (larger) and disengaged (smaller) depending on the weight of the stimulus covariate (cov_index).
-    Work for 2 states only.
-    :param weights: GLM weights of shape (n_states, obs_dim, input_dim)
-    :param cov_index: Index of the covariate to use for interpretation
-    :return: remapped_weights, remap_indices
-    """
-
-    def _interpret_single(weights, trans_mat, posterior_probs):
-
-        if weights.shape[0] != 2:
-            raise ValueError('Currently only supports 2 states')
-
-        cov = weights[:, 0, cov_index]
-        disengaged_index = np.argmin(cov)
-        engaged_index = np.argmax(cov)
-        remap_indices = [disengaged_index, engaged_index]
-        remapped_weights = weights[remap_indices]
-        remapped_trans_mat = trans_mat[np.ix_(remap_indices, remap_indices)]
-        remapped_posterior_probs = [p[:, remap_indices] for p in posterior_probs]
-        print(f'Remapped weights (dis., eng.): {remapped_weights[:, 0, cov_index]}')
-
-        return remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices
-
-    # Check if input is a list (multiple subjects) or a single array
-    if isinstance(weights, list) and isinstance(trans_mat, list) and isinstance(posterior_probs, list):
-
-        remapped_weights_subjects = []
-        remapped_trans_mat_subjects = []
-        remapped_posterior_probs_subjects = []
-        remap_indices_subjects = []
-
-        for w, t, p in zip(weights, trans_mat, posterior_probs):
-            remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices = _interpret_single(w, t, p)
-            remapped_weights_subjects.append(remapped_weights)
-            remapped_trans_mat_subjects.append(remapped_trans_mat)
-            remapped_posterior_probs_subjects.append(remapped_posterior_probs)
-            remap_indices_subjects.append(remap_indices)
-        return remapped_weights_subjects, remapped_trans_mat_subjects, remapped_posterior_probs_subjects, remap_indices_subjects
-
-    else:
-        return _interpret_single(weights, trans_mat, posterior_probs)
+    return df_fit_all
 
 
 # Plotting functions
@@ -1058,3 +804,6 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
 # trans_mat_drug = plot_trans_mat(trans_mat_drug)
 # trans_mat = np.mean([trans_mat_saline, trans_mat_drug], axis=0)
 # plot_trans_mat(trans_mat)
+
+
+

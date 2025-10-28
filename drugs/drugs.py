@@ -17,11 +17,12 @@ def plot_var_drug(df_intersessions, var_name='Accuracy', **kwargs):
     var = df_intersessions.groupby(['Subject', 'Drug'])[var_name].mean().reset_index()
     var_mean = var.groupby('Drug')[var_name].mean()
     var_sem = var.groupby('Drug')[var_name].sem()
+    n_subjects = var.Subject.nunique()
 
     # Plot paired lines
     plt.figure(constrained_layout=True, **kwargs)
     sns.boxplot(data=var, x='Drug', y=var_name, palette=['tab:gray', 'tab:pink'], showfliers=False)
-    sns.lineplot(data=var, x='Drug', y=var_name, hue='Subject', marker='', palette=['gray'] * var.Subject.nunique(), alpha=0.25, legend=False)
+    sns.lineplot(data=var, x='Drug', y=var_name, hue='Subject', marker='', palette=['k'] * n_subjects, alpha=0.25, legend=False)
     # Plot mean and SEM
     # plt.errorbar(x=var_mean.index, y=var_mean.values, yerr=var_sem.values, fmt='-o', color=color)
     # plt.title(var_name)
