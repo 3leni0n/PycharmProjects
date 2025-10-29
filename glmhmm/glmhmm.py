@@ -9,6 +9,9 @@ from kernels.kernels_tools import *
 from plotting_style import *
 import numpy as np
 np.random.seed(42)
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def get_action_trace(df, max_trial_lag=10, tau=2):
@@ -202,12 +205,15 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     if covariates is None:
         if n_states == 2:
             covariates = ['stim_vals', 'bias', 'at_choice']
-            state_label_map = {0: 'Disengaged', 1: 'Engaged'}
         elif n_states == 3:
             covariates = ['stim_vals', 'bias']
-            state_label_map = {0: 'Disengaged', 1: 'BiasedLeft', 2: 'BiasedRight'}
     else:
         covariates = covariates
+
+    if n_states == 2:
+        state_label_map = {0: 'Disengaged', 1: 'Engaged'}
+    elif n_states == 3:
+        state_label_map = {0: 'Engaged', 1: 'BiasedLeft', 2: 'BiasedRight'}
 
     # Filter data
     # df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
@@ -217,20 +223,21 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     experiment = df.Experiment.unique()[0]
 
     # # Drug sessions
-    # df = filter_drug_sessions(df)
+    df = filter_drug_sessions(df)
     # if drug is None:
     #     # Keep the sessions where drug is NaN (rest sessions, no saline nor drug)
     #     df = df[df.Drug.isnull()].reset_index(drop=True)
     #     condition = 'rest'
-    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states' / experiment
+    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / experiment
     # elif drug in [0, 1] and experiment == '2AFC_6':
     #     # Slice saline (0) or drug (1) sessions
     #     # df = filter_drug_sessions(df)
     #     df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=True)
     #     df = df[df.Drug == drug].reset_index(drop=True)
     #     condition = 'saline' if drug == 0 else 'drug'
-    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2_states' / condition / experiment
-    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
+    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
+    # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
+    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}' / experiment
 
     # Parse the data
     inputs, choices = parse_glmhmm(df, covariates=covariates)
@@ -293,7 +300,7 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     return df
 
 
-def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, drug=None, save=True):
+def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, covariates=None, drug=None, save=True):
     """
     Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
     :return: None
@@ -312,7 +319,7 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, dr
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
             try:
-                df_fit = fit_glmhmm(df, n_states=n_states, covariates=None, drug=drug, save=save)
+                df_fit = fit_glmhmm(df, n_states=n_states, covariates=covariates, drug=drug, save=save)
                 df_fit_all = pd.concat([df_fit_all, df_fit], ignore_index=True)
             except Exception as e:
                 print(f'Error fitting GLM-HMM for subject {subj}: {e}')
@@ -613,35 +620,31 @@ def plot_occupancy(posterior_probs, **kwargs):
     sns.despine()
 
 
-def plot_occupancy_boxplot(posterior_probs, **kwargs):
+def plot_occupancy_boxplot(df, **kwargs):
     """
     Plot state occupancies across subjects as boxplots.
-
-    :param posterior_probs: List of posterior probabilities (np.array of shape n_trials × n_states) per subject
-    :param kwargs: Additional keyword arguments for plt.figure()
+    Expects columns 'Subject' and 'State' in df.
     """
 
     palette = kwargs.pop('palette', ['tab:gray', 'tab:blue'])
 
-    # Normalize input to list of subjects
-    if isinstance(posterior_probs[0], np.ndarray) and posterior_probs[0].ndim == 2:
-        posterior_probs = [posterior_probs]  # single animal
-
     occupancies = []
-    for p in posterior_probs:
-        posterior_concat = np.concatenate(p)  # combine sessions if multiple
-        state_max = np.argmax(posterior_concat, axis=1)
-        _, counts = np.unique(state_max, return_counts=True)
-        counts = counts / np.sum(counts)  # fractional occupancy
-        occupancies.append(counts)
+    for subject, sub_df in df.groupby('Subject'):
+        state_counts = sub_df['State'].value_counts(normalize=True)
+        if df['State'].nunique() == 2:
+            disengaged = state_counts.get(0)
+            engaged = state_counts.get(1)
+        elif df['State'].nunique() == 3:
+            engaged = state_counts.get(0)
+            disengaged = state_counts.get(1) + state_counts.get(2)
+        else:
+            raise ValueError('This function only supports 2 or 3 states')
+        occupancies.append({'Subject': subject, 'Disengaged': disengaged, 'Engaged': engaged})
 
-    occupancies = np.array(occupancies)
-    columns = ['Disengaged', 'Engaged']
-    df = pd.DataFrame(occupancies, columns=columns)
-    df['Subject'] = df.index
+    occ_df = pd.DataFrame(occupancies)
 
     # Melt for seaborn
-    df_melt = df.melt(id_vars='Subject', var_name='State', value_name='Occupancy')
+    df_melt = occ_df.melt(id_vars='Subject', var_name='State', value_name='Occupancy')
     plt.figure(constrained_layout=True, **kwargs)
     sns.boxplot(x='State', y='Occupancy', data=df_melt,
                 palette=palette, showfliers=False)
@@ -657,53 +660,51 @@ def plot_occupancy_boxplot(posterior_probs, **kwargs):
     # print(f't = {t_stat:.3f}, p = {p_val:.3f}')
     # add_star_between(p_val)
 
-    # plt.xlabel('State')
     plt.xlabel('')
     plt.ylim(0, 1)
     plt.ylabel('Fractional occupancy')
     sns.despine()
 
-    return df
+    return occ_df
 
 
-def plot_log_likelihood(log_likelihood, posterior_probs, to_bits=True, **kwargs):
+def plot_ll(log_likelihood, n_trials, to_bits=True, positions=[1], **kwargs):
     """
     Plot log likelihood of one or several subjects.
     :param log_likelihood: List of log likelihoods (float) per subject
-    :param posterior_probs: List of posterior probabilities (np.array of shape (n_trials, n_states)) per subject. Used
-    to compute number of trials for normalization.
+    :param n_trials: List of number of trials (int) per subject
     :param to_bits: If True, normalize log likelihood by log(2) to convert to bits
     :param kwargs: Additional keyword arguments for plt.plot()
     :return:
     """
 
-    plt.figure(**kwargs, constrained_layout=True)
+    # plt.figure(**kwargs, constrained_layout=True)
+    color = kwargs.pop('color', 'k')
+
+    # Normalize log likelihood per trial
+    ll = [(ll / n) for ll, n in zip(log_likelihood, n_trials)]
 
     if to_bits:
-        n_trials = [sum(p.shape[0] for p in pp) for pp in posterior_probs]
+        ll = [ll / np.log(2) for ll in ll]
 
-        log_likelihood = [
-            (ll / n) / np.log(2) if to_bits else ll / n
-            for ll, n in zip(log_likelihood, n_trials)
-        ]
-        print(f'Log likelihood (normalized by number of trials): '
-              f'{np.mean(log_likelihood):.2f} ± {np.std(log_likelihood):.2f} (mean ± SD across subjects)')
-        ylabel = 'LL per trial (bits)' if to_bits else 'LL per trial (nats)'
-    else:
-        print(f'Log likelihood: {np.mean(log_likelihood):.2f} ± {np.std(log_likelihood):.2f} (mean ± SD across subjects)')
-        ylabel = 'LL (nats)'
+    ylabel = f"LL/trial {'(bits)' if to_bits else '(nats)'}"
+    mean_ll = np.mean(ll)
+    std_ll = np.std(ll, ddof=1)
+    print(f'LL/trial: {mean_ll:.2f} ± {std_ll:.2f} ({ylabel})')
 
-    # Plot boxplot
-    if len(log_likelihood) > 1:
-        sns.boxplot(y=log_likelihood, color='tab:blue', showfliers=True)
-        plt.scatter(np.zeros(len(log_likelihood)), log_likelihood, color='k', alpha=0.1)
+    if len(ll) > 1:
+        # sns.boxplot(y=log_likelihood, color=color, showfliers=True)
+        plt.boxplot(ll, positions=positions, showfliers=True)
+        plt.scatter([positions]*len(ll), ll, color=color, alpha=0.1)
     else:
-        plt.bar(0, log_likelihood[0], color='tab:blue', edgecolor='k')
+        plt.bar(positions, ll[0], color=color, edgecolor=color)
 
     # plt.title('Log Likelihood')
     plt.xlabel('GLM-HMM')
     plt.ylabel(ylabel)
     sns.despine()
+
+    return ll
 
 
 def plot_trans_mat_box_plots(trans_mat, **kwargs):
@@ -780,30 +781,180 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
 # posterior_probs_drug = results_drug['posterior_probs']
 # trans_mat_drug = results_drug['trans_mat']
 # df_occ_drug = plot_occupancy_boxplot(posterior_probs_drug)
-#
-# # Combine occupancy dataframes by state. So one df_engaged and one df_disengaged
-# df_occ_saline['Drug'] = 0
-# df_occ_drug['Drug'] = 1
-# df_occ = pd.concat([df_occ_saline, df_occ_drug], ignore_index=True)
 
-# # Engaged only
-# plt.figure()
-# sns.boxplot(data=df_occ, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
-# plt.xticks([0,1], ['Saline','Drug'])
-# plt.ylabel('Occupancy (Engaged)')
-# sns.despine()
-#
-# # Engaged only
-# plt.figure()
-# sns.boxplot(data=df_occ, x='Drug', y='Disengaged', palette=['tab:gray','tab:pink'], showfliers=False)
-# plt.xticks([0,1], ['Saline','Drug'])
-# plt.ylabel('Occupancy (Engaged)')
-# sns.despine()
 
-# trans_mat_saline = plot_trans_mat(trans_mat_saline)
-# trans_mat_drug = plot_trans_mat(trans_mat_drug)
-# trans_mat = np.mean([trans_mat_saline, trans_mat_drug], axis=0)
-# plot_trans_mat(trans_mat)
+########################################################################################################################
+
+# Model comparison
+
+# 2 vs 3 states (2 covariates: stim and bias)
+# df_2s_2cov = fit_all(experiments=[ '2AFC_6'], n_states=2, covariates=['stim_vals', 'bias'], drug=None, save=True)
+# df_3s_2cov = fit_all(experiments=[ '2AFC_6'], n_states=3, covariates=None, drug=None, save=True)
+figsize = fig_size(n_cols=2)
+figsize = (figsize[0], figsize[1]*2)
+plt.figure(figsize=figsize, constrained_layout=True)
+ll0 = df_2s_2cov['LogLikelihood'].unique()
+n_trials0 = df_2s_2cov.groupby('Subject').size()
+ll1 = df_3s_2cov['LogLikelihood'].unique()
+n_trials1 = df_3s_2cov.groupby('Subject').size()
+
+ll0 = plot_ll(ll0, n_trials0, to_bits=True, positions=[0])
+ll1 = plot_ll(ll1, n_trials1, to_bits=True, positions=[1])
+for y0, y1 in zip(ll0, ll1):
+    plt.plot([0, 1], [y0, y1], color='k', alpha=0.1)
+
+# Paired t-test between states (not needed because sums to 1)
+t_stat, p_val = ttest_rel(ll0, ll1)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+
+plt.xticks([0, 1],['2', '3'])
+plt.xlabel('N states')
+plt.title('2 Covariates\n(stim. and bias)')
+sns.despine()
+
+
+# 2 (stim. and bias) vs 3 (stim, bias and action trace) covariates with 3 states
+# df_3s_3cov = fit_all(experiments=[ '2AFC_6'], n_states=3, covariates=['stim_vals', 'bias', 'action_trace'], drug=None, save=True)
+# The other pair for the comparison is df_3s_2cov from above
+
+figsize = fig_size(n_cols=2)
+figsize = (figsize[0], figsize[1]*2)
+plt.figure(figsize=figsize, constrained_layout=True)
+ll0 = df_3s_2cov['LogLikelihood'].unique()
+n_trials0 = df_3s_2cov.groupby('Subject').size()
+ll1 = df_3s_3cov['LogLikelihood'].unique()
+n_trials1 = df_3s_3cov.groupby('Subject').size()
+
+ll0 = plot_ll(ll0, n_trials0, to_bits=True, positions=[0])
+ll1 = plot_ll(ll1, n_trials1, to_bits=True, positions=[1])
+for y0, y1 in zip(ll0, ll1):
+    plt.plot([0, 1], [y0, y1], color='k', alpha=0.1)
+
+# Paired t-test between states (not needed because sums to 1)
+t_stat, p_val = ttest_rel(ll0, ll1)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+
+plt.xticks([0, 1],['2', '3'])
+plt.xlabel('N covariates')
+plt.title('3 States')
+sns.despine()
+
+
+# 2 (stim. and bias) vs 3 (stim, bias and action trace) covariates with 2 states
+# df_2s_2cov = fit_all(experiments=[ '2AFC_6'], n_states=2, covariates=['stim_vals', 'bias', 'action_trace'], drug=None, save=True)
+# The other pair for the comparison is df_2s_2cov from above
+figsize = fig_size(n_cols=2)
+figsize = (figsize[0], figsize[1]*2)
+plt.figure(figsize=figsize, constrained_layout=True)
+ll0 = df_2s_2cov['LogLikelihood'].unique()
+n_trials0 = df_2s_2cov.groupby('Subject').size()
+ll1 = df_2s_3cov['LogLikelihood'].unique()
+n_trials1 = df_2s_3cov.groupby('Subject').size()
+
+ll0 = plot_ll(ll0, n_trials0, to_bits=True, positions=[0])
+ll1 = plot_ll(ll1, n_trials1, to_bits=True, positions=[1])
+for y0, y1 in zip(ll0, ll1):
+    plt.plot([0, 1], [y0, y1], color='k', alpha=0.1)
+
+# Paired t-test between states (not needed because sums to 1)
+t_stat, p_val = ttest_rel(ll0, ll1)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+
+plt.xticks([0, 1],['2', '3'])
+plt.xlabel('N covariates')
+plt.title('2 States')
+sns.despine()
+
+########################################################################################################################
+
+occ_2s_2cov_saline = plot_occupancy_boxplot(df_2s_2cov[df_2s_2cov.Drug==0], figsize=figsize)
+occ_2s_2cov_drug = plot_occupancy_boxplot(df_2s_2cov[df_2s_2cov.Drug==1], figsize=figsize)
+occ_2s_2cov_saline['Drug'] = 0
+occ_2s_2cov_drug['Drug'] = 1
+occ_2s_2cov_comparison = pd.concat([occ_2s_2cov_saline, occ_2s_2cov_drug], ignore_index=True)
+plt.figure(figsize=figsize, constrained_layout=True)
+sns.boxplot(data=occ_2s_2cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
+# Paired t-test between states (not needed because sums to 1)
+engaged_saline = occ_2s_2cov_comparison[occ_2s_2cov_comparison['Drug'] == 0]['Engaged']
+engaged_drug = occ_2s_2cov_comparison[occ_2s_2cov_comparison['Drug'] == 1]['Engaged']
+t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+plt.xticks([0,1], ['Saline','Drug'])
+plt.ylim(0, 1)
+plt.xlabel('Engaged')
+plt.ylabel('Occupancy')
+sns.despine()
+plt.title('2 states\n(2 cov.: stim., bias)')
+
+
+
+occ_2s_3cov_saline = plot_occupancy_boxplot(df_2s_3cov[df_2s_3cov.Drug==0], figsize=figsize)
+occ_2s_3cov_drug = plot_occupancy_boxplot(df_2s_3cov[df_2s_3cov.Drug==1], figsize=figsize)
+occ_2s_3cov_saline['Drug'] = 0
+occ_2s_3cov_drug['Drug'] = 1
+occ_2s_3cov_comparison = pd.concat([occ_2s_3cov_saline, occ_2s_3cov_drug], ignore_index=True)
+plt.figure(figsize=figsize, constrained_layout=True)
+sns.boxplot(data=occ_2s_3cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
+# Paired t-test between states (not needed because sums to 1)
+engaged_saline = occ_2s_3cov_comparison[occ_2s_3cov_comparison['Drug'] == 0]['Engaged']
+engaged_drug = occ_2s_3cov_comparison[occ_2s_3cov_comparison['Drug'] == 1]['Engaged']
+t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+plt.xticks([0,1], ['Saline','Drug'])
+plt.ylim(0, 1)
+plt.xlabel('Engaged')
+plt.ylabel('Occupancy')
+sns.despine()
+plt.title('2 states\n(3 cov.: stim., bias, At)')
+
+
+
+occ_3s_2cov_saline = plot_occupancy_boxplot(df_3s_2cov[df_3s_2cov.Drug==0], figsize=figsize)
+occ_3s_2cov_drug = plot_occupancy_boxplot(df_3s_2cov[df_3s_2cov.Drug==1], figsize=figsize)
+occ_3s_2cov_saline['Drug'] = 0
+occ_3s_2cov_drug['Drug'] = 1
+occ_3s_2cov_comparison = pd.concat([occ_3s_2cov_saline, occ_3s_2cov_drug], ignore_index=True)
+plt.figure(figsize=figsize, constrained_layout=True)
+sns.boxplot(data=occ_3s_2cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
+# Paired t-test between states (not needed because sums to 1)
+engaged_saline = occ_3s_2cov_comparison[occ_3s_2cov_comparison['Drug'] == 0]['Engaged']
+engaged_drug = occ_3s_2cov_comparison[occ_3s_2cov_comparison['Drug'] == 1]['Engaged']
+t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+plt.xticks([0,1], ['Saline','Drug'])
+plt.ylim(0, 1)
+plt.xlabel('Engaged')
+plt.ylabel('Occupancy')
+sns.despine()
+plt.title('3 states\n(2 cov.: stim., bias)')
+
+
+
+occ_3s_3cov_saline = plot_occupancy_boxplot(df_3s_3cov[df_3s_3cov.Drug==0], figsize=figsize)
+occ_3s_3cov_drug = plot_occupancy_boxplot(df_3s_3cov[df_3s_3cov.Drug==1], figsize=figsize)
+occ_3s_3cov_saline['Drug'] = 0
+occ_3s_3cov_drug['Drug'] = 1
+occ_3s_3cov_comparison = pd.concat([occ_3s_3cov_saline, occ_3s_3cov_drug], ignore_index=True)
+plt.figure(figsize=figsize, constrained_layout=True)
+sns.boxplot(data=occ_3s_3cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
+# Paired t-test between states (not needed because sums to 1)
+engaged_saline = occ_3s_3cov_comparison[occ_3s_3cov_comparison['Drug'] == 0]['Engaged']
+engaged_drug = occ_3s_3cov_comparison[occ_3s_3cov_comparison['Drug'] == 1]['Engaged']
+t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
+print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+add_star_between(p_val, 0, 1)
+plt.xticks([0,1], ['Saline','Drug'])
+plt.ylim(0, 1)
+plt.xlabel('Engaged')
+plt.ylabel('Occupancy')
+sns.despine()
+plt.title('3 states\n(3 cov.: stim., bias, At)')
 
 
 
