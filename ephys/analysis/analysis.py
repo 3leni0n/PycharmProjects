@@ -82,7 +82,7 @@ def get_ephys_sessions(subject):
 
     subject_folders = [f for f in folders if f.startswith(subject)]  # Filter folders that start with subject number
     subject_folders.sort()  # Sort the subject folders
-    print(subject_folders)  # Print the sorted subject folders
+    print(subject_folders, '\n')  # Print the sorted subject folders
 
     return subject_folders
 

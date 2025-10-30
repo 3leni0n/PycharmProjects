@@ -17,33 +17,9 @@ import time
 import pickle
 import traceback
 
-# sns.set_theme()
-# sns.set_style('ticks')
-# sns.set_context('talk')
-
 # Neuromatch tutorial: https://compneuro.neuromatch.io/tutorials/W1D5_DeepLearning/student/W1D5_Tutorial1.html
 
 ########################################################################################################################
-
-subject = '000'
-
-# ephys_ids = [
-#     '007_2024-06-22_10-48-57',
-#     '007_2024-06-23_12-46-55',
-#     '007_2024-06-24_17-47-22',
-#     '007_2024-06-25_15-54-23',
-#     '007_2024-06-26_15-19-30',
-#     '007_2024-06-27_15-06-28',
-#     '007_2024-06-28_14-18-51',
-#     '007_2024-06-29_16-24-52',
-#     # '007_2024-07-06_11-16-25',  # Bad session
-#     # '007_2024-07-07_13-20-29',  # Bad session
-#     '007_2024-07-08_12-20-29',
-#     '007_2024-07-09_12-10-57',
-#     '007_2024-07-10_12-03-35',
-#     '007_2024-07-11_12-39-21',
-#     '007_2024-07-12_13-29-26'
-# ]
 
 def preprocess_subject(subject):
     """
@@ -93,15 +69,7 @@ def preprocess_subject(subject):
 
     print(f'Sessions not preprocessed due to error: {error_sessions}')
 
-
-# behavior = []
-# for i in range(len(ephys_ids)):
-#     path_behavior = get_behavior_id(ephys_ids[i])
-#     filename = path_behavior.name
-#     print(i, filename)
-#     folder_child = folder_parent / ephys_ids[i]
-#     df = pd.read_csv(folder_child / filename)
-#     behavior.append(df)
+    return error_sessions
 
 
 def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=False):
@@ -322,8 +290,11 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
     """
     Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
     cross-validation across trials and across time bins.
+    :param bins: 1D array with time bins
+    :param epoch: epoch of interest (str: 'stim', 'delay', 'resp')
     :param X: 3D array with neural data (trials x time x neurons)
-    :param y: 1D array with binary stimulus condition
+    :param Y: 1D array with binary stimulus condition
+    :param n_shuffles: number of shuffles to perform
     :return: pred, pred_err (predicted condition and prediction error)
     """
 
@@ -353,6 +324,8 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
     elif epoch == 'resp':
         epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]  # Find index where go cue is in bins
         epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
+    else:
+        raise ValueError("Epoch must be 'stim', 'delay', or 'resp'.")
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     # for train_index, test_index in kf.split(X):
@@ -508,10 +481,10 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
 
 
 @timer
-def mean_decoder(kind=None, epoch=None, epoch_ortho=None, split_by=None, engagement=None, drop_miss=True, hit_only=False, n_shuffles=100,
-                 plot=False, save=False):
+def mean_decoder(subject, kind=None, epoch=None, epoch_ortho=None, split_by=None, engagement=None, drop_miss=True, hit_only=False,
+                 n_shuffles=100, plot=False, save=False):
     """
-    Perform within time bin decoder across all sessions.
+    Perform within time bin decoder across all sessions for one subject.
     :param kind: type of decoder (within, cross, epoch)
     :param save: whether to save the results as a pickle
     :param plot: whether to plot the decoding accuracy for each session
@@ -526,76 +499,88 @@ def mean_decoder(kind=None, epoch=None, epoch_ortho=None, split_by=None, engagem
         'bins': []
     }
 
+    folder_parent = Path.home() / 'data' / subject
+    ephys_ids = get_ephys_sessions(subject)
+    error_sessions = preprocess_subject(subject)
+    ephys_ids = [id for id in ephys_ids if id not in error_sessions]
+
     for i in range(len(ephys_ids)):
 
-        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+        try:
 
-        path_behavior = get_behavior_id(ephys_ids[i])
-        df_behavior = parse_v2(path_behavior)
-        disengagement = find_disengaged(df_behavior, plot=False)  # Find trial when disengagement happens
-        engaged = (df_behavior.Trial <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
-        df_behavior['Engaged'] = engaged
-        bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-        all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+            print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
 
-        eng_label = ''
-        if engagement is not None:  # Add engaged column to df_behavior
-            if engagement == 0:  # Disengaged trials
-                df_behavior = df_behavior[df_behavior.Engaged == 0].reset_index(drop=True)
-                eng_label = 'disengaged'
-            elif engagement == 1:  # Engaged trials
-                df_behavior = df_behavior[df_behavior.Engaged == 1].reset_index(drop=True)
-                eng_label = 'engaged'
-            all_psth = all_psth[df_behavior.index.values]  # Filter all_psth by selected engagement
+            path_behavior = get_behavior_id(ephys_ids[i])
+            df_behavior = parse_v2(path_behavior)
+            # disengagement = find_disengaged(df_behavior, plot=False)  # Find trial when disengagement happens
+            # engaged = (df_behavior.Trial <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
+            # df_behavior['Engaged'] = engaged
+            bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
+            all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
 
-        # Filter trials
-        # Remove misses (default)
-        if drop_miss:
-            resp_idx = df_behavior[df_behavior.Miss == 0].index
-            df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
-            all_psth = all_psth[resp_idx]
+            eng_label = ''
+            if engagement is not None:  # Add engaged column to df_behavior
+                if engagement == 0:  # Disengaged trials
+                    df_behavior = df_behavior[df_behavior.Engaged == 0].reset_index(drop=True)
+                    eng_label = '_disengaged'
+                elif engagement == 1:  # Engaged trials
+                    df_behavior = df_behavior[df_behavior.Engaged == 1].reset_index(drop=True)
+                    eng_label = '_engaged'
+                all_psth = all_psth[df_behavior.index.values]  # Filter all_psth by engagement
 
-        # Correct trials only (not default)
-        if hit_only:
-            correct_idx = df_behavior[df_behavior.Hit == 1].index
-            df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
-            all_psth = all_psth[correct_idx]
+            # Filter trials
+            # Remove misses (default)
+            if drop_miss:
+                resp_idx = df_behavior[df_behavior.Miss == 0].index
+                df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+                all_psth = all_psth[resp_idx]
 
-        # Select decoder
-        if kind == 'within':
-            pred, pred_err, acc, acc_null = \
-                within_decoder(all_psth, df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_within_decoder' + '_' + eng_label + '.pkl'
-        elif kind == 'cross':
-            pred, pred_err, acc, acc_null = \
-                cross_decoder(all_psth, df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_cross_decoder.pkl'
-        elif kind == 'epoch':
-            pred, pred_err, acc, acc_null = \
-                epoch_cross_decoder(bins, epoch, all_psth, df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '_' + eng_label + '.pkl'
-        elif kind == 'epoch_split':
-            split = df_behavior[split_by]
-            pred, pred_err, acc, acc_null = \
-                epoch_cross_decoder_split(bins, split, epoch=epoch, X=all_psth, y=df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '_' + 'split_by' + '_' + split_by + '.pkl'
+            # Correct trials only (not default)
+            if hit_only:
+                correct_idx = df_behavior[df_behavior.Hit == 1].index
+                df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
+                all_psth = all_psth[correct_idx]
 
-        # UNDER CONSTRUCTION (use at your own risk)
-        elif kind == 'test':
-            split = df_behavior[split_by]
-            pred, pred_err, acc, acc_null = \
-                epoch_cross_decoder_split_TEST(bins, split, epoch=epoch, X=all_psth, y=df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_TEST.pkl'
-        elif kind == 'epoch_ortho':
-            pred, pred_err, acc, acc_null = \
-                epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior.Side, n_shuffles=n_shuffles)
-            filename = 'results_mean_epoch_cross_decoder_ORTHO' + '_' + epoch + '_' + eng_label + '.pkl'
+            # Select decoder
+            if kind == 'within':
+                pred, pred_err, acc, acc_null = \
+                    within_decoder(all_psth, df_behavior.Side, n_shuffles=n_shuffles)
+                filename = 'results_mean_within_decoder' + eng_label + '.pkl'
+            elif kind == 'cross':
+                pred, pred_err, acc, acc_null = \
+                    cross_decoder(all_psth, df_behavior.Side, n_shuffles=n_shuffles)
+                filename = 'results_mean_cross_decoder.pkl'
+            elif kind == 'epoch':
+                pred, pred_err, acc, acc_null = \
+                    epoch_cross_decoder(bins, epoch, all_psth, df_behavior.Side, n_shuffles=n_shuffles)
+                filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + eng_label + '.pkl'
+            elif kind == 'epoch_split':
+                split = df_behavior[split_by]
+                pred, pred_err, acc, acc_null = \
+                    epoch_cross_decoder_split(bins, split, epoch=epoch, X=all_psth, y=df_behavior.Side, n_shuffles=n_shuffles)
+                filename = 'results_mean_epoch_cross_decoder' + '_' + epoch + '_' + 'split_by' + '_' + split_by + '.pkl'
 
-        results['pred'].append(pred)
-        results['pred_err'].append(pred_err)
-        results['acc'].append(acc)
-        results['acc_null'].append(acc_null)
-        results['bins'] = bins
+            # UNDER CONSTRUCTION (use at your own risk)
+            elif kind == 'test':
+                split = df_behavior[split_by]
+                pred, pred_err, acc, acc_null = \
+                    epoch_cross_decoder_split_TEST(bins, split, epoch=epoch, X=all_psth, y=df_behavior.Side, n_shuffles=n_shuffles)
+                filename = 'results_mean_TEST.pkl'
+            elif kind == 'epoch_ortho':
+                pred, pred_err, acc, acc_null = \
+                    epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior.Side, n_shuffles=n_shuffles)
+                filename = 'results_mean_epoch_cross_decoder_ORTHO' + '_' + epoch + eng_label + '.pkl'
+
+            results['pred'].append(pred)
+            results['pred_err'].append(pred_err)
+            results['acc'].append(acc)
+            results['acc_null'].append(acc_null)
+            results['bins'] = bins
+
+        except Exception as e:
+            print(f'An error occurred in session {ephys_ids[i]}: {e}')
+            traceback.print_exc()
+            continue
 
     # Plot decoding accuracy for each session
     if plot:
@@ -663,14 +648,18 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
 
     # Plot decoding accuracy
     plt.figure(constrained_layout=True)
+    plt.axvline(0, color='tab:red', linestyle='-')  # Stimulus onset
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+
+    bin_centers = (bins[:-1] + bins[1:]) / 2
 
     # Compute p-values and z-scores relative to the null distribution
     if z_null:
         z_scores = null_zscore(acc, acc_null)
         p_values = p_val(acc, acc_null)
         significant_region = p_values < 0.05  # When assessing significance of single sessions use p < 0.05
-        plt.plot(bins[:-1], z_scores, label='Z acc.')
-        plt.fill_between(bins[:-1], z_scores, where=significant_region, edgecolor='none',
+        plt.plot(bin_centers, z_scores, label='Z acc.')
+        plt.fill_between(bin_centers, z_scores, where=significant_region, edgecolor='none',
                          alpha=0.25, label='α < .05')
         plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
         ylabel = 'Z-score'
@@ -680,16 +669,16 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
         acc_null_mean = acc_null.mean(axis=0)
         acc_null_band = np.percentile(acc_null, [2.5, 97.5], axis=0)  # The 95% confidence interval of the shuffles
         # plt.plot(-np.mean(abs(pred_err), axis=0)+1)  # Equivalent
-        plt.plot(bins[:-1], acc_mean, label='Acc.')
-        plt.fill_between(bins[:-1], acc_mean - acc_sem, acc_mean + acc_sem, edgecolor='none', alpha=0.25,
+        plt.plot(bin_centers, acc_mean, label='Acc.')
+        plt.fill_between(bin_centers, acc_mean - acc_sem, acc_mean + acc_sem, edgecolor='none', alpha=0.25,
                          label='Acc. s.e.m.')
-        plt.plot(bins[:-1], acc_null_mean, color='tab:gray', linestyle='--', label='Null mean')  # Chance level (0.5)
-        plt.fill_between(bins[:-1], acc_null_band[0], acc_null_band[1], color='tab:gray', edgecolor='none', alpha=0.25,
+        plt.plot(bin_centers, acc_null_mean, color='tab:gray', linestyle='--', label='Null mean')  # Chance level (0.5)
+        plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray', edgecolor='none', alpha=0.25,
                          label='Null 95% CI')
         ylabel = 'Accuracy'
 
-    plt.axvline(0, color='tab:red', linestyle='-')  # Stimulus onset
-    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+    plt.xlim(bins[0], bins[-1])
+    plt.ylim(None, 1)
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
     # plt.title(f'Decoding accuracy\n'
@@ -707,6 +696,9 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
     """
 
     plt.figure(constrained_layout=True)
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
+    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
     # Compute the mean accuracy across all sessions
     acc_mean = [results['acc'][i].mean(axis=0) for i in range(len(results['acc']))]
@@ -715,15 +707,16 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
     acc_null_mean = np.array(acc_null_mean)
     n_trials = np.sum([results['acc'][i].shape[0] for i in range(len(results['acc']))])
     bins = results['bins']
+    bin_centers = (bins[:-1] + bins[1:]) / 2
 
     if z_null:
         z_scores = [null_zscore(results['acc'][i], results['acc_null'][i]) for i in range(len(results['acc']))]
         z_scores_mean = np.mean((z_scores), axis=0)
-        plt.plot(bins[:-1], z_scores_mean, color='tab:blue', label='Z acc.')
+        plt.plot(bin_centers, z_scores_mean, color='tab:blue', label='Z acc.')
         p_values = p_val(acc_mean, acc_null_mean)
         significant_region = p_values < 0.05  # When assessing significance across sessions use p < 0.05
         # significant_region = np.abs(z_scores_mean) >= 1.96  # When assessing significance across sessions use 1.96
-        plt.fill_between(bins[:-1], z_scores_mean, where=significant_region, edgecolor='none', color='tab:blue',
+        plt.fill_between(bin_centers, z_scores_mean, where=significant_region, edgecolor='none', color='tab:blue',
                          alpha=0.25, label='α < .05')
         plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
         ylabel = 'Z-score'
@@ -748,28 +741,27 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
             acc_null_band_label = 'Acc. null SEM'
 
         # Plot the mean decoding accuracy across all sessions
-        plt.plot(bins[:-1], acc_mean, color='tab:blue', label='Acc.')
-        plt.fill_between(bins[:-1], acc_band[0], acc_band[1], color='tab:blue', edgecolor='none',
+        plt.plot(bin_centers, acc_mean, color='tab:blue', label='Acc.')
+        plt.fill_between(bin_centers, acc_band[0], acc_band[1], color='tab:blue', edgecolor='none',
                          alpha=0.25)#, label=acc_band_label)
 
         # Plot the mean null accuracy across all sessions (chance level)
-        plt.plot(bins[:-1], acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
-        plt.fill_between(bins[:-1], acc_null_band[0], acc_null_band[1], color='tab:gray',
+        plt.plot(bin_centers, acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
+        plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray',
                          edgecolor='none', alpha=0.25)#, label=acc_null_band_label)
 
         # Plot the individual sessions accuracy
         for _ in range(len(results['acc'])):
-            plt.plot(bins[:-1], np.mean(results['acc'][_], axis=0), color='tab:blue', alpha=0.1)
+            plt.plot(bin_centers, np.mean(results['acc'][_], axis=0), color='tab:blue', alpha=0.1)
 
         # # Plot the individual sessions null accuracy (chance level)
         # for _ in range(len(results['acc_null'])):
-        #     plt.plot(bins[:-1], np.mean(results['acc_null'][_], axis=0), ls='--', color='tab:gray')
+        #     plt.plot(bin_centers, np.mean(results['acc_null'][_], axis=0), ls='--', color='tab:gray')
 
         ylabel = 'Accuracy'
 
-    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
-    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
-    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+    plt.xlim(bins[0], bins[-1])
+    plt.ylim(None, 1)
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
     # plt.title(f"Decoding accuracy\n"
@@ -831,23 +823,28 @@ def plot_mean_cross_decoder(results, z_null=True):
     # acc_null_mean = np.mean(acc_null_mean, axis=0)
     n_trials = np.sum([results['acc'][i].shape[0] for i in range(len(results['acc']))])
     bins = results['bins']
+    bin_width = np.diff(bins).mean()
+    extent = [bins[0] - bin_width / 2, bins[-1] + bin_width / 2,
+              bins[0] - bin_width / 2, bins[-1] + bin_width / 2]
 
     if z_null:
         z_scores = [null_zscore(results['acc'][i], results['acc_null'][i]) for i in range(len(results['acc']))]
         z_scores_mean = np.mean((z_scores), axis=0)
-        plt.imshow(z_scores_mean, origin='lower', cmap='RdBu_r', norm=CenteredNorm())
+        plt.imshow(z_scores_mean, origin='lower', cmap='RdBu_r', norm=CenteredNorm(), extent=extent)
     else:
-        plt.imshow(acc_mean, origin='lower')  # abs needed?
+        plt.imshow(acc_mean, origin='lower', extent=extent)  # abs needed?
 
     plt.colorbar(label='Z-score')
-    plt.xticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
-    plt.yticks(np.arange(0, len(bins), 10), np.round(bins[::10]).astype(int))
-    plt.axhline(np.where(bins == 0)[0], color='tab:gray', linestyle='-')  # Stimulus
-    plt.axvline(np.where(bins == 0)[0], color='tab:gray', linestyle='-')  # Stimulus
-    plt.axhline(np.where(bins == 0.5)[0], color='tab:gray', linestyle='--')  # Delay
-    plt.axvline(np.where(bins == 0.5)[0], color='tab:gray', linestyle='--')  # Delay
-    plt.axhline(np.where(bins == 1)[0], color='tab:gray', linestyle='-')  # Go cue
-    plt.axvline(np.where(bins == 1)[0], color='tab:gray', linestyle='-')  # Go cue
+
+    plt.axhline(0, color='tab:gray', linestyle='-')  # Stimulus
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus
+    plt.axhline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axhline(1, color='tab:gray', linestyle='-')  # Go cue
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+
+    plt.xticks(bins[::10], np.round(bins[::10], 1).astype(int))
+    plt.yticks(bins[::10], np.round(bins[::10], 1).astype(int))
     plt.xlabel('Test time (s)')
     plt.ylabel('Train time (s)')
     # plt.title(f"Decoding accuracy\n"
@@ -940,22 +937,26 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, errorbar='ci', engagement
         acc_band_label = 'Acc. SEM'
         acc_null_band_label = 'Acc. null SEM'
 
-    # n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
-    # plt.figure(constrained_layout=True)
-    plt.plot(results['bins'][:-1], acc_mean, color=color, label=label)
-    plt.fill_between(results['bins'][:-1], acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
-
-    plt.plot(results['bins'][:-1], acc_null_mean, linestyle='--', color=color)
-    plt.fill_between(results['bins'][:-1], acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
-                        alpha=0.25)
+    bins = results['bins']
+    bin_centers = (bins[:-1] + bins[1:]) / 2
 
     plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
     plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
     plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
+    # n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
+    # plt.figure(constrained_layout=True)
+    plt.plot(bin_centers, acc_mean, color=color, label=label)
+    plt.fill_between(bin_centers, acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
+
+    plt.plot(bin_centers, acc_null_mean, linestyle='--', color=color)
+    plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
+                        alpha=0.25)
+
     plt.legend(frameon=False)
     plt.xlabel('Time (s)')
     plt.ylabel('Accuracy')
+    plt.ylim(None, 1)
     # plt.title(f'Decoding accuracy\n'
     #           f'{subject}, {len(results["acc"])} sessions, {n_trials} trials')
     sns.despine()
@@ -1047,7 +1048,7 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
 
 ########################################################################################################################
 # UNDER CONSTRUCTION
-# Please wear safety equipment. Any resemblance to real persons, living or dead, is purely coincidental. I do not take
+# Please wear safety equipment. Any resemblance to real cool effects might be purely acidental. I do not take
 # responsibility for any damage caused by the use of this code. Use at your own risk.
 ########################################################################################################################
 

@@ -24,14 +24,14 @@ def dev():
 
     # Check remote vs local
     hostname = socket.gethostname()  # Machine name (remote if SSH)
-    username = getpass.getuser()  # Logged-in user
+    username = getpass.getuser()  # Logged in user
     os_type = platform.system()  # 'Linux', 'Darwin' (macOS), 'Windows'
     if (hostname == 'headnode' or hostname == 'minibaps' or hostname == 'minibaps2') \
         and os_type == 'Linux' and username == 'alexis':
         development = 'remote'
     else:
         development = 'local'  # Local machine (Ephys PC)
-    print(f'Development mode: {development} ({hostname}, {username}, {os_type})')
+    print(f'Development mode: {development} ({hostname}, {username}, {os_type})\n')
 
     return development
 
