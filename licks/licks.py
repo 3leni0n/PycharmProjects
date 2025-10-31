@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
 import seaborn as sns
-from plotting_style import *
+from my_fun.my_fun import fig_size
 
 
 # Define functions to get lick variables: RTs, N licks, ILI

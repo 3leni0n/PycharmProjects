@@ -1148,38 +1148,48 @@ def clean_session_start(df):
     return df
 
 
-def filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=True):
+def filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=True):
     """
     Filter the behavior DataFrame for one subject.
     :param df: DataFrame containing the data
     :return: Filtered DataFrame
     """
 
-    # Filters for groups 1-3
-    # df = df[df.Stage == 4].reset_index(drop=True)
-    # df = df[df.Motor == 4].reset_index(drop=True)
-    # df = df[df.StimDur == 1].reset_index(drop=True)
-    # df = df[df.P > 0].reset_index(drop=True)
+    _ = len(df)
 
-    # Filters for groups 4-5 (otherwise bump in lick rate before stimulus onset)
-    # df = df[df.StimDur == 1].reset_index(drop=True)
-    # df = df[df.Task == 'FD'].reset_index(drop=True)
-    # df = df[df.Delay == 0.5].reset_index(drop=True)
-    df = df[df.P > 0].reset_index(drop=True)
-
+    # General filters
+    # Remove AW and WarmUp trials
+    if clean_start:
+        df = clean_session_start(df)
     # Drop misses (Choice == NaN)
     if drop_miss:
         df = df.dropna(subset=['Choice']).reset_index(drop=True)
 
-    # Remove AW and WarmUp trials
-    if clean_start:
-        df = clean_session_start(df)
+    # Experiment-specific filters
+    experiment = df.Experiment.unique()[0]
 
-    # Filter drug data
-    if filter_drug:
-        df = filter_drug_sessions(df)
+    if experiment in ['2AFC_2', '2AFC_3']:
+        df = df[df.Stage == 4].reset_index(drop=True)
+        df = df[df.Motor == 4].reset_index(drop=True)
+        df = df[df.StimDur == 1].reset_index(drop=True)
+        df = df[df.P > 0].reset_index(drop=True)
 
-    print(f'Total:{round(len(df) / 1000)}k trials')
+    elif experiment in ['2AFC_4', '2AFC_6']:
+        df = df[df.Task == 'FD'].reset_index(drop=True)  # (otherwise bump in lick rate before stim. onset)
+        df = df[df.StimDur == 1].reset_index(drop=True)
+        df = df[df.Delay == 0.5].reset_index(drop=True)
+        df = df[df.P > 0].reset_index(drop=True)
+
+        if experiment == '2AFC_6' and filter_drug:  # Drug group
+            df = filter_drug_sessions(df)
+
+    elif experiment == '2AFC_5':
+        df = df[df.Task == 'FD'].reset_index(drop=True)
+        df = df[df.StimDur == 0.5].reset_index(drop=True)
+        df = df[df.Delay == 0.5].reset_index(drop=True)
+        df = df[df.P == 0].reset_index(drop=True)
+
+    print(f'Total:{round((_ - len(df)) / 1000)}k trials')
 
     return df
 
@@ -1217,7 +1227,8 @@ def fig_size(n_cols=1, ratio=None):
     :return:
     """
 
-    sns.set_theme(style='ticks', context='notebook')
+    sns.set_style('ticks')
+    sns.set_context('notebook')
 
     if ratio is None:
         default_figsize = np.array(plt.rcParams['figure.figsize'])

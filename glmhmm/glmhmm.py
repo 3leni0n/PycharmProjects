@@ -3,10 +3,9 @@ from scipy.stats import ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_star_between, filter_behavior, filter_drug_sessions
+from my_fun import get_experiment, add_star_between, filter_drug_sessions, filter_behavior, fig_size
 from cherry.cherry import *
 from kernels.kernels_tools import *
-from plotting_style import *
 import numpy as np
 np.random.seed(42)
 import pandas as pd
@@ -216,14 +215,14 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
         state_label_map = {0: 'Engaged', 1: 'BiasedLeft', 2: 'BiasedRight'}
 
     # Filter data
-    # df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
-    df = df[df.P > 0].reset_index(drop=True)
-    df = df.dropna(subset=['Choice']).reset_index(drop=True)
+    df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
+    # df = df[df.P > 0].reset_index(drop=True)
+    # df = df.dropna(subset=['Choice']).reset_index(drop=True)
 
     experiment = df.Experiment.unique()[0]
 
     # # Drug sessions
-    df = filter_drug_sessions(df)
+    # df = filter_drug_sessions(df)
     # if drug is None:
     #     # Keep the sessions where drug is NaN (rest sessions, no saline nor drug)
     #     df = df[df.Drug.isnull()].reset_index(drop=True)
@@ -237,7 +236,8 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     #     condition = 'saline' if drug == 0 else 'drug'
     #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
     # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
-    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}' / experiment
+    # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}' / experiment
+    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / experiment
 
     # Parse the data
     inputs, choices = parse_glmhmm(df, covariates=covariates)
@@ -300,13 +300,30 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     return df
 
 
-def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, covariates=None, drug=None, save=True):
+def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, covariates=None, cherry=True, drug=None, save=True):
     """
     Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
-    :return: None
+    :param experiments: List of experiments to fit
+    :param n_states: Number of discrete states (2 or 3)
+    :param covariates: List of covariates to include
+    :param cherry: If True, cherrypick the best subjects
+    :param drug: If None, fit rest sessions (no drug nor saline); if 0, fit saline sessions; if 1, fit drug sessions
+    :param save: If True, save the fitted DataFrame to CSV
+    :return: DataFrame with added columns for model fitting results for all subjects.
     """
+
     df_fit_all = pd.DataFrame()
-    cherries = main(experiments)  # Get good subjects from cherry
+
+    if cherry:
+        cherries = main(experiments)  # Get good subjects from cherry
+    else:
+        cherries = {}  # All subjects
+        for exp in experiments:
+            exp, folder_in = get_experiment(exp, path_session='glue_sessions')
+            subjects = os.listdir(folder_in)
+            subjects = [s for s in subjects if len(s) <= 7]  # Filter only subject data
+            subjects.sort()
+            cherries[exp] = subjects
 
     for exp in experiments:
         subjects = cherries[exp]
@@ -742,7 +759,7 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
     plt.title('Matrix')
     sns.despine()
 
-
+"""
 # # Save results
 # path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
 # with open(path, 'wb') as f:
@@ -955,6 +972,6 @@ plt.xlabel('Engaged')
 plt.ylabel('Occupancy')
 sns.despine()
 plt.title('3 states\n(3 cov.: stim., bias, At)')
-
+"""
 
 

@@ -8,10 +8,9 @@ from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
 import seaborn as sns
-from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, filter_drug_sessions
+from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, filter_drug_sessions, fig_size
 from parse.parse_v2 import parse_v2
 from cherry import *  # Potential circular import with cherry (uses plot_pc)
-from plotting_style import *
 
 # Good animals for psychometric curves
 # experiment = '2AFC_X'
