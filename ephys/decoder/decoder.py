@@ -193,7 +193,7 @@ def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
             X_test = scaler.transform(X_test)  # Only transform the test set using the same scaler
 
             # Train decoder (logistic regression) on the current time bin_train’s neural activity
-            clf = LogisticRegression()
+            clf = LogisticRegression(class_weight='balanced')
             clf.fit(X_train, y_train)
 
             # Evaluate decoder
@@ -262,7 +262,7 @@ def cross_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
             X_train = scaler.fit_transform(X_train)  # Fit and transform on the training set
 
             # Train decoder (logistic regression) on the current time bin_train’s neural activity
-            clf = LogisticRegression()
+            clf = LogisticRegression(class_weight='balanced')
             clf.fit(X_train, y_train)
 
             # Loop over each time bin_train
@@ -349,7 +349,7 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
         X_train = scaler.fit_transform(X_train)  # Fit and transform on the training set
 
         # Train decoder (logistic regression) on the current time bin_train’s neural activity
-        clf = LogisticRegression()
+        clf = LogisticRegression(class_weight='balanced')
         clf.fit(X_train, y_train)
 
         # Loop over each time bin_train
@@ -433,7 +433,7 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
         test_idx1 = split.loc[split.index.isin(test_index) & (split == 1)].index
 
         # Train decoder (logistic regression) on the current time bin’s neural activity
-        clf = LogisticRegression()
+        clf = LogisticRegression(class_weight='balanced')  # Handle imbalanced classes (bias)
         clf.fit(X_train, y_train)
 
         # Loop over each time bin_train
@@ -472,21 +472,34 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
             y_test_shuffled0 = y_test0.values.copy()
             y_test_shuffled1 = y_test1.values.copy()
             for _ in range(n_shuffles):
-                np.random.shuffle(y_test_shuffled0)
-                # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
-                acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
-                # shuffled labels
-                # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
-                # actual labels
+                # np.random.shuffle(y_test_shuffled0)
+                # # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
+                # acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
+                # # shuffled labels
+                # # pred_err_temp.append(y_pred - y_test_shuffled)
+                # # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
+                # # actual labels
+                #
+                # np.random.shuffle(y_test_shuffled1)
+                # # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
+                # acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
+                # # shuffled labels
+                # # pred_err_temp.append(y_pred - y_test_shuffled)
+                # # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
+                # # actual labels
 
-                np.random.shuffle(y_test_shuffled1)
-                # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
-                acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
-                # shuffled labels
-                # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
-                # actual labels
+                # TEST FOR NON FLAT SHUFFLES
+                y_train_shuff = np.random.permutation(y_train)
+                clf_null = LogisticRegression(class_weight='balanced')
+                clf_null.fit(X_train, y_train_shuff)
+
+                # Predict on the same test sets
+                y_pred0_null = clf_null.predict(X_test0)
+                y_pred1_null = clf_null.predict(X_test1)
+
+                # Compute per-trial accuracy
+                acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
+                acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
 
     return pred, pred_err, acc, acc_null
 
