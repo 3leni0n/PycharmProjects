@@ -15,6 +15,7 @@ from collections import namedtuple
 # My libraries
 from my_fun.my_fun import do_sounds_dict_inv, timer
 from parse.parse_v2 import parse_v2
+from licks.licks import add_lick_data
 
 
 def dev():
@@ -550,6 +551,19 @@ def align_ttl(df_ttl, df_behavior):
     df_ttl.reset_index(drop=True, inplace=True)  # Reset index
     assert len(df_ttl) == len(df_behavior), 'Number of stimulus onset TTLs and trials in behavior data do not match'
 
+    # Add Go-cue aligned to stimulus onset (df_ttl.OFF)
+    go_cue = df_behavior['RespWinStart'].values - df_behavior['StimStart'].values
+    go_cue = df_ttl.OFF + go_cue
+
+    # Add RT (first lick) aligned to stimulus onset (df_ttl.OFF)
+    df_behavior = add_lick_data(df_behavior)  # Add lick data to behavior dataframe (aligned to response window start)
+    df_behavior.RT = (df_behavior.RT - 0.15).clip(lower=0)
+    rt = df_behavior.RT.values
+    rt = go_cue + rt
+
+    df_ttl['GoCue'] = go_cue
+    df_ttl['RT'] = rt
+
     return df_ttl
 
 
@@ -588,6 +602,7 @@ def preprocess(ephys_id):
     # Load behavior data
     path_behavior = get_behavior_id(ephys_id)
     df_behavior = parse_v2(path_behavior)
+
 
     # Check if the behavior and ephys data match and get the number of trials common to both
     n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)

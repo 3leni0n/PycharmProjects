@@ -168,9 +168,11 @@ def get_peri_stim_spikes(df_cluster, df_ttl, align='stim', time_win=[-1, 3], sca
         jitter = np.random.normal(0, scale)  # Jitter the stimulus onset timestamps
 
         if align == 'stim':
-            alignment = df_ttl.OFF[trial] + jitter  # Get the stimulus onset timestamp
+            alignment = df_ttl.OFF[trial] + jitter  # Stimulus onset timestamp
         elif align == 'go_cue':
-            alignment = df_ttl.OFF[trial] + 1 + jitter  # Get the go cue timestamp
+            alignment = df_ttl.GoCue[trial] + jitter  # Go cue timestamp
+        elif align == 'resp':
+            alignment = df_ttl.RT[trial] + jitter  # First lick timestamp
 
         # Select only spikes within the time window of interest around the event
         spikes_trial = df_cluster[(df_cluster.times >= alignment - abs(time_win[0])) &
