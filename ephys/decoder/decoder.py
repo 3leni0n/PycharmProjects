@@ -16,6 +16,7 @@ from ephys.analysis import *
 import seaborn as sns
 import pickle
 import traceback
+from joblib import Parallel, delayed
 
 # Neuromatch tutorial: https://compneuro.neuromatch.io/tutorials/W1D5_DeepLearning/student/W1D5_Tutorial1.html
 
@@ -1442,6 +1443,20 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 #     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
 #     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
 #     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-#     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-#     #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-#     preprocess_subject(subj, align='resp', time_win=[-2, 2], bin_size=0.05)
+#     mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+#                  hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # preprocess_subject(subj, align='resp', time_win=[-2, 2], bin_size=0.05)
+
+
+# Paralelization test
+
+subjects = ['000', '007', '009']
+folder_parent = Path.home() / 'data'
+
+def run_fun(subj):
+    # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None,
+    #              split_by=None, drop_miss=True, hit_only=True, engagement=1, n_shuffles=100,
+    #              plot=False, save=True)
+    preprocess_subject(subj, align='stim', time_win=[-1, 3], bin_size=0.1)
+
+Parallel(n_jobs=-1)(delayed(run_fun)(subj) for subj in subjects)

@@ -61,7 +61,7 @@ for i in range(len(ephys_ids)):
     df_behavior['LickRate'] = np.mean(licks_psth, axis=1) / bin_size
 
     # Add baseline FR and sync to behavior dataframe
-    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win)
+    peri_stim_spikes = get_peri_event_spikes(df_spikes, df_ttl, time_win=time_win)
     bins, baseline_FR = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
     baseline_FR = np.mean(baseline_FR, axis=1)
     baseline_FR = baseline_FR/len(cluster_info)

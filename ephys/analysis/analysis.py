@@ -6,6 +6,8 @@ from scipy.stats import zscore, sem, poisson
 from scipy.ndimage import gaussian_filter1d
 from matplotlib import pyplot as plt
 import matplotlib as mpl
+from tqdm import tqdm
+from joblib import Parallel, delayed
 
 # Plotting parameters
 import seaborn as sns
@@ -26,7 +28,7 @@ from elephant.spike_train_correlation import cross_correlation_histogram
 
 # My own libraries
 from parse.parse_v2 import parse_v2
-from my_fun.my_fun import compute_window
+from my_fun.my_fun import compute_window, timer
 from ephys.preprocessing import *
 
 ########################################################################################################################
@@ -147,7 +149,7 @@ def select_cluster(cluster_info, group='all'):
     return cluster_info[cond].cluster_id
 
 
-def get_peri_stim_spikes(df_cluster, df_ttl, align='stim', time_win=[-1, 3], scale=0):
+def get_peri_event_spikes(df_cluster, df_ttl, align='stim', time_win=[-1, 3], scale=0):
     """
     Get peri-stimulus spikes for a cluster.
     :param df_cluster: DataFrame with spike times of a given cluster
@@ -156,7 +158,7 @@ def get_peri_stim_spikes(df_cluster, df_ttl, align='stim', time_win=[-1, 3], sca
     :param scale: Scale of the jitter (default: 0; no jitter)
     """
 
-    peri_stim_spikes = []
+    peri_event_spikes = []
     # Loop over trials (timestamps of stimulus onset)
 
     # Check if df_ttl is a Series and convert to DataFrame to iterate over single trial
@@ -178,9 +180,9 @@ def get_peri_stim_spikes(df_cluster, df_ttl, align='stim', time_win=[-1, 3], sca
         spikes_trial = df_cluster[(df_cluster.times >= alignment - abs(time_win[0])) &
                                   (df_cluster.times <= alignment + abs(time_win[1]))].times
         spikes_trial = spikes_trial - alignment  # Align spikes to the event
-        peri_stim_spikes.append(spikes_trial)
+        peri_event_spikes.append(spikes_trial)
 
-    return peri_stim_spikes
+    return peri_event_spikes
 
 
 def get_peri_stim_licks(df_behavior, event='StimStart'):
@@ -226,11 +228,11 @@ def convolve_psth(psth, sigma=1):
 ########################################################################################################################
 
 # Raster plots
-def plot_raster(df_behavior, peri_stim_spikes, colors=None, ax=None):
+def plot_raster(df_behavior, peri_event_spikes, colors=None, ax=None):
     """
     Plot a raster plot of a given cluster aligned to a specific event. Uses an approach completely independent of
     the behavior data. Loops over the TTL events related to stimuli registered in the ephys
-    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    :param peri_event_spikes: Spike times of a given cluster (output of get_peri_event_spikes)
     :param colors: Colors of the raster plot (default: None)
     :param ax: Axes to plot the raster (default: None)
     """
@@ -243,15 +245,15 @@ def plot_raster(df_behavior, peri_stim_spikes, colors=None, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
         responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
-        peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
+        peri_event_spikes = [peri_event_spikes[_] for _ in responded_trials]  # Only trials with a response
         title = f'Cluster {cluster} ({group})'
     else:
         title = ''
 
     if colors is None:
-        colors = ['k'] * len(peri_stim_spikes)
+        colors = ['k'] * len(peri_event_spikes)
 
-    ax.eventplot(peri_stim_spikes, lineoffsets=range(len(peri_stim_spikes)), colors=colors)
+    ax.eventplot(peri_event_spikes, lineoffsets=range(len(peri_event_spikes)), colors=colors)
 
     ax.axvline(0, color='tab:gray', label='Stimulus')
     # ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay')
@@ -281,15 +283,15 @@ def plot_raster_split(condition='outcome', ax=None):
         colors = ['tab:purple', 'tab:brown']
 
     indexes = get_trial_indexes(df_behavior, condition=condition)
-    peri_stim_spikes = []
+    peri_event_spikes = []
 
     for _ in range(len(indexes)):
-        peri_stim_spikes.append(
-            get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
+        peri_event_spikes.append(
+            get_peri_event_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
 
-    peri_stim_spikes = peri_stim_spikes[0] + peri_stim_spikes[1]  # Concatenate lists
+    peri_event_spikes = peri_event_spikes[0] + peri_event_spikes[1]  # Concatenate lists
     colors = [colors[0]] * len(indexes[0]) + [colors[1]] * len(indexes[1])  # Concatenate colors
-    plot_raster(df_behavior, peri_stim_spikes, colors=colors, ax=ax)  # Plot raster plot split by condition
+    plot_raster(df_behavior, peri_event_spikes, colors=colors, ax=ax)  # Plot raster plot split by condition
     ax.legend().remove()
 
 
@@ -388,10 +390,10 @@ def plot_psth_elephant(cluster, align='StimStart'):
     plt.close()
 
 
-def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
+def compute_psth(peri_event_spikes, time_win=[-1, 3], bin_size=0.1):
     """
     Compute a PSTH of a given cluster aligned to a specific event.
-    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    :param peri_event_spikes: Spike times of a given cluster (output of get_peri_event_spikes)
     :param time_win: List with the time window around the event (default: [-1, 3])
     :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
     """
@@ -401,14 +403,15 @@ def compute_psth(peri_stim_spikes, time_win=[-1, 3], bin_size=0.1):
 
     psth = []
     # Loop over trials (timestamps of stimulus onset)
-    for trial in range(len(peri_stim_spikes)):
-        hist, _ = np.histogram(peri_stim_spikes[trial], bins)  # Ignore the bin_edges output
+    for trial in range(len(peri_event_spikes)):
+        hist, _ = np.histogram(peri_event_spikes[trial], bins)  # Ignore the bin_edges output
         psth.append(hist)
     psth = np.array(psth)  # Convert to numpy array
 
     return bins, psth
 
 
+@timer
 def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align='stim', time_win=[-1, 3], bin_size=0.1):
     """
     Create 3-dimensional array (trial x bin x cluster) with all PSTHs for all clusters
@@ -426,8 +429,8 @@ def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align='stim', time_w
     for i, cluster in enumerate(cluster_info.cluster_id):
         # print(f'{i}: cluster {cluster}')
         df_cluster = df_spikes[df_spikes.cluster == cluster]
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, align=align, time_win=time_win, scale=0)
-        bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+        peri_event_spikes = get_peri_event_spikes(df_cluster, df_ttl, align=align, time_win=time_win, scale=0)
+        bins, psth = compute_psth(peri_event_spikes, time_win=time_win, bin_size=bin_size)
         all_psth[:, :, i] = psth
 
     return bins, all_psth
@@ -442,8 +445,8 @@ def compute_psth_shuffles(df_cluster, n_shuffles=1000, time_win=[-1, 3], scale=2
 
     psth_shuffles = []
     for _ in range(n_shuffles):
-        peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win, scale=scale)  # Get jittered spikes
-        bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)  # Compute the PSTH of the jittered spikes
+        peri_event_spikes = get_peri_event_spikes(df_cluster, df_ttl, time_win, scale=scale)  # Get jittered spikes
+        bins, psth = compute_psth(peri_event_spikes, time_win=time_win, bin_size=bin_size)  # Compute the PSTH of the jittered spikes
         psth = np.mean(psth, axis=0)  # Average across trials
         psth = psth / bin_size  # Convert to spikes/s
         psth_shuffles.append(psth)  # Store the PSTH of the shuffled spikes
@@ -531,7 +534,7 @@ def plot_psth_split(condition='outcome', over='spikes', ax=None):
 
     for _ in range(len(indexes)):
         if over == 'spikes':
-            peri_stim = get_peri_stim_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), align, time_win)
+            peri_stim = get_peri_event_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), align, time_win)
             ylabel = 'FR (spikes/s)'
         elif over == 'licks':
             peri_stim = get_peri_stim_licks(df_behavior.iloc[indexes[_]].reset_index(drop=True))
@@ -563,14 +566,14 @@ def plot_raster_psth(df_cluster, time_win=[-1, 3], bin_size=0.1, ax=[None, None]
         title = ''
 
     responded_trials = df_behavior[df_behavior.Response == 1].Trial.values
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, time_win=time_win)
-    peri_stim_spikes = [peri_stim_spikes[_] for _ in responded_trials]  # Only trials with a response
+    peri_event_spikes = get_peri_event_spikes(df_cluster, df_ttl, time_win=time_win)
+    peri_event_spikes = [peri_event_spikes[_] for _ in responded_trials]  # Only trials with a response
 
-    plot_raster(df_behavior, peri_stim_spikes, colors=['k'] * len(peri_stim_spikes), ax=ax[0])
+    plot_raster(df_behavior, peri_event_spikes, colors=['k'] * len(peri_event_spikes), ax=ax[0])
     ax[0].set_title('')
     ax[0].set_xlabel('')
     ax[0].legend().remove()
-    bins, psth = compute_psth(peri_stim_spikes)
+    bins, psth = compute_psth(peri_event_spikes)
     plot_psth(bins, psth, bin_size, ax=ax[1])
     # plot_psth(bins, psth, psth_shuffles, bin_size, ax=ax[1])
     ax[1].set_title('')
@@ -706,8 +709,8 @@ def plot_pop_psth(time_win=[-1, 3], bin_size=0.1, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
 
-    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
-    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    peri_event_spikes = get_peri_event_spikes(df_spikes, df_ttl, time_win)
+    bins, psth = compute_psth(peri_event_spikes, time_win, bin_size)
     # _, psth_shuffles = compute_psth_shuffles(df_spikes, n_shuffles=10, scale=2)
     psth = psth/len(cluster_info)
     plot_psth(bins, psth, bin_size, ax=ax)
@@ -841,7 +844,7 @@ def plot_isi(spikes, ax=None):
     """
     Plot the Inter Spike Intervals (ISI) of a given cluster.
     :param spikes: DataFrame with spike times of a given cluster (df_cluster) or list of spike times around an event
-    (peri_stim_spikes)
+    (peri_event_spikes)
     :param ax: Axes to plot the ISI distribution (default: None)
     return: ISI per trial
     """
@@ -858,9 +861,9 @@ def plot_isi(spikes, ax=None):
         # isis = isi(times)  # With elephant
         ax.hist(isis * 1000, bins=100, range=(0, 1000), color='k')
 
-    # With peri_stim_spikes (isis will be a list of np.arrays, one per trial)
+    # With peri_event_spikes (isis will be a list of np.arrays, one per trial)
     elif isinstance(spikes, list):
-        # ISIs per trial (requires peri_stim_spikes)
+        # ISIs per trial (requires peri_event_spikes)
         isis = []
         for trial in range(len(spikes)):
             spikes = spikes[trial]
@@ -912,17 +915,17 @@ def plot_cv(isis, ax=None):
     return coeff_var
 
 
-def fano_factor(peri_stim_spikes):
+def fano_factor(peri_event_spikes):
     """
     Compute the Fano factor of a PSTH.
-    :param peri_stim_spikes: Spike times of a given cluster (output of get_peri_stim_spikes)
+    :param peri_event_spikes: Spike times of a given cluster (output of get_peri_event_spikes)
     return: Fano factor
     """
 
-    spike_counts = [len(series) for series in peri_stim_spikes]
+    spike_counts = [len(series) for series in peri_event_spikes]
     # spike_counts = np.sum(psth, axis=1)  # Should give the same result
     fano = np.var(spike_counts) / np.mean(spike_counts)
-    # fano = fanofactor(peri_stim_spikes)  # With elephant
+    # fano = fanofactor(peri_event_spikes)  # With elephant
 
     return fano
 
@@ -962,8 +965,8 @@ def cluster_report(df_cluster, save=False):
     depth = cluster_info[cluster_info.cluster_id == cluster].depth.iloc[0]
     fr = cluster_info[cluster_info.cluster_id == cluster].fr.iloc[0]
 
-    peri_stim_spikes = get_peri_stim_spikes(df_cluster, df_ttl, align, time_win)
-    bins, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    peri_event_spikes = get_peri_event_spikes(df_cluster, df_ttl, align, time_win)
+    bins, psth = compute_psth(peri_event_spikes, time_win, bin_size)
     peri_stim_licks = get_peri_stim_licks(df_behavior)
     bins, licks_psth = compute_psth(peri_stim_licks)
     # bins, psth_shuffles = compute_psth_shuffles(df_cluster, n_shuffles=1, scale=2)
@@ -1113,7 +1116,7 @@ def cluster_report(df_cluster, save=False):
     # Set figure title with cluster info
     isis = plot_isi(spikes=df_cluster, ax=None)
     coeff_var = plot_cv(isis, ax=None)
-    fano = fano_factor(peri_stim_spikes)
+    fano = fano_factor(peri_event_spikes)
     fig.suptitle(f'Cluster {cluster} ({group}, {round(depth/1000, 2)} mm): '
                  f'\n'
                  f'mean FR={round(np.mean(fr), 2)}, '
@@ -1300,8 +1303,8 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
     # cluster_info.sort_values('Amplitude', ascending=False, inplace=True)
     # amplitude_clusters = cluster_info[0:len(cortex_clusters)].cluster_id
 
-    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=0)
-    bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+    peri_event_spikes = get_peri_event_spikes(df_spikes, df_ttl, time_win=time_win, scale=0)
+    bins, psth = compute_psth(peri_event_spikes, time_win=time_win, bin_size=bin_size)
     # psth = psth / df_spikes.cluster.nunique() / bin_size  # Normalize by the number of clusters and bin size
     psth_mean = np.mean(psth, axis=1)
     psth_std = np.std(psth, axis=1)
@@ -1315,8 +1318,8 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
     # elif method == 'shuffles':
     #     psth_std_shuffles = []
     #     for i in range(10):
-    #         peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win=time_win, scale=2)
-    #         bins, psth = compute_psth(peri_stim_spikes, time_win=time_win, bin_size=bin_size)
+    #         peri_event_spikes = get_peri_event_spikes(df_spikes, df_ttl, time_win=time_win, scale=2)
+    #         bins, psth = compute_psth(peri_event_spikes, time_win=time_win, bin_size=bin_size)
     #         psth = psth / df_spikes.cluster.nunique() / bin_size  # Normalize by the number of clusters and bin size
     #         psth_std_shuffles.append(np.std(psth, axis=1))
     #     psth_std_shuffles = np.array(psth_std_shuffles)
@@ -1326,7 +1329,7 @@ def get_sync(df_spikes, df_ttl, time_win=[-2, 0], bin_size=0.02, method='anal', 
     # Invariant to scaling
     elif method == "shuffles":
         psth_std_shuffles = []
-        for spike_times in peri_stim_spikes:
+        for spike_times in peri_event_spikes:
             spike_times = spike_times.values
             shuffled_spike_times = []
             for s in range(10):
@@ -1413,8 +1416,8 @@ def plot_corr_session(ax=None):
     else:
         annot = False
 
-    peri_stim_spikes = get_peri_stim_spikes(df_spikes, df_ttl, time_win)
-    _, psth = compute_psth(peri_stim_spikes, time_win, bin_size)
+    peri_event_spikes = get_peri_event_spikes(df_spikes, df_ttl, time_win)
+    _, psth = compute_psth(peri_event_spikes, time_win, bin_size)
     psth = psth / len(cluster_info)
     mfr, sfr = plot_mfr(psth, bin_size, ax=None)
     plt.close()  # Close mfr plot
