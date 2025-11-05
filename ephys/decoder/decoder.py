@@ -51,8 +51,8 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
                 df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = tuple(preprocessed)
                 bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align=align, time_win=time_win,
                                               bin_size=bin_size)
-                np.save(folder_child / 'bins.npy', bins)
-                np.save(folder_child / 'all_psth.npy', all_psth)
+                np.save(folder_child / f'bins_{align}.npy', bins)
+                np.save(folder_child / f'all_psth_{align}.npy', all_psth)
 
             except Exception as e:
                 print(f'An error occurred: {e}')
