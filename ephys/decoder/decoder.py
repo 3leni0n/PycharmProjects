@@ -504,12 +504,13 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
 
 
 @timer
-def mean_decoder(subject, what='stim', kind=None, epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+def mean_decoder(subject, what='stim', align='', kind=None, epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
                  hit_only=False, engagement=None, n_shuffles=100, plot=False, save=False):
     """
     Perform within time bin decoder across all sessions for one subject.
     :param subject: subject ID (str)
     :param what: what to decode ('stim' or 'choice')
+    :param align: alignment of neural data ('stim', 'go_cue', 'resp')
     :param kind: type of decoder (within, cross, epoch)
     :param epoch: epoch of interest (str: 'stim', 'delay', 'resp')
     :param epoch_ortho: epoch to orthogonalize against (str: 'stim', 'delay', 'resp')
@@ -549,8 +550,8 @@ def mean_decoder(subject, what='stim', kind=None, epoch=None, epoch_ortho=None, 
             print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
             path_behavior = get_behavior_id(ephys_ids[i])
             df_behavior = parse_v2(path_behavior)
-            bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-            all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
+            bins = np.load(folder_parent / ephys_ids[i] / f'bins_{align}.npy')
+            all_psth = np.load(folder_parent / ephys_ids[i] / f'all_psth_{align}.npy')
 
             if engagement is not None:  # Add engaged column to df_behavior
                 disengagement = find_disengaged(df_behavior, plot=False)  # Find trial where disengagement happens
@@ -586,20 +587,20 @@ def mean_decoder(subject, what='stim', kind=None, epoch=None, epoch_ortho=None, 
             if kind == 'within':
                 pred, pred_err, acc, acc_null = \
                     within_decoder(all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder{hit_label}{state_label}.pkl'
+                filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align} aligned).pkl'
             elif kind == 'cross':
                 pred, pred_err, acc, acc_null = \
                     cross_decoder(all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}{hit_label}{state_label}.pkl'
+                filename = f'{what}_{kind}{hit_label}{state_label}_({align} aligned).pkl'
             elif kind == 'epoch':
                 pred, pred_err, acc, acc_null = \
                     epoch_cross_decoder(bins, epoch, all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder_{epoch}{hit_label}{state_label}.pkl'
+                filename = f'{what}_{kind}_decoder_{epoch}{hit_label}{state_label}_({align} aligned).pkl'
             elif kind == 'epoch_split':
                 split = df_behavior[split_by]
                 pred, pred_err, acc, acc_null = \
                     epoch_cross_decoder_split(bins, split, epoch, all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder_{epoch}_split_by_{split_by}{hit_label}{state_label}.pkl'
+                filename = f'{what}_{kind}_decoder_{epoch}_split_by_{split_by}{hit_label}{state_label}_({align} aligned).pkl'
 
             # UNDER CONSTRUCTION (use at your own risk)
             elif kind == 'test':
