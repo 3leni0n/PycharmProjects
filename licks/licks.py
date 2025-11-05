@@ -183,7 +183,7 @@ def get_rt2(licks, df_behavior):
     return rt2
 
 
-def add_lick_data(df_behavior: pd.DataFrame) -> pd.DataFrame:
+def add_lick_data(df_behavior):
     """
     Main function to compute licks and reaction times for a given behavioral session.
     :param df_behavior: DataFrame with the behavioral data of a session

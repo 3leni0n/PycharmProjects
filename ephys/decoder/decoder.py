@@ -21,7 +21,7 @@ import traceback
 
 ########################################################################################################################
 
-def preprocess_subject(subject):
+def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
     """
     Preprocess all ephys and behavioral sessions for a given subject and save the results in a folder.
     :param subject: subject ID (str)
@@ -49,7 +49,8 @@ def preprocess_subject(subject):
                 print("'.npy' files do not exist in folder. Proceeding...")
                 preprocessed = preprocess(ephys_ids[i])
                 df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = tuple(preprocessed)
-                bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align='stim', time_win=[-1, 3], bin_size=0.1)
+                bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align=align, time_win=time_win,
+                                              bin_size=bin_size)
                 np.save(folder_child / 'bins.npy', bins)
                 np.save(folder_child / 'all_psth.npy', all_psth)
 
@@ -856,7 +857,7 @@ def plot_cross_decoder(bins, acc, acc_null, z_null=True):
     sns.despine()
 
 
-def plot_mean_cross_decoder(results, z_null=True):
+def plot_mean_cross_decoder(results, align='stim', z_null=True):
     """
     Plot the mean decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
@@ -888,43 +889,52 @@ def plot_mean_cross_decoder(results, z_null=True):
 
     plt.colorbar(label='Z-score', )
 
-    plt.axhline(0, color='tab:gray', linestyle='-')  # Stimulus
-    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus
-    plt.axhline(0.5, color='tab:gray', linestyle='--')  # Delay
-    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
-    plt.axhline(1, color='tab:gray', linestyle='-')  # Go cue
-    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+    color = 'tab:gray'
+    plt.axhline(0, color=color, linestyle='-')  # Stimulus
+    plt.axvline(0, color=color, linestyle='-')  # Stimulus
+    plt.axhline(1, color=color, linestyle='-')  # Go cue
+    plt.axvline(1, color=color, linestyle='-')  # Go cue
+    if align =='stim':
+        plt.axhline(0.5, color=color, linestyle='--')  # Delay
+        plt.axvline(0.5, color=color, linestyle='--')  # Delay
 
     # Add labeled rectangles for epoch slices
-    epochs = {
-        'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
-        'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
-        'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
-    }
+    if align == 'stim':
+        epochs = {
+            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
+            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
+            'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
+        }
+    # elif align == 'resp':
+    #     epochs = {
+    #         'stim': {'range': (-1, -0.9), 'color': 'tab:blue', 'label': 'Stimulus'},
+    #         'delay': {'range': (-0.1, 0), 'color': 'tab:orange', 'label': 'Delay'},
+    #         'resp': {'range': (0, 0.1), 'color': 'tab:green', 'label': 'Response'}
+    #     }
 
-    ax = plt.gca()
-    for name, props in epochs.items():
-        start, end = props['range']
-        color = props['color']
-        label = props['label']
+        ax = plt.gca()
+        for name, props in epochs.items():
+            start, end = props['range']
+            color = props['color']
+            label = props['label']
 
-        rect = patches.Rectangle(
-            xy=(x_min, start),
-            width=x_max - x_min,
-            height=end - start,
-            edgecolor=color,
-            facecolor='none',
-            zorder=2
-        )
-        ax.add_patch(rect)
+            rect = patches.Rectangle(
+                xy=(x_min, start),
+                width=x_max - x_min,
+                height=end - start,
+                edgecolor=color,
+                facecolor='none',
+                zorder=2
+            )
+            ax.add_patch(rect)
 
-        ax.text(
-            x=x_min,
-            y=start + 0.15,
-            s=label,
-            color=color,
-            ha='left',
-        )
+            ax.text(
+                x=x_min,
+                y=start + 0.15,
+                s=label,
+                color=color,
+                ha='left',
+            )
 
     plt.xticks(bins[::10], np.round(bins[::10], 1).astype(int))
     plt.yticks(bins[::10], np.round(bins[::10], 1).astype(int))
@@ -1426,9 +1436,12 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # folder_parent = Path.home() / 'data'
 #
 # for subj in subjects:
-#     mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
-#                      hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-#     mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
-#                      hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-#     mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
-#                      hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
+#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
+#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
+#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+#     #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+#     preprocess_subject(subj, align='resp', time_win=[-2, 2], bin_size=0.05)

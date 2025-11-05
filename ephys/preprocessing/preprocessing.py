@@ -15,7 +15,6 @@ from collections import namedtuple
 # My libraries
 from my_fun.my_fun import do_sounds_dict_inv, timer
 from parse.parse_v2 import parse_v2
-from licks.licks import add_lick_data
 
 
 def dev():
@@ -556,9 +555,7 @@ def align_ttl(df_ttl, df_behavior):
     go_cue = df_ttl.OFF + go_cue
 
     # Add RT (first lick) aligned to stimulus onset (df_ttl.OFF)
-    df_behavior = add_lick_data(df_behavior)  # Add lick data to behavior dataframe (aligned to response window start)
-    df_behavior.RT = (df_behavior.RT - 0.15).clip(lower=0)
-    rt = df_behavior.RT.values
+    rt = df_behavior.RespWinLen.values
     rt = go_cue + rt
 
     df_ttl['GoCue'] = go_cue
@@ -626,7 +623,7 @@ def preprocess(ephys_id):
     # Print session info
     y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
 
-    # Clean redundant TTLs (useful for check_data)
+    # Clean redundant TTLs (1 row/trial) for alignment with behavior data
     df_ttl = align_ttl(df_ttl, df_behavior)
 
     # Temporal alignment of ephys and behavior data (skip for now)

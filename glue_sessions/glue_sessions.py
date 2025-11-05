@@ -236,7 +236,7 @@ def glue_groups(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6']):
     df = pd.DataFrame()
 
     for exp in experiments:
-        df_groups = glue_animals(experiment=exp, update=False, to_csv=False)
+        df_groups = glue_animals(experiment=exp, path_session='glue_sessions', filter_drug=False, update=False, to_csv=False)
         df = pd.concat([df, df_groups])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 
