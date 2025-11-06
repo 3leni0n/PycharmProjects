@@ -417,7 +417,7 @@ def print_timeline(continuous, events, df_behavior, df_spikes):
     len_behavior = end_behavior - start_behavior  # Get the total behavior length
 
     print(f'The aquisition (press PLAY in Open Ephys) started at {start_aquisition} min '
-          f'and ended after {round(len_aquisition)} min '
+          f'and ended after {round(len_aquisition)} min. '
           f'It includes the time for lowering the probe.')
 
     print(f'The recording (press REC in Open Ephys) started at {round(first_timestamp)} min of acquisition '

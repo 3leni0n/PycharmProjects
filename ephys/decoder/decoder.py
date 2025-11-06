@@ -899,10 +899,10 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
     plt.colorbar(label='Z-score', )
 
     color = 'tab:gray'
-    plt.axhline(0, color=color, linestyle='-')  # Stimulus
-    plt.axvline(0, color=color, linestyle='-')  # Stimulus
-    plt.axhline(1, color=color, linestyle='-')  # Go cue
-    plt.axvline(1, color=color, linestyle='-')  # Go cue
+    plt.axhline(0, color=color, linestyle='-')  # Stimulus / First lick
+    plt.axvline(0, color=color, linestyle='-')  # Stimulus / First lick
+    plt.axhline(1, color=color, linestyle='-')  # Go cue / ITI
+    plt.axvline(1, color=color, linestyle='-')  # Go cue / ITI
     if align =='stim':
         plt.axhline(0.5, color=color, linestyle='--')  # Delay
         plt.axvline(0.5, color=color, linestyle='--')  # Delay
@@ -945,8 +945,14 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
                 ha='left',
             )
 
-    plt.xticks(bins[::10], np.round(bins[::10], 1).astype(int))
-    plt.yticks(bins[::10], np.round(bins[::10], 1).astype(int))
+    first_tick = np.ceil(bins[0])  # Round up to the nearest integer
+    last_tick = np.floor(bins[-1])  # Round down to the nearest integer
+    ticks = np.arange(first_tick, last_tick + 1, 1)  # Create ticks at every integer value
+    plt.xticks(ticks, ticks.astype(int))
+    plt.yticks(ticks, ticks.astype(int))
+
+    # plt.xticks(bins[::10], np.round(bins[::10], 1).astype(int))
+    # plt.yticks(bins[::10], np.round(bins[::10], 1).astype(int))
     plt.xlabel('Test time (s)')
     plt.ylabel('Train time (s)')
     # plt.title(f"Decoding accuracy\n"
