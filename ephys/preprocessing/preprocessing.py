@@ -66,6 +66,40 @@ def get_behavior_id(ephys_id):
     return path
 
 
+def get_ephys_sessions(subject):
+    """
+    Get the ephys sessions for a given subject by searching in both C: and D: drives.
+    :param subject: str, subject number (format: '000')
+    :return: list of ephys session folder names that match the subject number
+    """
+
+    folder_name_len = 23  # Length of the ephys sessions folder name
+
+    development = dev()
+
+    if development == 'local':
+
+        # Define the paths for ephys sessions on C: and D: drives on Ephys PC
+        C_drive = Path('C:/Users/Usuario/Documents/Open Ephys')
+        D_drive = Path(f'D:/{subject}')
+
+        # Get all folders in C: and D: (non-recursive), excluding folders that do not match the expected length
+        folders_C = [p.name for p in C_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+        folders_D = [p.name for p in D_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+
+        folders = folders_C + folders_D  # Combine the lists of folders from both drives
+
+    elif development == 'remote':
+        remote_drive = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject
+        folders = [p.name for p in remote_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
+
+    subject_folders = [f for f in folders if f.startswith(subject)]  # Filter folders that start with subject number
+    subject_folders.sort()  # Sort the subject folders
+    print(subject_folders, '\n')  # Print the sorted subject folders
+
+    return subject_folders
+
+
 def load_oe_data(directory, sync=True, stream='AP'):
     """
     Load raw Open Ephys data
@@ -382,25 +416,25 @@ def print_timeline(continuous, events, df_behavior, df_spikes):
     end_behavior = df_behavior['TrialEnd'].iloc[-1] / 60  # Get the last trial end
     len_behavior = end_behavior - start_behavior  # Get the total behavior length
 
-    print(f'The aquisition (press PLAY in Open Ephys) started at {start_aquisition} min. '
-          f'and ended after {round(len_aquisition)} min. '
-          f'It includes the time for lowering the probe')
+    print(f'The aquisition (press PLAY in Open Ephys) started at {start_aquisition} min '
+          f'and ended after {round(len_aquisition)} min '
+          f'It includes the time for lowering the probe.')
 
-    print(f'The recording (press REC in Open Ephys) started at {round(first_timestamp)} min. of acquisition '
-          f'and ended at {round(len_aquisition)} min. of acquisition, '
-          f'lasting {round(len_recording)} min. '
-          f'It includes the time for settling the tissue')
+    print(f'The recording (press REC in Open Ephys) started at {round(first_timestamp)} min of acquisition '
+          f'and ended at {round(len_aquisition)} min of acquisition, '
+          f'lasting {round(len_recording)} min '
+          f'It includes the time for settling the tissue.')
 
-    print(f'The first event happened at {round(first_event)} min. of acquisition '
-          f'({round((first_event - first_timestamp))} min. after recording started) '
-          f'and the last event happened at {round(last_event)} min. of acquisition '
-          f'({round((last_event - first_timestamp))} min. after recording started), '
+    print(f'The first event happened at {round(first_event)} min of acquisition '
+          f'({round((first_event - first_timestamp))} min after recording started) '
+          f'and the last event happened at {round(last_event)} min of acquisition '
+          f'({round((last_event - first_timestamp))} min after recording started), '
           f'lasting {round(len_events)} min.')
 
     print(f'The behavior lasted {round(len_behavior)} min.')
 
-    print(f'The first spike was recorded at {round(first_spike) + round(first_timestamp)} min. of acquisition '
-          f'and the last spike was recorded at {round(last_spike) + round(first_timestamp)} min. of acquisition, '
+    print(f'The first spike was recorded at {round(first_spike) + round(first_timestamp)} min of acquisition '
+          f'and the last spike was recorded at {round(last_spike) + round(first_timestamp)} min of acquisition, '
           f'lasting {round(len_spikes)} min.')
 
     # Check if the length of the behavioral session from behavioral and ephys data match

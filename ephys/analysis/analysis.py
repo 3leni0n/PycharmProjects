@@ -55,39 +55,6 @@ from ephys.preprocessing import *
 
 # Define helper functions
 
-def get_ephys_sessions(subject):
-    """
-    Get the ephys sessions for a given subject by searching in both C: and D: drives.
-    :param subject: str, subject number (format: '000')
-    :return: list of ephys session folder names that match the subject number
-    """
-
-    folder_name_len = 23  # Length of the ephys sessions folder name
-
-    development = dev()
-
-    if development == 'local':
-
-        # Define the paths for ephys sessions on C: and D: drives on Ephys PC
-        C_drive = Path('C:/Users/Usuario/Documents/Open Ephys')
-        D_drive = Path(f'D:/{subject}')
-
-        # Get all folders in C: and D: (non-recursive), excluding folders that do not match the expected length
-        folders_C = [p.name for p in C_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
-        folders_D = [p.name for p in D_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
-
-        folders = folders_C + folders_D  # Combine the lists of folders from both drives
-
-    elif development == 'remote':
-        remote_drive = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject
-        folders = [p.name for p in remote_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
-
-    subject_folders = [f for f in folders if f.startswith(subject)]  # Filter folders that start with subject number
-    subject_folders.sort()  # Sort the subject folders
-    print(subject_folders, '\n')  # Print the sorted subject folders
-
-    return subject_folders
-
 
 def get_trial_indexes(df_behavior, condition='outcome'):
     """

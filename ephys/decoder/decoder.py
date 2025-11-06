@@ -506,7 +506,7 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
 
 
 @timer
-def mean_decoder(subject, what='stim', align='', kind=None, epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
                  hit_only=False, engagement=None, n_shuffles=100, plot=False, save=False):
     """
     Perform within time bin decoder across all sessions for one subject.
@@ -543,17 +543,24 @@ def mean_decoder(subject, what='stim', align='', kind=None, epoch=None, epoch_or
 
     folder_parent = Path.home() / 'data' / subject
     ephys_ids = get_ephys_sessions(subject)
-    error_sessions = preprocess_subject(subject)
-    ephys_ids = [id for id in ephys_ids if id not in error_sessions]
+    # error_sessions = preprocess_subject(subject)
+    # ephys_ids = [id for id in ephys_ids if id not in error_sessions]
+
+    error_sessions = []
 
     for i in range(len(ephys_ids)):
 
+        folder_child = folder_parent / ephys_ids[i]
+
         try:
             print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
-            path_behavior = get_behavior_id(ephys_ids[i])
-            df_behavior = parse_v2(path_behavior)
-            bins = np.load(folder_parent / ephys_ids[i] / f'bins_{align}.npy')
-            all_psth = np.load(folder_parent / ephys_ids[i] / f'all_psth_{align}.npy')
+            # path_behavior = get_behavior_id(ephys_ids[i])
+            # df_behavior = parse_v2(path_behavior)
+            filename_behavior = [f for f in os.listdir(folder_child) if f.endswith('.csv')][0]  # Assume only one .csv file
+            path_behavior = folder_child / filename_behavior
+            df_behavior = pd.read_csv(path_behavior)
+            bins = np.load(folder_child / f'bins_{align}.npy')
+            all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
             if engagement is not None:  # Add engaged column to df_behavior
                 disengagement = find_disengaged(df_behavior, plot=False)  # Find trial where disengagement happens
@@ -625,6 +632,7 @@ def mean_decoder(subject, what='stim', align='', kind=None, epoch=None, epoch_or
 
         except Exception as e:
             print(f'An error occurred in session {ephys_ids[i]}: {e}')
+            error_sessions.append(ephys_ids[i])
             traceback.print_exc()
             continue
 
@@ -1437,26 +1445,29 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # folder_parent = Path.home() / 'data'
 #
 # for subj in subjects:
+#     # Epoch split decoders
 #     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
 #     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
 #     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
 #     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
 #     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
 #     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#
+#     # X decoder
 #     mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
 #                  hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-#     # preprocess_subject(subj, align='resp', time_win=[-2, 2], bin_size=0.05)
+#     # preprocess_subject(subj)
 
 
 # Paralelization test
 
-subjects = ['000', '007', '009']
-folder_parent = Path.home() / 'data'
-
-def run_fun(subj):
-    # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None,
-    #              split_by=None, drop_miss=True, hit_only=True, engagement=1, n_shuffles=100,
-    #              plot=False, save=True)
-    preprocess_subject(subj, align='stim', time_win=[-1, 3], bin_size=0.1)
-
-Parallel(n_jobs=-1)(delayed(run_fun)(subj) for subj in subjects)
+# subjects = ['000', '007', '009']
+# folder_parent = Path.home() / 'data'
+#
+# def run_fun(subj):
+#     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None,
+#     #              split_by=None, drop_miss=True, hit_only=True, engagement=1, n_shuffles=100,
+#     #              plot=False, save=True)
+#     preprocess_subject(subj, align='stim', time_win=[-1, 3], bin_size=0.1)
+#
+# Parallel(n_jobs=-1)(delayed(run_fun)(subj) for subj in subjects)
