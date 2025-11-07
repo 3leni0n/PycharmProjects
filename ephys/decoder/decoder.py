@@ -327,6 +327,8 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)  # Stratified cross-validation
 
     # Define epoch of interest
+
+    # Align to stimulus onset
     if epoch == 'stim':
         epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]  # Find index where stim_onset (0) is
         epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]  # Find index where delay (0.5) is
@@ -336,6 +338,14 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
     elif epoch == 'resp':
         epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]  # Find index where go cue is in bins
         epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
+
+    # Align to first lick
+    elif epoch == 'first_lick':
+        epoch_start_idx = np.where(np.round(bins, 2) == -0.05)[0][0]  # Find index where first lick is in bins
+        epoch_end_idx = np.where(np.round(bins, 2) == 0)[0][0]  # Find index where first lick is in bins
+    elif epoch == 'mid_lick':
+        epoch_start_idx = np.where(np.round(bins, 2) == 0.5)[0][0]  # Find index where first lick is in bins
+        epoch_end_idx = np.where(np.round(bins, 2) == 0.55)[0][0]  # Find index where first lick is in bins
     else:
         raise ValueError("Epoch must be 'stim', 'delay', or 'resp'.")
 
@@ -511,7 +521,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
     """
     Perform within time bin decoder across all sessions for one subject.
     :param subject: subject ID (str)
-    :param what: what to decode ('stim' or 'choice')
+    :param what: what to decode ('stim' or 'choice'). If correct trials only, they are the same ('choice'='stim')
     :param align: alignment of neural data ('stim', 'go_cue', 'resp')
     :param kind: type of decoder (within, cross, epoch)
     :param epoch: epoch of interest (str: 'stim', 'delay', 'resp')
@@ -531,7 +541,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
     elif what == 'choice':
         col = 'Choice'
     else:
-        raise ValueError("'what' must be 'stim' or 'choice'.")
+        raise ValueError("'what' (to decode) must be 'stim' or 'choice'.")
 
     results = {
         'pred': [],
@@ -1015,6 +1025,12 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, errorbar
     elif epoch == 'resp':
         color = 'tab:green'
         label = 'Response'
+    elif epoch == 'first_lick':
+        color = 'darkgreen'
+        label = 'First lick'
+    elif epoch == 'mid_lick':
+        color = 'lightgreen'
+        label = 'Mid lick'
 
     if engagement is not None:
         if engagement == 0:
@@ -1451,18 +1467,24 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # folder_parent = Path.home() / 'data'
 #
 # for subj in subjects:
-#     # Epoch split decoders
-#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
-#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
-#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
-#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # preprocess_subject(subj)
 #
 #     # X decoder
-#     mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-#                  hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-#     # preprocess_subject(subj)
+#     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+#     #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+#
+#     # Epoch decoders (align to first lick)
+#     mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
+#                  drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+
+    # Epoch split decoders
+    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
+    #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
+    #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
+    #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+
 
 
 # Paralelization test
