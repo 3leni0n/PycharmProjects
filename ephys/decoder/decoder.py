@@ -161,10 +161,10 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
 @timer
 def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
-    Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
-    cross-validation across trials and across time bins.
+    Perform logistic regression-based decoding of a binary condition from neural data using K-fold cross-validation.
+    Train and test within the same time bin.
     :param X: 3D array with neural data (trials x time x neurons)
-    :param y: 1D array with binary stimulus condition
+    :param y: 1D array with binary condition
     :return: pred, pred_err (predicted condition and prediction error)
     """
 
@@ -229,8 +229,8 @@ def within_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
 @timer
 def cross_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
-    Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
-    cross-validation across trials and across time bins.
+    Perform logistic regression-based decoding of a binary condition from neural data using K-fold cross-validation.
+    Train in one bin and test in the rest, for each time bin.
     :param X: 3D array with neural data (trials x time x neurons)
     :param y: 1D array with binary stimulus condition
     :return: pred, pred_err (predicted condition and prediction error)
@@ -300,8 +300,9 @@ def cross_decoder(X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
 @timer
 def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
-    Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
-    cross-validation across trials and across time bins.
+    Perform logistic regression-based decoding of a binary condition from neural data using K-fold cross-validation.
+    Train in one bin and test in the rest, for one epoch (one bin or the mean of a few). Akin of takin a slice of the
+    cross-decoder matrix.
     :param bins: 1D array with time bins
     :param epoch: epoch of interest (str: 'stim', 'delay', 'resp')
     :param X: 3D array with neural data (trials x time x neurons)
@@ -401,10 +402,12 @@ def epoch_cross_decoder(bins, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 
 @timer
 def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
     """
-    Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
-    cross-validation across trials and across time bins.
+    Perform logistic regression-based decoding of a binary condition from neural data using K-fold cross-validation.
+    Train in one bin and test in the rest, for one epoch (one bin or the mean of a few). Akin of takin a slice of the
+    cross-decoder matrix.
+    Train in all trials and test separately for each condition.
     :param X: 3D array with neural data (trials x time x neurons)
-    :param y: 1D array with binary stimulus condition
+    :param y: 1D array with binary condition
     :return: pred, pred_err (predicted condition and prediction error)
     """
 
@@ -442,6 +445,132 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=
 
         test_idx0 = split.loc[split.index.isin(test_index) & (split == 0)].index
         test_idx1 = split.loc[split.index.isin(test_index) & (split == 1)].index
+
+        # Train decoder (logistic regression) on the current time bin’s neural activity
+        clf = LogisticRegression(class_weight='balanced')  # Handle imbalanced classes (bias)
+        clf.fit(X_train, y_train)
+
+        # Loop over each time bin_train
+        for bin_test in range(n_bins):
+
+            # Define train and testing set for the current time bin_train and fold
+            X_test0 = X[test_idx0, bin_test]
+            X_test1 = X[test_idx1, bin_test]
+            y_test0 = y[test_idx0]
+            y_test1 = y[test_idx1]
+
+            X_test0 = scaler.transform(X_test0)  # Only transform the test set using the same scaler
+            X_test1 = scaler.transform(X_test1)  # Only transform the test set using the same scaler
+
+            # Evaluate decoder
+            y_pred0 = clf.predict(X_test0)  # Predicts the stimulus category for test trials
+            # y_acc0 = accuracy_score(y_test0, y_pred0)  # Computes accuracy for each fold & time bin_train
+            y_acc0 = (y_pred0 == y_test0).astype(int)  # Computes accuracy per trial
+            # print(f"Accuracy: {y_acc0:.2f}")
+            y_pred1 = clf.predict(X_test1)  # Predicts the stimulus category for test trials
+            # y_acc1 = accuracy_score(y_test1, y_pred1)  # Computes accuracy for each fold & time bin_train
+            y_acc1 = (y_pred1 == y_test1).astype(int)  # Computes accuracy per trial
+            # print(f"Accuracy: {y_acc1:.2f}")
+
+            # Store results
+            pred[0][test_idx0, bin_test] = y_pred0  # Predicted stimulus condition for each test trial at each time bin
+            pred_err[0][test_idx0, bin_test] = y_pred0 - y_test0  # Difference between predicted and actual labels
+            # acc0[k, bin_test] = y_acc0  # Accuracy for each test trial at each time bin
+            acc[0][test_idx0, bin_test] = y_acc0  # Accuracy per trial
+            pred[1][test_idx1, bin_test] = y_pred1  # Predicted stimulus condition for each test trial at each time bin
+            pred_err[1][test_idx1, bin_test] = y_pred1 - y_test1  # Difference between predicted and actual labels
+            # acc1[k, bin_test] = y_acc1  # Accuracy for each test trial at each time bin
+            acc[1][test_idx1, bin_test] = y_acc1  # Accuracy per trial
+
+            # Compute null distribution by shuffling the labels and evaluating accuracy
+            y_test_shuffled0 = y_test0.values.copy()
+            y_test_shuffled1 = y_test1.values.copy()
+            for _ in range(n_shuffles):
+                # np.random.shuffle(y_test_shuffled0)
+                # # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
+                # acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
+                # # shuffled labels
+                # # pred_err_temp.append(y_pred - y_test_shuffled)
+                # # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
+                # # actual labels
+                #
+                # np.random.shuffle(y_test_shuffled1)
+                # # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
+                # acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
+                # # shuffled labels
+                # # pred_err_temp.append(y_pred - y_test_shuffled)
+                # # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
+                # # actual labels
+
+                # TEST FOR NON FLAT SHUFFLES
+                y_train_shuffled = np.random.permutation(y_train)
+                clf_null = LogisticRegression(class_weight='balanced')
+                clf_null.fit(X_train, y_train_shuffled)
+
+                # Predict on the same test sets
+                y_pred0_null = clf_null.predict(X_test0)
+                y_pred1_null = clf_null.predict(X_test1)
+
+                # Compute per-trial accuracy
+                acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
+                acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
+
+    return pred, pred_err, acc, acc_null
+
+
+@timer
+def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
+    """
+    Perform logistic regression-based decoding of a binary condition from neural data using K-fold cross-validation.
+    Train in one bin and test in the rest, for one epoch (one bin or the mean of a few). Akin of takin a slice of the
+    cross-decoder matrix.
+    Train in one condition and test in that condition (cross-validation) and in the other condition (generalization).
+    :param X: 3D array with neural data (trials x time x neurons)
+    :param y: 1D array with binary condition
+    :return: pred, pred_err (predicted condition and prediction error)
+    """
+
+    # Initialize arrays
+    n_trials, n_bins, n_neurons = X.shape
+    pred = [np.empty((n_trials, n_bins)) * np.nan, np.empty((n_trials, n_bins)) * np.nan]
+    pred_err = [np.empty((n_trials, n_bins)) * np.nan, np.empty((n_trials, n_bins)) * np.nan]
+    acc = [np.empty((n_trials, n_bins)) * np.nan, np.empty((n_trials, n_bins)) * np.nan]
+    acc_null = [np.empty((n_trials, n_bins, n_shuffles)) * np.nan, np.empty((n_trials, n_bins, n_shuffles)) * np.nan]
+
+    # Apply z-scoring normalization across neurons and time bins (per trial)
+    scaler = StandardScaler()
+
+    # Cross-validate results
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    # Define epoch of interest
+    if epoch == 'stim':  # Find index where stim_onset (0-0.5) is
+        epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]
+        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]
+    elif epoch == 'delay':  # Find index where delay (0.5-1) is
+        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]
+        epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]
+    elif epoch == 'resp':  # Find index where go cue (1-2) is
+        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]
+        epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]
+
+    index1 = np.where(split == 1)[0]  # Indices of correct/engaged trials
+    index0 = np.where(split == 0)[0]  # Indices of error/disengaged trials (never used for training)
+
+    # Split trials into training and testing sets (each fold gets a unique test set to prevent over-fitting)
+    for k, (train_index, test_index) in enumerate(skf.split(X[index1], y[index1])):
+
+        # Cross thingy happens here
+        train_index = index1[train_index]  # Map indices back to full dataset
+        test_idx1 = index1[test_index]  # Correct/engaged trials for testing
+        test_idx0 = index0  # Use all error/disengaged trials for testing
+
+        X_train = np.mean(X[train_index, epoch_start_idx:epoch_end_idx], axis=1)
+        y_train = y[train_index]
+        X_train = scaler.fit_transform(X_train)  # Fit and transform on the training set
+
+        # test_idx0 = split.loc[split.index.isin(test_index) & (split == 0)].index
+        # test_idx1 = split.loc[split.index.isin(test_index) & (split == 1)].index
 
         # Train decoder (logistic regression) on the current time bin’s neural activity
         clf = LogisticRegression(class_weight='balanced')  # Handle imbalanced classes (bias)
@@ -572,7 +701,9 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             bins = np.load(folder_child / f'bins_{align}.npy')
             all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
+            state_label = ''
             if engagement is not None:  # Add engaged column to df_behavior
+            # if engagement is None:  # Add engaged column to df_behavior
                 disengagement = find_disengaged(df_behavior, plot=False)  # Find trial where disengagement happens
                 engaged = (df_behavior.Trial <= disengagement).astype(int)  # Label trials as engaged/disengaged
                 df_behavior['Engaged'] = engaged
@@ -583,8 +714,8 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                     df_behavior = df_behavior[df_behavior.Engaged == 1].reset_index(drop=True)
                     state_label = '_engaged'
                 all_psth = all_psth[df_behavior.index.values]  # Filter by engagement
-            else:
-                state_label = ''
+            # else:
+            #     state_label = ''
 
             # Filter trials
             # Remove misses (default)
@@ -620,13 +751,13 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                 pred, pred_err, acc, acc_null = \
                     epoch_cross_decoder_split(bins, split, epoch, all_psth, df_behavior[col], n_shuffles)
                 filename = f'{what}_{kind}_decoder_{epoch}_split_by_{split_by}{hit_label}{state_label}_({align} aligned).pkl'
-
-            # UNDER CONSTRUCTION (use at your own risk)
-            elif kind == 'test':
+            elif kind == 'epoch_generalize':
                 split = df_behavior[split_by]
                 pred, pred_err, acc, acc_null = \
-                    epoch_cross_decoder_split_TEST(bins, split, epoch, all_psth, df_behavior[col], n_shuffles)
-                filename = f'TEST.pkl'
+                    epoch_cross_decoder_generalize(bins, split, epoch, all_psth, df_behavior[col], n_shuffles)
+                filename = f'{what}_{kind}_decoder_{epoch}_generalize_{split_by}{hit_label}{state_label}_({align} aligned).pkl'
+
+            # Under construction (use at your own risk)
             elif kind == 'epoch_ortho':
                 pred, pred_err, acc, acc_null = \
                     epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior[col], n_shuffles)
@@ -649,9 +780,9 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
     # Plot decoding accuracy for each session
     if plot:
         if kind == 'within':
-            plot_within_decoder(bins, results['acc'][i], results['acc_null'][i], z_null=True)
+            pass
         elif kind == 'cross':
-            plot_cross_decoder(bins, acc, acc_null, z_null=True)
+            pass
         elif kind == 'epoch':
             pass
         elif kind == 'epoch_split':
@@ -883,7 +1014,7 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
     :return:
     """
 
-    plt.figure(constrained_layout=True)
+    # plt.figure(constrained_layout=True)
 
     # Compute the mean accuracy across all sessions
     acc_mean = [results['acc'][i].mean(axis=0) for i in range(len(results['acc']))]
@@ -920,9 +1051,9 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
     # Add labeled rectangles for epoch slices
     if align == 'stim':
         epochs = {
-            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
-            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
-            'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
+            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'S'},
+            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'D'},
+            'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'R'}
         }
     # elif align == 'resp':
     #     epochs = {
@@ -1130,17 +1261,16 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
         acc1_band_label = 'Acc1. SEM'
         acc_null1_band_label = 'Acc1. null SEM'
 
-    plt.figure(constrained_layout=True)
+    # Flip it to make it easier to compare
+    chance = 0.5
+    acc0_mean = chance + (chance - acc0_mean)
+    acc0_band = (chance + (chance - acc0_band[0]), chance + (chance - acc0_band[1]))
+    acc_null0_mean = chance + (chance - acc_null0_mean)
+    acc_null0_band = (chance + (chance - acc_null0_band[0]), chance + (chance - acc_null0_band[1]))
 
     if split == 'hit':
         colors = ('tab:red', 'tab:green')
         labels = ('Error', 'Correct')
-        # Flip it to make it easier to compare
-        if epoch == 'delay' or epoch == 'resp':
-            acc0_mean = 1 - acc0_mean
-            acc0_band = (1 - acc0_band[0], 1 - acc0_band[1])
-            acc_null0_mean = 1 - acc_null0_mean
-            acc_null0_band = (1 - acc_null0_band[0], 1 - acc_null0_band[1])
     elif split == 'engagement':
         if epoch == 'stim':
             colors = ('tab:gray', 'tab:blue')
@@ -1150,22 +1280,33 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
             colors = ('tab:gray', 'tab:green')
         labels = ('Disengaged', 'Engaged')
 
+    # plt.figure(constrained_layout=True)
+
+    bins = results['bins']
+    bin_centers = (bins[:-1] + bins[1:]) / 2
+
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
+    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+
     # Condition 0 (error/disengaged)
-    plt.plot(results['bins'][:-1], acc0_mean, color=colors[0], label=labels[0])
-    plt.fill_between(results['bins'][:-1], acc0_band[0], acc0_band[1], color=colors[0],
+    plt.plot(bin_centers, acc0_mean, color=colors[0], label=labels[0])
+    plt.fill_between(bin_centers, acc0_band[0], acc0_band[1], color=colors[0],
                      edgecolor='none', alpha=0.25)
-    plt.plot(results['bins'][:-1], acc_null0_mean, color=colors[0], linestyle='--')
-    # plt.fill_between(results['bins'][:-1], acc_null0_band[0], acc_null0_band[1], color=colors[0], edgecolor='none',
+    plt.plot(bin_centers, acc_null0_mean, color=colors[0], linestyle='--')
+    # plt.fill_between(bin_centers, acc_null0_band[0], acc_null0_band[1], color=colors[0], edgecolor='none',
     #                  alpha=0.25)
 
     # Condition 1 (correct/engaged). Negative to flip it and make it easier to compare
-    plt.plot(results['bins'][:-1], acc1_mean, color=colors[1], label=labels[1])
-    plt.fill_between(results['bins'][:-1], acc1_band[0], acc1_band[1], color=colors[1],
+    plt.plot(bin_centers, acc1_mean, color=colors[1], label=labels[1])
+    plt.fill_between(bin_centers, acc1_band[0], acc1_band[1], color=colors[1],
                      edgecolor='none', alpha=0.25)
-    plt.plot(results['bins'][:-1], acc_null1_mean, color=colors[1], linestyle='--')
-    # plt.fill_between(results['bins'][:-1], acc_null1_band[0], acc_null1_band[1], color='tab:green', edgecolor='none',
+    plt.plot(bin_centers, acc_null1_mean, color=colors[1], linestyle='--')
+    # plt.fill_between(bin_centers, acc_null1_band[0], acc_null1_band[1], color='tab:green', edgecolor='none',
     #                     alpha=0.25)
 
+    plt.xlim(bins[0], bins[-1])
+    # plt.ylim(None, 1)
     plt.xlabel('Time (s)')
     plt.ylabel('Accuracy')
     plt.legend(frameon=False)
@@ -1177,118 +1318,6 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
 # Please wear safety equipment. Any resemblance to real cool effects might be purely acidental. I do not take
 # responsibility for any damage caused by the use of this code. Use at your own risk.
 ########################################################################################################################
-
-
-# Testing split according to engagement
-@timer
-def epoch_cross_decoder_split_TEST(bins, split, epoch=None, X=np.zeros((1, 1, 1)), y=np.zeros((1, 1)), n_shuffles=100):
-    """
-    Perform logistic regression-based decoding of a binary stimulus condition from neural data using K-fold
-    cross-validation across trials and across time bins.
-    :param X: 3D array with neural data (trials x time x neurons)
-    :param y: 1D array with binary stimulus condition
-    :return: pred, pred_err (predicted condition and prediction error)
-    """
-
-    # Initialize arrays
-    n_trials, n_bins, n_neurons = X.shape
-    pred = [np.empty((n_trials, n_bins)) * np.nan, np.empty((n_trials, n_bins)) * np.nan]
-    pred_err = [np.empty((n_trials, n_bins)) * np.nan, np.empty((n_trials, n_bins)) * np.nan]
-    acc = [np.empty((n_trials, n_bins)) * np.nan, np.empty((n_trials, n_bins)) * np.nan]
-    acc_null = [np.empty((n_trials, n_bins, n_shuffles)) * np.nan, np.empty((n_trials, n_bins, n_shuffles)) * np.nan]
-
-    # Apply z-scoring normalization across neurons and time bins (per trial)
-    scaler = StandardScaler()
-
-    # Cross-validate results
-    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-
-    # Define epoch of interest
-    if epoch == 'stim':  # Find index where stim_onset (0-0.5) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]
-    elif epoch == 'delay':  # Find index where delay (0.5-1) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]
-    elif epoch == 'resp':  # Find index where go cue (1-2) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]
-
-    index1 = np.where(split == 1)[0]  # Indices of correct/engaged trials
-    index0 = np.where(split == 0)[0]  # Indices of error/disengaged trials (never used for training)
-
-    # Split trials into training and testing sets (each fold gets a unique test set to prevent over-fitting)
-    for k, (train_index, test_index) in enumerate(skf.split(X[index1], y[index1])):
-
-        # Cross thingy happens here
-        train_index = index1[train_index]  # Map indices back to full dataset
-        test_idx1 = index1[test_index]  # Correct/engaged trials for testing
-        test_idx0 = index0  # Use all error/disengaged trials for testing
-
-        X_train = np.mean(X[train_index, epoch_start_idx:epoch_end_idx], axis=1)
-        y_train = y[train_index]
-        X_train = scaler.fit_transform(X_train)  # Fit and transform on the training set
-
-        # test_idx0 = split.loc[split.index.isin(test_index) & (split == 0)].index
-        # test_idx1 = split.loc[split.index.isin(test_index) & (split == 1)].index
-
-        # Train decoder (logistic regression) on the current time bin’s neural activity
-        clf = LogisticRegression()
-        clf.fit(X_train, y_train)
-
-        # Loop over each time bin_train
-        for bin_test in range(n_bins):
-
-            # Define train and testing set for the current time bin_train and fold
-            X_test0 = X[test_idx0, bin_test]
-            X_test1 = X[test_idx1, bin_test]
-            y_test0 = y[test_idx0]
-            y_test1 = y[test_idx1]
-
-            X_test0 = scaler.transform(X_test0)  # Only transform the test set using the same scaler
-            X_test1 = scaler.transform(X_test1)  # Only transform the test set using the same scaler
-
-            # Evaluate decoder
-            y_pred0 = clf.predict(X_test0)  # Predicts the stimulus category for test trials
-            # y_acc0 = accuracy_score(y_test0, y_pred0)  # Computes accuracy for each fold & time bin_train
-            y_acc0 = (y_pred0 == y_test0).astype(int)  # Computes accuracy per trial
-            # print(f"Accuracy: {y_acc0:.2f}")
-            y_pred1 = clf.predict(X_test1)  # Predicts the stimulus category for test trials
-            # y_acc1 = accuracy_score(y_test1, y_pred1)  # Computes accuracy for each fold & time bin_train
-            y_acc1 = (y_pred1 == y_test1).astype(int)  # Computes accuracy per trial
-            # print(f"Accuracy: {y_acc1:.2f}")
-
-            # Store results
-            pred[0][test_idx0, bin_test] = y_pred0  # Predicted stimulus condition for each test trial at each time bin
-            pred_err[0][test_idx0, bin_test] = y_pred0 - y_test0  # Difference between predicted and actual labels
-            # acc0[k, bin_test] = y_acc0  # Accuracy for each test trial at each time bin
-            acc[0][test_idx0, bin_test] = y_acc0  # Accuracy per trial
-            pred[1][test_idx1, bin_test] = y_pred1  # Predicted stimulus condition for each test trial at each time bin
-            pred_err[1][test_idx1, bin_test] = y_pred1 - y_test1  # Difference between predicted and actual labels
-            # acc1[k, bin_test] = y_acc1  # Accuracy for each test trial at each time bin
-            acc[1][test_idx1, bin_test] = y_acc1  # Accuracy per trial
-
-            # Compute null distribution by shuffling the labels and evaluating accuracy
-            y_test_shuffled0 = y_test0.values.copy()
-            y_test_shuffled1 = y_test1.values.copy()
-            for _ in range(n_shuffles):
-                np.random.shuffle(y_test_shuffled0)
-                # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
-                acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
-                # shuffled labels
-                # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
-                # actual labels
-
-                np.random.shuffle(y_test_shuffled1)
-                # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
-                acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
-                # shuffled labels
-                # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
-                # actual labels
-
-    return pred, pred_err, acc, acc_null#, pred_err_null0, pred_err_null1
 
 # Testing split according to engagement
 # i = 0
@@ -1463,39 +1492,43 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # print(f'Trial total time: {total}s')
 
 
-# subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
-# folder_parent = Path.home() / 'data'
-#
-# for subj in subjects:
-#     # preprocess_subject(subj)
-#
-#     # X decoder
-#     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-#     #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-#
-#     # Epoch decoders (align to first lick)
-#     mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
-#                  drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
+folder_parent = Path.home() / 'data'
 
-    # Epoch split decoders
-    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
+for subj in subjects:
+    # preprocess_subject(subj)
+
+    # X decoder
+    # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+    #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+
+    # Epoch decoders (align to first lick)
+    # mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
+    #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+
+    # Split by outcome
+    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
+    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
+    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
 
+    # Split by engagement
+    mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+                     hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+    mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+                     hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+    mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+                     hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
 
 
 # Paralelization test
-
 # subjects = ['000', '007', '009']
 # folder_parent = Path.home() / 'data'
-#
 # def run_fun(subj):
 #     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None,
 #     #              split_by=None, drop_miss=True, hit_only=True, engagement=1, n_shuffles=100,
 #     #              plot=False, save=True)
 #     preprocess_subject(subj, align='stim', time_win=[-1, 3], bin_size=0.1)
-#
 # Parallel(n_jobs=-1)(delayed(run_fun)(subj) for subj in subjects)

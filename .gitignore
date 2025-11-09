@@ -209,6 +209,7 @@ fabric.properties
 
 # MacOS DS_Store
 .DS_Store
+._*
 
 # Figures
 #*.png
