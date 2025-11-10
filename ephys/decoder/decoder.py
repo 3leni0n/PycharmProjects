@@ -201,10 +201,10 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
 
     # Initialize arrays
     n_trials, n_bins, n_neurons = X.shape
-    pred = np.empty((n_trials, n_bins))
-    pred_err = np.empty((n_trials, n_bins))
-    acc = np.empty((n_trials, n_bins))
-    acc_null = np.empty((n_shuffles, n_bins))
+    pred = np.full((n_trials, n_bins), np.nan)
+    pred_err = np.full((n_trials, n_bins), np.nan)
+    acc = np.full((n_trials, n_bins), np.nan)
+    acc_null = np.full((n_shuffles, n_bins), np.nan)
 
     # Cross-validate results
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)  # Stratified cross-validation
@@ -269,10 +269,10 @@ def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
 
     # Initialize arrays
     n_trials, n_bins, n_neurons = X.shape
-    pred = np.empty((n_trials, n_bins, n_bins))
-    pred_err = np.empty((n_trials, n_bins, n_bins))
-    acc = np.empty((n_trials, n_bins, n_bins))
-    acc_null = np.empty((n_shuffles, n_bins, n_bins))
+    pred = np.full((n_trials, n_bins, n_bins), np.nan)
+    pred_err = np.full((n_trials, n_bins, n_bins), np.nan)
+    acc = np.full((n_trials, n_bins, n_bins), np.nan)
+    acc_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -344,10 +344,10 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
 
     # Initialize arrays
     n_trials, n_bins, n_neurons = X.shape
-    pred = np.empty((n_trials, n_bins))
-    pred_err = np.empty((n_trials, n_bins))
-    acc = np.empty((n_trials, n_bins))
-    acc_null = np.empty((n_trials, n_bins, n_shuffles))
+    pred = np.full((n_trials, n_bins), np.nan)
+    pred_err = np.full((n_trials, n_bins), np.nan)
+    acc = np.full((n_trials, n_bins), np.nan)
+    acc_null = np.full((n_trials, n_bins, n_shuffles), np.nan)
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -442,10 +442,10 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
 
     # Initialize arrays
     n_trials, n_bins, n_neurons = X.shape
-    pred = [np.empty((n_trials, n_bins)), np.empty((n_trials, n_bins))]
-    pred_err = [np.empty((n_trials, n_bins)), np.empty((n_trials, n_bins))]
-    acc = [np.empty((n_trials, n_bins)), np.empty((n_trials, n_bins))]
-    acc_null = [np.empty((n_trials, n_bins, n_shuffles)), np.empty((n_trials, n_bins, n_shuffles))]
+    pred = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    pred_err = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    acc = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    acc_null = [np.full((n_trials, n_bins, n_shuffles), np.nan), np.full((n_trials, n_bins, n_shuffles), np.nan)]
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -561,10 +561,10 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
 
     # Initialize arrays
     n_trials, n_bins, n_neurons = X.shape
-    pred = [np.empty((n_trials, n_bins)), np.empty((n_trials, n_bins))]
-    pred_err = [np.empty((n_trials, n_bins)), np.empty((n_trials, n_bins))]
-    acc = [np.empty((n_trials, n_bins)), np.empty((n_trials, n_bins))]
-    acc_null = [np.empty((n_trials, n_bins, n_shuffles)), np.empty((n_trials, n_bins, n_shuffles))]
+    pred = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    pred_err = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    acc = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    acc_null = [np.full((n_trials, n_bins, n_shuffles), np.nan), np.full((n_trials, n_bins, n_shuffles), np.nan)]
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -732,8 +732,8 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
             state_label = ''
-            if engagement is not None:  # Add engaged column to df_behavior
-            # if engagement is None:  # Add engaged column to df_behavior
+            # if engagement is not None:  # Add engaged column to df_behavior
+            if engagement is None:  # Add engaged column to df_behavior
                 disengagement = find_disengaged(df_behavior, plot=False)  # Find trial where disengagement happens
                 engaged = (df_behavior.Trial <= disengagement).astype(int)  # Label trials as engaged/disengaged
                 df_behavior['Engaged'] = engaged
@@ -1303,11 +1303,11 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
         colors = ('tab:red', 'tab:green')
         labels = ('Error', 'Correct')
         # If decoding stimulus, flip errors to make it easier to compare (only if decoding stimulus)
-        if epoch in ['delay', 'resp']:
-            chance = acc_null0_mean
-            acc0_mean = chance + (chance - acc0_mean)
-            acc0_band = (chance + (chance - acc0_band[1]), chance + (chance - acc0_band[0]))
-            acc_null0_band = (chance + (chance - acc_null0_band[1]), chance + (chance - acc_null0_band[0]))
+        # if epoch in ['delay', 'resp']:
+        #     chance = acc_null0_mean
+        #     acc0_mean = chance + (chance - acc0_mean)
+        #     acc0_band = (chance + (chance - acc0_band[1]), chance + (chance - acc0_band[0]))
+        #     acc_null0_band = (chance + (chance - acc_null0_band[1]), chance + (chance - acc_null0_band[0]))
     elif split == 'engagement':
         if epoch == 'stim':
             colors = ('tab:gray', 'tab:blue')
@@ -1563,9 +1563,9 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
     # # Split by engagement (generalize)
     # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
 
 
