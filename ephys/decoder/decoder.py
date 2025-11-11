@@ -84,6 +84,46 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
     return error_sessions
 
 
+
+
+# Test
+def get_beh(subject):
+    """
+    """
+
+    folder_parent = Path.home() / 'data' / subject
+    ephys_ids = get_ephys_sessions(subject)
+    error_sessions = []
+
+    for i in range(len(ephys_ids)):
+        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}')
+        folder_child = folder_parent / ephys_ids[i]
+        filename_behavior = [f for f in os.listdir(folder_child) if f.endswith('.csv')][0]  # Assume only one .csv file
+        path_behavior = folder_child / filename_behavior
+        df_behavior = pd.read_csv(path_behavior)
+        try:
+            print("'.csv' files do not exist in folder. Proceeding...")
+            experiment = df_behavior.Experiment.unique()[0]
+            filename = df_behavior.Session.unique()[0] + '.csv'
+            df_behavior.to_csv(folder_child / filename, index=False)
+        except Exception as e:
+            print(f'An error occurred: {e}')
+            # traceback.print_exc()
+            error_sessions.append(ephys_ids[i])
+
+    # # Save the glmhmm results if they don't exist
+    # # Requite probably to fit the GLMHMM to all data acquisition sessions (not only recorded ones)
+    # path_glmhmm =  Path.home() / 'PycharmProjects' / 'glmhmm' / experiment / f'{subject}.csv'
+    # df_glmhmm = pd.read_csv(path_glmhmm)
+
+    print(f'Sessions not preprocessed: {error_sessions}')
+
+    return error_sessions
+
+
+
+
+
 def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=False):
     """
     Find the first trial where the animal disengages from the task based on side accuracy.
@@ -1082,56 +1122,50 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
     plt.axvline(0, color=color, linestyle='-')  # Stimulus / First lick
     plt.axhline(1, color=color, linestyle='-')  # Go cue / ITI
     plt.axvline(1, color=color, linestyle='-')  # Go cue / ITI
+
     if align =='stim':
         plt.axhline(0.5, color=color, linestyle='--')  # Delay
         plt.axvline(0.5, color=color, linestyle='--')  # Delay
-
-    # Add labeled rectangles for epoch slices
-    if align == 'stim':
         epochs = {
             'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'S'},
             'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'D'},
             'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'R'}
         }
-    # elif align == 'resp':
-    #     epochs = {
-    #         'stim': {'range': (-1, -0.9), 'color': 'tab:blue', 'label': 'Stimulus'},
-    #         'delay': {'range': (-0.1, 0), 'color': 'tab:orange', 'label': 'Delay'},
-    #         'resp': {'range': (0, 0.1), 'color': 'tab:green', 'label': 'Response'}
-    #     }
+    elif align == 'resp':
+        epochs = {
+            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First lick'},
+            'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid lick'},
+        }
 
-        ax = plt.gca()
-        for name, props in epochs.items():
-            start, end = props['range']
-            color = props['color']
-            label = props['label']
+    ax = plt.gca()
+    for name, props in epochs.items():
+        start, end = props['range']
+        color = props['color']
+        label = props['label']
 
-            rect = patches.Rectangle(
-                xy=(x_min, start),
-                width=x_max - x_min,
-                height=end - start,
-                edgecolor=color,
-                facecolor='none',
-                zorder=2
-            )
-            ax.add_patch(rect)
+        rect = patches.Rectangle(
+            xy=(x_min, start),
+            width=x_max - x_min,
+            height=end - start,
+            edgecolor=color,
+            facecolor='none',
+            zorder=2
+        )
+        ax.add_patch(rect)
 
-            ax.text(
-                x=x_min,
-                y=start + 0.15,
-                s=label,
-                color=color,
-                ha='left',
-            )
+        ax.text(
+            x=x_min,
+            y=start + 0.15,
+            s=label,
+            color=color,
+            ha='left',
+        )
 
     first_tick = np.ceil(bins[0])  # Round up to the nearest integer
     last_tick = np.floor(bins[-1])  # Round down to the nearest integer
     ticks = np.arange(first_tick, last_tick + 1, 1)  # Create ticks at every integer value
     plt.xticks(ticks, ticks.astype(int))
     plt.yticks(ticks, ticks.astype(int))
-
-    # plt.xticks(bins[::10], np.round(bins[::10], 1).astype(int))
-    # plt.yticks(bins[::10], np.round(bins[::10], 1).astype(int))
     plt.xlabel('Test time (s)')
     plt.ylabel('Train time (s)')
     # plt.title(f"Decoding accuracy\n"

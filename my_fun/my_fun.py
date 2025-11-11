@@ -1,9 +1,7 @@
 # Import libraries (need to reduce scipy's entries)
 import numpy as np
 from scipy.signal import firwin, lfilter  # For white_noise
-from scipy.stats import beta  # Important! If using this, can't call any variable 'beta'!
 import pandas as pd
-from string import ascii_lowercase
 from matplotlib import pyplot as plt
 import seaborn as sns
 # from sympy import symbols, Eq, log, nsolve  # Not installed in setup PCs
@@ -235,6 +233,7 @@ def get_alpha_beta(mean, var, plot=False):
     Get the alpha and beta parameters of a beta distribution given the mean and variance. Optional plot of the distro.
     """
 
+    from scipy.stats import beta
     a = ((1 - mean) / var - 1 / mean) * mean ** 2  # 2: Substituting solved beta in variance formula
     b = a * (1 / mean - 1)  # 1: Solving beta in mean formula (given mean -coh- and variance are known)
     # Note: can't call it 'beta' as it would overwrite the scipy's 'beta' object imported
@@ -438,6 +437,8 @@ def enterthematrix(filepath):
 
 def do_sounds_dict(start=0.0003, stop=0.0078, num=26, n_decimals=4):
     """Dictionary letter: TTL pulses. Need to be in line with Arduino's code"""
+
+    from string import ascii_lowercase
     if num > 26:
         raise ValueError("'num' cannot be higher than abc's length (26)")
     chars = list(ascii_lowercase[:num])  # Make a list of all the lowercase letters as long as num
