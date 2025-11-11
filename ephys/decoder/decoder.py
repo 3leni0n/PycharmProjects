@@ -1257,7 +1257,7 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, errorbar
     sns.despine()
 
 
-def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorbar='ci', z_null=True):
+def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split='hit', excess=True, errorbar='ci', z_null=True):
     """
     Plot the mean epoch cross temporal decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
@@ -1302,12 +1302,16 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
     if split == 'hit':
         colors = ('tab:red', 'tab:green')
         labels = ('Error', 'Correct')
-        # If decoding stimulus, flip errors to make it easier to compare (only if decoding stimulus)
-        # if epoch in ['delay', 'resp']:
-        #     chance = acc_null0_mean
-        #     acc0_mean = chance + (chance - acc0_mean)
-        #     acc0_band = (chance + (chance - acc0_band[1]), chance + (chance - acc0_band[0]))
-        #     acc_null0_band = (chance + (chance - acc_null0_band[1]), chance + (chance - acc_null0_band[0]))
+        # Flip errors to make it easier to compare (only when trained in correct trials only)
+        if ((what == 'stim' and epoch in ['delay', 'resp']) or
+            (what == 'choice' and epoch == 'stim')):
+            # chance = acc_null0_mean
+            chance = 0.5
+            acc0_mean = chance + (chance - acc0_mean)
+            acc_null0_mean = chance + (chance - acc_null0_mean)
+            acc0_band = (chance + (chance - acc0_band[1]), chance + (chance - acc0_band[0]))
+            acc_null0_band = (chance + (chance - acc_null0_band[1]), chance + (chance - acc_null0_band[0]))
+
     elif split == 'engagement':
         if epoch == 'stim':
             colors = ('tab:gray', 'tab:blue')
@@ -1322,6 +1326,22 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
     bins = results['bins']
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
+    if excess:
+        acc0_mean = acc0_mean - acc_null0_mean
+        acc1_mean = acc1_mean - acc_null1_mean
+        acc0_band = (acc0_band[0] - acc_null0_mean, acc0_band[1] - acc_null0_mean)
+        acc1_band = (acc1_band[0] - acc_null1_mean, acc1_band[1] - acc_null1_mean)
+        ylabel = 'Excess accuracy'
+    else:
+        plt.plot(bin_centers, acc_null0_mean, color=colors[0], linestyle='--')
+        # plt.fill_between(bin_centers, acc_null0_band[0], acc_null0_band[1], color=colors[0], edgecolor='none',
+        #                  alpha=0.25)
+        plt.plot(bin_centers, acc_null1_mean, color=colors[1], linestyle='--')
+        # plt.fill_between(bin_centers, acc_null1_band[0], acc_null1_band[1], color='tab:green', edgecolor='none',
+        #                     alpha=0.25)
+        ylabel = 'Accuracy'
+
+
     plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
     plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
     plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
@@ -1330,22 +1350,16 @@ def plot_mean_epoch_cross_decoder_split(results, epoch=None, split='hit', errorb
     plt.plot(bin_centers, acc0_mean, color=colors[0], label=labels[0])
     plt.fill_between(bin_centers, acc0_band[0], acc0_band[1], color=colors[0],
                      edgecolor='none', alpha=0.25)
-    plt.plot(bin_centers, acc_null0_mean, color=colors[0], linestyle='--')
-    # plt.fill_between(bin_centers, acc_null0_band[0], acc_null0_band[1], color=colors[0], edgecolor='none',
-    #                  alpha=0.25)
 
     # Condition 1 (correct/engaged). Negative to flip it and make it easier to compare
     plt.plot(bin_centers, acc1_mean, color=colors[1], label=labels[1])
     plt.fill_between(bin_centers, acc1_band[0], acc1_band[1], color=colors[1],
                      edgecolor='none', alpha=0.25)
-    plt.plot(bin_centers, acc_null1_mean, color=colors[1], linestyle='--')
-    # plt.fill_between(bin_centers, acc_null1_band[0], acc_null1_band[1], color='tab:green', edgecolor='none',
-    #                     alpha=0.25)
 
     plt.xlim(bins[0], bins[-1])
     # plt.ylim(None, 1)
     plt.xlabel('Time (s)')
-    plt.ylabel('Accuracy')
+    plt.ylabel(ylabel)
     plt.legend(frameon=False)
     sns.despine()
 
@@ -1545,7 +1559,7 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
     #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
     #
     # Split by outcome
-    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
+    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
@@ -1561,7 +1575,7 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
     #
     # # Split by engagement (generalize)
-    # mean_decoder(subj, what='stim', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
