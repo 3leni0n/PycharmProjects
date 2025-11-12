@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import matplotlib.pyplot as plt
+import pandas as pd
 from matplotlib.colors import CenteredNorm
 import matplotlib.patches as patches
 import numpy as np
@@ -84,6 +85,35 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
     return error_sessions
 
 
+def summary_behavior(df_behavior):
+    """
+    Summarize behavioral performance by session and side.
+    :param df_behavior: DataFrame with behavioral data
+    :return: summary DataFrame
+    """
+
+    summary = (
+        df_behavior
+        .assign(Side=lambda x: x['Side'].map({0: 'Left', 1: 'Right'}))
+        .groupby(['Session', 'Side'])
+        .agg(
+            Total=('Trial', 'count'),
+            Correct=('Hit', 'sum'),
+            Error=('Hit', lambda x: (x == 0).sum())
+        )
+        .reset_index()
+    )
+    # convert to integers
+    summary['Correct'] = summary['Correct'].astype(int)
+    summary['Error'] = summary['Error'].astype(int)
+    # compute fractions relative to trials of that side
+    summary['HitRate'] = (summary['Correct'] / summary['Total']).round(2)
+    summary['ErrorRate'] = (summary['Error'] / summary['Total']).round(2)
+    pd.set_option('display.max_columns', None)  # Show all columns
+    pd.set_option('display.width', 0)  # No line wrapping
+    print(summary)
+
+    return summary
 
 
 # Test
@@ -93,35 +123,30 @@ def get_beh(subject):
 
     folder_parent = Path.home() / 'data' / subject
     ephys_ids = get_ephys_sessions(subject)
-    error_sessions = []
+    summaries = pd.DataFrame()
 
     for i in range(len(ephys_ids)):
-        print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}')
+
+        # Create child folder within parent folder for each ephys_id with its name if it doesn't exist
         folder_child = folder_parent / ephys_ids[i]
-        filename_behavior = [f for f in os.listdir(folder_child) if f.endswith('.csv')][0]  # Assume only one .csv file
-        path_behavior = folder_child / filename_behavior
-        df_behavior = pd.read_csv(path_behavior)
-        try:
-            print("'.csv' files do not exist in folder. Proceeding...")
-            experiment = df_behavior.Experiment.unique()[0]
-            filename = df_behavior.Session.unique()[0] + '.csv'
-            df_behavior.to_csv(folder_child / filename, index=False)
-        except Exception as e:
-            print(f'An error occurred: {e}')
-            # traceback.print_exc()
-            error_sessions.append(ephys_ids[i])
+        folder_child.mkdir(parents=True, exist_ok=True)
+        os.chdir(folder_child)
 
-    # # Save the glmhmm results if they don't exist
-    # # Requite probably to fit the GLMHMM to all data acquisition sessions (not only recorded ones)
-    # path_glmhmm =  Path.home() / 'PycharmProjects' / 'glmhmm' / experiment / f'{subject}.csv'
-    # df_glmhmm = pd.read_csv(path_glmhmm)
+        # .npy files (spike counts)
+        if any(f.endswith('.npy') for f in os.listdir(folder_child)):
+            print("'.npy' files exist in folder. Proceeding...")
+            print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}')
+            folder_child = folder_parent / ephys_ids[i]
+            filename_behavior = [f for f in os.listdir(folder_child) if f.endswith('.csv')][0]  # Assume only one .csv file
+            path_behavior = folder_child / filename_behavior
+            df_behavior = pd.read_csv(path_behavior)
+            summary = summary_behavior(df_behavior)
+            summaries = pd.concat([summaries, summary], ignore_index=True)
 
-    print(f'Sessions not preprocessed: {error_sessions}')
+        else:
+            print('There are no spike count files in the folder. Skipping...')
 
-    return error_sessions
-
-
-
+    return summaries
 
 
 def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=False):
@@ -180,37 +205,6 @@ def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=
         sns.despine()
 
     return disengaged_trial
-
-
-def summary_behavior(df_behavior):
-    """
-    Summarize behavioral performance by session and side.
-    :param df_behavior: DataFrame with behavioral data
-    :return: summary DataFrame
-    """
-
-    summary = (
-        df_behavior
-        .assign(Side=lambda x: x['Side'].map({0: 'Left', 1: 'Right'}))
-        .groupby(['Session', 'Side'])
-        .agg(
-            Total=('Trial', 'count'),
-            Correct=('Hit', 'sum'),
-            Error=('Hit', lambda x: (x == 0).sum())
-        )
-        .reset_index()
-    )
-    # convert to integers
-    summary['Correct'] = summary['Correct'].astype(int)
-    summary['Error'] = summary['Error'].astype(int)
-    # compute fractions relative to trials of that side
-    summary['HitRate'] = (summary['Correct'] / summary['Total']).round(2)
-    summary['ErrorRate'] = (summary['Error'] / summary['Total']).round(2)
-    pd.set_option('display.max_columns', None)  # Show all columns
-    pd.set_option('display.width', 0)  # No line wrapping
-    print(summary)
-
-    return summary
 
 
 # for i in range(len(behavior)):
@@ -772,8 +766,8 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
             state_label = ''
-            # if engagement is not None:  # Add engaged column to df_behavior
-            if engagement is None:  # Add engaged column to df_behavior
+            if engagement is not None:  # Add engaged column to df_behavior
+            # if engagement is None:  # Add engaged column to df_behavior
                 disengagement = find_disengaged(df_behavior, plot=False)  # Find trial where disengagement happens
                 engaged = (df_behavior.Trial <= disengagement).astype(int)  # Label trials as engaged/disengaged
                 df_behavior['Engaged'] = engaged
@@ -1577,16 +1571,20 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # print(f'Trial total time: {total}s')
 
 
-# subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
-# folder_parent = Path.home() / 'data'
-# for subj in subjects:
+subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
+folder_parent = Path.home() / 'data'
+summaries = pd.DataFrame()
 
-    # # Preprocess
-    # preprocess_subject(subj)
-    #
-    # # X decoder
-    # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-    #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+for subj in subjects:
+    df_sum_subj = get_beh(subj)
+    summaries = pd.concat([summaries, df_sum_subj], ignore_index=True)
+
+#     # # Preprocess
+#     # preprocess_subject(subj)
+#     #
+#     # # X decoder
+    mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+                 hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
     #
     # # Epoch decoders (align to first lick)
     # mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
