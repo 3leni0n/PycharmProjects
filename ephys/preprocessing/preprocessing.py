@@ -634,7 +634,6 @@ def preprocess(ephys_id):
     path_behavior = get_behavior_id(ephys_id)
     df_behavior = parse_v2(path_behavior)
 
-
     # Check if the behavior and ephys data match and get the number of trials common to both
     n_trials, sounds_mismatch_index = check_data(df_behavior, df_keys)
 
