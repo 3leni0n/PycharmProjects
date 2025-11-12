@@ -11,6 +11,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from scipy.stats import sem
+
 from my_fun.my_fun import timer
 from ephys.preprocessing import *
 from ephys.analysis import *
@@ -44,7 +45,7 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
         os.chdir(folder_child)
 
         # .npy files (spike counts)
-        if any(f.endswith('.npy') for f in os.listdir(folder_child)):
+        if any(f.endswith(f'{align}.npy') for f in os.listdir(folder_child)):
             print("'.npy' files exist in folder. Skipping...")
         else:
             try:
@@ -67,7 +68,8 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
         else:
             try:
                 print("'.csv' files do not exist in folder. Proceeding...")
-                experiment = df_behavior.Experiment.unique()[0]
+                # path_behavior = get_behavior_id(ephys_ids[i])
+                # df_behavior = parse_v2(path_behavior)
                 filename = df_behavior.Session.unique()[0] + '.csv'
                 df_behavior.to_csv(folder_child / filename, index=False)
             except Exception as e:
@@ -85,33 +87,40 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
     return error_sessions
 
 
-def summary_behavior(df_behavior):
+def summary_behavior(df):
     """
-    Summarize behavioral performance by session and side.
-    :param df_behavior: DataFrame with behavioral data
+    Summarize behavioral performance by session.
+    :param df: DataFrame with behavioral data
     :return: summary DataFrame
     """
 
+    df = df[df['Miss'] != 1]
+
     summary = (
-        df_behavior
-        .assign(Side=lambda x: x['Side'].map({0: 'Left', 1: 'Right'}))
-        .groupby(['Session', 'Side'])
-        .agg(
-            Total=('Trial', 'count'),
-            Correct=('Hit', 'sum'),
-            Error=('Hit', lambda x: (x == 0).sum())
-        )
+        df
+        .groupby('Session')
+        .apply(lambda x: pd.Series({
+            'TotalLeft': (x['Side'] == 0).sum(),
+            'TotalRight': (x['Side'] == 1).sum(),
+            'Total': len(x),
+            'ErrorLeft': ((x['Side'] == 0) & (x['Hit'] == 0)).sum(),
+            'ErrorRight': ((x['Side'] == 1) & (x['Hit'] == 0)).sum(),
+            'TotalError': (x['Hit'] == 0).sum(),
+            'CorrectLeft': ((x['Side'] == 0) & (x['Hit'] == 1)).sum(),
+            'CorrectRight': ((x['Side'] == 1) & (x['Hit'] == 1)).sum(),
+            'TotalCorrect': (x['Hit'] == 1).sum(),
+
+        }))
         .reset_index()
     )
-    # convert to integers
-    summary['Correct'] = summary['Correct'].astype(int)
-    summary['Error'] = summary['Error'].astype(int)
-    # compute fractions relative to trials of that side
-    summary['HitRate'] = (summary['Correct'] / summary['Total']).round(2)
-    summary['ErrorRate'] = (summary['Error'] / summary['Total']).round(2)
-    pd.set_option('display.max_columns', None)  # Show all columns
-    pd.set_option('display.width', 0)  # No line wrapping
-    print(summary)
+
+    summary['AccLeft'] = summary['CorrectLeft'] / summary['TotalLeft']
+    summary['AccRight'] = summary['CorrectRight'] / summary['TotalRight']
+    summary['TotalAcc'] = summary['TotalCorrect'] / summary['Total']
+
+    # pd.set_option('display.max_columns', None)  # Show all columns
+    # pd.set_option('display.width', 0)  # No line wrapping
+    # print(summary)
 
     return summary
 
@@ -142,7 +151,6 @@ def get_beh(subject):
             df_behavior = pd.read_csv(path_behavior)
             summary = summary_behavior(df_behavior)
             summaries = pd.concat([summaries, summary], ignore_index=True)
-
         else:
             print('There are no spike count files in the folder. Skipping...')
 
@@ -1206,7 +1214,7 @@ def plot_epoch_cross_decoder(bins, acc, acc_null, epoch=None, z_null=True):
     sns.despine()
 
 
-def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, errorbar='ci', z_null=True):
+def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=False, errorbar='ci', z_null=True):
     """
     Plot the mean epoch cross temporal decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
@@ -1266,20 +1274,29 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, errorbar
     plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
     plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
+    if excess:
+        acc_mean = acc_mean - acc_null_mean
+        acc_band = (acc_band[0] - acc_null_mean, acc_band[1] - acc_null_mean)
+        ylim = (0, 0.5)
+        ylabel = 'Excess accuracy'
+
+    else:
+        plt.plot(bin_centers, acc_null_mean, linestyle='--', color=color)
+        plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
+                         alpha=0.25)
+        ylim = (0.5, 1)
+        ylabel = 'Accuracy'
+
     # n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
     # plt.figure(constrained_layout=True)
     plt.plot(bin_centers, acc_mean, color=color, label=label)
     plt.fill_between(bin_centers, acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
 
-    plt.plot(bin_centers, acc_null_mean, linestyle='--', color=color)
-    plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
-                        alpha=0.25)
-
     plt.legend(frameon=False)
     plt.xlim(bins[0], bins[-1])
     plt.xlabel('Time (s)')
-    plt.ylabel('Accuracy')
-    plt.ylim(None, 1)
+    plt.ylabel(ylabel)
+    plt.ylim(ylim)
     # plt.title(f'Decoding accuracy\n'
     #           f'{subject}, {len(results["acc"])} sessions, {n_trials} trials')
     sns.despine()
@@ -1359,6 +1376,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
         acc1_mean = acc1_mean - acc_null1_mean
         acc0_band = (acc0_band[0] - acc_null0_mean, acc0_band[1] - acc_null0_mean)
         acc1_band = (acc1_band[0] - acc_null1_mean, acc1_band[1] - acc_null1_mean)
+        ylim = (0, 0.5)
         ylabel = 'Excess accuracy'
     else:
         plt.plot(bin_centers, acc_null0_mean, color=colors[0], linestyle='--')
@@ -1367,8 +1385,8 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
         plt.plot(bin_centers, acc_null1_mean, color=colors[1], linestyle='--')
         # plt.fill_between(bin_centers, acc_null1_band[0], acc_null1_band[1], color='tab:green', edgecolor='none',
         #                     alpha=0.25)
+        ylim = (0.5, 1)
         ylabel = 'Accuracy'
-
 
     plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
     plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
@@ -1387,6 +1405,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     plt.xlim(bins[0], bins[-1])
     # plt.ylim(None, 1)
     plt.xlabel('Time (s)')
+    plt.ylim(ylim)
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
     sns.despine()
@@ -1571,48 +1590,46 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # print(f'Trial total time: {total}s')
 
 
-subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
-folder_parent = Path.home() / 'data'
-summaries = pd.DataFrame()
-
-for subj in subjects:
-    df_sum_subj = get_beh(subj)
-    summaries = pd.concat([summaries, df_sum_subj], ignore_index=True)
-
-#     # # Preprocess
-#     # preprocess_subject(subj)
+# subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
+# folder_parent = Path.home() / 'data'
+# summaries = pd.DataFrame()
+# for subj in subjects:
+# # #     summaries = pd.concat([summaries, get_beh(subj)], ignore_index=True)
+# # #
+# #     # Preprocess
+# #     preprocess_subject(subj)
+# # #
+#     # X decoder
+#     mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+#                  hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+# #     #
+#     # # Epoch decoders (align to first lick)
+#     # mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
+#     #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
 #     #
-#     # # X decoder
-    mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-                 hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-    #
-    # # Epoch decoders (align to first lick)
-    # mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
-    #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-    #
-    # Split by outcome
-    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
-    #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
-    #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
-    #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
-
-    # # Split by engagement
-    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
-    #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
-    #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
-    #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    #
-    # # Split by engagement (generalize)
-    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
-    #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
-    #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
-    #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+#     # Split by outcome
+#     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Hit', drop_miss=True,
+#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Hit', drop_miss=True,
+#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Hit', drop_miss=True,
+#     #                  hit_only=False, engagement=1, n_shuffles=100, plot=False, save=True)
+#
+#     # # Split by engagement
+#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+#     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+#     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='stim', kind='epoch_split', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+#     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+#     #
+#     # # Split by engagement (generalize)
+#     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='stim', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+#     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='delay', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+#     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
+#     # mean_decoder(subj, what='choice', kind='epoch_generalize', epoch='resp', epoch_ortho=None, split_by='Engaged', drop_miss=True,
+#     #                  hit_only=True, engagement=None, n_shuffles=100, plot=False, save=True)
 
 
 # Paralelization test
