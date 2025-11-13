@@ -1371,15 +1371,26 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
             acc_null0_band = (chance + (chance - acc_null0_band[1]), chance + (chance - acc_null0_band[0]))
 
     elif split == 'engagement':
+        # Align to stimulus
         if epoch == 'stim':
             colors = ('tab:gray', 'tab:blue')
         elif epoch == 'delay':
             colors = ('tab:gray', 'tab:orange')
         elif epoch == 'resp':
             colors = ('tab:gray', 'tab:green')
+        # Align to first lick
+        elif epoch == 'first_lick':
+            colors = ('tab:gray', 'darkgreen')
+        elif epoch == 'mid_lick':
+            colors = ('tab:gray', 'lightgreen')
         labels = ('Dis.', 'Eng.')
 
     # plt.figure(constrained_layout=True)
+
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus / First lick
+    if epoch in ['stim', 'delay', 'response']:
+        plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue / ITI
 
     bins = results['bins']
     bin_centers = (bins[:-1] + bins[1:]) / 2
@@ -1401,10 +1412,6 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
         #                     alpha=0.25)
         ylim = (0.5, 1)
         ylabel = 'Accuracy'
-
-    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
-    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
-    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
     # Condition 0 (error/disengaged)
     plt.plot(bin_centers, acc0_mean, color=colors[0], label=labels[0])
