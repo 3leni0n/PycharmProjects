@@ -1245,6 +1245,8 @@ def fig_size(n_cols=1, ratio=None):
 
     # Full page (minus margins)
     if n_cols == 0:
+        # Full A4 minus margins
+        figsize = (width, height)
         if ratio == 1:  # Square
             figsize = (size[0], size[0])
         return figsize

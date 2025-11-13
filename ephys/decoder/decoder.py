@@ -125,14 +125,15 @@ def summary_behavior(df):
     return summary
 
 
-# Test
-def get_beh(subject):
+def get_all_beh(subject):
     """
+    Get and concatenate behavioral data from all ephys sessions for a given subject.
+    :param subject: subject ID (str)
     """
 
     folder_parent = Path.home() / 'data' / subject
     ephys_ids = get_ephys_sessions(subject)
-    summaries = pd.DataFrame()
+    df = pd.DataFrame()
 
     for i in range(len(ephys_ids)):
 
@@ -149,70 +150,11 @@ def get_beh(subject):
             filename_behavior = [f for f in os.listdir(folder_child) if f.endswith('.csv')][0]  # Assume only one .csv file
             path_behavior = folder_child / filename_behavior
             df_behavior = pd.read_csv(path_behavior)
-            summary = summary_behavior(df_behavior)
-            summaries = pd.concat([summaries, summary], ignore_index=True)
+            df = pd.concat([df_behavior, df], ignore_index=True)
         else:
             print('There are no spike count files in the folder. Skipping...')
 
-    return summaries
-
-
-def find_disengaged(df_behavior, threshold=0.5, min_trial=200, win_len=20, plot=False):
-    """
-    Find the first trial where the animal disengages from the task based on side accuracy.
-    :param df_behavior: DataFrame with behavioral data
-    :param threshold: threshold accuracy to consider the animal disengaged
-    :param min_trial: minimum trial to start looking for disengagement
-    :param win_len: window length to compute rolling average
-    :return: first_trial (int)
-    """
-
-    x_total, y_total, x_0, y_0, x_1, y_1 = get_roll_avg(df_behavior, kind='side')
-
-    # Convert indices to lists to ensure compatibility
-    x_0, x_1, x_total = list(x_0), list(x_1), list(x_total)
-
-    # Adjust minimum trial to account for the running window
-    min_valid_trial = min_trial + win_len
-
-    # Filter trials starting from min_valid_trial
-    filtered_x_total = [(x, y) for x, y in zip(x_total, y_total) if x >= min_valid_trial]
-    filtered_x_0 = [(x, y) for x, y in zip(x_0, y_0) if x >= min_valid_trial]
-    filtered_x_1 = [(x, y) for x, y in zip(x_1, y_1) if x >= min_valid_trial]
-
-    # Find first trial where y_total reaches threshold
-    idx_total = next(((x, y) for x, y in filtered_x_total if y <= threshold), None)
-
-    # Find first trial where y_0 or y_1 reaches threshold, mapped back to absolute trials
-    idx_0 = next(((x_total[x_total.index(x)], y) for x, y in filtered_x_0 if y <= threshold), None) if filtered_x_0 else None
-    idx_1 = next(((x_total[x_total.index(x)], y) for x, y in filtered_x_1 if y <= threshold), None) if filtered_x_1 else None
-
-    # Get the earliest occurrence and corresponding y-value
-    disengaged_trial, disengaged_y = min(filter(None, [idx_total, idx_0, idx_1]), default=(None, None))
-
-    print(f'Disengagement in trial {disengaged_trial}')
-
-    # Side accuracy plot
-    if plot:
-        plt.figure(constrained_layout=True)
-        plt.plot(x_total, y_total, color='k', label='Total')
-        plt.plot(x_0, y_0, color='tab:blue', label='Left')
-        plt.plot(x_1, y_1, color='tab:orange', label='Right')
-        plt.axhline(0.25, color='tab:gray', ls=':')
-        plt.axhline(0.5, color='tab:gray', ls='--')
-        plt.axhline(0.75, color='tab:gray', ls=':')
-
-        # Plot the red dot at the correct x (absolute trial number) and y=0.5
-        if disengaged_trial is not None:
-            plt.plot(disengaged_trial, threshold, 'ro')
-
-        plt.xlabel('Trial')
-        plt.ylabel('Accuracy')
-        plt.title(df_behavior.Session.unique()[0])
-        plt.legend(frameon=False)
-        sns.despine()
-
-    return disengaged_trial
+    return df
 
 
 # for i in range(len(behavior)):
@@ -1283,21 +1225,21 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
     bins = results['bins']
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
-    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
-    plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
-    plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
+    # plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
+    # plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
+    # plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
     if excess:
         acc_mean = acc_mean - acc_null_mean
         acc_band = (acc_band[0] - acc_null_mean, acc_band[1] - acc_null_mean)
-        ylim = (0, 0.5)
+        ylim = (None, 0.5)
         ylabel = 'Excess accuracy'
 
     else:
         plt.plot(bin_centers, acc_null_mean, linestyle='--', color=color)
         plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
                          alpha=0.25)
-        ylim = (0.5, 1)
+        ylim = (None, 1)
         ylabel = 'Accuracy'
 
     # n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
@@ -1388,7 +1330,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     # plt.figure(constrained_layout=True)
 
     plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus / First lick
-    if epoch in ['stim', 'delay', 'response']:
+    if epoch in ['stim', 'delay', 'resp']:
         plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
     plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue / ITI
 
@@ -1426,7 +1368,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     plt.xlim(bins[0], bins[-1])
     # plt.ylim(None, 1)
     plt.xlabel('Time (s)')
-    plt.ylim(ylim)
+    # plt.ylim(ylim)
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
     sns.despine()
@@ -1614,20 +1556,22 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
 # subjects = ['000', '007', '009']  # Removed 001 (all sessions bad)
 # folder_parent = Path.home() / 'data'
 # summaries = pd.DataFrame()
+# df = pd.DataFrame()
 # for subj in subjects:
-#     summaries = pd.concat([summaries, get_beh(subj)], ignore_index=True)
-#
-#     # Preprocess
-#     preprocess_subject(subj)
-#
-#     # X decoder
-#     mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-#                  hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-#
-    # # Epoch decoders (align to first lick)
-    # mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
+#     df = pd.concat([df, get_all_beh(subj)], ignore_index=True)
+    # summaries = pd.concat([summaries, get_beh(subj)], ignore_index=True)
+    #
+    # # Preprocess
+    # preprocess_subject(subj)
+    #
+    # # X decoder
+    # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
+    #              hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
+
+    # Epoch decoders (align to first lick)
+    # mean_decoder(subj, what='choice', align='resp', kind='epoch', epoch='first_lick', epoch_ortho=None, split_by=None,
     #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
-    # mean_decoder(subj, what='stim', align='resp', kind='epoch', epoch='mid_lick', epoch_ortho=None, split_by=None,
+    # mean_decoder(subj, what='choice', align='resp', kind='epoch', epoch='mid_lick', epoch_ortho=None, split_by=None,
     #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, plot=False, save=True)
 
     # # Split by outcome (generalize)

@@ -16,7 +16,7 @@ from my_fun.my_fun import fig_size
 
 
 # Define functions to get lick variables: RTs, N licks, ILI
-def curate_licks(licks: pd.Series, df_behavior: pd.DataFrame, time_window=1) -> pd.Series:
+def curate_licks(licks, df_behavior, time_window=1):
     """
     Curate licks for a given behavioral session (remove licks before Response Window opens or after ITI ends).
     Note that timestamps (in seconds) of licks and events are relative to the trial onset (0 s).
@@ -53,7 +53,7 @@ def get_peri_stim_licks(df_behavior, event='StimStart', time_window=1):
     :return: pd.Series with a list of peri-stimulus licks per trial
     """
 
-    # Convert string representations of lists back to actual lists
+    # Convert string of lists back lists
     try:
         df_behavior["Port1In"] = df_behavior["Port1In"].apply(ast.literal_eval)
         df_behavior["Port2In"] = df_behavior["Port2In"].apply(ast.literal_eval)
@@ -78,27 +78,6 @@ def get_peri_stim_licks(df_behavior, event='StimStart', time_window=1):
     premature_lick_trials = [premature_lick_trials_left] + [premature_lick_trials_right]
 
     return licks, premature_lick_trials
-
-
-def compute_psth(peri_stim_licks, time_win=[-1, 3], bin_size=0.1):
-    """
-    Compute a PSTH of a given cluster aligned to a specific event.
-    :param peri_stim_spikes: Lick times of a given subject (output of get_peri_stim_licks)
-    :param time_win: List with the time window around the event (default: [-1, 3])
-    :param bin_size: Size of the bins for the PSTH (default: 0.1 s)
-    """
-
-    n_bins = int((time_win[1] - time_win[0]) / bin_size) + 1
-    bins = np.linspace(time_win[0], time_win[1], n_bins)  # linspace is preferred over arange for PSTHs
-
-    psth = []
-    # Loop over trials (timestamps of stimulus onset)
-    for trial in range(len(peri_stim_licks)):
-        hist, _ = np.histogram(peri_stim_licks.iloc[trial], bins)  # Ignore the bin_edges output
-        psth.append(hist)
-    psth = np.array(psth)  # Convert to numpy array
-
-    return bins, psth
 
 
 def inter_lick_interval(licks: pd.Series, method: str='first') -> list:
