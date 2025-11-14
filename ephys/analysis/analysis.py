@@ -194,7 +194,8 @@ def get_peri_event_licks(df_behavior, event='StimStart'):
         df_behavior["Port1In"] = df_behavior["Port1In"].apply(ast.literal_eval)
         df_behavior["Port2In"] = df_behavior["Port2In"].apply(ast.literal_eval)
     except ValueError:
-        print('Port1In or Port2In are already lists')
+        # print('Port1In or Port2In are already lists')
+        pass
 
     licks_left = df_behavior.Port1In.copy()
     licks_right = df_behavior.Port2In.copy()
@@ -813,8 +814,8 @@ def plot_mfr(psth, bin_size=0.1, ax=None):
     # mfr_percentile = np.percentile(mfr, percentile)
 
     ax.plot(mfr, color='k')
-    ax.fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.25)
-    ax.axhline(mfr_mean, color='tab:red', label='mean')
+    ax.fill_between(np.arange(len(mfr)), mfr - sfr, mfr + sfr, color='k', alpha=0.25, edgecolor='none')
+    # ax.axhline(mfr_mean, color='tab:red', label='mean')
     # ax.axhline(mfr_percentile, color='tab:gray', linestyle='--', label=f'{percentile}th percentile')
     ax.set_xlabel('Trial')
     ax.set_ylim(bottom=0)
@@ -1002,7 +1003,7 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
     # ax_dict['PSTHRepeat'].set_xlabel('')
     ax_dict['LicksAll'].set_xlabel('')
     ax_dict['LicksOutcome'].set_xlabel('')
-    # ax_dict['LicksChoice'].set_xlabel('')
+    ax_dict['LicksChoice'].set_xlabel('')
     ax_dict['LicksStimulus'].set_xlabel('')
     # ax_dict['LicksRepeat'].set_xlabel('')
 
@@ -1136,7 +1137,7 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
                  f'mean FR={round(np.mean(fr), 2)}, '
                  f'CV={round(coeff_var, 2)}, '
                  f'Fano factor={round(fano, 2)}')
-    # fig.supxlabel('Time (s) from stimulus onset')
+    fig.supxlabel('Time (s) from stimulus onset')
 
     # fig.tight_layout()
 

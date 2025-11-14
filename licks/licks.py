@@ -46,11 +46,11 @@ def curate_licks(licks, df_behavior, time_window=1):
     return licks, premature_lick_trials
 
 
-def get_peri_stim_licks(df_behavior, event='StimStart', time_window=1):
+def get_peri_event_licks(df_behavior, event='StimStart', time_window=1):
     """
-    Get peri-stimulus licks for a given behavioral session
+    Get peri-event licks for a given behavioral session
     :param df_behavior: DataFrame with behavior data
-    :return: pd.Series with a list of peri-stimulus licks per trial
+    :return: pd.Series with a list of peri-event licks per trial
     """
 
     # Convert string of lists back lists
@@ -80,7 +80,7 @@ def get_peri_stim_licks(df_behavior, event='StimStart', time_window=1):
     return licks, premature_lick_trials
 
 
-def inter_lick_interval(licks: pd.Series, method: str='first') -> list:
+def inter_lick_interval(licks, method='first'):
     """
     Compute the mean inter-lick interval (ILI) of the licks of a behavioral session.
     :return: Inter-lick interval (ILI) of the licks per trial
@@ -170,7 +170,7 @@ def add_lick_data(df_behavior):
     """
 
     # Apply lick functions
-    licks, premature_lick_trials = get_peri_stim_licks(df_behavior, event='StimStart')
+    licks, premature_lick_trials = get_peri_event_licks(df_behavior, event='StimStart')
 
     # Combine left and right premature lick trials
     premature_lick_trials = sorted(set(premature_lick_trials[0] + premature_lick_trials[1]))
@@ -210,7 +210,7 @@ def add_lick_data(df_behavior):
     df_behavior['RT'] = rt
 
     # Add RT2 to DataFrame
-    licks, premature_lick_trials = get_peri_stim_licks(df_behavior, event='StimStart', time_window=0)
+    licks, premature_lick_trials = get_peri_event_licks(df_behavior, event='StimStart', time_window=0)
     rt2 = get_rt2(licks, df_behavior)
     df_behavior['RT2'] = rt2
 
