@@ -1,9 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-plt.figure(constrained_layout=True)
-plt.close('all')
 import seaborn as sns
 import pandas as pd
+from matplotlib.lines import Line2D
 
 # Plotting parameters
 sns.set_theme()
@@ -164,7 +163,7 @@ def plot_reactive_ddm(N=1000, t_max=1, t_fix=0.5, dt=0.001, v=1, w=0, a=1, senso
     left_rts = []  # -1
     right_rts = []  # +1
 
-    plt.figure(constrained_layout=True)
+    # plt.figure(constrained_layout=True)
 
     # Middle plot: DVs
     ax1 = plt.subplot(3, 1, 2)
@@ -176,10 +175,10 @@ def plot_reactive_ddm(N=1000, t_max=1, t_fix=0.5, dt=0.001, v=1, w=0, a=1, senso
                                      motor_delay=motor_delay)
 
         if choice == -1:
-            color = 'tab:green'
+            color = 'tab:blue'
             left_rts.append(rt)
         elif choice == 1:
-            color = 'tab:purple'
+            color = 'tab:orange'
             right_rts.append(rt)
         else:
             color = 'tab:gray'
@@ -192,16 +191,20 @@ def plot_reactive_ddm(N=1000, t_max=1, t_fix=0.5, dt=0.001, v=1, w=0, a=1, senso
     # plt.xlabel('Time')
     plt.ylabel('DV')
     plt.yticks([-a / 2, 0, a / 2], [r'-$\theta$', '0', r'$\theta$'])  # Set 3 yticks only -a/2, 0, a/2
-    plt.axhline(-a / 2, xmin=0, xmax=t_max, c='tab:green', ls='--')
-    plt.axhline(a / 2, xmin=0, xmax=t_max, c='purple', ls='--')
+    plt.axhline(-a / 2, xmin=0, xmax=t_max, c='tab:blue', ls='--')
+    plt.axhline(a / 2, xmin=0, xmax=t_max, c='tab:orange', ls='--')
     plt.axvline(t_fix, c='tab:gray', ls='--')
     plt.xticks([])
     ax1.set_xlim([0, t_max])
 
+    left_handle = Line2D([], [], color='tab:blue', label='Left')
+    right_handle = Line2D([], [], color='tab:orange', label='Right')
+    ax1.legend(handles=[left_handle, right_handle], frameon=False, loc='upper right')
+
     # Plot Right RTs
     ax0 = plt.subplot(3, 1, 1)
-    plt.hist(right_rts, bins=np.arange(0, t_max, dt * 20), color='tab:purple')
-    plt.ylabel('Right\nRTs')
+    plt.hist(right_rts, bins=np.arange(0, t_max, dt * 20), color='tab:orange')
+    plt.ylabel('Right RTs')
     # sns.despine(top=True, right=True, left=False, bottom=True)
     ax0.spines[['right', 'top', 'bottom']].set_visible(False)
     plt.xticks([])
@@ -211,9 +214,9 @@ def plot_reactive_ddm(N=1000, t_max=1, t_fix=0.5, dt=0.001, v=1, w=0, a=1, senso
     # Plot Left RTs
     ax2 = plt.subplot(3, 1, 3)
     ax2.invert_yaxis()
-    plt.hist(left_rts, bins=np.arange(0, t_max, dt * 20), color='tab:green')
+    plt.hist(left_rts, bins=np.arange(0, t_max, dt * 20), color='tab:blue')
     plt.xlabel('Time (s)')
-    plt.ylabel('Left\nRTs')
+    plt.ylabel('Left RTs')
     # sns.despine(top=True, right=True, left=False, bottom=True)
     ax2.spines[['right', 'top', 'bottom']].set_visible(False)
     # plt.xticks([])
@@ -227,7 +230,7 @@ def plot_reactive_ddm(N=1000, t_max=1, t_fix=0.5, dt=0.001, v=1, w=0, a=1, senso
     ax2.invert_yaxis()
 
     # plt.subplots_adjust(wspace=0, hspace=0)
-    plt.suptitle(f'Reactive DDM')
+    # plt.suptitle(f'Reactive DDM')
 
 
 def plot_proactive_ddm(N=1000, t_max=1, dt=0.001, v=1, w=0, a=1, motor_delay=0):
@@ -560,7 +563,7 @@ def plot_responses(winners, rts, params):
 
     return bins_centers, hist_reactive, hist_proactive
 
-
+"""
 N=10000
 kind='psiam'
 t_max=1.5
@@ -708,3 +711,5 @@ plt.axvline(t_fix, c='tab:gray', ls='--')
 # Make a pandas Dataframe from the lists the Xs, choices, rts, winners, params
 # df = pd.DataFrame({'choices': choices, 'rts': rts, 'winners': winners})
 # df.to_csv('data.csv', index=False)
+
+"""
