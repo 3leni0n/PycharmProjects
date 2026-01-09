@@ -235,9 +235,10 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     #     df = df[df.Drug == drug].reset_index(drop=True)
     #     condition = 'saline' if drug == 0 else 'drug'
     #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
+
     # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
-    # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}' / experiment
-    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / experiment
+    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST2' / f'{n_states}s_{len(covariates)}cov' / experiment
+    # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / experiment
 
     # Parse the data
     inputs, choices = parse_glmhmm(df, covariates=covariates)
@@ -759,219 +760,44 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
     plt.title('Matrix')
     sns.despine()
 
-"""
-# # Save results
-# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
-# with open(path, 'wb') as f:
-#     pickle.dump(results, f)
-#
-# # Load results
-# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
-# with open(path, 'rb') as f:
-#     results = pickle.load(f)
-#
-# # Unpack results
-# all_animals = results['all_animals']
-# fit_ll = results['fit_ll']
-# weights = results['weights']
-# trans_mat = results['trans_mat']
-# posterior_probs = results['posterior_probs']
-# log_likelihood = results['log_likelihood']
-# remap_indices = results['remap_indices']
-# interpret = results['interpret']
 
-# results_saline = test_full_model(experiments=['2AFC_6'], drug=0, interpret=True)
-# results_drug = test_full_model(experiments=['2AFC_6'], drug=1, interpret=True)
+"""
+# Save results
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
+with open(path, 'wb') as f:
+    pickle.dump(results, f)
 
 # Load results
-# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results_saline.pkl'
-# with open(path, 'rb') as f:
-#     results_saline = pickle.load(f)
-# posterior_probs_saline = results_saline['posterior_probs']
-# trans_mat_saline = results_saline['trans_mat']
-# df_occ_saline = plot_occupancy_boxplot(posterior_probs_saline)
-#
-# # Load results
-# path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results_drug.pkl'
-# with open(path, 'rb') as f:
-#     results_drug = pickle.load(f)
-# posterior_probs_drug = results_drug['posterior_probs']
-# trans_mat_drug = results_drug['trans_mat']
-# df_occ_drug = plot_occupancy_boxplot(posterior_probs_drug)
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results.pkl'
+with open(path, 'rb') as f:
+    results = pickle.load(f)
 
+# Unpack results
+all_animals = results['all_animals']
+fit_ll = results['fit_ll']
+weights = results['weights']
+trans_mat = results['trans_mat']
+posterior_probs = results['posterior_probs']
+log_likelihood = results['log_likelihood']
+remap_indices = results['remap_indices']
+interpret = results['interpret']
 
-########################################################################################################################
+results_saline = test_full_model(experiments=['2AFC_6'], drug=0, interpret=True)
+results_drug = test_full_model(experiments=['2AFC_6'], drug=1, interpret=True)
 
-# Model comparison
+# Load results
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results_saline.pkl'
+with open(path, 'rb') as f:
+    results_saline = pickle.load(f)
+posterior_probs_saline = results_saline['posterior_probs']
+trans_mat_saline = results_saline['trans_mat']
+df_occ_saline = plot_occupancy_boxplot(posterior_probs_saline)
 
-# 2 vs 3 states (2 covariates: stim and bias)
-# df_2s_2cov = fit_all(experiments=[ '2AFC_6'], n_states=2, covariates=['stim_vals', 'bias'], drug=None, save=True)
-# df_3s_2cov = fit_all(experiments=[ '2AFC_6'], n_states=3, covariates=None, drug=None, save=True)
-figsize = fig_size(n_cols=2)
-figsize = (figsize[0], figsize[1]*2)
-plt.figure(figsize=figsize, constrained_layout=True)
-ll0 = df_2s_2cov['LogLikelihood'].unique()
-n_trials0 = df_2s_2cov.groupby('Subject').size()
-ll1 = df_3s_2cov['LogLikelihood'].unique()
-n_trials1 = df_3s_2cov.groupby('Subject').size()
-
-ll0 = plot_ll(ll0, n_trials0, to_bits=True, positions=[0])
-ll1 = plot_ll(ll1, n_trials1, to_bits=True, positions=[1])
-for y0, y1 in zip(ll0, ll1):
-    plt.plot([0, 1], [y0, y1], color='k', alpha=0.1)
-
-# Paired t-test between states (not needed because sums to 1)
-t_stat, p_val = ttest_rel(ll0, ll1)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-
-plt.xticks([0, 1],['2', '3'])
-plt.xlabel('N states')
-plt.title('2 Covariates\n(stim. and bias)')
-sns.despine()
-
-
-# 2 (stim. and bias) vs 3 (stim, bias and action trace) covariates with 3 states
-# df_3s_3cov = fit_all(experiments=[ '2AFC_6'], n_states=3, covariates=['stim_vals', 'bias', 'action_trace'], drug=None, save=True)
-# The other pair for the comparison is df_3s_2cov from above
-
-figsize = fig_size(n_cols=2)
-figsize = (figsize[0], figsize[1]*2)
-plt.figure(figsize=figsize, constrained_layout=True)
-ll0 = df_3s_2cov['LogLikelihood'].unique()
-n_trials0 = df_3s_2cov.groupby('Subject').size()
-ll1 = df_3s_3cov['LogLikelihood'].unique()
-n_trials1 = df_3s_3cov.groupby('Subject').size()
-
-ll0 = plot_ll(ll0, n_trials0, to_bits=True, positions=[0])
-ll1 = plot_ll(ll1, n_trials1, to_bits=True, positions=[1])
-for y0, y1 in zip(ll0, ll1):
-    plt.plot([0, 1], [y0, y1], color='k', alpha=0.1)
-
-# Paired t-test between states (not needed because sums to 1)
-t_stat, p_val = ttest_rel(ll0, ll1)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-
-plt.xticks([0, 1],['2', '3'])
-plt.xlabel('N covariates')
-plt.title('3 States')
-sns.despine()
-
-
-# 2 (stim. and bias) vs 3 (stim, bias and action trace) covariates with 2 states
-# df_2s_2cov = fit_all(experiments=[ '2AFC_6'], n_states=2, covariates=['stim_vals', 'bias', 'action_trace'], drug=None, save=True)
-# The other pair for the comparison is df_2s_2cov from above
-figsize = fig_size(n_cols=2)
-figsize = (figsize[0], figsize[1]*2)
-plt.figure(figsize=figsize, constrained_layout=True)
-ll0 = df_2s_2cov['LogLikelihood'].unique()
-n_trials0 = df_2s_2cov.groupby('Subject').size()
-ll1 = df_2s_3cov['LogLikelihood'].unique()
-n_trials1 = df_2s_3cov.groupby('Subject').size()
-
-ll0 = plot_ll(ll0, n_trials0, to_bits=True, positions=[0])
-ll1 = plot_ll(ll1, n_trials1, to_bits=True, positions=[1])
-for y0, y1 in zip(ll0, ll1):
-    plt.plot([0, 1], [y0, y1], color='k', alpha=0.1)
-
-# Paired t-test between states (not needed because sums to 1)
-t_stat, p_val = ttest_rel(ll0, ll1)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-
-plt.xticks([0, 1],['2', '3'])
-plt.xlabel('N covariates')
-plt.title('2 States')
-sns.despine()
-
-########################################################################################################################
-
-occ_2s_2cov_saline = plot_occupancy_boxplot(df_2s_2cov[df_2s_2cov.Drug==0], figsize=figsize)
-occ_2s_2cov_drug = plot_occupancy_boxplot(df_2s_2cov[df_2s_2cov.Drug==1], figsize=figsize)
-occ_2s_2cov_saline['Drug'] = 0
-occ_2s_2cov_drug['Drug'] = 1
-occ_2s_2cov_comparison = pd.concat([occ_2s_2cov_saline, occ_2s_2cov_drug], ignore_index=True)
-plt.figure(figsize=figsize, constrained_layout=True)
-sns.boxplot(data=occ_2s_2cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
-# Paired t-test between states (not needed because sums to 1)
-engaged_saline = occ_2s_2cov_comparison[occ_2s_2cov_comparison['Drug'] == 0]['Engaged']
-engaged_drug = occ_2s_2cov_comparison[occ_2s_2cov_comparison['Drug'] == 1]['Engaged']
-t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-plt.xticks([0,1], ['Saline','Drug'])
-plt.ylim(0, 1)
-plt.xlabel('Engaged')
-plt.ylabel('Occupancy')
-sns.despine()
-plt.title('2 states\n(2 cov.: stim., bias)')
-
-
-
-occ_2s_3cov_saline = plot_occupancy_boxplot(df_2s_3cov[df_2s_3cov.Drug==0], figsize=figsize)
-occ_2s_3cov_drug = plot_occupancy_boxplot(df_2s_3cov[df_2s_3cov.Drug==1], figsize=figsize)
-occ_2s_3cov_saline['Drug'] = 0
-occ_2s_3cov_drug['Drug'] = 1
-occ_2s_3cov_comparison = pd.concat([occ_2s_3cov_saline, occ_2s_3cov_drug], ignore_index=True)
-plt.figure(figsize=figsize, constrained_layout=True)
-sns.boxplot(data=occ_2s_3cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
-# Paired t-test between states (not needed because sums to 1)
-engaged_saline = occ_2s_3cov_comparison[occ_2s_3cov_comparison['Drug'] == 0]['Engaged']
-engaged_drug = occ_2s_3cov_comparison[occ_2s_3cov_comparison['Drug'] == 1]['Engaged']
-t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-plt.xticks([0,1], ['Saline','Drug'])
-plt.ylim(0, 1)
-plt.xlabel('Engaged')
-plt.ylabel('Occupancy')
-sns.despine()
-plt.title('2 states\n(3 cov.: stim., bias, At)')
-
-
-
-occ_3s_2cov_saline = plot_occupancy_boxplot(df_3s_2cov[df_3s_2cov.Drug==0], figsize=figsize)
-occ_3s_2cov_drug = plot_occupancy_boxplot(df_3s_2cov[df_3s_2cov.Drug==1], figsize=figsize)
-occ_3s_2cov_saline['Drug'] = 0
-occ_3s_2cov_drug['Drug'] = 1
-occ_3s_2cov_comparison = pd.concat([occ_3s_2cov_saline, occ_3s_2cov_drug], ignore_index=True)
-plt.figure(figsize=figsize, constrained_layout=True)
-sns.boxplot(data=occ_3s_2cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
-# Paired t-test between states (not needed because sums to 1)
-engaged_saline = occ_3s_2cov_comparison[occ_3s_2cov_comparison['Drug'] == 0]['Engaged']
-engaged_drug = occ_3s_2cov_comparison[occ_3s_2cov_comparison['Drug'] == 1]['Engaged']
-t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-plt.xticks([0,1], ['Saline','Drug'])
-plt.ylim(0, 1)
-plt.xlabel('Engaged')
-plt.ylabel('Occupancy')
-sns.despine()
-plt.title('3 states\n(2 cov.: stim., bias)')
-
-
-
-occ_3s_3cov_saline = plot_occupancy_boxplot(df_3s_3cov[df_3s_3cov.Drug==0], figsize=figsize)
-occ_3s_3cov_drug = plot_occupancy_boxplot(df_3s_3cov[df_3s_3cov.Drug==1], figsize=figsize)
-occ_3s_3cov_saline['Drug'] = 0
-occ_3s_3cov_drug['Drug'] = 1
-occ_3s_3cov_comparison = pd.concat([occ_3s_3cov_saline, occ_3s_3cov_drug], ignore_index=True)
-plt.figure(figsize=figsize, constrained_layout=True)
-sns.boxplot(data=occ_3s_3cov_comparison, x='Drug', y='Engaged', palette=['tab:gray','tab:pink'], showfliers=False)
-# Paired t-test between states (not needed because sums to 1)
-engaged_saline = occ_3s_3cov_comparison[occ_3s_3cov_comparison['Drug'] == 0]['Engaged']
-engaged_drug = occ_3s_3cov_comparison[occ_3s_3cov_comparison['Drug'] == 1]['Engaged']
-t_stat, p_val = ttest_rel(engaged_saline, engaged_drug)
-print(f't = {t_stat:.3f}, p = {p_val:.3f}')
-add_star_between(p_val, 0, 1)
-plt.xticks([0,1], ['Saline','Drug'])
-plt.ylim(0, 1)
-plt.xlabel('Engaged')
-plt.ylabel('Occupancy')
-sns.despine()
-plt.title('3 states\n(3 cov.: stim., bias, At)')
+# Load results
+path = Path.home() / 'PycharmProjects' / 'glmhmm' / 'results_drug.pkl'
+with open(path, 'rb') as f:
+    results_drug = pickle.load(f)
+posterior_probs_drug = results_drug['posterior_probs']
+trans_mat_drug = results_drug['trans_mat']
+df_occ_drug = plot_occupancy_boxplot(posterior_probs_drug)
 """
-
-

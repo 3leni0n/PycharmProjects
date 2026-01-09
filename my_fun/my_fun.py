@@ -1170,15 +1170,17 @@ def filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=True):
     experiment = df.Experiment.unique()[0]
 
     if experiment in ['2AFC_2', '2AFC_3']:
-        df = df[df.Stage == 4].reset_index(drop=True)
-        df = df[df.Motor == 4].reset_index(drop=True)
-        df = df[df.StimDur == 1].reset_index(drop=True)
+        # These 3 conditons return 0 trials
+        # df = df[df.Stage == 4].reset_index(drop=True)
+        # df = df[df.Motor == 4].reset_index(drop=True)
+        # df = df[df.StimDur == 1].reset_index(drop=True)
         df = df[df.P > 0].reset_index(drop=True)
 
     elif experiment in ['2AFC_4', '2AFC_6']:
-        df = df[df.Task == 'FD'].reset_index(drop=True)  # (otherwise bump in lick rate before stim. onset)
-        df = df[df.StimDur == 1].reset_index(drop=True)
-        df = df[df.Delay == 0.5].reset_index(drop=True)
+        # These 3 conditons return 0 trials
+        # df = df[df.Task == 'FD'].reset_index(drop=True)  # (otherwise bump in lick rate before stim. onset)
+        # df = df[df.StimDur == 1].reset_index(drop=True)
+        # df = df[df.Delay == 0.5].reset_index(drop=True)
         df = df[df.P > 0].reset_index(drop=True)
 
         if experiment == '2AFC_6' and filter_drug:  # Drug group
