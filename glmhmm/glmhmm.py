@@ -712,8 +712,8 @@ def plot_ll(log_likelihood, n_trials, to_bits=True, positions=[1], **kwargs):
 
     if len(ll) > 1:
         # sns.boxplot(y=log_likelihood, color=color, showfliers=True)
-        plt.boxplot(ll, positions=positions, showfliers=True)
-        plt.scatter([positions]*len(ll), ll, color=color, alpha=0.1)
+        plt.boxplot(ll, positions=positions, showfliers=False)
+        # plt.scatter([positions]*len(ll), ll, color=color, alpha=0.1)
     else:
         plt.bar(positions, ll[0], color=color, edgecolor=color)
 
