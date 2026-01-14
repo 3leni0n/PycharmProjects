@@ -3,7 +3,7 @@ from scipy.stats import ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_star_between, filter_drug_sessions, filter_behavior, fig_size
+from my_fun import get_experiment, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
 from cherry.cherry import *
 from kernels.kernels_tools import *
 import numpy as np
@@ -42,7 +42,7 @@ def get_action_trace(df, max_trial_lag=10, tau=2):
         past_rminus = r_minus[max(0, t - max_trial_lag):t]
         past_rplus = r_plus[max(0, t - max_trial_lag):t]
 
-        effective_weights = weights[:len(past_choice)]
+        effective_weights = weights[:len(past_choice)][::-1]
 
         at_choice.append(np.sum(past_choice * effective_weights) / Z)
         at_error.append(np.sum(past_rminus * effective_weights) / Z)
@@ -176,6 +176,8 @@ def interpret_weights(weights, trans_mat, posterior_probs):
         biased_left = others[np.argmin(bias_weights[others])]
         biased_right = others[np.argmax(bias_weights[others])]
         remap_indices = [engaged_index, biased_left, biased_right]
+    elif n_states == 1 or n_states > 3:
+        remap_indices = list(range(n_states))  # No interpretation — identity remap for testing
     else:
         raise ValueError('Only 2 or 3 states supported for interpretation.')
 
@@ -198,8 +200,8 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     :return: DataFrame with added columns for model fitting results.
     """
 
-    if n_states not in (2, 3):
-        raise ValueError('n_states must be 2 or 3')
+    # if n_states not in (1, 2, 3, 4):
+    #     raise ValueError('n_states must be 2 or 3')
 
     if covariates is None:
         if n_states == 2:
@@ -209,10 +211,14 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     else:
         covariates = covariates
 
+    if n_states == 1:
+        state_label_map = {0: 'State0'}
     if n_states == 2:
         state_label_map = {0: 'Disengaged', 1: 'Engaged'}
     elif n_states == 3:
         state_label_map = {0: 'Engaged', 1: 'BiasedLeft', 2: 'BiasedRight'}
+    elif n_states >= 4:
+        state_label_map = {i: f'State{i}' for i in range(n_states)}  # Testing only
 
     # Filter data
     df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
@@ -237,7 +243,7 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
 
     # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
-    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST2' / f'{n_states}s_{len(covariates)}cov' / experiment
+    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}cov' / experiment
     # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / experiment
 
     # Parse the data
@@ -301,6 +307,7 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     return df
 
 
+@timer
 def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, covariates=None, cherry=True, drug=None, save=True):
     """
     Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
