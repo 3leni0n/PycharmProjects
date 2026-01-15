@@ -148,7 +148,7 @@ def compute_window(data, win_length=20):
             roll_avg.append(round(np.nanmean(data[0:i + 1]), 2))
         else:
             roll_avg.append(round(np.nanmean(data[i - win_length + 1:i + 1]), 2))
-    return roll_avg
+    return roll_avg[::-1]
 
 
 # New interpret function for 2 states
@@ -242,9 +242,9 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     #     condition = 'saline' if drug == 0 else 'drug'
     #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
 
-    # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / f'{n_states}_states_TEST_unpaired' / experiment
     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}cov' / experiment
-    # folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / experiment
+    if covariates == ['bias']:
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_null' / experiment
 
     # Parse the data
     inputs, choices = parse_glmhmm(df, covariates=covariates)
@@ -712,10 +712,10 @@ def plot_ll(log_likelihood, n_trials, to_bits=True, positions=[1], **kwargs):
     if to_bits:
         ll = [ll / np.log(2) for ll in ll]
 
-    ylabel = f"LL/trial {'(bits)' if to_bits else '(nats)'}"
+    ylabel = f"LL {'(bits/trial)' if to_bits else '(nats/trial)'}"
     mean_ll = np.mean(ll)
     std_ll = np.std(ll, ddof=1)
-    print(f'LL/trial: {mean_ll:.2f} ± {std_ll:.2f} ({ylabel})')
+    print(f'{mean_ll:.2f} ± {std_ll:.2f} {ylabel}')
 
     if len(ll) > 1:
         # sns.boxplot(y=log_likelihood, color=color, showfliers=True)
