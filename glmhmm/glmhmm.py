@@ -1,5 +1,5 @@
 import os
-from scipy.stats import ttest_rel
+from scipy.stats import ttest_rel, bernoulli
 import pickle
 import ssm
 from matplotlib import cm
@@ -242,9 +242,10 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     #     condition = 'saline' if drug == 0 else 'drug'
     #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
 
-    folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}cov' / experiment
     if covariates == ['bias']:
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_null' / experiment
+    else:
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}cov' / experiment
 
     # Parse the data
     inputs, choices = parse_glmhmm(df, covariates=covariates)
@@ -693,11 +694,12 @@ def plot_occupancy_boxplot(df, **kwargs):
     return occ_df
 
 
-def plot_ll(log_likelihood, n_trials, to_bits=True, positions=[1], **kwargs):
+def plot_ll(log_likelihood, n_trials, log_likelihood_bernoulli=None, to_bits=True, positions=[1], **kwargs):
     """
     Plot log likelihood of one or several subjects.
     :param log_likelihood: List of log likelihoods (float) per subject
     :param n_trials: List of number of trials (int) per subject
+    :param log_likelihood_bernoulli: List of Bernoulli log likelihoods (float) per subject to subtract as baseline
     :param to_bits: If True, normalize log likelihood by log(2) to convert to bits
     :param kwargs: Additional keyword arguments for plt.plot()
     :return:
@@ -708,6 +710,10 @@ def plot_ll(log_likelihood, n_trials, to_bits=True, positions=[1], **kwargs):
 
     # Normalize log likelihood per trial
     ll = [(ll / n) for ll, n in zip(log_likelihood, n_trials)]
+
+    # Subtract Bernoulli baseline (Ashwood-style)
+    if log_likelihood_bernoulli is not None:
+        ll = [ll - (ll_b / n) for ll, ll_b, n in zip(ll, log_likelihood_bernoulli, n_trials)]
 
     if to_bits:
         ll = [ll / np.log(2) for ll in ll]
@@ -766,6 +772,66 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
     plt.xlabel('Transition')
     plt.title('Matrix')
     sns.despine()
+
+
+def iqr_inliers(x):
+    q1, q3 = np.percentile(x, [25, 75])
+    iqr = q3 - q1
+    return (x >= q1 - 1.5 * iqr) & (x <= q3 + 1.5 * iqr)
+
+
+def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
+
+    if n_cov == 1:
+        covariates = ['stim_vals']
+        cov_labels = 'stim.'
+    elif n_cov == 2:
+        covariates = ['stim_vals', 'bias']
+        cov_labels = 'stim. and bias'
+    elif n_cov == 3:
+        covariates = ['stim_vals', 'bias', 'at_choice']
+        cov_labels = 'stim., bias and At'
+    elif n_cov == 4:
+        covariates = ['stim_vals', 'bias', 'at_error', 'at_correct']
+        cov_labels = 'stim., bias, At- and At+'
+
+    figsize = fig_size(n_cols=2)
+    figsize = (figsize[0], figsize[1] * 2)
+    plt.figure(figsize=figsize, constrained_layout=True)
+
+    lls = []
+    inliers = []
+    for n_states in range(1, 6):  # 1-5 states
+        print(f'Loading results of model with {n_states} states and {n_cov} covariates')
+        if fit:
+            df = fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=n_states, covariates=covariates, drug=None, save=True)
+        else:
+            df = glue_groups(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], path_session=f'glmhmm/TEST/{n_states}s_{n_cov}cov')
+
+        ll = df['LogLikelihood'].unique()
+        n_trials = df.groupby('Subject').size()
+        ll = plot_ll(ll, n_trials, ll_null, to_bits=True, positions=[n_states])
+        ll = np.array(ll)
+        lls.append(ll)
+        inliers.append(iqr_inliers(ll))
+
+    mask = np.logical_and.reduce(inliers)
+
+    for i in range(len(lls) - 1):
+        for y_prev, y_next in zip(lls[i][mask], lls[i + 1][mask]):
+            plt.plot([i + 1, i + 2], [y_prev, y_next], color='k', alpha=0.1)
+        t_stat, p_val = ttest_rel(lls[i][mask], lls[i + 1][mask])
+        print(f't = {t_stat:.3f}, p = {p_val:.3f}')
+        add_star_between(p_val, i + 1, i + 2)
+
+    plt.xticks([1, 2, 3, 4, 5], ['1', '2', '3', '4', '5'])
+    plt.xlabel('N states')
+    plt.title(f'{n_cov} Covariates\n({cov_labels})')
+    sns.despine()
+
+    # ll_2_cov_means = [np.mean(ll_1), np.mean(ll_2), np.mean(ll_3), np.mean(ll_4), np.mean(ll_5)]
+
+    return lls
 
 
 """
