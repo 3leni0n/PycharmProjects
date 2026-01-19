@@ -788,10 +788,10 @@ def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
         cov_labels = 'stim. and bias'
     elif n_cov == 3:
         covariates = ['stim_vals', 'bias', 'at_choice']
-        cov_labels = 'stim., bias and At'
+        cov_labels = r'stim., bias and $A_t$'
     elif n_cov == 4:
         covariates = ['stim_vals', 'bias', 'at_error', 'at_correct']
-        cov_labels = 'stim., bias, At- and At+'
+        cov_labels = r'stim., bias, $A_t-$ and $A_t+$'
 
     figsize = fig_size(n_cols=2)
     figsize = (figsize[0], figsize[1] * 2)
@@ -826,8 +826,6 @@ def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
     plt.xlabel('N states')
     plt.title(f'{n_cov} Covariates\n({cov_labels})')
     sns.despine()
-
-    # ll_2_cov_means = [np.mean(ll_1), np.mean(ll_2), np.mean(ll_3), np.mean(ll_4), np.mean(ll_5)]
 
     return lls
 
