@@ -74,7 +74,7 @@ folder_in = folder_in + animal + '.csv'
 
 # Load sounds
 # sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds.csv'
-sounds_path = '/home/alexis/PycharmProjects/create_sounds/sounds_2.csv'
+sounds_path = '/create_sounds/sounds_2.csv'
 sounds = pd.read_csv(sounds_path)
 n_frames = 10
 

@@ -51,8 +51,6 @@ from collections import namedtuple
 from my_fun.my_fun import get_experiment, get_animal, save_fig, timer, filter_drug_sessions
 from cherry.cherry import *
 from kernels.kernels_tools import *
-from plotting_style import *
-
 
 
 @timer

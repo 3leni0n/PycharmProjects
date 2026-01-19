@@ -1186,7 +1186,7 @@ def filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=True):
         if experiment == '2AFC_6' and filter_drug:  # Drug group
             df = filter_drug_sessions(df)
 
-    elif experiment == '2AFC_5':
+    elif experiment == '2AFC_5':  # Ephys group
         df = df[df.Task == 'FD'].reset_index(drop=True)
         df = df[df.StimDur == 0.5].reset_index(drop=True)
         df = df[df.Delay == 0.5].reset_index(drop=True)

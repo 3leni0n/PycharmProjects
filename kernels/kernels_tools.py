@@ -29,6 +29,12 @@ def make_choice_history_dm(df, k=10):
                 r_minus.append(np.nan)
                 r_plus.append(np.nan)
             else:
+                # Prevent between sessions leak
+                if df.Session.iloc[_] != df.Session.iloc[_ - k]:
+                    r_minus.append(np.nan)
+                    r_plus.append(np.nan)
+                    continue
+
                 # r-(t-k): error right = +1, error left = -1, no error (correct) = 0
                 if df.Hit[_ - k] == 0 and df.Choice[_ - k] == 1:
                     r_minus.append(1)
@@ -206,24 +212,24 @@ def get_shuffles_GLM(endog, exog, iterations, kind, stim_set=6):
             exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, -len_net_ilds:] = net_stim_shuffled
 
-        # History kernels/Full model
-        elif kind == 'hk_rminus':
+        # Full model
+        elif kind == 'fk_rminus':
             prev_resp_shuffled = exog.iloc[:, 0:trial_lag].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, 0:trial_lag] = prev_resp_shuffled
-        elif kind == 'hk_rplus':
+        elif kind == 'fk_rplus':
             prev_resp_shuffled = exog.iloc[:, trial_lag:trial_lag*2].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, trial_lag:trial_lag*2] = prev_resp_shuffled
-        elif kind == 'hk_session_index':
+        elif kind == 'fk_session_index':
             session_indexes_shuffled = exog.iloc[:, trial_lag*2:-len_net_ilds-n_frames].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, trial_lag*2:-len_net_ilds-n_frames] = session_indexes_shuffled
-        elif kind == 'hk_net_stim':
+        elif kind == 'fk_net_stim':
             net_stim_shuffled = exog.iloc[:, -14:-10].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, -14:-10] = net_stim_shuffled
-        elif kind == 'hk_frames':
+        elif kind == 'fk_frames':
             frames_shuffled = exog.iloc[:, -n_frames:].sample(frac=1).reset_index(drop=True)
             exog_shuffled = exog.copy()
             exog_shuffled.iloc[:, -n_frames:] = frames_shuffled

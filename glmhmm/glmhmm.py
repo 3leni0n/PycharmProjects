@@ -3,7 +3,7 @@ from scipy.stats import ttest_rel, bernoulli
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
+from my_fun import get_experiment, add_star_between, filter_behavior, fig_size, timer
 from cherry.cherry import *
 from kernels.kernels_tools import *
 import numpy as np
@@ -13,20 +13,30 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def get_action_trace(df, max_trial_lag=10, tau=2):
+def get_action_trace(df, max_trial_lag=10, tau_choice=1.58, tau_error=2.22, tau_correct=0.95):
     """
     Computes the action trace for each trial in the DataFrame. The action trace is an exponentially weighted sum of past
     choices, where more recent choices have a greater influence. The weights decay exponentially with a time constant
     tau. Output is normalized between -1 and +1.
     :param df: DataFrame containing the data with a column of interest (0=left; 1=right)
     :param max_trial_lag: Number of past trials to consider
-    :param tau: Decay constant
+    :param tau_choice: Decay constant for choice action trace. Fitted from data (mean across subjects)
+    :param tau_error: Decay constant for error action trace. Fitted from data (mean across subjects)
+    :param tau_correct: Decay constant for correct action trace. Fitted from data (mean across subjects)
     :return: List of action trace values for each trial for choices, errors and correct trials
     """
 
     lags = np.arange(1, max_trial_lag + 1)  # Lags from 1 to k
-    weights = np.exp(-lags / tau)  # Exponential decay weights
-    Z = np.sum(weights)  # Fixed normalizer
+
+    # Exponential decay weights
+    weights_choice = np.exp(-lags / tau_choice)
+    weights_error = np.exp(-lags / tau_error)
+    weights_correct = np.exp(-lags / tau_correct)
+
+    # Fixed normalizers
+    Z_choice = np.sum(weights_choice)
+    Z_error = np.sum(weights_error)
+    Z_correct = np.sum(weights_correct)
 
     # Precompute signed choice
     signed_choice = 2 * df['Choice'].to_numpy() - 1  # Map 0→-1, 1→+1
@@ -42,11 +52,14 @@ def get_action_trace(df, max_trial_lag=10, tau=2):
         past_rminus = r_minus[max(0, t - max_trial_lag):t]
         past_rplus = r_plus[max(0, t - max_trial_lag):t]
 
-        effective_weights = weights[:len(past_choice)][::-1]
+        # Slice the weights to match available history and reverse
+        w_choice = weights_choice[:len(past_choice)][::-1]
+        w_error = weights_error[:len(past_rminus)][::-1]
+        w_correct = weights_correct[:len(past_rplus)][::-1]
 
-        at_choice.append(np.sum(past_choice * effective_weights) / Z)
-        at_error.append(np.sum(past_rminus * effective_weights) / Z)
-        at_correct.append(np.sum(past_rplus * effective_weights) / Z)
+        at_choice.append(np.sum(past_choice * w_choice) / Z_choice)
+        at_error.append(np.sum(past_rminus * w_error) / Z_error)
+        at_correct.append(np.sum(past_rplus * w_correct) / Z_correct)
 
     return at_choice, at_error, at_correct
 
@@ -151,12 +164,10 @@ def compute_window(data, win_length=20):
     return roll_avg[::-1]
 
 
-# New interpret function for 2 states
 def interpret_weights(weights, trans_mat, posterior_probs):
     """
     Interpret the HMM latent states (zt) of one or several subjects based on the GLM weights of its covariates.
     Assign engaged (larger) and disengaged (smaller) depending on the weight of the stimulus covariate (cov_index).
-    Work for 2 states only.
     :param weights: GLM weights of shape (n_states, obs_dim, input_dim)
     :param cov_index: Index of the covariate to use for interpretation
     :return: remapped_weights, remap_indices
@@ -200,17 +211,6 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     :return: DataFrame with added columns for model fitting results.
     """
 
-    # if n_states not in (1, 2, 3, 4):
-    #     raise ValueError('n_states must be 2 or 3')
-
-    if covariates is None:
-        if n_states == 2:
-            covariates = ['stim_vals', 'bias', 'at_choice']
-        elif n_states == 3:
-            covariates = ['stim_vals', 'bias']
-    else:
-        covariates = covariates
-
     if n_states == 1:
         state_label_map = {0: 'State0'}
     if n_states == 2:
@@ -222,8 +222,6 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
 
     # Filter data
     df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
-    # df = df[df.P > 0].reset_index(drop=True)
-    # df = df.dropna(subset=['Choice']).reset_index(drop=True)
 
     experiment = df.Experiment.unique()[0]
 
