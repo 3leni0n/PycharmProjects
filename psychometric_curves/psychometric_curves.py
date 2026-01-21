@@ -688,7 +688,6 @@ def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kw
         # xytext = (ilds[-1], 0)
         xy = (20, 0)
         xytext = (20, 0)
-        color = 'tab:brown'
         va = 'bottom'
         ha = 'right'
 
