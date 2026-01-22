@@ -1,5 +1,5 @@
 import os
-from scipy.stats import ttest_rel, bernoulli
+from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
@@ -692,7 +692,25 @@ def plot_occupancy_boxplot(df, **kwargs):
     return occ_df
 
 
-def plot_ll(log_likelihood, n_trials, log_likelihood_bernoulli=None, to_bits=True, positions=[1], **kwargs):
+def norm_ll(ll, n_trials, ll_null=None, to_bits=True):
+    """
+    Normalize log likelihood of one or several subjects.
+    """
+
+    # Normalize log likelihood per trial
+    ll_norm = [(ll / n) for ll, n in zip(ll, n_trials)]
+
+    # Subtract Bernoulli baseline (Ashwood-style)
+    if ll_null is not None:
+        ll_norm = [ll - (ll_b / n) for ll, ll_b, n in zip(ll_norm, ll_null, n_trials)]
+
+    if to_bits:
+        ll_norm = [ll / np.log(2) for ll in ll_norm]
+
+    return ll_norm
+
+
+def plot_ll(ll, n_trials, ll_null=None, to_bits=True, positions=[1], **kwargs):
     """
     Plot log likelihood of one or several subjects.
     :param log_likelihood: List of log likelihoods (float) per subject
@@ -706,15 +724,17 @@ def plot_ll(log_likelihood, n_trials, log_likelihood_bernoulli=None, to_bits=Tru
     # plt.figure(**kwargs, constrained_layout=True)
     color = kwargs.pop('color', 'k')
 
-    # Normalize log likelihood per trial
-    ll = [(ll / n) for ll, n in zip(log_likelihood, n_trials)]
+    # # Normalize log likelihood per trial
+    # ll = [(ll / n) for ll, n in zip(log_likelihood, n_trials)]
+    #
+    # # Subtract Bernoulli baseline (Ashwood-style)
+    # if ll_null is not None:
+    #     ll = [ll - (ll_b / n) for ll, ll_b, n in zip(ll, ll_null, n_trials)]
+    #
+    # if to_bits:
+    #     ll = [ll / np.log(2) for ll in ll]
 
-    # Subtract Bernoulli baseline (Ashwood-style)
-    if log_likelihood_bernoulli is not None:
-        ll = [ll - (ll_b / n) for ll, ll_b, n in zip(ll, log_likelihood_bernoulli, n_trials)]
-
-    if to_bits:
-        ll = [ll / np.log(2) for ll in ll]
+    ll = norm_ll(ll, n_trials, ll_null, to_bits=True)
 
     ylabel = f"LL {'(bits/trial)' if to_bits else '(nats/trial)'}"
     mean_ll = np.mean(ll)
@@ -785,17 +805,13 @@ def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
         cov_labels = 'stim.'
     elif n_cov == 2:
         covariates = ['stim_vals', 'bias']
-        cov_labels = 'stim. and bias'
+        cov_labels = 'stim., bias'
     elif n_cov == 3:
         covariates = ['stim_vals', 'bias', 'at_choice']
-        cov_labels = r'stim., bias and $A_t$'
+        cov_labels = r'stim., bias, $A_t$'
     elif n_cov == 4:
         covariates = ['stim_vals', 'bias', 'at_error', 'at_correct']
-        cov_labels = r'stim., bias, $A_t-$ and $A_t+$'
-
-    figsize = fig_size(n_cols=2)
-    figsize = (figsize[0], figsize[1] * 2)
-    plt.figure(figsize=figsize, constrained_layout=True)
+        cov_labels = r'stim., bias, $A_{t-}$, $A_{t+}$'
 
     lls = []
     inliers = []
@@ -828,6 +844,71 @@ def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
     sns.despine()
 
     return lls
+
+
+def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
+
+    if n_cov == 1:
+        covariates = ['stim_vals']
+        cov_labels = 'stim.'
+    elif n_cov == 2:
+        covariates = ['stim_vals', 'bias']
+        cov_labels = 'stim. and bias'
+    elif n_cov == 3:
+        covariates = ['stim_vals', 'bias', 'at_choice']
+        cov_labels = r'stim., bias and $A_t$'
+    elif n_cov == 4:
+        covariates = ['stim_vals', 'bias', 'at_error', 'at_correct']
+        cov_labels = r'stim., bias, $A_{t-}$ and $A_{t+}$'
+
+    lls = []
+    inliers = []
+    for n_states in range(1, 6):  # 1-5 states
+        print(f'Loading results of model with {n_states} states and {n_cov} covariates')
+        if fit:
+            df = fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=n_states, covariates=covariates, drug=None, save=True)
+        else:
+            df = glue_groups(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], path_session=f'glmhmm/TEST/{n_states}s_{n_cov}cov')
+
+        ll = df['LogLikelihood'].unique()
+        n_trials = df.groupby('Subject').size()
+        ll = norm_ll(ll, n_trials, ll_null, to_bits=True)
+        ll = np.array(ll)
+        lls.append(ll)
+        inliers.append(iqr_inliers(ll))
+
+    mask = np.logical_and.reduce(inliers)
+
+   # Compute all consecutive differences
+    diffs = [lls[i + 1][mask] - lls[i][mask] for i in range(len(lls) - 1)]
+
+    # Prepare long-form DataFrame for all Δ LLs
+    df_plot = pd.DataFrame({'diffs': np.concatenate(diffs),
+    'comparison': np.repeat(['2s–1s', '3s–2s', '4s–3s', '5s–4s'],
+                            [len(d) for d in diffs])})
+
+    # Plotting Δ LL clouds
+    sns.stripplot(x='comparison', y='diffs', data=df_plot, color='tab:gray', zorder=1)
+
+    for i, diff in enumerate(diffs):
+        mean_diff = diff.mean()
+        ci_low, ci_high = np.percentile(diff, [2.5, 97.5])
+        plt.plot([i, i], [ci_low, ci_high], color='k', zorder=2)
+        plt.scatter(i, mean_diff, facecolor='tab:orange', edgecolor='k', zorder=3)
+
+        # # One-sample t-test against 0
+        # t_stat, p_val = ttest_1samp(diffs, 0)
+        # print(f'{i+1}→{i+2}: t = {t_stat:.3f}, p = {p_val:.3f}')
+        # add_star_between(p_val, i, i)  # adjust if your star function uses indices
+
+    plt.axhline(0, color='k', ls='--')
+    plt.xticks(range(4), ['2-1', '3-2', '4-3', '5-4'])
+    plt.title(f'{n_cov} Covariates\n({cov_labels})')
+    plt.xlabel('N States')
+    plt.ylabel('Δ LL (bits/trial)')
+    sns.despine()
+
+    return diffs
 
 
 """
