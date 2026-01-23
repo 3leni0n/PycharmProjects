@@ -1016,7 +1016,7 @@ def add_star_between(pval, x1=0, x2=1, y=None):
     :param x2: x-coordinate of the right point of the horizontal line
     """
 
-    color='k'
+    color = 'k'
 
     # Get y max of the current axis
     if y is None:

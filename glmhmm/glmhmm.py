@@ -353,108 +353,144 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
     return df_fit_all
 
 
-# Plotting functions
-
-def plot_GLMHMM_kernel(remapped_weights, **kwargs):
+def get_weights(df):
     """
-    Plot GLM remapped weights for one subject for each state. Requires weight remapping first according to
-    interpretation.
-    :param weights_remapped: np.array with GLM weights of shape (n_states, obs_dim, input_dim) already remapped
-    (0 = disengaged, 1 = engaged)
-    :param kwargs: Additional keyword arguments for plt.plot()
-    :return: None
+    Extract string weights from dataframe and convert back to array
+    (pandas stores them as strings when writting to csv).
+    :params: df: DataFrame containing the data with a column 'Weights'
     """
 
-    weights_disengaged = remapped_weights[0, 0, :]
-    weights_engaged = remapped_weights[1, 0, :]
+    n_states = df.Nstates.unique()[0]
+    input_dim = df.InputDimensions.unique()[0]
+    weights = df.Weights  # Get unique strings
 
-    bias_index = 1
-    weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
-    weights_engaged[bias_index] = abs(weights_engaged[bias_index])
+    # Convert all strings to arrays
+    weights = np.array([
+        np.fromstring(s.replace('\n','').strip('[]'), sep=' ').reshape(n_states, input_dim)
+        for s in weights
+    ])
 
-    plt.plot(weights_disengaged, color='tab:gray', marker='o', **kwargs)
-    plt.plot(weights_engaged, color='tab:blue', marker='o', **kwargs)
-    plt.axhline(0, color='black', linestyle='--')
-    cov_names = ['stim.', '|bias|', '$A_t$']
-    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
-    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
-    plt.xticks(np.arange(len(cov_names)), cov_names)
-    plt.xlabel('Covariate')
-    plt.ylabel(f'Weight')
-    plt.title(f'GLM-HMM kernel')
-    sns.despine()
+    return weights
 
 
-def plot_mean_GLMHMM_kernel(remapped_weights, **kwargs):
-    """
-    Plot GLM remapped weights for all subjects for each state. Requires weight remapping first according to
-    interpretation.
-    :param remapped_weights: List GLM weights per subject of shape (n_states, obs_dim, input_dim) already remapped
-    (0 = disengaged, 1 = engaged)
-    :param kwargs: Additional keyword arguments for plt.plot()
-    :return: None
-    """
+def iqr_inliers(x):
+    q1, q3 = np.percentile(x, [25, 75])
+    iqr = q3 - q1
+    return (x >= q1 - 1.5 * iqr) & (x <= q3 + 1.5 * iqr)
 
-    plt.figure(**kwargs, constrained_layout=True)
 
-    mean_weights_engaged = []
-    mean_weights_disengaged = []
-    for i, w in enumerate(remapped_weights):
-        weights_disengaged = w[0, 0, :]
-        weights_engaged = w[1, 0, :]
+def remove_outliers(weights):
+    # Remove outliers based on IQR for each covariate (for zooming in plots)
+    n_subjects, n_states, n_cov = weights.shape
+    mask = np.ones(n_subjects, dtype=bool)  # Initialize mask with all True
+    for i_state in range(n_states):
+        for j_cov in range(n_cov):
+            inliers = iqr_inliers(weights[:, i_state, j_cov])
+            mask &= inliers  # keep only subjects that are inliers for all covariates
+    print(f'Kept {mask.sum()} / {n_subjects} subjects after column-wise IQR filtering')
+    # weights = weights[mask]
+    return mask
 
-        bias_index = 1
-        weights_disengaged[bias_index] = abs(weights_disengaged[bias_index])
-        weights_engaged[bias_index] = abs(weights_engaged[bias_index])
 
-        # if weights_disengaged[3] > 10 or weights_engaged[3] > 10:
-        #     print(f'Skipping animal {animals[i]} with weights {weights_disengaged[3]}, {weights_engaged[3]}')
-        #     continue
+def plot_GLMHMM_kernel(df):
 
-        mean_weights_disengaged.append(weights_disengaged)
-        mean_weights_engaged.append(weights_engaged)
-        plot_GLMHMM_kernel(remapped_weights[i], alpha=0.1)
+    weights = get_weights(df)
 
-    # convert to arrays
-    mean_weights_disengaged = np.array(mean_weights_disengaged)
-    mean_weights_engaged = np.array(mean_weights_engaged)
+    flattened = weights.reshape(weights.shape[0], -1)  # Flatten each 2D array to 1D
+    unique_flat = np.unique(flattened, axis=0)  # Keep only unique arrays
+    weights = unique_flat.reshape(-1, weights.shape[1], weights.shape[2])  # Reshape back to original 2D shape per array
 
-    # Compute the mean across animals
-    mean_weights_disengaged = np.mean(mean_weights_disengaged, axis=0)
-    mean_weights_engaged = np.mean(mean_weights_engaged, axis=0)
+    mask = remove_outliers(weights)
+    weights = weights[mask]
+    n_animals, n_states, n_cov = weights.shape
 
-    plt.plot(mean_weights_disengaged, color='tab:gray', marker='o', label='Disengaged')
-    plt.plot(mean_weights_engaged, color='tab:blue', marker='o', label='Engaged')
-    cov_names = ['stim.', '|bias|', '$A_t$']
-    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
-    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
-    plt.xticks(np.arange(len(cov_names)), cov_names)
-    plt.xlabel('Covariate')
-    plt.ylabel(f'Weight')
-    plt.title(f'GLM-HMM kernel')
+    # Plot weights
+    mean_weights = weights.mean(axis=0)
+    sem_weights = sem(weights, axis=0)
+
+    # Plot each state's mean kernel
+    if n_states == 2 and n_cov == 3:
+        state_labels = ['Disengaged', 'Engaged']
+        colors = ['tab:gray', 'tab:green']
+        cov_labels = ['Stim.', 'Bias', r'$A_t$']
+        title = '2 states 3 covariates'
+    elif n_states == 3 and n_cov == 2:
+        state_labels = ['Engaged', 'Left bias', 'Right bias']
+        colors = ['tab:green', 'tab:blue', 'tab:orange']
+        cov_labels = ['Stim.', 'Bias']
+        title = '3 states 2 covariates'
+
+    x = np.arange(len(cov_labels))
+
+    figsize = fig_size(n_cols=2)
+    plt.figure(figsize=figsize, constrained_layout=True)
+    plt.axhline(y=0, color='k', ls='--')
+
+    # Individuals
+    for w in weights:  # w shape: (n_states, n_cov)
+        for s in range(n_states):
+            plt.plot(x, w[s], color=colors[s % len(colors)], alpha=0.1)
+
+    # Mean ± SEM
+    for s in range(n_states):
+        plt.errorbar(
+            x, mean_weights[s], yerr=sem_weights[s],
+            marker='o', lw=3, color=colors[s % len(colors)],
+            label=state_labels[s]
+        )
+
+    plt.xticks(x, cov_labels)
+    # plt.xlabel('Covariates')
+    plt.ylabel('Weights')
+    plt.title(title)
     plt.legend(frameon=False)
     sns.despine()
 
 
-def results_2_df(all_animals, experiment, weights):
+# Plotting functions
+
+
+def results_2_df(df):
+
+    all_animals = df.Subject.unique()
+    experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
+
+    weights = get_weights(df)
+    flattened = weights.reshape(weights.shape[0], -1)  # Flatten each 2D array to 1D
+    unique_flat = np.unique(flattened, axis=0)  # Keep only unique arrays
+    weights = unique_flat.reshape(-1, weights.shape[1], weights.shape[2])  # Reshape back to original 2D shape per array
+
+    # mask = remove_outliers(weights)
+    # weights = weights[mask]
+
+    n_states = weights.shape[1]
+    if n_states == 1:
+        state_label_map = {0: 'State0'}
+    if n_states == 2:
+        state_label_map = {0: 'Disengaged', 1: 'Engaged'}
+    elif n_states == 3:
+        state_label_map = {0: 'Engaged', 1: 'BiasedLeft', 2: 'BiasedRight'}
+    elif n_states >= 4:
+        state_label_map = {i: f'State{i}' for i in range(n_states)}  # Testing only
+
     data = []
     for animal_id, w, exp in zip(all_animals, weights, experiment):
         for state_idx in range(w.shape[0]):
-            for cov_idx in range(w.shape[2]):
+            for cov_idx in range(w.shape[1]):
                 data.append({
                     'Animal': animal_id,
                     'Experiment': exp,
                     'State': state_idx,
-                    'Label': 'Disengaged' if state_idx == 0 else 'Engaged',
+                    'Label': state_label_map[state_idx],
                     'Covariate': cov_idx,
-                    'Weight': w[state_idx, 0, cov_idx]
+                    'Weight': w[state_idx, cov_idx]
                 })
     data = pd.DataFrame(data)
     data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
+
     return data
 
 
-# def plot_paired_boxplot_GLMHMM_kernel(remapped_weights, all_animals, drug=False, **kwargs):
 def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     """
     Plot paired boxplots for engaged vs disengaged weights across all subjects for each covariate.
@@ -470,39 +506,28 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     bbox = kwargs.pop('bbox_to_anchor', None)
     # palette = kwargs.pop('palette', None)
 
-    # data = []
-    # for animal_id, w in zip(all_animals, remapped_weights):
-    #     for state_idx in range(w.shape[0]):
-    #         for cov_idx in range(w.shape[2]):
-    #             data.append({
-    #                 'Animal': animal_id,
-    #                 'State': state_idx,
-    #                 # 'Label': 'Disengaged' if state_idx == 0 else 'Engaged',
-    #                 'Covariate': cov_idx,
-    #                 'Weight': w[state_idx, 0, cov_idx]
-    #             })
-    # data = pd.DataFrame(data)
-    # data.loc[data['Covariate'] == 1, 'Weight'] = data.loc[data['Covariate'] == 1, 'Weight'].abs()  # Absolute  bias
-
     # Color scheme and legend labels
     if drug:
         palette = {0: 'tab:gray', 1: 'tab:pink'}
         labels = ['Saline', 'Drug']
         hue = 'Drug'
     else:
-        palette = {0: 'tab:gray', 1: 'tab:blue'}
-        labels = ['Disengaged', 'Engaged']
         hue = 'State'
+        n_states = data.State.nunique()
+        if n_states == 2:
+            palette = {0: 'tab:gray', 1: 'tab:green'}
+            labels = ['Dis.', 'Eng.']
+            cov_names = ['stim.', '|bias|', '$A_t$']
+        elif n_states == 3:
+            palette = {0: 'tab:green', 1: 'tab:blue', 2: 'tab:orange'}
+            labels = ['Eng.', 'L. bias', 'R. bias']
+            cov_names = ['stim.', '|bias|']
 
     palette = kwargs.pop('palette', palette)
 
     plt.figure(constrained_layout=True, **kwargs)
     plt.axhline(0, color='black', linestyle='--')
-    ax = sns.boxplot(x='Covariate', y='Weight', hue=hue, data=data,
-                palette=palette, showfliers=False)
-    cov_names = ['stim.', '|bias|', '$A_t$']
-    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_t$']
-    # cov_names = ['|2|', '|4|', '|8|', '|70|', 'bias', '$A_{t^-}$', '$A_{t^+}$']
+    ax = sns.boxplot(x='Covariate', y='Weight', hue=hue, data=data, palette=palette, showfliers=False)
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('')
     plt.title(title)
@@ -510,24 +535,50 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     ax.legend(handles, labels, loc=loc,  bbox_to_anchor=bbox, frameon=False)  # Rename legend labels
     sns.despine()
 
+    # Get seaborn box width and compute positions for each state
+    width = 0.8
+    state_positions = [(i - (n_states - 1) / 2) * width / n_states for i in range(n_states)]
+
     # Draw paired lines of subjects between boxes (states)
     for cov in sorted(data['Covariate'].unique()):
         for animal in sorted(data['Animal'].unique()):
             subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
-            x0 = cov - 0.2  # disengaged box (gray)
-            x1 = cov + 0.2  # engaged box (blue)
-            y0 = subset[subset[hue] == 0]['Weight'].values[0]
-            y1 = subset[subset[hue] == 1]['Weight'].values[0]
-            ax.plot([x0, x1], [y0, y1], color='k', alpha=0.1)
+            for i in range(n_states - 1):
+                x_start = cov + state_positions[i]
+                x_end   = cov + state_positions[i + 1]
+                y_start = subset[subset[hue] == i]['Weight'].values[0]
+                y_end   = subset[subset[hue] == i + 1]['Weight'].values[0]
+                ax.plot([x_start, x_end], [y_start, y_end], color='k', alpha=0.1)
 
     # Compute paired-samples t-tests for each covariate between states
     y_star = ax.get_ylim()[1]
     for cov in sorted(data['Covariate'].unique()):
-        cov_disengaged = data[(data['Covariate'] == cov) & (data[hue] == 0)].sort_values('Animal')['Weight']
-        cov_engaged = data[(data['Covariate'] == cov) & (data[hue] == 1)].sort_values('Animal')['Weight']
-        t_stat, p_val = ttest_rel(cov_engaged, cov_disengaged)
-        print(f'Covariate {cov}: t={t_stat:.3f}, p={p_val:.4f}')
-        add_star_between(p_val, x1=cov - 0.2, x2=cov + 0.2, y=y_star)
+        if n_states == 2:
+            cov_disengaged = data[(data['Covariate'] == cov) & (data[hue] == 0)].sort_values('Animal')['Weight']
+            cov_engaged = data[(data['Covariate'] == cov) & (data[hue] == 1)].sort_values('Animal')['Weight']
+            t_stat, p_val = ttest_rel(cov_engaged, cov_disengaged)
+            print(f'Covariate {cov}: t={t_stat:.3f}, p={p_val:.4f}')
+            add_star_between(p_val, x1=cov - abs(state_positions[0]), x2=cov + abs(state_positions[1]), y=y_star)
+        if n_states == 3:
+            # Get weights for each state
+            engaged = data[(data['Covariate'] == cov) & (data[hue] == 0)].sort_values('Animal')['Weight']
+            left_bias = data[(data['Covariate'] == cov) & (data[hue] == 1)].sort_values('Animal')['Weight']
+            right_bias = data[(data['Covariate'] == cov) & (data[hue] == 2)].sort_values('Animal')['Weight']
+
+            # Engaged vs Left bias
+            t_stat, p_val = ttest_rel(engaged, left_bias)
+            print(f'Covariate {cov}, Eng-Lbias: t={t_stat:.3f}, p={p_val:.4f}')
+            add_star_between(p_val, x1=cov + state_positions[0] + 0.05, x2=cov + state_positions[1] - 0.05, y=y_star)
+
+            # Engaged vs Right bias
+            t_stat, p_val = ttest_rel(engaged, right_bias)
+            print(f'Covariate {cov}, Eng-Rbias: t={t_stat:.3f}, p={p_val:.4f}')
+            add_star_between(p_val, x1=cov + state_positions[0], x2=cov + state_positions[2], y=y_star + y_star * 0.15)
+
+            # Left bias vs Right bias
+            t_stat, p_val = ttest_rel(left_bias, right_bias)
+            print(f'Covariate {cov}, Lbias-Rbias: t={t_stat:.3f}, p={p_val:.4f}')
+            add_star_between(p_val, x1=cov + state_positions[1] + 0.05, x2=cov + state_positions[2] - 0.05, y=y_star)
 
     # Collect all y positions of star lines or texts
     ax = plt.gca()
@@ -790,12 +841,6 @@ def plot_trans_mat_box_plots(trans_mat, **kwargs):
     plt.xlabel('Transition')
     plt.title('Matrix')
     sns.despine()
-
-
-def iqr_inliers(x):
-    q1, q3 = np.percentile(x, [25, 75])
-    iqr = q3 - q1
-    return (x >= q1 - 1.5 * iqr) & (x <= q3 + 1.5 * iqr)
 
 
 def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
