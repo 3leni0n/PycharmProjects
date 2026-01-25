@@ -3,7 +3,7 @@ from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_star_between, filter_behavior, fig_size, timer
+from my_fun import get_experiment, add_stars, add_star_between, filter_behavior, fig_size, timer
 from cherry.cherry import *
 from kernels.kernels_tools import *
 import numpy as np
@@ -353,24 +353,36 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
     return df_fit_all
 
 
-def get_weights(df):
+def get_str_mat(df, col_name):
     """
-    Extract string weights from dataframe and convert back to array
-    (pandas stores them as strings when writting to csv).
-    :params: df: DataFrame containing the data with a column 'Weights'
+    Extract string matrix from dataframe and convert back to array
+    (pandas stores them as strings when writing to csv). It can be the weights or the transition matrix.
+    :params: df: DataFrame containing the data
+    :params: col_name: Name of the column containing the string matrices
     """
 
     n_states = df.Nstates.unique()[0]
     input_dim = df.InputDimensions.unique()[0]
-    weights = df.Weights  # Get unique strings
+    matrix = df[col_name]
+
+    if col_name == 'Weights':
+        dim2 = input_dim
+    elif col_name == 'TransMat':
+        dim2 = n_states
+    else:
+        raise ValueError(f"Column name {col_name} not recognized. Use 'Weights' or 'TransMat'.")
 
     # Convert all strings to arrays
-    weights = np.array([
-        np.fromstring(s.replace('\n','').strip('[]'), sep=' ').reshape(n_states, input_dim)
-        for s in weights
+    matrix = np.array([
+        np.fromstring(s.replace('\n', '').strip('[]'), sep=' ').reshape(n_states, dim2)
+        for s in matrix
     ])
 
-    return weights
+    flattened = matrix.reshape(matrix.shape[0], -1)  # Flatten each 2D array to 1D
+    unique_flat = np.unique(flattened, axis=0)  # Keep only unique arrays
+    matrix = unique_flat.reshape(-1, matrix.shape[1], matrix.shape[2])  # Reshape back to original 2D shape per array
+
+    return matrix
 
 
 def iqr_inliers(x):
@@ -394,14 +406,10 @@ def remove_outliers(weights):
 
 def plot_GLMHMM_kernel(df):
 
-    weights = get_weights(df)
-
-    flattened = weights.reshape(weights.shape[0], -1)  # Flatten each 2D array to 1D
-    unique_flat = np.unique(flattened, axis=0)  # Keep only unique arrays
-    weights = unique_flat.reshape(-1, weights.shape[1], weights.shape[2])  # Reshape back to original 2D shape per array
-
+    weights = get_str_mat(df, col_name='Weights')
     mask = remove_outliers(weights)
     weights = weights[mask]
+
     n_animals, n_states, n_cov = weights.shape
 
     # Plot weights
@@ -455,13 +463,9 @@ def results_2_df(df):
     all_animals = df.Subject.unique()
     experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
 
-    weights = get_weights(df)
-    flattened = weights.reshape(weights.shape[0], -1)  # Flatten each 2D array to 1D
-    unique_flat = np.unique(flattened, axis=0)  # Keep only unique arrays
-    weights = unique_flat.reshape(-1, weights.shape[1], weights.shape[2])  # Reshape back to original 2D shape per array
-
-    # mask = remove_outliers(weights)
-    # weights = weights[mask]
+    weights = get_str_mat(df, col_name='Weights')
+    mask = remove_outliers(weights)
+    weights = weights[mask]
 
     n_states = weights.shape[1]
     if n_states == 1:
@@ -610,14 +614,23 @@ def plot_trans_mat(trans_mat, **kwargs):
     :return: None
     """
 
-    # If trans_mat is a list of arrays, average them
-    if isinstance(trans_mat, list):
-        trans_mat = np.mean(np.stack(trans_mat, axis=0), axis=0)  # Stack and average
+    if trans_mat.ndim == 2:  # Target dimension
+        pass
+    elif trans_mat.ndim == 3:  # Multiple subjects
+        trans_mat = trans_mat.mean(axis=0)
+    else:  # Invalid dimension
+        raise ValueError('trans_mat must be 2D (n_states x n_states) or '
+            '3D (n_subjects x n_states x n_states)'        )
 
-    n_states = int(np.mean(trans_mat.shape))
+    n_states = trans_mat.shape[0]
+    if n_states == 2:
+        ticklabels = ['D', 'E']  # Short labels
+    elif n_states == 3:
+        ticklabels = ['E', 'L', 'R']  # Short labels
+    else:
+        NotImplementedError('n_states must be 2 or 3')
+
     plt.figure(**kwargs, constrained_layout=True)
-
-    # gen_trans_mat = np.exp(log_trans_mat)[0]
     plt.imshow(trans_mat, vmin=-1, vmax=1, cmap='bone', origin='lower')
 
     for i in range(trans_mat.shape[0]):
@@ -628,8 +641,7 @@ def plot_trans_mat(trans_mat, **kwargs):
 
     # plt.xlim(-0.5, n_states + 0.5)
     ticks = range(0, n_states)
-    ticklabels = [str(i) for i in range(n_states)]
-    ticklabels = ['D', 'E']  # Short labels
+    # ticklabels = [str(i) for i in range(n_states)]
     plt.xticks(ticks, ticklabels)
     plt.yticks(ticks, ticklabels)
     # plt.ylim(n_states - 0.5, -0.5)
@@ -645,53 +657,92 @@ def plot_trans_mat(trans_mat, **kwargs):
     return trans_mat
 
 
-def plot_occupancy(posterior_probs, **kwargs):
+def plot_trans_mat_box_plots(trans_mat, **kwargs):
     """
-    Plot state occupancies for one or several subjects based on posterior probabilities.
-    :param posterior_probs: List of posterior probabilities (np.array of shape (n_trials, n_states)) per subject
+    Plot box plots of transition matrix probabilities across subjects.
+    :param trans_mat: List of transition matrices (np.array of shape (n_states, n_states)) per subject
     :param kwargs: Additional keyword arguments for plt.plot()
     :return: None
     """
 
-    # Normalize input to list of lists of arrays
-    if isinstance(posterior_probs[0], np.ndarray):
-        posterior_probs = [posterior_probs]  # Single animal
+    n_subjects, n_states, _ = trans_mat.shape
 
-    n_states = posterior_probs[0][0].shape[1]
-    colors = kwargs.pop('color', ['tab:gray', 'tab:blue'])
-    labels = ['D', 'E']
+    if n_states == 2:
+        labels = ['D', 'E']
+    elif n_states == 3:
+        labels = ['D', 'N', 'E']
+    else:
+        raise NotImplementedError('n_states must be 2 or 3')
+
+    # Flatten each subject
+    trans_mat = trans_mat.reshape(n_subjects, n_states * n_states)
+
+    # Generate column names dynamically
+    columns = [f'{labels[i]}→{labels[j]}' for i in range(n_states) for j in range(n_states)]
+
+    # Keep only diagonal transitions
+    diag_cols = [f'{labels[i]}→{labels[i]}' for i in range(n_states)]
+    df = pd.DataFrame(trans_mat, columns=columns)[diag_cols]
+    df_melt = df.melt(var_name='Transition', value_name='Probability')
+
+    # Color palette based on mean probabilities
+    means = df.mean().to_dict()
+    norm = plt.Normalize(vmin=-1, vmax=1)
+    cmap = cm.get_cmap('bone')
+    palette = {k: cmap(norm(v)) for k, v in means.items()}
+
+    plt.figure(**kwargs, constrained_layout=True)
+    sns.boxplot(x='Transition', y='Probability', data=df_melt, palette=palette, showfliers=False)
+    # sns.stripplot(x='Transition', y='Probability', data=df_melt, color='k', alpha=0.1, jitter=False)
+    plt.ylim(None, 1)
+    plt.ylabel('Probability')
+    plt.xlabel('Transition')
+    plt.title('Matrix')
+    sns.despine()
+
+
+def plot_occupancy(df, **kwargs):
+    """
+    Plot state occupancies for one or multiple subjects based on posterior probabilities.
+    :param df: pd.DataFrame with columns p0, p1, ..., p(n_states)
+    """
+
+    # Posterior probability columns
+    p_cols = [c for c in df.columns if c.startswith('p')]
+    p_cols = sorted(p_cols, key=lambda x: int(x[1:]))
+
+    n_states = df.Nstates.unique()[0]
+    if n_states == 2:
+        colors = kwargs.pop('color', ['tab:gray', 'tab:green'])
+        labels = ['D', 'E']
+    elif n_states == 3:
+        colors = kwargs.pop('color', ['tab:green', 'tab:blue', 'tab:orange'])
+        labels = ['E', 'L', 'R']
+    else:
+        raise NotImplementedError
 
     occupancies = []
 
-    for p in posterior_probs:
+    for _, g in df.groupby('Subject'):
+        posterior_probs = g[p_cols].to_numpy()
+        state_max_posterior = np.argmax(posterior_probs, axis=1)
+        counts = np.bincount(state_max_posterior, minlength=n_states)
+        occupancies.append(counts / counts.sum())
 
-        # Concatenate posterior probabilities across sessions
-        posterior_probs_concat = np.concatenate(p)
-
-        # Get state with maximum posterior probability at particular trial
-        state_max_posterior = np.argmax(posterior_probs_concat, axis=1)
-
-        # Obtain state fractional occupancies
-        _, state_occupancies = np.unique(state_max_posterior, return_counts=True)
-        state_occupancies = state_occupancies / np.sum(state_occupancies)
-        occupancies.append(state_occupancies)
-
-    occupancies = np.array(occupancies)
-    mean_occupancy = np.mean(occupancies, axis=0)
+    occupancies = np.asarray(occupancies)
+    mean_occupancy = occupancies.mean(axis=0)
 
     # Plot fractional occupancies
     plt.figure(**kwargs, constrained_layout=True)
 
-    for z, occ in enumerate(mean_occupancy):
-        print(f'State {z} occupancy: {occ:.2f}')
-        plt.bar(z, occ, color=colors[z], edgecolor='k')
+    for _, occ in enumerate(mean_occupancy):
+        print(f'State {labels[_]} occupancy: {occ:.2f}')
+        plt.bar(_, occ, color=colors[_], edgecolor='k')
 
     plt.xticks(range(len(labels)), labels)
     plt.ylim((0, 1))
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
-    # plt.xlabel('State')
     plt.ylabel('Occ.')
-    # plt.title('Occupancy')
     sns.despine()
 
 
@@ -701,7 +752,7 @@ def plot_occupancy_boxplot(df, **kwargs):
     Expects columns 'Subject' and 'State' in df.
     """
 
-    palette = kwargs.pop('palette', ['tab:gray', 'tab:blue'])
+
 
     occupancies = []
     for subject, sub_df in df.groupby('Subject'):
@@ -709,20 +760,28 @@ def plot_occupancy_boxplot(df, **kwargs):
         if df['State'].nunique() == 2:
             disengaged = state_counts.get(0)
             engaged = state_counts.get(1)
+            labels = ['D', 'E']
+            occupancies.append({'Subject': subject, 'Disengaged': disengaged, 'Engaged': engaged})
+            palette = kwargs.pop('palette', ['tab:gray', 'tab:green'])
         elif df['State'].nunique() == 3:
             engaged = state_counts.get(0)
-            disengaged = state_counts.get(1) + state_counts.get(2)
+            biased_left = state_counts.get(1)
+            biased_right = state_counts.get(2)
+            labels = ['E', 'L', 'R']
+            occupancies.append({'Subject': subject, 'Engaged': engaged, 'BiasedLeft': biased_left, 'BiasedRight': biased_right})
+            palette = kwargs.pop('palette', ['tab:gray', 'tab:blue', 'tab:orange'])
         else:
             raise ValueError('This function only supports 2 or 3 states')
-        occupancies.append({'Subject': subject, 'Disengaged': disengaged, 'Engaged': engaged})
 
-    occ_df = pd.DataFrame(occupancies)
+
+    df_occ = pd.DataFrame(occupancies)
 
     # Melt for seaborn
-    df_melt = occ_df.melt(id_vars='Subject', var_name='State', value_name='Occupancy')
+    df_melt = df_occ.melt(id_vars='Subject', var_name='State', value_name='Occupancy')
     plt.figure(constrained_layout=True, **kwargs)
     sns.boxplot(x='State', y='Occupancy', data=df_melt,
                 palette=palette, showfliers=False)
+    plt.xticks(np.arange(len(labels)), labels)
 
     # sns.lineplot(data=df_melt,  # Paired lines per subject. Not needed because sums to 1
     #     x='State', y='Occupancy',
@@ -737,10 +796,10 @@ def plot_occupancy_boxplot(df, **kwargs):
 
     plt.xlabel('')
     plt.ylim(0, 1)
-    plt.ylabel('Fractional occupancy')
+    plt.ylabel('Occupancy')
     sns.despine()
 
-    return occ_df
+    return df_occ
 
 
 def norm_ll(ll, n_trials, ll_null=None, to_bits=True):
@@ -775,17 +834,7 @@ def plot_ll(ll, n_trials, ll_null=None, to_bits=True, positions=[1], **kwargs):
     # plt.figure(**kwargs, constrained_layout=True)
     color = kwargs.pop('color', 'k')
 
-    # # Normalize log likelihood per trial
-    # ll = [(ll / n) for ll, n in zip(log_likelihood, n_trials)]
-    #
-    # # Subtract Bernoulli baseline (Ashwood-style)
-    # if ll_null is not None:
-    #     ll = [ll - (ll_b / n) for ll, ll_b, n in zip(ll, ll_null, n_trials)]
-    #
-    # if to_bits:
-    #     ll = [ll / np.log(2) for ll in ll]
-
-    ll = norm_ll(ll, n_trials, ll_null, to_bits=True)
+    ll = norm_ll(ll, n_trials, ll_null, to_bits=to_bits)
 
     ylabel = f"LL {'(bits/trial)' if to_bits else '(nats/trial)'}"
     mean_ll = np.mean(ll)
@@ -805,42 +854,6 @@ def plot_ll(ll, n_trials, ll_null=None, to_bits=True, positions=[1], **kwargs):
     sns.despine()
 
     return ll
-
-
-def plot_trans_mat_box_plots(trans_mat, **kwargs):
-    """
-    Plot box plots of transition matrix probabilities across subjects.
-    :param trans_mat: List of transition matrices (np.array of shape (n_states, n_states)) per subject
-    :param kwargs: Additional keyword arguments for plt.plot()
-    :return: None
-    """
-
-    if not isinstance(trans_mat, list):
-        print('trans_mat must be a list')
-        return
-
-    trans_mat = np.array([m.flatten() for m in trans_mat])
-    columns = ['D→D', 'D→E', 'E→D', 'E→E']
-    df = pd.DataFrame(trans_mat, columns=columns)
-    df = df[['D→D', 'E→E']]  # Keep only D→D and E→E (the other two are redundant)
-    df_melt = df.melt(var_name='Transition', value_name='Probability')
-
-    # Create a color palette based on mean probabilities
-    means = df.mean().to_dict()  # Compute mean probability for each transition
-    norm = plt.Normalize(vmin=-1, vmax=1)  # Normalize to 0–1 for colormap sampling
-    cmap = cm.get_cmap('bone')
-    palette = {k: cmap(norm(v)) for k, v in means.items()}  # Sample bone color according to mean probability
-
-    plt.figure(**kwargs, constrained_layout=True)
-    # plt.figure(**kwargs, constrained_layout=True)
-    sns.boxplot(x='Transition', y='Probability', data=df_melt, palette=palette, showfliers=False)
-    sns.stripplot(x='Transition', y='Probability', data=df_melt,
-                  color='k', alpha=0.1, jitter=False)
-    # plt.ylim(0, 1)
-    plt.ylabel('Probability')
-    plt.xlabel('Transition')
-    plt.title('Matrix')
-    sns.despine()
 
 
 def plot_model_comparison(n_cov=2, ll_null=None, fit=False):
@@ -904,7 +917,7 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
         cov_labels = r'stim., bias and $A_t$'
     elif n_cov == 4:
         covariates = ['stim_vals', 'bias', 'at_error', 'at_correct']
-        cov_labels = r'stim., bias, $A_{t-}$ and $A_{t+}$'
+        cov_labels = r'stim., bias, $A_{t-}$, $A_{t+}$'
 
     lls = []
     inliers = []
@@ -934,6 +947,7 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
 
     # Plotting Δ LL clouds
     sns.stripplot(x='comparison', y='diffs', data=df_plot, color='tab:gray', zorder=1)
+    y_max = plt.gca().get_ylim()[1]
 
     for i, diff in enumerate(diffs):
         mean_diff = diff.mean()
@@ -942,9 +956,9 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
         plt.scatter(i, mean_diff, facecolor='tab:orange', edgecolor='k', zorder=3)
 
         # # One-sample t-test against 0
-        # t_stat, p_val = ttest_1samp(diffs, 0)
+        # t_stat, p_val = ttest_1samp(diff, 0)
         # print(f'{i+1}→{i+2}: t = {t_stat:.3f}, p = {p_val:.3f}')
-        # add_star_between(p_val, i, i)  # adjust if your star function uses indices
+        # add_stars([p_val], y_max)
 
     plt.axhline(0, color='k', ls='--')
     plt.xticks(range(4), ['2-1', '3-2', '4-3', '5-4'])
