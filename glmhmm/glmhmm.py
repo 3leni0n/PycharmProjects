@@ -3,7 +3,7 @@ from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_stars, add_star_between, filter_behavior, fig_size, timer
+from my_fun import get_experiment, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
 from cherry.cherry import *
 from kernels.kernels_tools import *
 import numpy as np
@@ -220,30 +220,42 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     elif n_states >= 4:
         state_label_map = {i: f'State{i}' for i in range(n_states)}  # Testing only
 
+    experiment = df.Experiment.unique()[0]
+
     # Filter data
     df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
 
-    experiment = df.Experiment.unique()[0]
-
-    # # Drug sessions
-    # df = filter_drug_sessions(df)
-    # if drug is None:
-    #     # Keep the sessions where drug is NaN (rest sessions, no saline nor drug)
-    #     df = df[df.Drug.isnull()].reset_index(drop=True)
-    #     condition = 'rest'
-    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / experiment
-    # elif drug in [0, 1] and experiment == '2AFC_6':
-    #     # Slice saline (0) or drug (1) sessions
-    #     # df = filter_drug_sessions(df)
-    #     df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=True)
-    #     df = df[df.Drug == drug].reset_index(drop=True)
-    #     condition = 'saline' if drug == 0 else 'drug'
-    #     folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / '2s_2cov' / condition / experiment
-
-    if covariates == ['bias']:
+    # Set output folder
+    if covariates == ['bias']:  # Null model (weighted Bernoulli coin-flip)
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_null' / experiment
     else:
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}cov' / experiment
+
+    # Drug sessions
+    if experiment == '2AFC_6':  # Drug experiment
+        if drug is None:
+            print('Fitting rest sessions (no drug nor saline)')
+            # Keep the sessions where drug is NaN (rest sessions, no saline nor drug)
+            df = df[df.Drug.isnull()].reset_index(drop=True)
+            condition = 'rest'
+        elif drug == 'paired':
+            print('Fitting paired drug and saline sessions')
+            df = filter_drug_sessions(df)
+            condition = 'paired_sessions'
+        elif drug in [0, 1]:  # Slice saline (0) or drug (1) sessions
+                df = filter_drug_sessions(df)
+                df = df[df.Drug == drug].reset_index(drop=True)
+                condition = 'saline' if drug == 0 else 'drug'
+                print(f'Fitting only {condition} sessions')
+        # Get summary df of paired sessions
+        # summary = (
+        #     df[['Subject', 'Date', 'Drug']]
+        #     .drop_duplicates(['Subject', 'Date', 'Drug'])
+        #     .sort_values(['Subject', 'Date', 'Drug'])
+        #     .reset_index(drop=True)
+        # )
+        # summary
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'pharma' / condition / experiment
 
     # Parse the data
     inputs, choices = parse_glmhmm(df, covariates=covariates)
@@ -458,14 +470,15 @@ def plot_GLMHMM_kernel(df):
 # Plotting functions
 
 
-def results_2_df(df):
+def results_2_df(df, remove_outliers=False):
 
     all_animals = df.Subject.unique()
     experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
-
     weights = get_str_mat(df, col_name='Weights')
-    mask = remove_outliers(weights)
-    weights = weights[mask]
+
+    if remove_outliers:
+        mask = remove_outliers(weights)
+        weights = weights[mask]
 
     n_states = weights.shape[1]
     if n_states == 1:
@@ -514,7 +527,9 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     if drug:
         palette = {0: 'tab:gray', 1: 'tab:pink'}
         labels = ['Saline', 'Drug']
+        cov_names = ['stim.', '|bias|', '$A_t$']
         hue = 'Drug'
+        n_states = data[hue].nunique()
     else:
         hue = 'State'
         n_states = data.State.nunique()
@@ -751,8 +766,6 @@ def plot_occupancy_boxplot(df, **kwargs):
     Plot state occupancies across subjects as boxplots.
     Expects columns 'Subject' and 'State' in df.
     """
-
-
 
     occupancies = []
     for subject, sub_df in df.groupby('Subject'):

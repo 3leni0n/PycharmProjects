@@ -1048,39 +1048,6 @@ def timer(func):
     return wrapper
 
 
-def filter_drug_sessions(df):
-    """Filter out saline sessions (Drug==0) that are not immediately followed by a drug session (Drug==1) for paired
-    saline-drug analyses (batch #6).
-    :return: df with only paired saline-drug sessions
-    """
-
-    # The column date is called differently depending on session or intersession data
-    if 'Date' in df.columns:
-        col_name = 'Date'  # Sessions
-        # df.drop_duplicates(subset=col_name, inplace=True)  # Keep a row per unique date
-    elif 'Dates' in df.columns:
-        col_name = 'Dates'  # Intersessions
-
-    # In case of sessions data
-    df[col_name] = pd.to_datetime(df[col_name])  # Convert to datetime if not already
-    df.sort_values(by=col_name, inplace=True)  # Sort by date
-    df.reset_index(drop=True, inplace=True)  # Reset index inplace
-
-    # Find saline sessions immediately followed by a drug session
-    paired_sessions = []
-    for i in range(len(df) - 1):
-        current = df.iloc[i]
-        next = df.iloc[i + 1]
-        if current.Drug == 0 and next.Drug == 1:
-            paired_sessions.append(df[col_name][i])
-
-    # Filter original df
-    df = df[(df[col_name].isin(paired_sessions) | (df.Drug == 1))]
-    df.reset_index(drop=True, inplace=True)
-
-    return df
-
-
 def save_notebook_files(notebook_path='notebook.ipynb'):
     """
     Save all figures from the notebook outputs to a folder named after the notebook.
@@ -1145,6 +1112,42 @@ def clean_session_start(df):
     _ = len(df)
     df = df.groupby('Session', group_keys=False).apply(_clean).reset_index(drop=True)
     print(f'Removed {(_ - len(df))} trials from session start (AW and Warm Up trials)')
+
+    return df
+
+
+def filter_drug_sessions(df):
+    """Filter out saline sessions (Drug==0) that are not immediately followed by a drug session (Drug==1) for paired
+    saline-drug analyses (batch #6).
+    :return: df with only paired saline-drug sessions
+    """
+
+    # The column date is called differently depending on session or intersession data
+    if 'Date' in df.columns:
+        col_name = 'Date'  # Sessions
+        # df.drop_duplicates(subset=col_name, inplace=True)  # Keep a row per unique date
+    elif 'Dates' in df.columns:
+        col_name = 'Dates'  # Intersessions
+
+    # In case of sessions data
+    df[col_name] = pd.to_datetime(df[col_name])  # Convert to datetime if not already
+    df.sort_values(by=col_name, inplace=True)  # Sort by date
+    df.reset_index(drop=True, inplace=True)  # Reset index inplace
+
+    # Find saline sessions immediately followed by a drug session
+    paired_sessions = []
+    for i in range(len(df) - 1):
+        current = df.iloc[i]
+        next = df.iloc[i + 1]
+        if current.Drug == 0 and next.Drug == 1:
+            paired_sessions.append(df[col_name][i])
+
+    # Filter original df
+    df = df[(df[col_name].isin(paired_sessions) | (df.Drug == 1))]
+    df.reset_index(drop=True, inplace=True)
+
+    # Get summary df of paired sessions
+    # summary = (df[['Date', 'Drug']].drop_duplicates(['Date', 'Drug']).sort_values('Date').reset_index(drop=True))
 
     return df
 
