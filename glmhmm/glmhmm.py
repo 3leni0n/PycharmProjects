@@ -81,7 +81,7 @@ def parse_glmhmm(df, covariates=None):
     """
 
     accepted_covariates = ['stim_vals', 'stim_strength', 'net_ild', 'at_choice', 'at_error', 'at_correct', 'bias',
-                           'session_index']
+                           'session_index', 'prev_choice', 'wsls']
     if covariates is None:
         covariates = ['stim_vals', 'bias', 'at_choice']  # Default model
     else:
@@ -137,6 +137,14 @@ def parse_glmhmm(df, covariates=None):
                 session_cols.append(np.array(at_error))
             if 'at_correct' in covariates:
                 session_cols.append(np.array(at_correct))
+
+        if 'prev_choice' in covariates:
+            prev_choice = df_session.Choice.shift(1).fillna(0).values
+            session_cols.append(prev_choice)
+
+        if 'wsls' in covariates:
+            wsls = df_session.Side.shift(1).fillna(0).replace({0: -1, 1: 1}).values
+            session_cols.append(wsls)
 
         # Combine selected covariates
         session_input = np.column_stack(session_cols)
@@ -200,7 +208,39 @@ def interpret_weights(weights, trans_mat, posterior_probs):
     return remapped_weights, remapped_trans_mat, remapped_posterior_probs, remap_indices
 
 
-# New fitting function for 2 states (drug input, so slice sessions in saline vs drug)
+def force_lapse_model(glmhmm, lapse_state=0, gamma_l=0.05, gamma_r=0.05):
+    """
+    Constrain a 2-state GLM-HMM to the classic lapse model:
+      - lapse_state has zero stimulus weights and fixed bias
+      - transitions are identical rows
+    """
+
+    # Zero stimulus weights for lapse state (everything except bias)
+    glmhmm.observations.params[lapse_state, 0, 0] = 0.0  # stim weight
+
+    # Set lapse state bias = -log(gamma_l / gamma_r)
+    bias_index = 1  # Assuming bias is the second input
+    glmhmm.observations.params[lapse_state, 0, bias_index] = -np.log(gamma_l / gamma_r)
+
+    # Constrain transition matrix to have identical rows
+    p_lapse = gamma_l + gamma_r
+    p_engaged = 1 - p_lapse
+    glmhmm.transitions.transition_matrix[:] = np.array([[p_engaged, p_lapse], [p_engaged, p_lapse]])
+
+
+def fit_lapse_model(glmhmm, choices, inputs, method='em', num_iters=200, tolerance=1e-4):
+    lls = []
+    for i in range(num_iters):
+        ll = glmhmm.fit(
+            choices, inputs=inputs, method=method, num_iters=1, initialize=(i==0)
+        )
+        force_lapse_model(glmhmm)
+        lls.append(ll[-1])
+        if i > 1 and abs(lls[-1] - lls[-2]) < tolerance:
+            break
+    # return lls
+
+
 def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     """
     Fit GLM-HMM to the data of one subject.
@@ -226,8 +266,13 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
 
     # Set output folder
-    if covariates == ['bias']:  # Null model (weighted Bernoulli coin-flip)
+    if n_states == 1 and covariates == ['bias']:  # Null model (weighted Bernoulli coin-flip)
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_null' / experiment
+    elif n_states == 2 and covariates == ['stim_vals', 'bias']:  # Classic lapse model
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'lapse' / experiment
+        lapse_flag = True
+    elif n_states == 3 and covariates == ['stim_vals', 'bias', 'prev_choice', 'wsls']:  # Ashwood et al. (2022)
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'ashwood' / experiment
     else:
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_{len(covariates)}cov' / experiment
 
@@ -275,7 +320,13 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     num_iters = 200 # Max number of EM iterations
     tolerance = 1e-4  # Tolerance for stopping criterion
 
-    glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
+    if lapse_flag:
+        print('Fitting lapse model')
+        fit_lapse_model(glmhmm, choices, inputs, method=method, num_iters=num_iters, tolerance=tolerance)
+    else:
+        glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
+
+    # glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
     weights = -glmhmm.observations.params  # Flip sign of weights
     trans_mat = glmhmm.transitions.transition_matrix
     posterior_probs = [glmhmm.expected_states(data=data, input=input)[0]
@@ -788,18 +839,15 @@ def plot_occupancy_boxplot(df, **kwargs):
 
 
     df_occ = pd.DataFrame(occupancies)
+    df_melt = df_occ.melt(id_vars='Subject', var_name='State', value_name='Occupancy')  # Melt for seaborn
 
-    # Melt for seaborn
-    df_melt = df_occ.melt(id_vars='Subject', var_name='State', value_name='Occupancy')
     plt.figure(constrained_layout=True, **kwargs)
     sns.boxplot(x='State', y='Occupancy', data=df_melt,
                 palette=palette, showfliers=False)
-    plt.xticks(np.arange(len(labels)), labels)
-
     # sns.lineplot(data=df_melt,  # Paired lines per subject. Not needed because sums to 1
     #     x='State', y='Occupancy',
     #     units='Subject', estimator=None,
-    #     alpha=0.25, legend=False, color='k'
+    #     alpha=0.1, legend=False, color='k'
     # )
 
     # Paired t-test between states (not needed because sums to 1)
@@ -807,10 +855,14 @@ def plot_occupancy_boxplot(df, **kwargs):
     # print(f't = {t_stat:.3f}, p = {p_val:.3f}')
     # add_star_between(p_val)
 
+    plt.xticks(np.arange(len(labels)), labels)
     plt.xlabel('')
     plt.ylim(0, 1)
     plt.ylabel('Occupancy')
     sns.despine()
+
+    mean_occupancy = df_melt.groupby('State')['Occupancy'].mean()
+    print(mean_occupancy)
 
     return df_occ
 
@@ -820,15 +872,18 @@ def norm_ll(ll, n_trials, ll_null=None, to_bits=True):
     Normalize log likelihood of one or several subjects.
     """
 
-    # Normalize log likelihood per trial
-    ll_norm = [(ll / n) for ll, n in zip(ll, n_trials)]
-
-    # Subtract Bernoulli baseline (Ashwood-style)
+    # Subtract Bernoulli baseline (Ashwood style)
     if ll_null is not None:
-        ll_norm = [ll - (ll_b / n) for ll, ll_b, n in zip(ll_norm, ll_null, n_trials)]
+        ll_norm = [ll_i - ll_b for ll_i, ll_b in zip(ll, ll_null)]
+    else:
+        ll_norm = ll
 
+    # Normalize per trial
+    ll_norm = [ll_i / n for ll_i, n in zip(ll_norm, n_trials)]
+
+    # Conver to bits/trial
     if to_bits:
-        ll_norm = [ll / np.log(2) for ll in ll_norm]
+        ll_norm = [ll_i / np.log(2) for ll_i in ll_norm]
 
     return ll_norm
 
