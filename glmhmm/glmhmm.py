@@ -3,7 +3,7 @@ from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from my_fun import get_experiment, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
+from my_fun import get_experiment, add_stars, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
 from cherry.cherry import *
 from kernels.kernels_tools import *
 import numpy as np
@@ -228,24 +228,47 @@ def force_lapse_model(glmhmm, lapse_state=0, gamma_l=0.05, gamma_r=0.05):
     glmhmm.transitions.transition_matrix[:] = np.array([[p_engaged, p_lapse], [p_engaged, p_lapse]])
 
 
-def fit_lapse_model(glmhmm, choices, inputs, method='em', num_iters=200, tolerance=1e-4):
+def force_tiffany_model(glmhmm, covariates=['stim','bias','at_choice']):
+    """
+    Force selected weights to zero in a 2-state GLM-HMM:
+      - disengaged state: stim weight = 0
+      - engaged state: action trace weight = 0
+    Assumes covariates order matches the list.
+    """
+    disengaged_state = 0
+    engaged_state = 1
+
+    # Get indices of covariates to zero
+    stim_idx = covariates.index('stim')
+    action_trace_idx = covariates.index('at_choice')
+
+    # Zero weights
+    glmhmm.observations.params[disengaged_state, 0, stim_idx] = 0.0
+    glmhmm.observations.params[engaged_state, 0, action_trace_idx] = 0.0
+
+
+def fit_constrained_model(glmhmm, choices, inputs, constrain='lapse', method='em', num_iters=200, tolerance=1e-4):
     lls = []
     for i in range(num_iters):
         ll = glmhmm.fit(
             choices, inputs=inputs, method=method, num_iters=1, initialize=(i==0)
         )
-        force_lapse_model(glmhmm)
+        if constrain == 'lapse':
+            force_lapse_model(glmhmm)
+        elif constrain == 'tiffany':
+            force_tiffany_model(glmhmm, covariates=['stim','bias','at_choice'])
         lls.append(ll[-1])
         if i > 1 and abs(lls[-1] - lls[-2]) < tolerance:
             break
-    # return lls
 
 
-def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
+def fit_glmhmm(df, n_states=2, covariates=None, constrain=None, drug=None, save=False):
     """
     Fit GLM-HMM to the data of one subject.
     :param df: DataFrame containing the data of one subject
-    :param n_states: Number of discrete states (2 or 3)
+    :param n_states: Number of discrete states
+    :param covariates: List of covariates to include
+    :param constrain: String with the contrain to enforce in the model. Options: 'lapse' or' tiffany'
     :param drug: If None, fit rest sessions (no drug nor saline); if 0, fit saline sessions; if 1, fit drug sessions.
     :param save: If True, save the fitted DataFrame to CSV.
     :return: DataFrame with added columns for model fitting results.
@@ -268,9 +291,10 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     # Set output folder
     if n_states == 1 and covariates == ['bias']:  # Null model (weighted Bernoulli coin-flip)
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{n_states}s_null' / experiment
-    elif n_states == 2 and covariates == ['stim_vals', 'bias']:  # Classic lapse model
-        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'lapse' / experiment
-        lapse_flag = True
+    elif n_states == 2 and covariates == ['stim_vals', 'bias'] and constrain == 'lapse':  # Classic lapse model
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{constrain}' / experiment
+    elif n_states == 2 and covariates == ['stim_vals', 'bias', 'at_choice'] and constrain == 'tiffany':  # Tiffany et al. (2024)
+        folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'{constrain}' / experiment
     elif n_states == 3 and covariates == ['stim_vals', 'bias', 'prev_choice', 'wsls']:  # Ashwood et al. (2022)
         folder_out = Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / f'ashwood' / experiment
     else:
@@ -320,13 +344,11 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
     num_iters = 200 # Max number of EM iterations
     tolerance = 1e-4  # Tolerance for stopping criterion
 
-    if lapse_flag:
-        print('Fitting lapse model')
-        fit_lapse_model(glmhmm, choices, inputs, method=method, num_iters=num_iters, tolerance=tolerance)
+    if constrain is not None:
+        fit_constrained_model(glmhmm, choices, inputs, constrain=constrain, method=method, num_iters=num_iters, tolerance=tolerance)
     else:
         glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
 
-    # glmhmm.fit(choices, inputs=inputs, method=method, num_iters=num_iters, tolerance=tolerance)
     weights = -glmhmm.observations.params  # Flip sign of weights
     trans_mat = glmhmm.transitions.transition_matrix
     posterior_probs = [glmhmm.expected_states(data=data, input=input)[0]
@@ -370,7 +392,8 @@ def fit_glmhmm(df, n_states=2, covariates=None, drug=None, save=False):
 
 
 @timer
-def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, covariates=None, cherry=True, drug=None, save=True):
+def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, covariates=None, constrain=None,
+            cherry=True, drug=None, save=True):
     """
     Fit GLM-HMM to all subjects of one group and save the results to a CSV file.
     :param experiments: List of experiments to fit
@@ -406,7 +429,7 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
             print(f'Loading data from {folder_in}')
             df = pd.read_csv(folder_in, low_memory=False)
             try:
-                df_fit = fit_glmhmm(df, n_states=n_states, covariates=covariates, drug=drug, save=save)
+                df_fit = fit_glmhmm(df, n_states=n_states, covariates=covariates, constrain=constrain, drug=drug, save=save)
                 df_fit_all = pd.concat([df_fit_all, df_fit], ignore_index=True)
             except Exception as e:
                 print(f'Error fitting GLM-HMM for subject {subj}: {e}')
@@ -979,10 +1002,10 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
         cov_labels = 'stim.'
     elif n_cov == 2:
         covariates = ['stim_vals', 'bias']
-        cov_labels = 'stim. and bias'
+        cov_labels = 'stim., bias'
     elif n_cov == 3:
         covariates = ['stim_vals', 'bias', 'at_choice']
-        cov_labels = r'stim., bias and $A_t$'
+        cov_labels = r'stim., bias, $A_t$'
     elif n_cov == 4:
         covariates = ['stim_vals', 'bias', 'at_error', 'at_correct']
         cov_labels = r'stim., bias, $A_{t-}$, $A_{t+}$'
@@ -1017,16 +1040,20 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
     sns.stripplot(x='comparison', y='diffs', data=df_plot, color='tab:gray', zorder=1)
     y_max = plt.gca().get_ylim()[1]
 
+    p_vals = []
     for i, diff in enumerate(diffs):
         mean_diff = diff.mean()
         ci_low, ci_high = np.percentile(diff, [2.5, 97.5])
         plt.plot([i, i], [ci_low, ci_high], color='k', zorder=2)
         plt.scatter(i, mean_diff, facecolor='tab:orange', edgecolor='k', zorder=3)
 
-        # # One-sample t-test against 0
-        # t_stat, p_val = ttest_1samp(diff, 0)
-        # print(f'{i+1}→{i+2}: t = {t_stat:.3f}, p = {p_val:.3f}')
-        # add_stars([p_val], y_max)
+        # One-sample t-test against 0
+        t_stat, p_val = ttest_1samp(diff, 0)
+        p_vals.append(p_val)
+        print(f'{i+1}→{i+2}: t = {t_stat:.3f}, p = {p_val:.3f}')
+
+    p_vals = np.array(p_vals)
+    # add_stars(p_vals, y_max)
 
     plt.axhline(0, color='k', ls='--')
     plt.xticks(range(4), ['2-1', '3-2', '4-3', '5-4'])
