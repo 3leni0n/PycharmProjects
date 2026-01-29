@@ -1,8 +1,10 @@
 import os
 from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
-import ssm
+# import ssm
 from matplotlib import cm
+from typing_extensions import no_type_check
+
 from my_fun import get_experiment, add_stars, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
 from cherry.cherry import *
 from kernels.kernels_tools import *
@@ -544,15 +546,13 @@ def plot_GLMHMM_kernel(df):
 # Plotting functions
 
 
-def results_2_df(df, remove_outliers=False):
+def results_2_df(df):
 
     all_animals = df.Subject.unique()
     experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
     weights = get_str_mat(df, col_name='Weights')
-
-    if remove_outliers:
-        mask = remove_outliers(weights)
-        weights = weights[mask]
+    mask = remove_outliers(weights)
+    weights = weights[mask]
 
     n_states = weights.shape[1]
     if n_states == 1:
@@ -609,18 +609,20 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
         n_states = data.State.nunique()
         if n_states == 2:
             palette = {0: 'tab:gray', 1: 'tab:green'}
-            labels = ['Dis.', 'Eng.']
+            labels = ['D', 'E']
             cov_names = ['stim.', '|bias|', '$A_t$']
         elif n_states == 3:
             palette = {0: 'tab:green', 1: 'tab:blue', 2: 'tab:orange'}
-            labels = ['Eng.', 'L. bias', 'R. bias']
+            labels = ['E', 'L', 'R']
             cov_names = ['stim.', '|bias|']
 
     palette = kwargs.pop('palette', palette)
 
     plt.figure(constrained_layout=True, **kwargs)
-    plt.axhline(0, color='black', linestyle='--')
-    ax = sns.boxplot(x='Covariate', y='Weight', hue=hue, data=data, palette=palette, showfliers=False)
+    plt.axhline(0, color='tab:gray', linestyle='--')
+    ax = sns.boxplot(x='Covariate', y='Weight', hue=hue, data=data, palette=palette, showfliers=False, showcaps=False,
+                     fill=False)
+
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('')
     plt.title(title)
@@ -632,16 +634,16 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     width = 0.8
     state_positions = [(i - (n_states - 1) / 2) * width / n_states for i in range(n_states)]
 
-    # Draw paired lines of subjects between boxes (states)
-    for cov in sorted(data['Covariate'].unique()):
-        for animal in sorted(data['Animal'].unique()):
-            subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
-            for i in range(n_states - 1):
-                x_start = cov + state_positions[i]
-                x_end   = cov + state_positions[i + 1]
-                y_start = subset[subset[hue] == i]['Weight'].values[0]
-                y_end   = subset[subset[hue] == i + 1]['Weight'].values[0]
-                ax.plot([x_start, x_end], [y_start, y_end], color='k', alpha=0.1)
+    # # Draw paired lines of subjects between boxes (states)
+    # for cov in sorted(data['Covariate'].unique()):
+    #     for animal in sorted(data['Animal'].unique()):
+    #         subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
+    #         for i in range(n_states - 1):
+    #             x_start = cov + state_positions[i]
+    #             x_end   = cov + state_positions[i + 1]
+    #             y_start = subset[subset[hue] == i]['Weight'].values[0]
+    #             y_end   = subset[subset[hue] == i + 1]['Weight'].values[0]
+    #             ax.plot([x_start, x_end], [y_start, y_end], color='k', alpha=0.1)
 
     # Compute paired-samples t-tests for each covariate between states
     y_star = ax.get_ylim()[1]
@@ -841,6 +843,8 @@ def plot_occupancy_boxplot(df, **kwargs):
     Expects columns 'Subject' and 'State' in df.
     """
 
+    plt.figure(constrained_layout=True, **kwargs)
+
     occupancies = []
     for subject, sub_df in df.groupby('Subject'):
         state_counts = sub_df['State'].value_counts(normalize=True)
@@ -850,23 +854,22 @@ def plot_occupancy_boxplot(df, **kwargs):
             labels = ['D', 'E']
             occupancies.append({'Subject': subject, 'Disengaged': disengaged, 'Engaged': engaged})
             palette = kwargs.pop('palette', ['tab:gray', 'tab:green'])
+            plt.axhline(0.5, color='tab:gray', ls='--')  # Reference line at 0.5
         elif df['State'].nunique() == 3:
             engaged = state_counts.get(0)
             biased_left = state_counts.get(1)
             biased_right = state_counts.get(2)
             labels = ['E', 'L', 'R']
             occupancies.append({'Subject': subject, 'Engaged': engaged, 'BiasedLeft': biased_left, 'BiasedRight': biased_right})
-            palette = kwargs.pop('palette', ['tab:gray', 'tab:blue', 'tab:orange'])
+            palette = kwargs.pop('palette', ['tab:green', 'tab:blue', 'tab:orange'])
+            plt.axhline(1/3, color='tab:gray', ls='--')  # Reference line at 0.5
         else:
             raise ValueError('This function only supports 2 or 3 states')
-
 
     df_occ = pd.DataFrame(occupancies)
     df_melt = df_occ.melt(id_vars='Subject', var_name='State', value_name='Occupancy')  # Melt for seaborn
 
-    plt.figure(constrained_layout=True, **kwargs)
-    sns.boxplot(x='State', y='Occupancy', data=df_melt,
-                palette=palette, showfliers=False)
+    sns.boxplot(x='State', y='Occupancy', data=df_melt, palette=palette, showfliers=False, showcaps=False, fill=False)
     # sns.lineplot(data=df_melt,  # Paired lines per subject. Not needed because sums to 1
     #     x='State', y='Occupancy',
     #     units='Subject', estimator=None,
@@ -881,6 +884,7 @@ def plot_occupancy_boxplot(df, **kwargs):
     plt.xticks(np.arange(len(labels)), labels)
     plt.xlabel('')
     plt.ylim(0, 1)
+    plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
     plt.ylabel('Occupancy')
     sns.despine()
 
@@ -1037,7 +1041,15 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
                             [len(d) for d in diffs])})
 
     # Plotting Δ LL clouds
-    sns.stripplot(x='comparison', y='diffs', data=df_plot, color='tab:gray', zorder=1)
+    cmap = cm.get_cmap('tab20c')
+    colors = [cmap(18), cmap(17), cmap(16)]
+    if n_cov ==2:
+        color = colors[0]
+    elif n_cov ==3:
+        color = colors[1]
+    elif n_cov ==4:
+        color = colors[2]
+    sns.stripplot(x='comparison', y='diffs', data=df_plot, color=color, zorder=1)
     y_max = plt.gca().get_ylim()[1]
 
     p_vals = []
@@ -1045,7 +1057,7 @@ def plot_model_comparison_diffs(n_cov=2, ll_null=None, fit=False):
         mean_diff = diff.mean()
         ci_low, ci_high = np.percentile(diff, [2.5, 97.5])
         plt.plot([i, i], [ci_low, ci_high], color='k', zorder=2)
-        plt.scatter(i, mean_diff, facecolor='tab:orange', edgecolor='k', zorder=3)
+        plt.scatter(i, mean_diff, facecolor='white', edgecolor='k', zorder=3)
 
         # One-sample t-test against 0
         t_stat, p_val = ttest_1samp(diff, 0)
