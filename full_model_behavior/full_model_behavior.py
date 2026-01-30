@@ -1,11 +1,7 @@
-"""
-To do:
-- Choice history regressors to re-start every session
-"""
-
 import time
 from pathlib import Path
 import os
+import pickle
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
@@ -19,13 +15,26 @@ from cherry.cherry import *
 from kernels.kernels_tools import *
 
 
-# GLM weights of previously rewarded (r+) and previously unrewarded (r-) responses. These kernels quantify the
-# influence on choice of the side (left vs. right) of previous responses.
-# From 'Response outcomes gate the impact of expectations on perceptual decisions', Figure 4
-# (https://www-nature-com.sire.ub.edu/articles/s41467-020-14824-w)
+# Create namedtuple objects at the module level for pickling purposes
+FK = namedtuple('FK', [
+    'params_rminus', 'params_rplus', 'params_session_index', 'params_net_stim', 'params_frames',  # params
+    'std_err_rminus', 'std_err_rplus', 'std_err_session_index', 'std_err_net_stim', 'std_err_frames',  # bse
+    'p_values_rminus', 'p_values_rplus', 'p_values_session_index', 'p_values_net_stim', 'p_values_frames',  # p_values
+    'shuffles_rminus', 'shuffles_rplus', 'shuffles_session_index', 'shuffles_net_stim', 'shuffles_frames',  # shuffles
+    'n_trials', 'trial_lag', 'experiment', 'animal', 'drug', 'iterations', 'n_frames'  # metadata
+])
+
+MeanFK = namedtuple('MeanFK', [
+    'params_rminus', 'params_rplus', 'params_session_index', 'params_net_stim', 'params_frames',  # params
+    'std_err_rminus', 'std_err_rplus', 'std_err_session_index', 'std_err_net_stim', 'std_err_frames',  # bse
+    'p_values',  # p_values
+    'shuffles_rminus', 'shuffles_rplus', 'shuffles_net_stim', 'shuffles_frames',  # shuffles
+    'n_trials', 'experiment', 'animal', 'drug', 'trial_lag', 'iterations', 'n_frames'  # metadata
+])
+
 
 @timer
-def get_fk(experiment=None, animal=None, residuals=True, zscore=False, drug=None, trial_lag=10, iterations=1000):
+def get_fk(experiment=None, animal=None, residuals=True, zscore=False, drug=None, trial_lag=10, iterations=1000, save=False):
     """
     Get full kernel for a given animal. The history kernel is the GLM weight of previously rewarded (r+) and
     previously unrewarded (r-) responses (choices). These kernels quantify the influence on choice of the side (left vs.
@@ -156,46 +165,6 @@ def get_fk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
     shuffles_frames = get_shuffles_GLM(endog, exog, iterations, kind='fk_frames', stim_set=stim_set)
     shuffles_frames = [shuffles_frames[i].iloc[-n_frames:] for i in range(len(shuffles_frames))]  # From shuffles
 
-    # Store results in a namedtuple
-    FK = namedtuple('FK', [
-        # params
-        'params_rminus',
-        'params_rplus',
-        'params_session_index',
-        'params_net_stim',
-        'params_frames',
-
-        # bse
-        'std_err_rminus',
-        'std_err_rplus',
-        'std_err_session_index',
-        'std_err_net_stim',
-        'std_err_frames',
-
-        # p_values
-        'p_values_rminus',
-        'p_values_rplus',
-        'p_values_session_index',
-        'p_values_net_stim',
-        'p_values_frames',
-
-        # shuffles
-        'shuffles_rminus',
-        'shuffles_rplus',
-        'shuffles_session_index',
-        'shuffles_net_stim',
-        'shuffles_frames',
-
-        # metadata
-        'n_trials',
-        'trial_lag',
-        'experiment',
-        'animal',
-        'drug',
-        'iterations',
-        'n_frames'
-    ])
-
     fk = FK(
         # params
         params_rminus=params_rminus,
@@ -235,11 +204,16 @@ def get_fk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
         n_frames=n_frames
     )
 
+    if save:
+        filename = f'fk_{animal}'
+        with open(filename, 'wb') as f:
+            pickle.dump(fk, f)
+
     return fk
 
 
-def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000, save=False, **kwargs):
-
+# def plot_fk(fk, experiment=None, animal=None, drug=None, trial_lag=10, iterations=1000, save=False, **kwargs):
+def plot_fk(fk, save=False, **kwargs):
     """
     Plot the full kernel of a given animal.
     :param experiment: str, name of the experiment
@@ -251,14 +225,20 @@ def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     :return:
     """
 
+    experiment = fk.experiment
+    animal = fk.animal
+    drug = fk.drug
+    trial_lag = fk.trial_lag
+    iterations = fk.iterations
+
     if type(experiment) == list:
-        fk = get_mean_fk(experiments=experiment, animals=None, drug=drug, trial_lag=trial_lag,
-                         iterations=iterations)
+        # fk = get_mean_fk(experiments=experiment, animals=None, drug=drug, trial_lag=trial_lag,
+        #                  iterations=iterations)
         title = f'N={len(fk.animal)}, {fk.n_trials} trials'
         filename_prefix = 'mean_'
     else:
-        fk = get_fk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
-        title = f'Mouse {fk.animal}, {fk.n_trials} trials'
+        # fk = get_fk(experiment=experiment, animal=animal, drug=drug, trial_lag=trial_lag, iterations=iterations)
+        # title = f'Mouse {fk.animal}, {fk.n_trials} trials'
         filename_prefix = ''
 
     # Default plotting parameters
@@ -283,7 +263,8 @@ def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     yerr = fk.std_err_frames
     plt.plot(x, y, color=color, marker='o', label=label)
     plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-    plt.title(title)
+    plt.xticks([2, 4, 6, 8, 10], ['2', '4', '6', '8', '10'])
+    # plt.title(title)
     plt.xlabel('Stimulus frame')
     plt.ylabel('Weight')
     sns.despine()
@@ -326,7 +307,7 @@ def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
     yerr = fk.std_err_net_stim
     plt.plot(x, y, color=color, marker='o')
     plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-    plt.title(title)
+    # plt.title(title)
     plt.xlabel('Net stimuli (dB)')
     plt.ylabel('Weight')
     plt.xticks(x, ['2', '4', '8', '70'])
@@ -372,7 +353,7 @@ def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         # plot kernel
         plt.plot(x, y, color=color, marker='o', label=label)
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
+        # plt.title(title)
         # plt.xticks(x, x[::-1])
         plt.xticks(x[::5], x[::-1][::5])
         plt.xlabel(xlabel)
@@ -403,7 +384,7 @@ def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
 
     if type(experiment) == str:  # Don't do it for the mean kernel
 
-        kwargs['figsize'] = (4 * kwargs['figsize'][0], kwargs['figsize'][1])
+        kwargs['figsize'] = (2 * kwargs['figsize'][0], kwargs['figsize'][1])
         plt.figure(**kwargs, constrained_layout=True)
         x = fk.params_session_index.index.values
 
@@ -422,7 +403,7 @@ def plot_fk(experiment=None, animal=None, drug=None, trial_lag=10, iterations=10
         yerr = fk.std_err_session_index
         plt.plot(x, y, color=color, marker='o')
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-        plt.title(title)
+        # plt.title(title)
         ax = plt.gca()
         ax.set_xlim(x[0]-1, x[-1]+1)
         plt.xlabel('Session index')
@@ -456,7 +437,7 @@ def plot_fks(experiment='2AFC_2', animals=['325', '327', '329', '330', '332', '3
                 save=save)
 
 
-def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=None, iterations=1000):
+def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=None, iterations=1000, save=False):
     """
     Get the mean peak of the full kernel of all animals of a given batch.
     :param experiments: list of str, name of the experiments
@@ -584,32 +565,6 @@ def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=No
     # shuffles_rminus_means_across_animals = [shuffles_rminus_means_across_animals[i].rename({0: 'const'}) for i in
     #                                  range(len(shuffles_rminus_means_across_animals))]
 
-    # Store results in a namedtuple
-    MeanFK = namedtuple('MeanFK', [
-        'params_rminus',
-        'params_rplus',
-        'params_session_index',
-        'params_net_stim',
-        'params_frames',
-        'std_err_rminus',
-        'std_err_rplus',
-        'std_err_session_index',
-        'std_err_net_stim',
-        'std_err_frames',
-        'p_values',
-        'shuffles_rminus',
-        'shuffles_rplus',
-        'shuffles_net_stim',
-        'shuffles_frames',
-        'n_trials',
-        'experiment',
-        'animal',
-        'drug',
-        'trial_lag',
-        'iterations',
-        'n_frames'
-    ])
-
     mean_fk = MeanFK(
         params_rminus=params_rminus_mean_across_animals,
         params_rplus=params_rplus_mean_across_animals,
@@ -634,6 +589,14 @@ def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=No
         iterations=iterations,
         n_frames=n_frames
     )
+
+    if save:
+        if type (mean_fk.experiment) == str:
+            filename = f'fk_mean_{mean_fk.experiment[0]}'
+        elif type(mean_fk.experiment) == list:
+            filename = 'fk_mean'
+        with open(filename, 'wb') as f:
+            pickle.dump(fk, f)
 
     return mean_fk
 
