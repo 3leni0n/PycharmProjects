@@ -226,10 +226,6 @@ def plot_fk(fk, save=False, **kwargs):
     """
 
     experiment = fk.experiment
-    animal = fk.animal
-    drug = fk.drug
-    trial_lag = fk.trial_lag
-    iterations = fk.iterations
 
     if type(experiment) == list:
         # fk = get_mean_fk(experiments=experiment, animals=None, drug=drug, trial_lag=trial_lag,
@@ -322,6 +318,7 @@ def plot_fk(fk, save=False, **kwargs):
 
     # PLOT HISTORY KERNEL
 
+    axes = []
     trial_lag = fk.trial_lag
     for _ in range(1, 3):
         if _ == 1:  # R+
@@ -340,6 +337,9 @@ def plot_fk(fk, save=False, **kwargs):
             shuffles = fk.shuffles_rplus
 
         plt.figure(**kwargs, constrained_layout=True)
+        ax = plt.gca()
+        axes.append(ax)
+
         x = np.arange(1, trial_lag + 1)
 
         # Plot shuffles
@@ -354,8 +354,10 @@ def plot_fk(fk, save=False, **kwargs):
         plt.plot(x, y, color=color, marker='o', label=label)
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
         # plt.title(title)
-        # plt.xticks(x, x[::-1])
-        plt.xticks(x[::5], x[::-1][::5])
+        # plt.xticks(x, x[::-1])  # Reverse ticks
+        plt.xticks(x[::2], x[::-1][::2])  # Show every 2nd tick (reversed)
+        # plt.xticks(x[::5], x[::-1][::5])
+        # plt.xticks([2, 4, 6, 8, 10], ['2', '4', '6', '8', '10'])
         plt.xlabel(xlabel)
         ylabel = 'Weight'
         plt.ylabel(ylabel)
@@ -377,6 +379,11 @@ def plot_fk(fk, save=False, **kwargs):
             folder_out = Path.home() / 'Documentos' / 'kernels' / 'FK' / experiment
             save_fig(folder_out, filename)
             plt.close()
+
+    ymins, ymaxs = zip(*(ax.get_ylim() for ax in axes))
+    ylim = (min(ymins), max(ymaxs))
+    for ax in axes:
+        ax.set_ylim(ylim)
 
     ####################################################################################################################
 
@@ -596,7 +603,7 @@ def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=No
         elif type(mean_fk.experiment) == list:
             filename = 'fk_mean'
         with open(filename, 'wb') as f:
-            pickle.dump(fk, f)
+            pickle.dump(mean_fk, f)
 
     return mean_fk
 

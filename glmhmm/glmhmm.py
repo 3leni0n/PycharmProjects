@@ -551,8 +551,8 @@ def results_2_df(df):
     all_animals = df.Subject.unique()
     experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
     weights = get_str_mat(df, col_name='Weights')
-    mask = remove_outliers(weights)
-    weights = weights[mask]
+    # mask = remove_outliers(weights)
+    # weights = weights[mask]
 
     n_states = weights.shape[1]
     if n_states == 1:
@@ -609,7 +609,7 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
         n_states = data.State.nunique()
         if n_states == 2:
             palette = {0: 'tab:gray', 1: 'tab:green'}
-            labels = ['D', 'E']
+            labels = ['Dis.', 'Eng.']
             cov_names = ['stim.', '|bias|', '$A_t$']
         elif n_states == 3:
             palette = {0: 'tab:green', 1: 'tab:blue', 2: 'tab:orange'}
@@ -727,7 +727,10 @@ def plot_trans_mat(trans_mat, **kwargs):
     for i in range(trans_mat.shape[0]):
         for j in range(trans_mat.shape[1]):
             # text = str(np.around(trans_mat[i, j], decimals=2))
-            text = f"{trans_mat[i, j]:.2f}".lstrip('0').replace('-0.', '-.').rstrip('0').rstrip('.')
+            if np.round(trans_mat[i, j], 2) == 0.0:
+                text = '0'
+            else:
+                text = f"{trans_mat[i, j]:.2f}".lstrip('0').replace('-0.', '-.').rstrip('0').rstrip('.')
             plt.text(j, i, text, ha='center', va='center', color='k')
 
     # plt.xlim(-0.5, n_states + 0.5)
