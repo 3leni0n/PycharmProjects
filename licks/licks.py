@@ -222,15 +222,19 @@ def model_licks(df_behavior, var='RT', drug=False, me=False):
     # Create column for after error trials (invert AfterHit)
     df_behavior['AfterError'] = 1 - df_behavior['AfterHit']
 
+    # Before error: next trial is an error
+    df_behavior['BeforeError'] = df_behavior['AfterError'].shift(-1)
+    df_behavior['BeforeError'] = df_behavior['BeforeError'].fillna(0).astype(int)
+
     if var == 'RT' or var == 'ILI':
-        formula_cols = ['Choice', 'Hit', 'AfterError', 'absILD', 'NormTrial', 'NormTrial2']
-        formula = f'{var} ~ Choice + Hit + AfterError + absILD + absILD:Hit + NormTrial + NormTrial2'
+        formula_cols = ['Choice', 'Hit', 'BeforeError', 'AfterError', 'absILD', 'NormTrial', 'NormTrial2', 'p1']
+        formula = f'{var} ~ Choice + Hit + BeforeError + AfterError + absILD + absILD:Hit + NormTrial + NormTrial2 + p1'
         family = sm.families.Gaussian()
         print(f'Fitting GLM with Gaussian family for {var}...')
     elif var == 'nLicks':
         # Remove Hit and AfterHit for nLicks as will fit only correct trials
-        formula_cols = ['Choice', 'absILD', 'NormTrial', 'NormTrial2']
-        formula = f'{var} ~ Choice + absILD + NormTrial + NormTrial2'
+        formula_cols = ['Choice', 'absILD', 'NormTrial', 'NormTrial2', 'p1']
+        formula = f'{var} ~ Choice + absILD + NormTrial + NormTrial2 + p1'
         family = sm.families.Poisson()
         me = False  # No mixed effects for Poisson
         print(f'Fitting GLM with Poisson family for {var}...')
@@ -972,7 +976,7 @@ def plot_chrono_curve_split(df_behavior, split='outcome', absolute=True):
     sns.despine()
 
 
-def plot_model_licks(df_params, df_p, kind='box', **kwargs):
+def plot_model_licks(df_params, df_p, **kwargs):
 
     # Compute mean, SEM and p values across mice
     params_mean = df_params.mean()
@@ -987,9 +991,6 @@ def plot_model_licks(df_params, df_p, kind='box', **kwargs):
     df_params = df_params.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
     df_p = df_p.drop('Intercept', axis=1, errors='ignore')  # ME doesn't have intercept
 
-    # Drop Trial and Trial^2 columns if present
-    df_params = df_params.drop(['NormTrial', 'NormTrial2'], axis=1, errors='ignore')
-
     # Apply Bonferroni correction
     n_tests = len(df_params.columns)
     t_test_results = {}
@@ -997,48 +998,50 @@ def plot_model_licks(df_params, df_p, kind='box', **kwargs):
         t_stat, p_val = ttest_1samp(df_params[col], 0, nan_policy='omit')
         p_bonf = min(p_val * n_tests, 1)  # Bonferroni correction (cap at 1)
         t_test_results[col] = {'t': t_stat, 'p': p_val, 'p_bonf': p_bonf}
-        print(f'Test {col}: t={t_stat:.2f}, p={p_bonf:.3f}')
+        print(f'Test {col}: t = {t_stat:.2f}, p = {p_bonf:.3f}')
 
     print(t_test_results)
 
+    # Drop Trial and Trial^2 columns if present
+    df_params = df_params.drop(['NormTrial', 'NormTrial2'], axis=1, errors='ignore')
+
     # Highlight effects where mean p-value < 0.05
     # colors = ['red' if df_p[col].mean() < 0.05 else 'gray' for col in df_p.columns]
-    colors = ['red' if t_test_results[col]['p_bonf'] < 0.05 else 'gray' for col in df_params.columns]
+    colors = ['tab:red' if t_test_results[col]['p_bonf'] < 0.05 else 'tab:gray' for col in df_params.columns]
 
-    # Define the labels you want to rename
+    # Define the labels to rename
     label_map = {
         'Hit': 'Correct',
-        'AfterError': 'After error',
+        'BeforeError': 'Before\nerror',
+        'AfterError': 'After\nerror',
         'absILD': "|ILD|'",
-        'absILD:Hit': "|ILD|':Correct",
+        'absILD:Hit': "|ILD|':\nCorrect",
         'NormTrial': "Trial'",
-        'NormTrial2': "Trial'²"
+        'NormTrial2': "Trial²",
+        'p1': r'$p$(eng.)'
     }
 
     plt.figure(constrained_layout=True, **kwargs)
-    plt.axhline(0, color='black', linestyle='--')
+    plt.axhline(0, color='k', linestyle='--')
 
-    # Box plots
-    if kind == 'box':
-        bp = plt.boxplot([df_params[col] for col in df_params.columns],
-                         showfliers=False,
-                         labels=[label_map.get(col, col) for col in df_params.columns],
-                         patch_artist=True,
-                         medianprops=dict(color='black'))
-        plt.xticks(rotation=0, ha='center')
-        plt.ylabel('Weights')
+    # bp = plt.boxplot([df_params[col] for col in df_params.columns],
+    #                  showfliers=False,
+    #                  labels=[label_map.get(col, col) for col in df_params.columns],
+    #                  patch_artist=True,
+    #                  medianprops=dict(color='black'), showcaps=False)
+    sns.boxplot(data=df_params.rename(columns=label_map),
+                palette=colors,
+                showfliers=False,
+                showcaps=False,
+                fill=False,
+                width=0.5)  # Matplotlib's default, prevent adaptive width
+    # plt.xticks(rotation=45, ha='center')
+    plt.ylabel('Weights')
 
-        # Color the boxes
-        for patch, color in zip(bp['boxes'], colors):
-            patch.set_facecolor(color)
+    # # Color the boxes
+    # for patch, color in zip(bp['boxes'], colors):
+    #     patch.set_facecolor(color)
 
-    # Bar plots
-    else:
-        plt.bar(range(len(params_mean)), params_mean, yerr=params_sem, color=colors)
-        plt.xticks(range(len(params_mean)), [label_map.get(col, col) for col in params_mean.index], rotation=0, ha='center')
-        plt.ylabel('Weights\n(mean ± SEM)')
-
-    # plt.axhline(0, color='black', linestyle='--')
     plt.title('Kernel')
     sns.despine()
 

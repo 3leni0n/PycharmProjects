@@ -8,7 +8,7 @@ from scipy import stats
 from matplotlib import pyplot as plt
 import numpy as np
 import seaborn as sns
-from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, filter_drug_sessions, fig_size
+from my_fun.my_fun import get_experiment, get_animal, compute_psych_curve, filter_drug_sessions, filter_behavior, fig_size
 from parse.parse_v2 import parse_v2
 from cherry import *  # Potential circular import with cherry (uses plot_pc)
 
@@ -53,7 +53,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     df_intersession = pd.read_csv(path_intersession)
 
     # Filter trials
-    df = df[df.P > 0]  # Only those sessions with ilds
+    df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
+    # df = df[df.P > 0]  # Only those sessions with ilds
     # Only sessions with accuracy > X threshold?
     # try:
     #     df = df[df.Drug.isnull()]  # Remove drug experimental sessions
@@ -87,8 +88,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
 
         # Plot params
         color = 'tab:orange'
-        # xlabel = 'Stimulus ILD (dB)'
-        xlabel = 'ILD (dB)'
+        xlabel = 'Stimulus ILD (dB)'
+        # xlabel = 'ILD (dB)'
         ylabel = 'Prob. choose right'
         # ylabel = 'P. right'
 
@@ -116,7 +117,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
 
         # Plot params
         color = 'tab:brown'
-        xlabel = 'Rep. ILD (dB)'
+        xlabel = 'Rep. stim. ILD (dB)'
+        # xlabel = 'Rep. ILD (dB)'
         ylabel = 'Prob. choose repeat'
         # ylabel = 'P. rep.'
 
@@ -166,9 +168,9 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
     ilds[0] = psych_curve.xdata[0]
     ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
-    # plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    plt.gca().set_xticklabels(['-70', '', '', '', '0', '', '', '', '70'])
-    # plt.ylim([-0.025, 1.025])
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '+8', '+70'])
+    # plt.gca().set_xticklabels(['-70', '', '', '', '0', '', '', '', '+70'])
+    plt.ylim([0, 1])
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -251,9 +253,9 @@ def plot_all_pcs(experiment=None, animals=None, kind='prob_right', ncols=5):
     for ax in axes.flatten()[n_animals:]:
         ax.remove()
 
-    fig.suptitle(suptitle + ' psychometric curves')
-    fig.supxlabel(supxlabel)
-    fig.supylabel(supylabel)
+    # fig.suptitle(suptitle + ' psychometric curves')
+    fig.supxlabel(supxlabel, fontsize=plt.rcParams['axes.labelsize'])
+    fig.supylabel(supylabel, fontsize=plt.rcParams['axes.labelsize'])
 
 
 def plot_mean_pc(experiment='2AFC_6', animals=None, kind='prob_right', drug=np.nan, save=False, **kwargs):
@@ -288,7 +290,7 @@ def plot_mean_pc(experiment='2AFC_6', animals=None, kind='prob_right', drug=np.n
     for i in range(len(animals)):
 
         df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
-        df = df[df.P > 0]  # Only those sessions with ilds
+        df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
 
         if drug is None:
             df = df[~df.Drug.isin([0, 1])]
@@ -378,8 +380,8 @@ def plot_mean_pc(experiment='2AFC_6', animals=None, kind='prob_right', drug=np.n
     ilds[0] = psych_curve.xdata[0]
     ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
-    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    # plt.ylim([-0.025, 1.025])
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '+8', '+70'])
+    plt.ylim([0, 1])
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -628,7 +630,7 @@ def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kw
 
         for i in range(len(animals)):
             df = pd.read_csv(Path(folder_in / animals[i]).with_suffix('.csv'))
-            df = df[df.P > 0]  # Only those sessions with ilds
+            df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
             ilds = np.sort(df.ILD.unique())
 
             if kind == 'prob_right':
@@ -712,8 +714,8 @@ def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kw
     ilds[0] = -20
     ilds[-1] = 20
     plt.xticks(ilds)
-    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    plt.ylim([-0.025, 1.025])
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '+8', '+70'])
+    plt.ylim([0, 1])
     plt.yticks([0, 0.5, 1], [0, 0.5, 1])
     # plt.legend(loc='lower center')
     plt.xlabel(xlabel)

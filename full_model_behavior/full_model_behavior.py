@@ -59,18 +59,18 @@ def get_fk(experiment=None, animal=None, residuals=True, zscore=False, drug=None
     # Filter trials
     df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
 
-    # Load intersession data
-    path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (str(int(animal)) + '_intersession.csv')
-    # str(int(animal)) to remove the 0 padding in ID
-    df_intersession = pd.read_csv(path_intersession)
-    threshold = 0.5  # Accuracy threshold to remove bad sessions
-    # mask = df_intersession.Accuracy < threshold
-    mask = (df_intersession.AccuracyLeft < threshold) | (df_intersession.AccuracyRight < threshold)
-
-    # Remove bad sessions based on intersession data
-    if drug is None:
-        dates_to_remove = df_intersession[mask].Dates
-        df = df[~df.Date.isin(dates_to_remove)].reset_index(drop=True)
+    # # Load intersession data
+    # path_intersession = Path.home() / 'PycharmProjects' / 'intersession' / experiment / (str(int(animal)) + '_intersession.csv')
+    # # str(int(animal)) to remove the 0 padding in ID
+    # df_intersession = pd.read_csv(path_intersession)
+    # threshold = 0.5  # Accuracy threshold to remove bad sessions
+    # # mask = df_intersession.Accuracy < threshold
+    # mask = (df_intersession.AccuracyLeft < threshold) | (df_intersession.AccuracyRight < threshold)
+    #
+    # # Remove bad sessions based on intersession data
+    # if drug is None:
+    #     dates_to_remove = df_intersession[mask].Dates
+    #     df = df[~df.Date.isin(dates_to_remove)].reset_index(drop=True)
 
     # # Engagement
     # engaged = [1 if state == 0 else 0 for state in df.State]
@@ -598,9 +598,9 @@ def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=No
     )
 
     if save:
-        if type (mean_fk.experiment) == str:
-            filename = f'fk_mean_{mean_fk.experiment[0]}'
-        elif type(mean_fk.experiment) == list:
+        if len(mean_fk.experiment) == 1:  # One group
+            filename = f'fk_{mean_fk.experiment[0]}'
+        else:  # Multiple groups
             filename = 'fk_mean'
         with open(filename, 'wb') as f:
             pickle.dump(mean_fk, f)

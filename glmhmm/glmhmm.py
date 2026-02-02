@@ -551,8 +551,8 @@ def results_2_df(df):
     all_animals = df.Subject.unique()
     experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
     weights = get_str_mat(df, col_name='Weights')
-    # mask = remove_outliers(weights)
-    # weights = weights[mask]
+    mask = remove_outliers(weights)
+    weights = weights[mask]
 
     n_states = weights.shape[1]
     if n_states == 1:
@@ -609,7 +609,7 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
         n_states = data.State.nunique()
         if n_states == 2:
             palette = {0: 'tab:gray', 1: 'tab:green'}
-            labels = ['Dis.', 'Eng.']
+            labels = ['D', 'E']
             cov_names = ['stim.', '|bias|', '$A_t$']
         elif n_states == 3:
             palette = {0: 'tab:green', 1: 'tab:blue', 2: 'tab:orange'}
