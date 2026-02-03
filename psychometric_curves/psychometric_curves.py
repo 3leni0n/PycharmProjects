@@ -418,7 +418,7 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right', **kwargs)
     """
 
     if kind == 'prob_right':
-        color = 'tab:orange'
+        color = 'tab:gray'
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
@@ -426,7 +426,7 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right', **kwargs)
         upper_lapse = 'LR_L='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
-        color = 'tab:brown'
+        color = 'tab:gray'
         xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
@@ -476,23 +476,23 @@ def plot_pc_drug(experiment='2AFC_6', animal='020', kind='prob_right', **kwargs)
         plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
-                     lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-                     upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                     xy=xy, xytext=xytext, color=color,
-                     va=va, ha=ha)
+        # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+        #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
+        #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+        #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+        #              xy=xy, xytext=xytext, color=color,
+        #              va=va, ha=ha)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
     # plt.title(f'N={len(animals) - animals_removed}, {trials} trials')
-    # plt.title('N=7')
+    plt.title('Example mouse')
     plt.xlim([psych_curve.xdata[0] - 1, psych_curve.xdata[-1] + 1])  # To chop the extreme values
     ilds[0] = psych_curve.xdata[0]
     ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
-    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    # plt.ylim([-0.025, 1.025])
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '+8', '+70'])
+    plt.ylim(0, 1)
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -515,7 +515,7 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         animals = main(experiment)[experiment]
 
     if kind == 'prob_right':
-        color = 'tab:orange'
+        color = 'tab:gray'
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper center'
@@ -523,7 +523,7 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         upper_lapse = 'LR_L='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
-        color = 'tab:brown'
+        color = 'tab:gray'
         xlabel = 'Rep. stim. ILD (dB)'
         ylabel = 'Prob. choose repeat'
         loc = 'lower center'
@@ -571,23 +571,24 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
-                     lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-                     upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-                     xy=xy, xytext=xytext, color=color,
-                     va=va, ha=ha)
+        # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+        #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
+        #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+        #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+        #              xy=xy, xytext=xytext, color=color,
+        #              va=va, ha=ha)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
     # plt.title(f'N={len(animals) - animals_removed}, {trials} trials')
-    # plt.title('N=7')
+    plt.title('All mice')
     plt.xlim([psych_curve.xdata[0] - 1, psych_curve.xdata[-1] + 1])  # To chop the extreme values
     ilds[0] = psych_curve.xdata[0]
     ilds[-1] = psych_curve.xdata[-1]
     plt.xticks(ilds)
-    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '8', '70'])
-    # plt.ylim([-0.025, 1.025])
+
+    plt.gca().set_xticklabels(['-70', '-8', '', '', '0', '', '', '+8', '+70'])
+    plt.ylim(0, 1)
     plt.yticks([0, 0.5, 1], ['0', '0.5', '1'])
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
