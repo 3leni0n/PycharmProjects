@@ -551,8 +551,8 @@ def results_2_df(df):
     all_animals = df.Subject.unique()
     experiment = df.groupby('Subject')['Experiment'].first().reindex(all_animals).values
     weights = get_str_mat(df, col_name='Weights')
-    mask = remove_outliers(weights)
-    weights = weights[mask]
+    # mask = remove_outliers(weights)
+    # weights = weights[mask]
 
     n_states = weights.shape[1]
     if n_states == 1:
@@ -634,16 +634,16 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     width = 0.8
     state_positions = [(i - (n_states - 1) / 2) * width / n_states for i in range(n_states)]
 
-    # # Draw paired lines of subjects between boxes (states)
-    # for cov in sorted(data['Covariate'].unique()):
-    #     for animal in sorted(data['Animal'].unique()):
-    #         subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
-    #         for i in range(n_states - 1):
-    #             x_start = cov + state_positions[i]
-    #             x_end   = cov + state_positions[i + 1]
-    #             y_start = subset[subset[hue] == i]['Weight'].values[0]
-    #             y_end   = subset[subset[hue] == i + 1]['Weight'].values[0]
-    #             ax.plot([x_start, x_end], [y_start, y_end], color='k', alpha=0.1)
+    # Draw paired lines of subjects between boxes (states)
+    for cov in sorted(data['Covariate'].unique()):
+        for animal in sorted(data['Animal'].unique()):
+            subset = data[(data['Covariate'] == cov) & (data['Animal'] == animal)]
+            for i in range(n_states - 1):
+                x_start = cov + state_positions[i]
+                x_end   = cov + state_positions[i + 1]
+                y_start = subset[subset[hue] == i]['Weight'].values[0]
+                y_end   = subset[subset[hue] == i + 1]['Weight'].values[0]
+                ax.plot([x_start, x_end], [y_start, y_end], color='k', alpha=0.1)
 
     # Compute paired-samples t-tests for each covariate between states
     y_star = ax.get_ylim()[1]
