@@ -245,9 +245,10 @@ def model_licks(df_behavior, var='RT', drug=False, me=False):
     if drug:
         formula_cols.append('Drug')
         parts = formula.split(' + ')
-        parts.insert(-2, 'Drug')
+        parts.append('Drug')
+        parts.append('Drug:p1')
         formula = ' + '.join(parts)
-        print('Including Drug as a predictor...')
+        print('Including Drug and its interaction with p(eng) as a predictor...')
 
     subjects = df_behavior.Subject.unique()
     all_params = []
@@ -382,13 +383,13 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
 
         if var == 'RT':
             xlim = (0, 0.5)
-            xticks = (0, 0.25, 0.5)
+            xticks = ([0, 0.25, 0.5], ['0', '0.25', '0.5'])
             # pass
         elif var == 'ILI':
             mean_ILI = df_behavior.ILI.mean()
             std_ILI = df_behavior.ILI.std()
             xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
-            xticks = (0, 0.05, 0.1, 0.15, 0.2)
+            xticks = ([0, 0.1, 0.2], ['0', '0.1', '0.2'])
 
         bin_edges = (0, df_behavior.RespWin.unique()[0])
         n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
@@ -399,7 +400,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
         #     ylabel = 'Density'
         #     sns.kdeplot(df_behavior[var], color=color, **kwargs)
         # else:
-        ylabel = 'Freq. (norm.)'
+        ylabel = 'Frequency (norm.)'
         window = 0.01  # bin_size * 10
         sigma = window / bin_size
         # Average across them (mean and sem)
@@ -433,7 +434,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
             # plt.hist(df_behavior[var], bins=bins, density=False, color=color, edgecolor=color, **kwargs)
 
         plt.xlim(xlim)
-        # plt.xticks(xticks)
+        plt.xticks(*xticks)
         plt.ylim(0, None)
         plt.xlabel('Time (s)')
 
@@ -442,18 +443,18 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
         min_val = df_behavior[var].min()
         max_val = df_behavior[var].max()
         bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
-        plt.hist(df_behavior[var], bins=bins, color=color, density=True, **kwargs)
-        ax = plt.gca()
-        ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
-        plt.xlim(0, 20)
+        plt.hist(df_behavior[var], bins=bins, histtype='step', color=color, density=True, **kwargs)
+        # ax = plt.gca()
+        # ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+        plt.xlim(0, 16)
         # plt.xlim(min_val - 0.5, max_val + 0.5)
         plt.xlabel('N licks')
-        plt.xticks((4, 8, 12, 16))
+        plt.xticks((4, 8, 12))
         loc = 'best'
         if density:
             ylabel = 'Density'
         else:
-            ylabel = 'Freq. (norm.)'
+            ylabel = 'Frequency (norm.)'
 
     if df_behavior.Subject.unique().size > 1:
         title = (f'{var}\n'
@@ -531,19 +532,19 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
                 mean_ILI = df_behavior.ILI.mean()
                 std_ILI = df_behavior.ILI.std()
                 xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
-                xticks = (0, 0.05, 0.1, 0.15, 0.2)
+                xticks = ([0, 0.1, 0.2], ['0', '0.1', '0.2'])
                 loc = 'lower center'
 
             if kind == 'hist':
                 # plt.hist(split_var, bins=1000, density=False, label=labels[i], color=colors[i],
                 #          edgecolor='none', alpha=0.5)
                 plot_licks_dist(df_behavior[df_behavior[split_var_name] == i], var=var, label=labels[i], color=colors[i], **kwargs)
-                ylabel = 'Freq. (norm.)'
+                ylabel = 'Frequency (norm.)'
             elif kind == 'kde':
                 sns.kdeplot(split_var, color=colors[i], label=labels[i])
                 ylabel = 'Density'
             plt.xlim(xlim)
-            # plt.xticks(xticks)
+            plt.xticks(*xticks)
             plt.xlabel('Time (s)')
 
         # Discrete variable
@@ -552,18 +553,18 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
             max_val = split_var.max()
             bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
             density = True if kind == 'kde' else False
-            plt.hist(split_var, bins=bins, density=density, histtype='step', color=colors[i], label=labels[i])
-            ax = plt.gca()
-            ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
-            plt.xlim(0, 20)
-            plt.xticks((4, 8, 12, 16))
+            plt.hist(split_var, bins=bins, density=True, histtype='step', color=colors[i], label=labels[i])
+            # ax = plt.gca()
+            # ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
+            plt.xlim(0, 16)
+            plt.xticks((4, 8, 12))
             # plt.xlim(min_val - 0.5, max_val + 0.5)
             plt.xlabel('N licks')
             loc = 'best'
             if kind == 'kde':
                 ylabel = 'Density'
             else:
-                ylabel = 'Freq. (norm.)'
+                ylabel = 'Frequency (norm.)'
 
         if df_behavior.Subject.unique().size > 1:
             title = (f'{var}\n'
@@ -865,11 +866,11 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     # if density:
     #     supylabel = 'Density'
     # else:
-    supylabel = 'Frequency (normalized)'
+    supylabel = 'Frequency (norm.)'
 
-    fig.suptitle(title)
-    fig.supxlabel(supxlabel)
-    fig.supylabel(supylabel)
+    # fig.suptitle(title)
+    fig.supxlabel(supxlabel, fontsize=plt.rcParams['axes.labelsize'])
+    fig.supylabel(supylabel, fontsize=plt.rcParams['axes.labelsize'])
 
 
 def plot_chrono_curve(df_behavior, absolute=True):
@@ -1018,7 +1019,9 @@ def plot_model_licks(df_params, df_p, **kwargs):
         'absILD:Hit': "|ILD|':\nCorrect",
         'NormTrial': "Trial'",
         'NormTrial2': "Trial²",
-        'p1': r'$p$(eng.)'
+        'p1': r'$p$(eng.)',
+        'Drug': 'Drug',
+        'Drug:p1': 'Drug:\n$p$(eng.)'
     }
 
     plt.figure(constrained_layout=True, **kwargs)

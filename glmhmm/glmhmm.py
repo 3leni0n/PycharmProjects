@@ -727,10 +727,7 @@ def plot_trans_mat(trans_mat, **kwargs):
     for i in range(trans_mat.shape[0]):
         for j in range(trans_mat.shape[1]):
             # text = str(np.around(trans_mat[i, j], decimals=2))
-            if np.round(trans_mat[i, j], 2) == 0.0:
-                text = '0'
-            else:
-                text = f"{trans_mat[i, j]:.2f}".lstrip('0').replace('-0.', '-.').rstrip('0').rstrip('.')
+            text = f"{trans_mat[i, j]:.3f}".lstrip('0').replace('-0.', '-.').rstrip('0').rstrip('.')
             plt.text(j, i, text, ha='center', va='center', color='k')
 
     # plt.xlim(-0.5, n_states + 0.5)
