@@ -11,6 +11,7 @@ from scipy.stats import zscore
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
+import matplotlib.cm as cm
 import seaborn as sns
 from my_fun.my_fun import fig_size
 
@@ -590,8 +591,12 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
     # plt.figure(constrained_layout=True)
 
     # Collapse the signed ILD levels to absolute values for cleaner visualization
-    abs_ilds = sorted(df_behavior.absILD.unique().astype(int), reverse=True)
-    palette = list(sns.color_palette('tab10', len(abs_ilds)))[::-1]
+    abs_ilds = sorted(df_behavior.absILD.unique().astype(int), reverse=False)
+    # palette = list(sns.color_palette('tab10', len(abs_ilds)))[::-1]
+
+    norm = plt.Normalize(vmin=min(abs_ilds), vmax=16)  # Scale |ILD| → 0–1
+    cmap = cm.get_cmap('Reds')  #Continuous colormap
+    palette = [cmap(norm(ild)) for ild in abs_ilds]
 
     peaks = {}
     # Plot the distribution for each absolute ILD level
@@ -604,6 +609,7 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
 
             if var == 'RT':
                 xlim = (0, 0.5)
+                # xlim = (0, 0.2)
                 loc = 'upper center'
             elif var == 'ILI':
                 mean_ILI = df_behavior.ILI.mean()
@@ -614,7 +620,6 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
             # Plot and capture the Line2D object
             # sns.kdeplot(df_ild[var], color=color, label=ild)
             plot_licks_dist(df_behavior[df_behavior.absILD == ild], var=var, sem=False, color=color, label=ild, **kwargs)
-            # sns.histplot(df_ild[var], stat='density', element='step', fill=False, kde=False, color=color, label=ild)
             # plt.plot(bin_centers, hist, color=color, label=ild)
             plt.xlim(xlim)
 
@@ -635,7 +640,7 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
             plt.hist(df_ild[var], bins=bins, density=True, histtype='step', color=color, label=ild)
             ax = plt.gca()
             ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
-            plt.xlim(0, 20)
+            plt.xlim(0, 16)
             # plt.xlim(min_val - 0.5, max_val + 0.5)
             plt.xlabel(var)
 
@@ -652,6 +657,7 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
     mean_rt = np.mean(list((peaks.values())))
     print(f'Mean {var} = {mean_rt:.3f} s')
 
+    # plt.axvline(0.15, color='k', linestyle='--')
     plt.title(var + ' distribution')
     plt.xlabel(var)
     plt.ylabel('Density')
@@ -873,7 +879,7 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     fig.supylabel(supylabel, fontsize=plt.rcParams['axes.labelsize'])
 
 
-def plot_chrono_curve(df_behavior, absolute=True):
+def plot_chrono_curve(df_behavior, absolute=True, **kwargs):
     """
     Plot the chronometric curve of a behavioral session (all trials).
     :param df_behavior: DataFrame with the behavioral data of a session
@@ -881,17 +887,39 @@ def plot_chrono_curve(df_behavior, absolute=True):
     :return:
     """
 
+    # df_behavior.loc[df_behavior['ILD'] == -70, 'ILD'] = -20
+    # df_behavior.loc[df_behavior['ILD'] == 70, 'ILD'] = 20
+
+    subjects = df_behavior['Subject'].unique()
+
     if absolute:
         df_behavior['absILD'] = df_behavior['ILD'].abs()
-        mean_rts = df_behavior.groupby('absILD')['RT'].mean().reset_index()
-        ilds = sorted(df_behavior['absILD'].unique())
-        x = mean_rts['absILD']
+        ild_col = 'absILD'
+        # mean_rts = df_behavior.groupby('absILD')['RT'].mean().reset_index()
+        # ilds = sorted(df_behavior['absILD'].unique())
+        # x = mean_rts['absILD']
         xlabel = '|ILD|'
     else:
-        mean_rts = df_behavior.groupby('ILD')['RT'].mean().reset_index()
-        ilds = sorted(df_behavior['ILD'].unique())
-        x = mean_rts['ILD']
+        ild_col = 'ILD'
+        # mean_rts = df_behavior.groupby('ILD')['RT'].mean().reset_index()
+        # ilds = sorted(df_behavior['ILD'].unique())
+        # x = mean_rts['ILD']
         xlabel = 'ILD'
+
+    if len(subjects) > 1:
+        # Mean across mice
+        mouse_means = df_behavior.groupby(['Subject', ild_col])['RT'].median().reset_index()   # Mean per mouse per ILD
+        mean_rts = mouse_means.groupby(ild_col)['RT'].mean().reset_index()
+        sem_rts = mouse_means.groupby(ild_col)['RT'].sem().reset_index()
+    else:
+        # Single mouse: just mean per ILD
+        mean_rts = df_behavior.groupby(ild_col)['RT'].median().reset_index()
+        sem_rts = df_behavior.groupby(ild_col)['RT'].sem().reset_index()
+
+    ilds = sorted(df_behavior[ild_col].unique())
+    x = mean_rts[ild_col]
+    y = mean_rts['RT']
+    yerr = sem_rts['RT']
 
     if df_behavior.Subject.unique().size > 1:
         title = f'Chronometric Curve\n N={len(df_behavior.Subject.unique())} mice, {len(df_behavior)} trials'
@@ -899,9 +927,9 @@ def plot_chrono_curve(df_behavior, absolute=True):
         title = f'Chronometric Curve\n ID: {df_behavior.Subject.unique()[0]}, N={len(df_behavior)} trials'
 
     print(mean_rts)
-    plt.figure(constrained_layout=True)
-    y = mean_rts['RT']
-    plt.plot(x, y, color='k', marker='o', linestyle='-')
+    plt.figure(constrained_layout=True, **kwargs)
+    # plt.plot(x, y, color='k', marker='o', linestyle='-')
+    plt.errorbar(x, y, yerr=yerr, fmt='o-', color='k', linestyle='-')
     plt.xticks(ilds)
     plt.title(title)
     plt.xlabel(xlabel)

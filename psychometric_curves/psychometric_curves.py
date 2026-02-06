@@ -476,12 +476,12 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
         plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-        # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-        #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
-        #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-        #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-        #              xy=xy, xytext=xytext, color=color,
-        #              va=va, ha=ha)
+        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                     lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                     upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                     xy=xy, xytext=xytext, color=color,
+                     va=va, ha=ha)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
@@ -571,12 +571,12 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-        # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-        #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
-        #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-        #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-        #              xy=xy, xytext=xytext, color=color,
-        #              va=va, ha=ha)
+        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                     lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                     upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                     xy=xy, xytext=xytext, color=color,
+                     va=va, ha=ha)
 
     plt.axhline(0.5, color='tab:gray', ls='--')
     plt.axvline(0., color='tab:gray', ls='--')
