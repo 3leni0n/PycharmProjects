@@ -1243,7 +1243,7 @@ def fig_size(n_cols=1, ratio=None):
 
     # All measurements are in inches
     A4_size = np.array((8.27, 11.69))  # A4 measurements
-    margins = 2  # On each dimension
+    margins = 2  # On both dimension
     size = A4_size - margins  # Effective size after margins removal (2 per dimension)
     width = size[0]
     height = size[1]
