@@ -51,7 +51,7 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
             try:
                 print("'.npy' files do not exist in folder. Proceeding...")
                 preprocessed = preprocess(ephys_ids[i])
-                df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = tuple(preprocessed)
+                df_ttl, df_behavior, n_trials, df_spikes, cluster_info, timeline = preprocessed
                 bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align=align, time_win=time_win,
                                               bin_size=bin_size)
                 np.save(folder_child / f'bins_{align}.npy', bins)
@@ -867,18 +867,19 @@ def p_val(acc, acc_null):
 # PLOT DECODERS
 ########################################################################################################################
 
-def plot_within_decoder(bins, acc, acc_null, z_null=True):
+def plot_within_decoder(bins, acc, acc_null, z_null=False, excess=False):
     """
     Plot the decoding accuracy and the null distribution of accuracy.
     :param bins: 1D array with time bins
     :param acc: 2D array with decoding accuracy (trials x time)
     :param acc_null: 2D array with null distribution of accuracy (shuffles x time)
     :param z_null: whether to Z-score the decoding accuracy by the null distribution of accuracy
+    :param excess: whether to plot excess accuracy (acc - null mean)
     """
 
     # Plot decoding accuracy
     # plt.figure(constrained_layout=True)
-    plt.axvline(0, color='tab:red', linestyle='-')  # Stimulus onset
+    plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus onset
     plt.axvline(1, color='tab:gray', linestyle='-')  # Go cue
 
     bin_centers = (bins[:-1] + bins[1:]) / 2
@@ -888,8 +889,8 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
         z_scores = null_zscore(acc, acc_null)
         p_values = p_val(acc, acc_null)
         significant_region = p_values < 0.05  # When assessing significance of single sessions use p < 0.05
-        plt.plot(bin_centers, z_scores, label='Z acc.')
-        plt.fill_between(bin_centers, z_scores, where=significant_region, edgecolor='none',
+        plt.plot(bin_centers, z_scores, color='k', label='Z acc.')
+        plt.fill_between(bin_centers, z_scores, color='tab:gray', where=significant_region, edgecolor='none',
                          alpha=0.25, label='α < .05')
         plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
         ylabel = 'Z-score'
@@ -898,17 +899,29 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
         acc_sem = sem(acc, axis=0)
         acc_null_mean = acc_null.mean(axis=0)
         acc_null_band = np.percentile(acc_null, [2.5, 97.5], axis=0)  # The 95% confidence interval of the shuffles
-        # plt.plot(-np.mean(abs(pred_err), axis=0)+1)  # Equivalent
-        plt.plot(bin_centers, acc_mean, label='Acc.')
-        plt.fill_between(bin_centers, acc_mean - acc_sem, acc_mean + acc_sem, edgecolor='none', alpha=0.25,
-                         label='Acc. s.e.m.')
-        plt.plot(bin_centers, acc_null_mean, color='tab:gray', linestyle='--', label='Null mean')  # Chance level (0.5)
-        plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray', edgecolor='none', alpha=0.25,
-                         label='Null 95% CI')
-        ylabel = 'Accuracy'
+
+        if excess:
+            acc_mean = acc_mean - acc_null_mean
+            acc_band_low = acc_mean - acc_sem
+            acc_band_high = acc_mean + acc_sem
+            ylabel = 'Excess accuracy'
+            plt.axhline(0, color='tab:gray', linestyle='--')
+            plt.plot(bin_centers, acc_mean, color='k', label='Excess acc.')
+            plt.fill_between(bin_centers, acc_band_low, acc_band_high, color='tab:gray',
+                             edgecolor='none', alpha=0.25, label='Acc. s.e.m.')
+            plt.ylim(None, 0.5)
+        else:
+            # plt.plot(-np.mean(abs(pred_err), axis=0)+1)  # Equivalent
+            plt.plot(bin_centers, acc_mean, color='k', label='Acc.')
+            plt.fill_between(bin_centers, acc_mean - acc_sem, acc_mean + acc_sem, color='tab:gray', edgecolor='none', alpha=0.25,
+                             label='Acc. s.e.m.')
+            plt.plot(bin_centers, acc_null_mean, color='tab:gray', linestyle='--', label='Null mean')  # Chance level (0.5)
+            plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray', edgecolor='none', alpha=0.25,
+                             label='Null 95% CI')
+            ylabel = 'Accuracy'
+            plt.ylim(None, 1)
 
     plt.xlim(bins[0], bins[-1])
-    plt.ylim(None, 1)
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
     # plt.title(f'Decoding accuracy\n'
@@ -917,7 +930,7 @@ def plot_within_decoder(bins, acc, acc_null, z_null=True):
     sns.despine()
 
 
-def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
+def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
     """
     Plot the mean decoding accuracy across all sessions.
     :param results: dict with decoding results for each session
@@ -970,28 +983,44 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False):
             acc_band_label = 'Acc. SEM'
             acc_null_band_label = 'Acc. null SEM'
 
-        # Plot the mean decoding accuracy across all sessions
-        plt.plot(bin_centers, acc_mean, color='tab:blue', label='Acc.')
-        plt.fill_between(bin_centers, acc_band[0], acc_band[1], color='tab:blue', edgecolor='none',
-                         alpha=0.25)#, label=acc_band_label)
+        if excess:
+            acc_mean = acc_mean - acc_null_mean
+            acc_band = (acc_band[0] - acc_null_mean, acc_band[1] - acc_null_mean)
+            yticks = (0, 0.25, 0.5)
+            yticklabels = ('0', '0.25', '0.5')
+            ylim = (-0.05, 0.5)
+            ylabel = 'Excess accuracy'
+        else:
+            # Plot the mean null accuracy across all sessions (chance level)
+            plt.plot(bin_centers, acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
+            plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray',
+                             edgecolor='none', alpha=0.25)  # , label=acc_null_band_label)
+            yticks = (0.5, 0.75, 1)
+            yticklabels = ('0.5', '0.75', '1')
+            ylim = (0.45, 1)
+            ylabel = 'Accuracy'
 
-        # Plot the mean null accuracy across all sessions (chance level)
-        plt.plot(bin_centers, acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
-        plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray',
-                         edgecolor='none', alpha=0.25)#, label=acc_null_band_label)
+        # Plot the mean decoding accuracy across all sessions
+        plt.plot(bin_centers, acc_mean, color='k', label='Acc.')
+        plt.fill_between(bin_centers, acc_band[0], acc_band[1], color='k', edgecolor='none',
+                         alpha=0.25)#, label=acc_band_label)
 
         # Plot the individual sessions accuracy
         for _ in range(len(results['acc'])):
-            plt.plot(bin_centers, np.mean(results['acc'][_], axis=0), color='tab:blue', alpha=0.1)
+            session_mean = np.mean(results['acc'][_], axis=0)
+            if excess:
+                session_mean = session_mean - acc_null_mean
+            plt.plot(bin_centers, session_mean, color='tab:gray', alpha=0.1)
 
         # # Plot the individual sessions null accuracy (chance level)
         # for _ in range(len(results['acc_null'])):
         #     plt.plot(bin_centers, np.mean(results['acc_null'][_], axis=0), ls='--', color='tab:gray')
 
-        ylabel = 'Accuracy'
+        # ylabel = 'Accuracy'
 
     plt.xlim(bins[0], bins[-1])
-    plt.ylim(None, 1)
+    plt.yticks(yticks, yticklabels)
+    plt.ylim(ylim)
     plt.xlabel('Time (s)')
     plt.ylabel(ylabel)
     # plt.title(f"Decoding accuracy\n"
@@ -1084,14 +1113,14 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
         plt.axhline(0.5, color=color, linestyle='--')  # Delay
         plt.axvline(0.5, color=color, linestyle='--')  # Delay
         epochs = {
-            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'S'},
-            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'D'},
-            'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'R'}
+            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
+            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
+            'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
         }
     elif align == 'resp':
         epochs = {
-            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': '1st'},
-            'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid'},
+            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First lick'},
+            'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid lick'},
         }
 
     ax = plt.gca()
@@ -1111,7 +1140,7 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
         ax.add_patch(rect)
 
         ax.text(
-            x=x_min,
+            x=x_min + 0.15,
             y=start + 0.15,
             s=label,
             color=color,
@@ -1232,28 +1261,33 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
     if excess:
         acc_mean = acc_mean - acc_null_mean
         acc_band = (acc_band[0] - acc_null_mean, acc_band[1] - acc_null_mean)
-        ylim = (None, 0.5)
+        yticks = (0, 0.25, 0.5)
+        yticklabels = ('0', '0.25', '0.5')
+        ylim = (-0.05, 0.5)
         ylabel = 'Excess accuracy'
 
     else:
         plt.plot(bin_centers, acc_null_mean, linestyle='--', color=color)
         plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color=color, edgecolor='none',
                          alpha=0.25)
-        ylim = (None, 1)
+        yticks = (0.5, 0.75, 1)
+        yticklabels = ('0.5', '0.75', '1')
+        ylim = (0.45, 1)
         ylabel = 'Accuracy'
 
     # n_trials = np.sum([results['pred'][i].shape[0] for i in range(len(results['acc']))])
     # plt.figure(constrained_layout=True)
     plt.plot(bin_centers, acc_mean, color=color, label=label)
     plt.fill_between(bin_centers, acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
-
-    plt.legend(frameon=False)
     plt.xlim(bins[0], bins[-1])
     plt.xlabel('Time (s)')
-    plt.ylabel(ylabel)
+    plt.yticks(yticks, yticklabels)
     plt.ylim(ylim)
+    plt.ylabel(ylabel)
+
     # plt.title(f'Decoding accuracy\n'
     #           f'{subject}, {len(results["acc"])} sessions, {n_trials} trials')
+    plt.legend(frameon=False)
     sns.despine()
 
 

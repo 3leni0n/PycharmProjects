@@ -345,24 +345,15 @@ def load_spike_sorted_data(path_ks4, path_phy2):
           f'Max spike time: {round(max(df_spikes.times / 60))} min')
     print('\n')
 
-    # Get the number of good and mua clusters
-    n_clusters = len(cluster_group)
-    print(f'Total number of clusters: {n_clusters}')
-    n_good_clusters = len(cluster_group[cluster_group['group'] == 'good'])
-    print(f'Number of good clusters: {n_good_clusters} ({round(n_good_clusters / n_clusters * 100)}%)')
-    n_mua_clusters = len(cluster_group[cluster_group['group'] == 'mua'])
-    print(f'Number of mua clusters: {n_mua_clusters} ({round(n_mua_clusters / n_clusters * 100)}%)')
-    n_noise_clusters = len(cluster_group[cluster_group['group'] == 'noise'])
-    print(f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters / n_clusters * 100)}%)')
-    print('\n')
-
     # Drop noise clusters
     df_spikes = df_spikes.loc[(df_spikes.group != 'noise')]
     cluster_info = cluster_info.loc[(cluster_info.group != 'noise')].reset_index(drop=True)
 
-    x = ['good', 'mua', 'noise']
-    height = [n_good_clusters, n_mua_clusters, n_noise_clusters]
-    labels = ['good', 'mua', 'noise']
+    # Drop sparse units
+    fr_threshold = 0.1  # Firing rate in Hz
+    sparse_clusters = cluster_info[cluster_info.fr < fr_threshold].cluster_id.to_list()
+    cluster_info = cluster_info[~cluster_info.cluster_id.isin(sparse_clusters)].reset_index(drop=True)
+    df_spikes = df_spikes[~df_spikes.cluster.isin(sparse_clusters)].reset_index(drop=True)
 
     # # Plot the first minute
     # plt.figure()
@@ -373,10 +364,10 @@ def load_spike_sorted_data(path_ks4, path_phy2):
     # plt.ylabel('Cluster ID')
     # plt.title('First min. of recording')
 
-    return df_spikes, cluster_info, x, height, labels
+    return df_spikes, cluster_info
 
 
-def plot_group_clusters_dist(x, height, labels, ax=None):
+def plot_group_clusters_dist(df_spikes, cluster_info, ax=None):
     """
     Plot a bar graph with the number of good, mua and noise clusters
     """
@@ -384,8 +375,22 @@ def plot_group_clusters_dist(x, height, labels, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
 
-    colors = ['tab:green', 'tab:orange', 'tab:gray']
-    ax.bar(x, height, label=labels, color=colors)
+    # Get the number of good and mua clusters
+    n_clusters = len(cluster_info)
+    print(f'Total number of clusters: {n_clusters}')
+    n_good_clusters = len(cluster_info[cluster_info['group'] == 'good'])
+    print(f'Number of good clusters: {n_good_clusters} ({round(n_good_clusters / n_clusters * 100)}%)')
+    n_mua_clusters = len(cluster_info[cluster_info['group'] == 'mua'])
+    print(f'Number of mua clusters: {n_mua_clusters} ({round(n_mua_clusters / n_clusters * 100)}%)')
+    # n_noise_clusters = len(cluster_info[cluster_info['group'] == 'noise'])
+    # print(f'Number of noise clusters: {n_noise_clusters} ({round(n_noise_clusters / n_clusters * 100)}%)')
+    print('\n')
+
+    x = ['good', 'mua']
+    height = [n_good_clusters, n_mua_clusters]
+
+    colors = ['tab:green', 'tab:orange']
+    ax.bar(x, height, label=x, color=colors)
     ax.set_xlabel('Group')
     ax.set_ylabel('Count')
     sns.despine(ax=ax)
@@ -395,6 +400,8 @@ def print_timeline(continuous, events, df_behavior, df_spikes):
     """
     Print information about the ephys and behavior data
     """
+
+    Timeline = namedtuple('Timeline', ['y', 'width', 'left', 'ts_edges', 'events_edges'])
 
     # Ephys session info
     start_aquisition = 0  # Press PLAY in Open Ephys GUI
@@ -451,10 +458,12 @@ def print_timeline(continuous, events, df_behavior, df_spikes):
     ts_edges = (first_timestamp, last_timestamp)
     events_edges = (first_event, last_event)
 
-    return y, width, left, ts_edges, events_edges
+    timeline = Timeline(y, width, left, ts_edges, events_edges)
+
+    return timeline
 
 
-def plot_timeline(y, width, left, ts_edges, events_edges, ax=None):
+def plot_timeline(timeline, ax=None):
     """
     Plot timecourse of aquisition, recording, events, behavior and spikes
     param y: Labels of the bars
@@ -464,6 +473,8 @@ def plot_timeline(y, width, left, ts_edges, events_edges, ax=None):
 
     if ax is None:
         fig, ax = plt.subplots()
+
+    y, width, left, ts_edges, events_edges = timeline
 
     color = ['tab:gray', 'tab:red', 'tab:green', 'tab:blue', 'tab:orange']
     ax.barh(y=y, width=width, left=left, color=color)
@@ -651,10 +662,10 @@ def preprocess(ephys_id):
         path_spike_sorting = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_id
         path_ks4 = path_spike_sorting / 'kilosort4'
         path_phy2 = path_spike_sorting / 'phy2'
-    df_spikes, cluster_info, x, height, labels = load_spike_sorted_data(path_ks4, path_phy2)
+    df_spikes, cluster_info = load_spike_sorted_data(path_ks4, path_phy2)
 
     # Print session info
-    y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
+    timeline = print_timeline(continuous, events, df_behavior, df_spikes)
 
     # Clean redundant TTLs (1 row/trial) for alignment with behavior data
     df_ttl = align_ttl(df_ttl, df_behavior)
@@ -663,35 +674,10 @@ def preprocess(ephys_id):
     # df_aligned, df_spikes = temp_align(df_ttl, df_behavior, df_spikes)
 
     Preprocessed = namedtuple('Preprocessed', [
-        'df_ttl',
-        'df_behavior',
-        'n_trials',
-        'df_spikes',
-        'cluster_info',
-        'x',
-        'height',
-        'labels',
-        'y',
-        'width',
-        'left',
-        'ts_edges',
-        'events_edges'
+        'df_ttl', 'df_behavior', 'n_trials', 'df_spikes', 'cluster_info', 'timeline'
     ])
 
     preprocessed = Preprocessed(
-        df_ttl,
-        df_behavior,
-        n_trials,
-        df_spikes,
-        cluster_info,
-        x,
-        height,
-        labels,
-        y,
-        width,
-        left,
-        ts_edges,
-        events_edges
-    )
+        df_ttl, df_behavior, n_trials, df_spikes, cluster_info, timeline)
 
     return preprocessed

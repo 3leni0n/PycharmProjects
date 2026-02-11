@@ -950,6 +950,44 @@ def fano_factor(peri_event_spikes):
     return fano
 
 
+def get_session_fano(all_psth):
+    """
+    Compute Fano factor for each cluster in a session from a precomputed PSTH array.
+    :param all_psth: np.array of shape (trials, bins, clusters)
+    :return: list of Fano factors for each cluster in the session
+    """
+
+    fano_session = []
+    n_clusters = all_psth.shape[2]
+
+    for cluster in range(n_clusters):
+        # sum spikes across bins for each trial to get spike counts
+        spike_counts = all_psth[:, :, cluster].sum(axis=1)  # shape: (n_trials,)
+        ff = np.var(spike_counts) / np.mean(spike_counts) if spike_counts.mean() > 0 else np.nan
+        fano_session.append(ff)
+
+    return fano_session
+
+
+def filter_units(all_psth, cluster_info, fano=10, depth=None, group=None):
+
+    # By Fano factor
+    if fano:
+        fano_session = get_session_fano(all_psth)
+        cluster_info['fano'] = fano_session
+        mask = fano_session < fano
+        all_psth = all_psth[:, :, mask]
+        cluster_info = cluster_info[mask].reset_index(drop=True)
+
+    if depth:
+        pass
+
+    if group:
+        pass
+
+    return all_psth, cluster_info
+
+
 ########################################################################################################################
 
 
@@ -1512,7 +1550,7 @@ def plot_corr_session(df_spikes, df_ttl, cluster_info, df_behavior, time_win=[-1
 def session_report(ephys_id):
 
     preprocessed = preprocess(ephys_id)
-    df_ttl, df_behavior, n_trials, df_spikes, cluster_info, x, height, labels, y, width, left, ts_edges, events_edges = (
+    df_ttl, df_behavior, n_trials, df_spikes, cluster_info, timeline = (
         tuple(preprocessed))
     subject = df_behavior.Subject.unique()[0]
     date = df_behavior.Date.unique()[0]
@@ -1530,9 +1568,9 @@ def session_report(ephys_id):
     fig, ax_dict = plt.subplot_mosaic(mosaic, figsize=figsize)
 
     # Plot panels
-    # y, width, left, ts_edges, events_edges = print_timeline(continuous, events, df_behavior, df_spikes)
-    plot_timeline(y, width, left, ts_edges, events_edges, ax=ax_dict['Timeline'])
-    plot_group_clusters_dist(x, height, labels, ax=ax_dict['PopGroupDist'])
+    # timeline = print_timeline(continuous, events, df_behavior, df_spikes)
+    plot_timeline(timeline, ax=ax_dict['Timeline'])
+    plot_group_clusters_dist(cluster_info, ax=ax_dict['PopGroupDist'])
     bins, psth = plot_pop_psth(df_spikes, df_ttl, cluster_info, ax=ax_dict['PopPSTH'])
     plot_mfr(psth, ax=ax_dict['MFR'])
     plot_sync(df_spikes, df_ttl, df_behavior, time_win=[-2, 0], method='anal', smooth=True, ax=ax_dict['Sync'])
