@@ -12,7 +12,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from scipy.stats import sem
 
-from my_fun.my_fun import timer
+from my_fun.my_fun import timer, filter_behavior
 from ephys.preprocessing import *
 from ephys.analysis import *
 import seaborn as sns
@@ -44,7 +44,7 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
         folder_child.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_child)
 
-        # .npy files (spike counts)
+        # .npy files (bins and spike counts)
         if any(f.endswith(f'{align}.npy') for f in os.listdir(folder_child)):
             print("'.npy' files exist in folder. Skipping...")
         else:
@@ -94,7 +94,7 @@ def summary_behavior(df):
     :return: summary DataFrame
     """
 
-    df = df[df['Miss'] != 1]
+    df = df[df.Miss == 0]  # Exclude missed trials
 
     summary = (
         df
@@ -509,34 +509,34 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
             y_test_shuffled0 = y_test0.values.copy()
             y_test_shuffled1 = y_test1.values.copy()
             for _ in range(n_shuffles):
-                # np.random.shuffle(y_test_shuffled0)
-                # # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
-                # acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
-                # # shuffled labels
-                # # pred_err_temp.append(y_pred - y_test_shuffled)
-                # # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
-                # # actual labels
+                np.random.shuffle(y_test_shuffled0)
+                # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
+                acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
+                # shuffled labels
+                # pred_err_temp.append(y_pred - y_test_shuffled)
+                # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
+                # actual labels
+
+                np.random.shuffle(y_test_shuffled1)
+                # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
+                acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
+                # shuffled labels
+                # pred_err_temp.append(y_pred - y_test_shuffled)
+                # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
+                # actual labels
+
+                # # TEST FOR NON FLAT SHUFFLES
+                # y_train_shuffled = np.random.permutation(y_train)
+                # clf_null = LogisticRegression(class_weight='balanced')
+                # clf_null.fit(X_train, y_train_shuffled)
                 #
-                # np.random.shuffle(y_test_shuffled1)
-                # # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
-                # acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
-                # # shuffled labels
-                # # pred_err_temp.append(y_pred - y_test_shuffled)
-                # # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
-                # # actual labels
-
-                # TEST FOR NON FLAT SHUFFLES
-                y_train_shuffled = np.random.permutation(y_train)
-                clf_null = LogisticRegression(class_weight='balanced')
-                clf_null.fit(X_train, y_train_shuffled)
-
-                # Predict on the same test sets
-                y_pred0_null = clf_null.predict(X_test0)
-                y_pred1_null = clf_null.predict(X_test1)
-
-                # Compute per-trial accuracy
-                acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
-                acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
+                # # Predict on the same test sets
+                # y_pred0_null = clf_null.predict(X_test0)
+                # y_pred1_null = clf_null.predict(X_test1)
+                #
+                # # Compute per-trial accuracy
+                # acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
+                # acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
 
     return pred, pred_err, acc, acc_null
 
@@ -647,41 +647,41 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
             y_test_shuffled0 = y_test0.values.copy()
             y_test_shuffled1 = y_test1.values.copy()
             for _ in range(n_shuffles):
-                # np.random.shuffle(y_test_shuffled0)
-                # # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
-                # acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
-                # # shuffled labels
-                # # pred_err_temp.append(y_pred - y_test_shuffled)
-                # # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
-                # # actual labels
+                np.random.shuffle(y_test_shuffled0)
+                # acc_null0[k, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
+                acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
+                # shuffled labels
+                # pred_err_temp.append(y_pred - y_test_shuffled)
+                # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
+                # actual labels
+
+                np.random.shuffle(y_test_shuffled1)
+                # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
+                acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
+                # shuffled labels
+                # pred_err_temp.append(y_pred - y_test_shuffled)
+                # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
+                # actual labels
+
+                # # TEST FOR NON FLAT SHUFFLES
+                # y_train_shuffled = np.random.permutation(y_train)
+                # clf_null = LogisticRegression(class_weight='balanced')
+                # clf_null.fit(X_train, y_train_shuffled)
                 #
-                # np.random.shuffle(y_test_shuffled1)
-                # # acc_null1[k, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
-                # acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
-                # # shuffled labels
-                # # pred_err_temp.append(y_pred - y_test_shuffled)
-                # # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
-                # # actual labels
-
-                # TEST FOR NON FLAT SHUFFLES
-                y_train_shuffled = np.random.permutation(y_train)
-                clf_null = LogisticRegression(class_weight='balanced')
-                clf_null.fit(X_train, y_train_shuffled)
-
-                # Predict on the same test sets
-                y_pred0_null = clf_null.predict(X_test0)
-                y_pred1_null = clf_null.predict(X_test1)
-
-                # Compute per-trial accuracy
-                acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
-                acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
+                # # Predict on the same test sets
+                # y_pred0_null = clf_null.predict(X_test0)
+                # y_pred1_null = clf_null.predict(X_test1)
+                #
+                # # Compute per-trial accuracy
+                # acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
+                # acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
 
     return pred, pred_err, acc, acc_null
 
 
 @timer
 def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-                 hit_only=False, engagement=None, n_shuffles=100, plot=False, save=False):
+                 hit_only=False, engagement=None, n_shuffles=100, save=False):
     """
     Perform within time bin decoder across all sessions for one subject.
     :param subject: subject ID (str)
@@ -695,7 +695,6 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
     :param hit_only: whether to use only hit trials (default: False)
     :param engagement: whether to filter by engagement (1: engaged, 0: disengaged, None: all trials)
     :param n_shuffles: number of shuffles to perform
-    :param plot: whether to plot the decoding accuracy for each session
     :param save: whether to save the results as a pickle
     :return: results (dict)
     """
@@ -736,21 +735,36 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             bins = np.load(folder_child / f'bins_{align}.npy')
             all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
+            # all_psth = filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=None, depth=None)
+
             state_label = ''
             if engagement is not None:  # Add engaged column to df_behavior
-            # if engagement is None:  # Add engaged column to df_behavior
-                disengagement = find_disengaged(df_behavior, plot=False)  # Find trial where disengagement happens
-                engaged = (df_behavior.Trial <= disengagement).astype(int)  # Label trials as engaged/disengaged
-                df_behavior['Engaged'] = engaged
-                if engagement == 0:  # Disengaged trials
-                    df_behavior = df_behavior[df_behavior.Engaged == 0].reset_index(drop=True)
-                    state_label = '_disengaged'
-                elif engagement == 1:  # Engaged trials
-                    df_behavior = df_behavior[df_behavior.Engaged == 1].reset_index(drop=True)
-                    state_label = '_engaged'
-                all_psth = all_psth[df_behavior.index.values]  # Filter by engagement
-            # else:
-            #     state_label = ''
+
+                # Load GLM-HMM fit
+                path_glmhmm = (Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / '2AFC_5' / subject).with_suffix('.csv')
+                df_glmhmm = pd.read_csv(path_glmhmm)
+                session = df_behavior.Session.unique()[0]
+                df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
+
+                # Drop misses
+                resp_idx = df_behavior[df_behavior.Miss == 0].index
+                df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+                all_psth = all_psth[resp_idx]
+
+                assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
+                df_behavior = df_glmhmm
+                drop_miss = False  # To not do it twice
+
+                # Filter by engagement
+                mask = (df_behavior.State == engagement).to_numpy()
+                if engagement == 1 and mask.sum() < 200:
+                    # Make the first 200 trials engaged if not enough engaged trials (for decoder stability)
+                    mask = np.zeros(len(df_behavior), dtype=bool)
+                    mask[:200] = True
+
+                df_behavior = df_behavior[mask].reset_index(drop=True)
+                all_psth = all_psth[mask]
+                state_label = '_engaged' if engagement == 1 else '_disengaged'
 
             # Filter trials
             # Remove misses (default)
@@ -812,17 +826,6 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             # traceback.print_exc()
             continue
 
-    # Plot decoding accuracy for each session
-    if plot:
-        if kind == 'within':
-            pass
-        elif kind == 'cross':
-            pass
-        elif kind == 'epoch':
-            pass
-        elif kind == 'epoch_split':
-            pass
-
     if save:
         os.chdir(folder_parent)
         with open(filename, 'wb') as f:
@@ -867,7 +870,7 @@ def p_val(acc, acc_null):
 # PLOT DECODERS
 ########################################################################################################################
 
-def plot_within_decoder(bins, acc, acc_null, z_null=False, excess=False):
+def plot_within_decoder(bins, acc, acc_null, z_null=False, excess=True):
     """
     Plot the decoding accuracy and the null distribution of accuracy.
     :param bins: 1D array with time bins

@@ -51,7 +51,7 @@ def get_behavior_id(ephys_id):
     if development == 'local':
         folder_parent = Path.home() / 'pv_nmdar_eranet/experiments/Ephys/setups' / subject / 'sessions'
     elif development == 'remote':
-        folder_parent = Path('/archive/alexis/pv_nmdar_eranet/experiments/Ephys/setups')  / subject / 'sessions'
+        folder_parent = Path('/archive/alexis/pv_nmdar_eranet/experiments/Ephys/setups') / subject / 'sessions'
 
     # List all the child folders in the parent folder
     sessions = os.listdir(folder_parent)
@@ -350,10 +350,10 @@ def load_spike_sorted_data(path_ks4, path_phy2):
     cluster_info = cluster_info.loc[(cluster_info.group != 'noise')].reset_index(drop=True)
 
     # Drop sparse units
-    fr_threshold = 0.1  # Firing rate in Hz
-    sparse_clusters = cluster_info[cluster_info.fr < fr_threshold].cluster_id.to_list()
-    cluster_info = cluster_info[~cluster_info.cluster_id.isin(sparse_clusters)].reset_index(drop=True)
-    df_spikes = df_spikes[~df_spikes.cluster.isin(sparse_clusters)].reset_index(drop=True)
+    # fr_threshold = 0.1  # Firing rate in Hz
+    # sparse_clusters = cluster_info[cluster_info.fr < fr_threshold].cluster_id.to_list()
+    # cluster_info = cluster_info[~cluster_info.cluster_id.isin(sparse_clusters)].reset_index(drop=True)
+    # df_spikes = df_spikes[~df_spikes.cluster.isin(sparse_clusters)].reset_index(drop=True)
 
     # # Plot the first minute
     # plt.figure()

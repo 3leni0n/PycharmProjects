@@ -3,7 +3,6 @@ from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
 import ssm
 from matplotlib import cm
-from typing_extensions import no_type_check
 
 from my_fun import get_experiment, add_stars, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
 from cherry.cherry import *
@@ -230,7 +229,7 @@ def force_lapse_model(glmhmm, lapse_state=0, gamma_l=0.05, gamma_r=0.05):
     glmhmm.transitions.transition_matrix[:] = np.array([[p_engaged, p_lapse], [p_engaged, p_lapse]])
 
 
-def force_tiffany_model(glmhmm, covariates=['stim','bias','at_choice']):
+def force_tiffany_model(glmhmm, covariates=['stim_vals','bias','at_choice']):
     """
     Force selected weights to zero in a 2-state GLM-HMM:
       - disengaged state: stim weight = 0
@@ -285,10 +284,13 @@ def fit_glmhmm(df, n_states=2, covariates=None, constrain=None, drug=None, save=
     elif n_states >= 4:
         state_label_map = {i: f'State{i}' for i in range(n_states)}  # Testing only
 
-    experiment = df.Experiment.unique()[0]
-
     # Filter data
-    df = filter_behavior(df, clean_start=True, drop_miss=True, filter_drug=False)
+    experiment = df.Experiment.unique()[0]
+    if experiment in ['2AFC_5', 'Ephys']:
+        clean_start = False  # Don't filter out the first trials of the session in ephys animals
+    else:
+        clean_start = True
+    df = filter_behavior(df, clean_start=clean_start, drop_miss=True, filter_drug=False)
 
     # Set output folder
     if n_states == 1 and covariates == ['bias']:  # Null model (weighted Bernoulli coin-flip)
@@ -421,7 +423,10 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
             cherries[exp] = subjects
 
     for exp in experiments:
-        subjects = cherries[exp]
+        if exp == '2AFC_5':
+            subjects = ['000', '001', '002', '003', '004', '005', '006', '007', '008', '009']
+        else:
+            subjects = cherries[exp]
 
         for i, subj in enumerate(subjects):
             # Load behavioral data
@@ -429,7 +434,25 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
             print(f'Fitting GLM-HMM for subject {subj} ({i + 1}/{len(subjects)} of Experiment {exp})')
             folder_in = Path(folder_in / subj).with_suffix('.csv')
             print(f'Loading data from {folder_in}')
-            df = pd.read_csv(folder_in, low_memory=False)
+            # df = pd.read_csv(folder_in, low_memory=False)
+
+            # Ephys animals were usually first trained under '2AFC_5' (regular boxes) before being moved to 'Ephys' (box)
+            # Some exist only in one, others exist in both
+            # Merge behavioral data from both folders before fitting
+            if exp == '2AFC_5':  # Ephys group
+                try:
+                    df = pd.read_csv(folder_in, low_memory=False)
+                except FileNotFoundError:
+                    df = pd.DataFrame()
+                try:
+                    path_subject_ephys = Path.home() / 'PycharmProjects' / 'glue_sessions' / 'Ephys' / f'{subj}.csv'
+                    df2 = pd.read_csv(path_subject_ephys, low_memory=False)
+                except FileNotFoundError:
+                    df2 = pd.DataFrame()
+                df = pd.concat([df, df2], ignore_index=True)
+            else:
+                df = pd.read_csv(folder_in, low_memory=False)
+
             try:
                 df_fit = fit_glmhmm(df, n_states=n_states, covariates=covariates, constrain=constrain, drug=drug, save=save)
                 df_fit_all = pd.concat([df_fit_all, df_fit], ignore_index=True)

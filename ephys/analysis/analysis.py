@@ -423,7 +423,7 @@ def compute_psth(peri_event_spikes, time_win=[-1, 3], bin_size=0.1):
 @timer
 def get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align='stim', time_win=[-1, 3], bin_size=0.1):
     """
-    Create 3-dimensional array (trial x bin x cluster) with all PSTHs for all clusters
+    Create 3-dimensional array (trial x bin x cluster) with all PSTHs for all clusters of one session
     :param df_spikes: dataframe with spike times
     :param cluster_info: dataframe with cluster information
     :param time_win: time window around event
@@ -943,7 +943,7 @@ def fano_factor(peri_event_spikes):
     """
 
     spike_counts = [len(series) for series in peri_event_spikes]
-    # spike_counts = np.sum(psth, axis=1)  # Should give the same result
+    # spike_counts = np.sum(peri_event_spikes, axis=1)  # Should give the same result
     fano = np.var(spike_counts) / np.mean(spike_counts)
     # fano = fanofactor(peri_event_spikes)  # With elephant
 
@@ -966,24 +966,59 @@ def get_session_fano(all_psth):
         ff = np.var(spike_counts) / np.mean(spike_counts) if spike_counts.mean() > 0 else np.nan
         fano_session.append(ff)
 
+    # fano_session = np.array(fano_session)
+
     return fano_session
 
 
-def filter_units(all_psth, cluster_info, fano=10, depth=None, group=None):
+def filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=None, depth=None):
+    """
+    Filter units based on firing rate, Fano factor, group and depth. Should be run by session.
+    :param bins: bins used to compute the PSTH (output of get_all_psth)
+    :param all_psth: np.array of shape (trials, bins, clusters) with the PSTH of all clusters in a session (output of
+    get_all_psth)
+    :param cluster_info: DataFrame with cluster information (output of get_cluster_info)
+    :param min_fr: Minimum firing rate to include a unit (default: 0.1 Hz)
+    :param max_fano: Maximum Fano factor to include a unit (default: 10)
+    :param group: Group to include (default: None, includes all groups)
+    :param depth: tuple depth range (min, max) to include (default: None, includes all depths)
+    """
+
+    n_units = all_psth.shape[2]
+    mask = np.ones(n_units, dtype=bool) # Start with all units included
+
+    # By firing rate
+    if min_fr:
+        bin_size = bins[1] - bins[0]
+        fr = all_psth.mean(axis=(0, 1)) / bin_size
+        count = mask.sum()
+        mask &= fr >= min_fr
+        print(f'Removed {count - mask.sum()} units by FR')
 
     # By Fano factor
-    if fano:
+    if max_fano:
         fano_session = get_session_fano(all_psth)
+        fano_session = np.array(fano_session)
         cluster_info['fano'] = fano_session
-        mask = fano_session < fano
-        all_psth = all_psth[:, :, mask]
-        cluster_info = cluster_info[mask].reset_index(drop=True)
-
-    if depth:
-        pass
+        count = mask.sum()
+        mask &= fano_session <= max_fano
+        print(f'Removed {count - mask.sum()} units by Fano factor')
 
     if group:
-        pass
+        count = mask.sum()
+        mask &= (cluster_info.group == group).to_numpy()
+        print(f'Removed {count - mask.sum()} units by group')
+
+    if depth:
+        surface = cluster_info.depth.max()
+        depth = surface - cluster_info['depth']
+        count = mask.sum()
+        mask &= (depth >= depth[0]) & (depth <= depth[1])
+        print(f'Removed {count - mask.sum()} units by depth')
+
+    print(f'{sum(mask)} / {n_units} units kept')
+    all_psth = all_psth[:, :, mask]
+    cluster_info = cluster_info[mask].reset_index(drop=True)
 
     return all_psth, cluster_info
 
