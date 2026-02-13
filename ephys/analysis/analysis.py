@@ -981,7 +981,7 @@ def filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=No
     :param min_fr: Minimum firing rate to include a unit (default: 0.1 Hz)
     :param max_fano: Maximum Fano factor to include a unit (default: 10)
     :param group: Group to include (default: None, includes all groups)
-    :param depth: tuple depth range (min, max) to include (default: None, includes all depths)
+    :param depth: tuple depth range in mm to include (default: None, includes all depths)
     """
 
     n_units = all_psth.shape[2]
@@ -1010,10 +1010,13 @@ def filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=No
         print(f'Removed {count - mask.sum()} units by group')
 
     if depth:
+        cluster_info['depth'] /= 1000
+        min_depth, max_depth = depth
         surface = cluster_info.depth.max()
-        depth = surface - cluster_info['depth']
+        # Compute depth from surface (originally distance from probe tip)
+        depth_from_surface = surface - cluster_info['depth']
         count = mask.sum()
-        mask &= (depth >= depth[0]) & (depth <= depth[1])
+        mask &= (depth_from_surface >= min_depth) & (depth_from_surface <= max_depth)
         print(f'Removed {count - mask.sum()} units by depth')
 
     print(f'{sum(mask)} / {n_units} units kept')

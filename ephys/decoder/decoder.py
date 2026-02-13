@@ -189,6 +189,7 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     pred_err = np.full((n_trials, n_bins), np.nan)
     acc = np.full((n_trials, n_bins), np.nan)
     acc_null = np.full((n_shuffles, n_bins), np.nan)
+    weights = np.full((n_trials, n_bins, n_neurons), np.nan)
 
     # Cross-validate results
     skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)  # Stratified cross-validation
@@ -222,6 +223,8 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
             pred[test_index, bin_train] = y_pred  # Predicted stimulus condition for each test trial at each time bin_train
             pred_err[test_index, bin_train] = y_pred - y_test  # Difference between predicted and actual labels
             acc[test_index, bin_train] = y_acc  # Accuracy for each test trial at each time bin_train
+            for i in test_index:  # Store weights for each test trial (same for all trials in the fold)
+                weights[i, bin_train, :] = clf.coef_[0]
 
             # Compute null distribution by shuffling the y_test (faster)
             y_test_shuffled = y_test.values.copy()
@@ -238,7 +241,7 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
             #     y_pred_shuffled = clf.predict(X_test)
             #     acc_null[_, bin_train] = accuracy_score(y_test, y_pred_shuffled)
 
-    return pred, pred_err, acc, acc_null
+    return pred, pred_err, acc, acc_null, weights
 
 
 @timer
@@ -680,8 +683,8 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
 
 
 @timer
-def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
-                 hit_only=False, engagement=None, n_shuffles=100, save=False):
+def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoch_ortho=None, split_by=None,
+                 drop_miss=True, hit_only=False, engagement=None, group=None, depth=None, n_shuffles=100, save=False):
     """
     Perform within time bin decoder across all sessions for one subject.
     :param subject: subject ID (str)
@@ -711,7 +714,8 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
         'pred_err': [],
         'acc': [],
         'acc_null': [],
-        'bins': []
+        'bins': [],
+        'weights': []
     }
 
     folder_parent = Path.home() / 'data' / subject
@@ -735,7 +739,12 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             bins = np.load(folder_child / f'bins_{align}.npy')
             all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
-            # all_psth = filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=None, depth=None)
+            # Filter units
+            path_cluster_info = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
+            cluster_info = pd.read_csv(path_cluster_info / 'cluster_info.tsv', sep='\t')
+            cluster_info = cluster_info[cluster_info['group'] != 'noise'].reset_index(drop=True)  # Keep only good units
+            assert all_psth.shape[2] == len(cluster_info)
+            all_psth, cluster_info = filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=group, depth=depth)
 
             state_label = ''
             if engagement is not None:  # Add engaged column to df_behavior
@@ -757,10 +766,10 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
 
                 # Filter by engagement
                 mask = (df_behavior.State == engagement).to_numpy()
-                if engagement == 1 and mask.sum() < 200:
-                    # Make the first 200 trials engaged if not enough engaged trials (for decoder stability)
-                    mask = np.zeros(len(df_behavior), dtype=bool)
-                    mask[:200] = True
+                # if engagement == 1 and mask.sum() < 200:
+                #     # Make the first 200 trials engaged if not enough engaged trials (for decoder stability)
+                #     mask = np.zeros(len(df_behavior), dtype=bool)
+                #     mask[:200] = True
 
                 df_behavior = df_behavior[mask].reset_index(drop=True)
                 all_psth = all_psth[mask]
@@ -784,7 +793,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
 
             # Select decoder
             if kind == 'within':
-                pred, pred_err, acc, acc_null = \
+                pred, pred_err, acc, acc_null, weights = \
                     within_decoder(all_psth, df_behavior[col], n_shuffles)
                 filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align} aligned).pkl'
             elif kind == 'cross':
@@ -958,11 +967,11 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
     if z_null:
         z_scores = [null_zscore(results['acc'][i], results['acc_null'][i]) for i in range(len(results['acc']))]
         z_scores_mean = np.mean((z_scores), axis=0)
-        plt.plot(bin_centers, z_scores_mean, color='tab:blue', label='Z acc.')
+        plt.plot(bin_centers, z_scores_mean, color='k', label='Z acc.')
         p_values = p_val(acc_mean, acc_null_mean)
         significant_region = p_values < 0.05  # When assessing significance across sessions use p < 0.05
         # significant_region = np.abs(z_scores_mean) >= 1.96  # When assessing significance across sessions use 1.96
-        plt.fill_between(bin_centers, z_scores_mean, where=significant_region, edgecolor='none', color='tab:blue',
+        plt.fill_between(bin_centers, z_scores_mean, where=significant_region, edgecolor='none', color='k',
                          alpha=0.25, label='α < .05')
         plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
         ylabel = 'Z-score'
@@ -978,13 +987,9 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
         if errorbar == 'ci':
             acc_band = (acc_mean - acc_CI, acc_mean + acc_CI)
             acc_null_band = (acc_null_mean - acc_null_CI, acc_null_mean + acc_null_CI)
-            acc_band_label = 'Acc. 95% CI'
-            acc_null_band_label = 'Acc. null 95% CI'
         elif errorbar == 'sem':
             acc_band = (acc_mean - acc_sem, acc_mean + acc_sem)
             acc_null_band = (acc_null_mean - acc_null_sem, acc_null_mean + acc_null_sem)
-            acc_band_label = 'Acc. SEM'
-            acc_null_band_label = 'Acc. null SEM'
 
         if excess:
             acc_mean = acc_mean - acc_null_mean
@@ -997,7 +1002,7 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
             # Plot the mean null accuracy across all sessions (chance level)
             plt.plot(bin_centers, acc_null_mean, ls='--', color='tab:gray', label='Acc. null')
             plt.fill_between(bin_centers, acc_null_band[0], acc_null_band[1], color='tab:gray',
-                             edgecolor='none', alpha=0.25)  # , label=acc_null_band_label)
+                             edgecolor='none', alpha=0.25)
             yticks = (0.5, 0.75, 1)
             yticklabels = ('0.5', '0.75', '1')
             ylim = (0.45, 1)
@@ -1006,7 +1011,7 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
         # Plot the mean decoding accuracy across all sessions
         plt.plot(bin_centers, acc_mean, color='k', label='Acc.')
         plt.fill_between(bin_centers, acc_band[0], acc_band[1], color='k', edgecolor='none',
-                         alpha=0.25)#, label=acc_band_label)
+                         alpha=0.25)
 
         # Plot the individual sessions accuracy
         for _ in range(len(results['acc'])):
@@ -1030,6 +1035,8 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
     #           f"{subject}, {len(results['acc'])} sessions, {n_trials} trials")
     sns.despine()
     # plt.legend(frameon=False)
+
+    return bin_centers, acc_mean, acc_band
 
 
 def plot_cross_decoder(bins, acc, acc_null, z_null=True):
