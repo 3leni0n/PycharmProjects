@@ -651,17 +651,14 @@ def preprocess(ephys_id):
     # Load spike sorted data (KS4)
     if development == 'local':
         path_spike_sorting = Path.home() / 'Downloads/spike_sorting' / subject / ephys_id
-        path_ks4 = path_spike_sorting / 'kilosort4'
-        path_phy2 = path_spike_sorting / 'Phy2'
     elif development == 'remote':
-        # After rsync copy files (final)
-        # path_spike_sorting = Path('/archive/alexis/ephys/spike sorting') / subject / ephys_id
-        # path_ks4 = path_spike_sorting/ 'kilosort4'
-        # path_phy2 = path_spike_sorting / 'phy2'
+        # # After rsync copy files (final)
+        # path_spike_sorting = Path('/archive/alexis/ephys/spike_sorting') / subject / ephys_id
         # Temporary path for rsync copy files (in progress)
         path_spike_sorting = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_id
-        path_ks4 = path_spike_sorting / 'kilosort4'
-        path_phy2 = path_spike_sorting / 'phy2'
+
+    path_ks4 = path_spike_sorting / 'kilosort4'
+    path_phy2 = path_spike_sorting / 'phy2'
     df_spikes, cluster_info = load_spike_sorted_data(path_ks4, path_phy2)
 
     # Print session info
