@@ -1,10 +1,19 @@
 import os
+import os
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+os.environ['NUMEXPR_NUM_THREADS'] = '1'
+import threadpoolctl
+threadpoolctl.threadpool_info()
+
 from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.colors import CenteredNorm
 import matplotlib.patches as patches
 import pandas as pd
 import numpy as np
+
 from sklearn.model_selection import KFold, StratifiedKFold, cross_val_predict
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
@@ -12,28 +21,36 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from scipy.stats import sem, zscore
 
+import seaborn as sns
+import pickle
+import traceback
+from joblib import Parallel, delayed
+from tqdm import tqdm
+import warnings
+warnings.filterwarnings('ignore')
+
 from my_fun.my_fun import timer, filter_behavior
 from ephys.preprocessing import *
 from ephys.analysis import *
-import seaborn as sns
-import pickle
-# import traceback
-from joblib import Parallel, delayed
-from tqdm import tqdm
 
-import warnings
-warnings.filterwarnings('ignore')
 
 # Neuromatch tutorial: https://compneuro.neuromatch.io/tutorials/W1D5_DeepLearning/student/W1D5_Tutorial1.html
 
 ########################################################################################################################
 
-def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
+def preprocess_subject(subject, align='stim', overwrite=False):
     """
     Preprocess all ephys and behavioral sessions for a given subject and save the results in a folder.
     :param subject: subject ID (str)
     :return: None
     """
+
+    if align == 'stim':
+        time_win = [-1, 4]
+        bin_size = 0.1
+    elif align == 'resp':
+        time_win = [-1, 2]
+        bin_size = 0.05
 
     folder_parent = Path.home() / 'data' / subject
     ephys_ids = get_ephys_sessions(subject)
@@ -48,43 +65,26 @@ def preprocess_subject(subject, align='stim', time_win=[-1, 3], bin_size=0.1):
         folder_child.mkdir(parents=True, exist_ok=True)
         os.chdir(folder_child)
 
-        # .npy files (bins and spike counts)
-        if any(f.endswith(f'{align}.npy') for f in os.listdir(folder_child)):
-            print("'.npy' files exist in folder. Skipping...")
+        npy_exists = any(f.endswith(f'{align}.npy') for f in os.listdir(folder_child))
+        csv_exists = any(f.endswith('.csv') for f in os.listdir(folder_child))
+
+        if npy_exists and csv_exists and not overwrite:
+            print('Files exist in folder and overwrite=False. Skipping...')
         else:
             try:
-                print("'.npy' files do not exist in folder. Proceeding...")
+                print('Files do not exist in folder or overwrite=True. Proceeding...')
                 preprocessed = preprocess(ephys_ids[i])
                 df_ttl, df_behavior, n_trials, df_spikes, cluster_info, timeline = preprocessed
                 bins, all_psth = get_all_psth(cluster_info, df_spikes, df_ttl, n_trials, align=align, time_win=time_win,
                                               bin_size=bin_size)
                 np.save(folder_child / f'bins_{align}.npy', bins)
                 np.save(folder_child / f'all_psth_{align}.npy', all_psth)
-
-            except Exception as e:
-                print(f'An error occurred: {e}')
-                # traceback.print_exc()
-                error_sessions.append(ephys_ids[i])
-
-        # .csv files (behavior)
-        if any(f.endswith('.csv') for f in os.listdir(folder_child)):
-            print("'.csv' files exist in folder. Skipping...")
-        else:
-            try:
-                print("'.csv' files do not exist in folder. Proceeding...")
-                # path_behavior = get_behavior_id(ephys_ids[i])
-                # df_behavior = parse_v2(path_behavior)
                 filename = df_behavior.Session.unique()[0] + '.csv'
                 df_behavior.to_csv(folder_child / filename, index=False)
             except Exception as e:
                 print(f'An error occurred: {e}')
                 # traceback.print_exc()
                 error_sessions.append(ephys_ids[i])
-
-    # # Save the glmhmm results if they don't exist
-    # # Requite probably to fit the GLMHMM to all data acquisition sessions (not only recorded ones)
-    # path_glmhmm =  Path.home() / 'PycharmProjects' / 'glmhmm' / experiment / f'{subject}.csv'
-    # df_glmhmm = pd.read_csv(path_glmhmm)
 
     print(f'Sessions not preprocessed: {error_sessions}')
 
@@ -196,7 +196,7 @@ def get_all_beh(subject, glmhmm=False):
 def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     """
     Perform logistic regression-based decoding of a binary condition from neural data using K-fold cross-validation.
-    Train and test within the same time bin.
+    Train and test within the same time within_bin.
     :param X: 3D array with neural data (trials x time x neurons)
     :param y: 1D array with binary condition
     :return: pred, pred_err (predicted condition and prediction error)
@@ -211,11 +211,13 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     pred = np.full((n_trials, n_bins), np.nan)
     pred_err = np.full((n_trials, n_bins), np.nan)
     acc = np.full((n_trials, n_bins), np.nan)
-    acc_null = np.full((n_shuffles, n_bins), np.nan)
+    # acc_null = np.full((n_shuffles, n_bins), np.nan)
+    acc_null = np.zeros((n_shuffles, n_bins))
     weights = np.full((n_splits, n_neurons), np.nan)
     weights_null = np.full((n_splits, n_neurons, n_shuffles), np.nan)
     dv = np.full((n_trials, n_bins), np.nan)
-    dv_null = np.full((n_trials, n_bins, n_shuffles), np.nan)
+    # dv_null = np.full((n_trials, n_bins, n_shuffles), np.nan)
+    dv_null = np.zeros((n_trials, n_bins, n_shuffles))
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
@@ -224,11 +226,11 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
         # print(f'Train: index={train_index}')
         # print(f'Test: index={test_index}')
 
-        # Loop over each time bin
-        for bin in range(n_bins):
+        # Loop over each time within_bin
+        for within_bin in range(n_bins):
 
-            # Define train and testing set for the current time bin and fold
-            X_train, X_test = X[train_index, bin], X[test_index, bin]
+            # Define train and testing set for the current time within_bin and fold
+            X_train, X_test = X[train_index, within_bin], X[test_index, within_bin]
             y_train, y_test = y[train_index], y[test_index]
 
             # Apply z-scoring normalization across neurons and time bins (otherwise might not converge)
@@ -236,47 +238,47 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
             X_train = scaler.fit_transform(X_train)  # Fit and transform on the training set
             X_test = scaler.transform(X_test)  # Only transform the test set using the same scaler
 
-            # Train decoder (logistic regression) on the current time bin’s neural activity
+            # Train decoder (logistic regression) on the current time within_bin’s neural activity
             clf = LogisticRegression(class_weight='balanced')
             clf.fit(X_train, y_train)
 
             # Evaluate decoder
             y_pred = clf.predict(X_test)  # Predicts the stimulus category for test trials
             y_score = clf.decision_function(X_test)  # Decision variable per trial (continuous distance to hyperplane)
-            y_score = zscore(y_score, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
-            # y_acc = accuracy_score(y_test, y_pred)  # Computes accuracy for each fold and time bin
+            # y_acc = accuracy_score(y_test, y_pred)  # Computes accuracy for each fold and time within_bin
             y_acc = (y_pred == y_test).astype(int)  # Accuracy per trial
 
             # Store results
-            pred[test_index, bin] = y_pred  # Predicted stimulus condition for each test trial at each time bin
-            pred_err[test_index, bin] = y_pred - y_test  # Difference between predicted and actual labels
-            acc[test_index, bin] = y_acc  # Accuracy for each test trial at each time bin
-            weights[fold, :] = clf.coef_[0]  # Store decoder weights for each fold and time bin
-            dv[test_index, bin] = y_score  # Store decision variable for each test trial at each time bin
+            pred[test_index, within_bin] = y_pred  # Predicted stimulus condition for each test trial at each time within_bin
+            pred_err[test_index, within_bin] = y_pred - y_test  # Difference between predicted and actual labels
+            acc[test_index, within_bin] = y_acc  # Accuracy for each test trial at each time within_bin
+            weights[fold, :] = clf.coef_[0]  # Store decoder weights for each fold and time within_bin
+            dv[test_index, within_bin] = y_score  # Store decision variable for each test trial at each time within_bin
 
-            # # Compute null distribution by shuffling the y_test (faster)
-            # y_test_shuffled = y_test.values.copy()
-            # for _ in range(n_shuffles):
-            #     np.random.shuffle(y_test_shuffled)
-            #     # acc_null[_, bin_train] = accuracy_score(y_test_shuffled, y_pred)
-            #     acc_null[_, bin_train] = np.mean((y_pred == y_test_shuffled).astype(int))
+            # Compute null distribution by shuffling the y_test (faster)
+            y_test_shuffled = y_test.values.copy()
+            for i in range(n_shuffles):
+                np.random.shuffle(y_test_shuffled)
+                # acc_null[i, bin_train] = accuracy_score(y_test_shuffled, y_pred)
+                acc_null[i, within_bin] = np.mean((y_pred == y_test_shuffled).astype(int))
 
-        # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
-        for _ in tqdm(range(n_shuffles), desc=f'Fold {fold}/{n_splits}'):
-            y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
-            clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
-            clf_null.fit(X_train, y_train_shuffled)
-            weights_null[fold, :, _] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
-
-            # Loop over each time bin
-            for bin in range(n_bins):
-                X_test = X[test_index, bin]
-                X_test = scaler.transform(X_test)
-                y_pred_null = clf_null.predict(X_test)
-                y_score_null = clf_null.decision_function(X_test)
-                # y_score_null = zscore(y_score_null, axis=0, ddof=1)
-                acc_null[_, bin] = np.mean((y_pred_null == y_test).astype(int))  # Store null accuracy per trial
-                dv_null[test_index, bin, _] = y_score_null  # Store null decision variable for each test trial at each time bin
+        # # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
+        # for i in tqdm(range(n_shuffles), desc=f'Fold {fold}/{n_splits}'):
+        #     y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
+        #     clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
+        #     clf_null.fit(X_train, y_train_shuffled)
+        #     weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
+        #
+        #     # Loop over each time within_bin
+        #     for within_bin in range(n_bins):
+        #         X_test = X[test_index, within_bin]
+        #         X_test = scaler.transform(X_test)
+        #         y_pred_null = clf_null.predict(X_test)
+        #         y_score_null = clf_null.decision_function(X_test)
+        #         # acc_null[i, within_bin] = np.mean((y_pred_null == y_test).astype(int))  # Store null accuracy per trial
+        #         acc_null[i, within_bin] += np.mean((y_pred_null == y_test).astype(int)) / n_splits
+        #         # dv_null[test_index, within_bin, i] = y_score_null  # Store null decision variable for each test trial at each time within_bin
+        #         dv_null[test_index, within_bin, i] += y_score_null / n_splits
 
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
@@ -300,11 +302,13 @@ def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     pred = np.full((n_trials, n_bins, n_bins), np.nan)
     pred_err = np.full((n_trials, n_bins, n_bins), np.nan)
     acc = np.full((n_trials, n_bins, n_bins), np.nan)
-    acc_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
+    # acc_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
+    acc_null = np.zeros((n_shuffles, n_bins, n_bins))  # Initialize with zeros to accumulate accuracy across folds
     weights = np.full((n_splits, n_bins, n_neurons), np.nan)
     weights_null = np.full((n_splits, n_neurons, n_shuffles), np.nan)
     dv = np.full((n_trials, n_bins, n_bins), np.nan)
-    dv_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
+    # dv_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
+    dv_null = np.zeros((n_shuffles, n_bins, n_bins))  # Initialize with zeros to accumulate decision variable across folds
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -342,7 +346,6 @@ def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
                 # Evaluate decoder
                 y_pred = clf.predict(X_test)  # Predicts the stimulus category for test trials
                 y_score = clf.decision_function(X_test)  # Decision variable per trial (continuous distance to hyperplane)
-                # y_score = zscore(y_score, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
                 y_acc = accuracy_score(y_test, y_pred)  # Computes accuracy for each fold & time bin
 
                 # Store results
@@ -350,35 +353,36 @@ def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
                 # each time bin
                 pred_err[test_index, bin_train, bin_test] = y_pred - y_test  # Difference between predicted and labels
                 acc[test_index, bin_train, bin_test] = y_acc  # Accuracy for each test trial at each time bin
-                # weights[fold, bin_train, :] = clf.coef_[0]  # Store decoder weights for each fold and time bin
-                # dv[test_index, bin_train, bin_test] = y_score  # Store decision variable for each test trial at each time bin
+                weights[fold, bin_train, :] = clf.coef_[0]  # Store decoder weights for each fold and time bin
+                dv[test_index, bin_train, bin_test] = y_score  # Store decision variable for each test trial at each time bin
 
-                # Compute null distribution by shuffling the labels and evaluating accuracy
-                y_test_shuffled = y_test.values.copy()
-                for _ in range(n_shuffles):
-                    np.random.shuffle(y_test_shuffled)
-                    acc_null[_, bin_train, bin_test] = accuracy_score(y_test_shuffled, y_pred)
+                # # Compute null distribution by shuffling the labels and evaluating accuracy
+                # y_test_shuffled = y_test.values.copy()
+                # for i in range(n_shuffles):
+                #     np.random.shuffle(y_test_shuffled)
+                #     acc_null[i, bin_train, bin_test] = accuracy_score(y_test_shuffled, y_pred)
 
-            # # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
-            # for _ in tqdm(range(n_shuffles)):
-            #     y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
-            #     clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
-            #     clf_null.fit(X_train, y_train_shuffled)
-            #     # weights_null[fold, :, _] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
-            #
-            #     # Evaluate null decoder on all test bins
-            #     for bin_test in range(n_bins):
-            #         X_test = X[test_index, bin_test]
-            #         X_test = scaler.transform(X_test)
-            #         y_pred_null = clf_null.predict(X_test)
-            #         y_score_null = clf_null.decision_function(X_test)
-            #         acc_null[_, bin_train, bin_test] = accuracy_score(y_test, y_pred_null)
-            #         # dv_null[_, bin_train, bin_test] = np.mean(y_score_null)
+            # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
+            for i in tqdm(range(n_shuffles)):
+                y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
+                clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
+                clf_null.fit(X_train, y_train_shuffled)
+                weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
+
+                # Evaluate null decoder on all test bins
+                for bin_test in range(n_bins):
+                    X_test = X[test_index, bin_test]
+                    X_test = scaler.transform(X_test)
+                    y_pred_null = clf_null.predict(X_test)
+                    y_score_null = clf_null.decision_function(X_test)
+                    # acc_null[i, bin_train, bin_test] = accuracy_score(y_test, y_pred_null)
+                    acc_null[i, bin_train, bin_test] += accuracy_score(y_test, y_pred_null) / n_splits
+                    # dv_null[i, bin_train, bin_test] = np.mean(y_score_null)
+                    dv_null[i, bin_train, bin_test] += np.mean(y_score_null) / n_splits
 
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
 
-# Testing getting accuracy per trial instead of per fold
 @timer
 def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     """
@@ -464,7 +468,6 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
             # Evaluate decoder
             y_pred = clf.predict(X_test)  # Predicts the stimulus category for test trials
             y_score = clf.decision_function(X_test)  # Decision variable per trial (continuous distance to hyperplane)
-            # y_score = zscore(y_score, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
             # y_acc = accuracy_score(y_test, y_pred)  # Computes accuracy for each fold
             y_acc = (y_pred == y_test).astype(int)  # Computes accuracy per trial
 
@@ -476,12 +479,18 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
             weights[fold, :] = clf.coef_[0]  # Store decoder weights for each fold
             dv[test_index, bin_test] = y_score  # Store decision variable for each test trial at each time bin
 
+            # y_test_shuffled = y_test.values.copy()
+            # for _ in range(n_shuffles):
+            #     np.random.shuffle(y_test_shuffled)
+            #     # acc_null[_, bin_test] = accuracy_score(y_test_shuffled, y_pred)
+            #     acc_null[test_index, bin_test, _] = (y_pred == y_test_shuffled).astype(int)
+
         # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
-        for _ in tqdm(range(n_shuffles)):
+        for i in tqdm(range(n_shuffles)):
             y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
             clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
             clf_null.fit(X_train, y_train_shuffled)
-            weights_null[fold, :, _] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
+            weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
 
             # Loop over each time bin_train
             for bin_test in range(n_bins):
@@ -489,9 +498,8 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
                 X_test = scaler.transform(X_test)
                 y_pred_null = clf_null.predict(X_test)
                 y_score_null = clf_null.decision_function(X_test)
-                # y_score_null = zscore(y_score_null, axis=0, ddof=1)
-                acc_null[test_index, bin_test, _] = (y_pred_null == y_test).astype(int)  # Store null accuracy per trial
-                dv_null[test_index, bin_test, _] = y_score_null  # Store null decision variable for each test trial at each time bin
+                acc_null[test_index, bin_test, i] = (y_pred_null == y_test).astype(int)  # Store null accuracy per trial
+                dv_null[test_index, bin_test, i] = y_score_null  # Store null decision variable for each test trial at each time bin
 
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
@@ -580,13 +588,11 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
             # Evaluate decoder
             y_pred0 = clf.predict(X_test0)  # Predicts the stimulus category for test trials
             y_score0 = clf.decision_function(X_test0)  # Decision variable per trial (continuous distance to hyperplane)
-            y_score0 = zscore(y_score0, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
             # y_acc0 = accuracy_score(y_test0, y_pred0)  # Computes accuracy for each fold & time bin_train
             y_acc0 = (y_pred0 == y_test0).astype(int)  # Computes accuracy per trial
             # print(f"Accuracy: {y_acc0:.2f}")
             y_pred1 = clf.predict(X_test1)  # Predicts the stimulus category for test trials
             y_score1 = clf.decision_function(X_test1)  # Decision variable per trial (continuous distance to hyperplane)
-            y_score1 = zscore(y_score1, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
             # y_acc1 = accuracy_score(y_test1, y_pred1)  # Computes accuracy for each fold & time bin_train
             y_acc1 = (y_pred1 == y_test1).astype(int)  # Computes accuracy per trial
             # print(f"Accuracy: {y_acc1:.2f}")
@@ -608,21 +614,21 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
             # Compute null distribution by shuffling the labels and evaluating accuracy
             y_test_shuffled0 = y_test0.values.copy()
             y_test_shuffled1 = y_test1.values.copy()
-            for _ in range(n_shuffles):
+            for i in range(n_shuffles):
                 np.random.shuffle(y_test_shuffled0)
-                # acc_null0[fold, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
-                acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
+                # acc_null0[fold, i, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
+                acc_null[0][test_idx0, bin_test, i] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
                 # shuffled labels
                 # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
+                # pred_err_null0[test_idx0, bin_test, i] = y_pred0 - y_test_shuffled0  # Difference between predicted and
                 # actual labels
 
                 np.random.shuffle(y_test_shuffled1)
-                # acc_null1[fold, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
-                acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
+                # acc_null1[fold, i, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
+                acc_null[1][test_idx1, bin_test, i] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
                 # shuffled labels
                 # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
+                # pred_err_null1[test_idx1, bin_test, i] = y_pred1 - y_test_shuffled1  # Difference between predicted and
                 # actual labels
 
                 # # TEST FOR NON FLAT SHUFFLES
@@ -635,8 +641,8 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
                 # y_pred1_null = clf_null.predict(X_test1)
                 #
                 # # Compute per-trial accuracy
-                # acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
-                # acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
+                # acc_null[0][test_idx0, bin_test, i] = (y_pred0_null == y_test0).astype(int)
+                # acc_null[1][test_idx1, bin_test, i] = (y_pred1_null == y_test1).astype(int)
 
     return pred, pred_err, acc, acc_null, weights, dv
 
@@ -732,13 +738,11 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
             # Evaluate decoder
             y_pred0 = clf.predict(X_test0)  # Predicts the stimulus category for test trials
             y_score0 = clf.decision_function(X_test0)  # Decision variable per trial (continuous distance to hyperplane)
-            y_score0 = zscore(y_score0, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
             # y_acc0 = accuracy_score(y_test0, y_pred0)  # Computes accuracy for each fold & time bin_train
             y_acc0 = (y_pred0 == y_test0).astype(int)  # Computes accuracy per trial
             # print(f"Accuracy: {y_acc0:.2f}")
             y_pred1 = clf.predict(X_test1)  # Predicts the stimulus category for test trials
             y_score1 = clf.decision_function(X_test1)  # Decision variable per trial (continuous distance to hyperplane)
-            y_score1 = zscore(y_score1, axis=0, ddof=1)  # Z-score the decision variable across trials for each time bin_train
             # y_acc1 = accuracy_score(y_test1, y_pred1)  # Computes accuracy for each fold & time bin_train
             y_acc1 = (y_pred1 == y_test1).astype(int)  # Computes accuracy per trial
             # print(f"Accuracy: {y_acc1:.2f}")
@@ -760,21 +764,21 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
             # Compute null distribution by shuffling the labels and evaluating accuracy
             y_test_shuffled0 = y_test0.values.copy()
             y_test_shuffled1 = y_test1.values.copy()
-            for _ in range(n_shuffles):
+            for i in range(n_shuffles):
                 np.random.shuffle(y_test_shuffled0)
-                # acc_null0[fold, _, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
-                acc_null[0][test_idx0, bin_test, _] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
+                # acc_null0[fold, i, bin_test] = accuracy_score(y_test_shuffled0, y_pred0)
+                acc_null[0][test_idx0, bin_test, i] = (y_pred0 == y_test_shuffled0).astype(int)  # Accuracy per trial for
                 # shuffled labels
                 # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null0[test_idx0, bin_test, _] = y_pred0 - y_test_shuffled0  # Difference between predicted and
+                # pred_err_null0[test_idx0, bin_test, i] = y_pred0 - y_test_shuffled0  # Difference between predicted and
                 # actual labels
 
                 np.random.shuffle(y_test_shuffled1)
-                # acc_null1[fold, _, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
-                acc_null[1][test_idx1, bin_test, _] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
+                # acc_null1[fold, i, bin_test] = accuracy_score(y_test_shuffled1, y_pred1)
+                acc_null[1][test_idx1, bin_test, i] = (y_pred1 == y_test_shuffled1).astype(int)  # Accuracy per trial for
                 # shuffled labels
                 # pred_err_temp.append(y_pred - y_test_shuffled)
-                # pred_err_null1[test_idx1, bin_test, _] = y_pred1 - y_test_shuffled1  # Difference between predicted and
+                # pred_err_null1[test_idx1, bin_test, i] = y_pred1 - y_test_shuffled1  # Difference between predicted and
                 # actual labels
 
                 # # TEST FOR NON FLAT SHUFFLES
@@ -787,8 +791,8 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
                 # y_pred1_null = clf_null.predict(X_test1)
                 #
                 # # Compute per-trial accuracy
-                # acc_null[0][test_idx0, bin_test, _] = (y_pred0_null == y_test0).astype(int)
-                # acc_null[1][test_idx1, bin_test, _] = (y_pred1_null == y_test1).astype(int)
+                # acc_null[0][test_idx0, bin_test, i] = (y_pred0_null == y_test0).astype(int)
+                # acc_null[1][test_idx1, bin_test, i] = (y_pred1_null == y_test1).astype(int)
 
     return pred, pred_err, acc, acc_null, weights, dv
 
@@ -808,6 +812,8 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
     :param drop_miss: whether to drop miss trials (default: True)
     :param hit_only: whether to use only hit trials (default: False)
     :param engagement: whether to filter by engagement (1: engaged, 0: disengaged, None: all trials)
+    :param group: 'good' for isolated units, 'mua' for multiunit activity, None for both
+    :param depth: tuple with min and max depth to include (surface = 0 mm, max depth = 4 mm)
     :param n_shuffles: number of shuffles to perform
     :param save: whether to save the results as a pickle
     :return: results (dict)
@@ -856,9 +862,12 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             all_psth = np.load(folder_child / f'all_psth_{align}.npy')
 
             # Filter units
-            path_cluster_info = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
+            # path_cluster_info = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
+            path_cluster_info = Path('/archive/alexis/ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
             cluster_info = pd.read_csv(path_cluster_info / 'cluster_info.tsv', sep='\t')
-            cluster_info = cluster_info[cluster_info['group'] != 'noise'].reset_index(drop=True)  # Keep only good units
+            cluster_info = cluster_info[cluster_info['group'] != 'noise'].reset_index(drop=True)  # Drop noise units
+            cluster_info = cluster_info.loc[cluster_info.group.isin(['good', 'mua'])].reset_index(drop=True)
+
             assert all_psth.shape[2] == len(cluster_info)
             all_psth, cluster_info = filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=group, depth=depth)
 
@@ -866,8 +875,9 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             if engagement is not None:  # Add engaged column to df_behavior
 
                 # Load GLM-HMM fit
-                path_glmhmm = (Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / '2AFC_5' / subject).with_suffix('.csv')
-                df_glmhmm = pd.read_csv(path_glmhmm)
+                path_glmhmm = ((Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / '2AFC_5' / subject)
+                               .with_suffix('.csv'))
+                df_glmhmm = pd.read_csv(path_glmhmm)  # All sessions concatenated
                 session = df_behavior.Session.unique()[0]
                 df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
 
@@ -908,7 +918,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                     within_decoder(all_psth, df_behavior[col], n_shuffles)
                 filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align} aligned).pkl'
             elif kind == 'cross':
-                pred, pred_err, acc, acc_null, weights, dv = \
+                pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     cross_decoder(all_psth, df_behavior[col], n_shuffles)
                 filename = f'{what}_{kind}{hit_label}{state_label}_({align} aligned).pkl'
             elif kind == 'epoch':
@@ -1785,12 +1795,16 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
     # # Preprocess
     # preprocess_subject(subj)
     #
-    # # X decoder
+    # Within decoder
+    # mean_decoder(subj, what='stim', align='stim', kind='within', epoch=None, epoch_ortho=None, split_by=None,
+    #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, save=True)
+    #
+    # X decoder
     # mean_decoder(subj, what='stim', align='stim', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
     #              hit_only=True, engagement=1, n_shuffles=100, save=True)
     # mean_decoder(subj, what='stim', align='resp', kind='cross', epoch=None, epoch_ortho=None, split_by=None, drop_miss=True,
     #              hit_only=True, engagement=1, n_shuffles=100, save=True)
-
+    #
     # Epoch decoders (align to stimulus onset)
     # mean_decoder(subj, what='stim', align='stim', kind='epoch', epoch='stim', epoch_ortho=None, split_by=None,
     #              drop_miss=True, hit_only=True, engagement=1, n_shuffles=100, save=True)

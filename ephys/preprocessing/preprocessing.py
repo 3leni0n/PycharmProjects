@@ -90,7 +90,8 @@ def get_ephys_sessions(subject):
         folders = folders_C + folders_D  # Combine the lists of folders from both drives
 
     elif development == 'remote':
-        remote_drive = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject
+        # remote_drive = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject
+        remote_drive = Path('/archive/alexis/ephys/spike_sorting') / subject
         folders = [p.name for p in remote_drive.iterdir() if p.is_dir() and len(p.name) == folder_name_len]
 
     subject_folders = [f for f in folders if f.startswith(subject)]  # Filter folders that start with subject number
@@ -126,6 +127,10 @@ def load_oe_data(directory, sync=True, stream='AP'):
                                 109,  # processor ID
                                 'ProbeA-LFP',  # stream name
                                 main=False)  # align to the main stream
+
+        # # Convert to dict for backward compatibility
+        # for c in recording.continuous:
+        #     c.metadata = vars(c.metadata)
 
         # recording.compute_global_timestamps()  # Generate new global timestamps column
         recording.compute_global_timestamps(overwrite=True)  # Overwrite existing timestamps
@@ -348,6 +353,10 @@ def load_spike_sorted_data(path_ks4, path_phy2):
     # Drop noise clusters
     df_spikes = df_spikes.loc[(df_spikes.group != 'noise')]
     cluster_info = cluster_info.loc[(cluster_info.group != 'noise')].reset_index(drop=True)
+
+    # Keep only good or single units (drop unsorted or other categories)
+    df_spikes = df_spikes.loc[df_spikes.group.isin(['good', 'mua'])]
+    cluster_info = cluster_info.loc[cluster_info.group.isin(['good', 'mua'])].reset_index(drop=True)
 
     # Drop sparse units
     # fr_threshold = 0.1  # Firing rate in Hz
@@ -621,8 +630,9 @@ def preprocess(ephys_id):
     subject = ephys_id[:3]
     directory = Path() / 'D:' / subject / ephys_id  # Ephys PC extra SSD HD (C:)
     directory2 = Path.home() / 'Documents/Open Ephys' / ephys_id  # Ephys PC main SSD HD (C:)
-    directory3 = Path('/archive/alexis/ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
     # directory3 = Path('/archive/mouse/Alexis ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
+    directory3 = Path('/archive/alexis/ephys/raw') / subject / ephys_id  # Remote server archive (remote development)
+
 
     development = dev()
 
@@ -652,10 +662,9 @@ def preprocess(ephys_id):
     if development == 'local':
         path_spike_sorting = Path.home() / 'Downloads/spike_sorting' / subject / ephys_id
     elif development == 'remote':
-        # # After rsync copy files (final)
-        # path_spike_sorting = Path('/archive/alexis/ephys/spike_sorting') / subject / ephys_id
-        # Temporary path for rsync copy files (in progress)
-        path_spike_sorting = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_id
+        # path_spike_sorting = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_id
+        path_spike_sorting = Path('/archive/alexis/ephys/spike_sorting') / subject / ephys_id
+
 
     path_ks4 = path_spike_sorting / 'kilosort4'
     path_phy2 = path_spike_sorting / 'phy2'
@@ -678,3 +687,40 @@ def preprocess(ephys_id):
         df_ttl, df_behavior, n_trials, df_spikes, cluster_info, timeline)
 
     return preprocessed
+
+
+def check_ephys_sessions_subject(subject):
+    """
+    Check the ephys sessions for a given subject and recover the ones with errors.
+    Errors can arise from the raw ephys data, the spike sorting files, or the behavioral data.
+    :param subject: Subject ID
+    :return: error_sessions, error_messages
+    """
+
+    ephys_ids = np.array(get_ephys_sessions(subject))
+    n_sessions = len(ephys_ids)
+    load = []
+    # exceptions = []
+    error_messages = []
+
+    for i, id in enumerate(ephys_ids):
+        print(f'Session {i}: {id}')
+        try:
+            preprocess(id)
+            load.append(True)
+            error_messages.append(None)  # No error
+        except Exception as e:
+            print(f'Error in {id}: {e}')
+            load.append(False)
+            error_messages.append(str(e))
+
+    load = np.array(load, dtype=bool)
+    error_sessions = ephys_ids[~load]
+    error_messages = np.array(error_messages, dtype=object)[~load]
+    n_errors = len(error_sessions)
+    print(f'{n_errors}/{n_sessions} error sessions: {error_sessions}')
+
+    for sess, msg in zip(error_sessions, error_messages):
+        print(f'{sess}: {msg}')
+
+    return error_sessions, error_messages
