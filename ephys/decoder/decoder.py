@@ -8,26 +8,26 @@ import threadpoolctl
 threadpoolctl.threadpool_info()
 
 from pathlib import Path
+import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.colors import CenteredNorm
 import matplotlib.patches as patches
-import pandas as pd
-import numpy as np
-
-from sklearn.model_selection import KFold, StratifiedKFold, cross_val_predict
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import make_pipeline
-from scipy.stats import sem, zscore
-
 import seaborn as sns
+from scipy.stats import sem, zscore
 import pickle
 import traceback
 from joblib import Parallel, delayed
 from tqdm import tqdm
 import warnings
 warnings.filterwarnings('ignore')
+
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_predict
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import make_pipeline
+import statsmodels.api as sm
 
 from my_fun.my_fun import timer, filter_behavior
 from ephys.preprocessing import *
@@ -140,8 +140,7 @@ def get_all_beh(subject, glmhmm=False):
 
     if glmhmm:
         # Load GLM-HMM fit
-        path_glmhmm = (Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / '2AFC_5' / subject).with_suffix('.csv')
-        df_glmhmm = pd.read_csv(path_glmhmm)
+        path_glmhmm = (Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / 'Ephys' / subject).with_suffix('.csv')
 
     for i in range(len(ephys_ids)):
 
@@ -160,12 +159,13 @@ def get_all_beh(subject, glmhmm=False):
             df_behavior = pd.read_csv(path_behavior)
 
             if glmhmm:
+                df_glmhmm = pd.read_csv(path_glmhmm)
                 session = df_behavior.Session.unique()[0]
                 df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
                 df_behavior = df_behavior[df_behavior.Miss == 0].reset_index(drop=True)
                 print(len(df_behavior))
                 print(len(df_glmhmm))
-                assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
+                # assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
                 df_behavior = df_glmhmm
 
             df = pd.concat([df_behavior, df], ignore_index=True)
@@ -174,6 +174,18 @@ def get_all_beh(subject, glmhmm=False):
             print('There are no spike count files in the folder. Skipping...')
 
     return df
+
+
+def get_rec_side(ephys_id):
+    df = pd.read_csv(r'/home/alexis/PycharmProjects/ephys/RECside.csv')
+    df.Subject = df.Subject.astype(int).astype(str).str.zfill(3)  # 00X pad subjects ID
+    # df = df[df.Subject.isin(subjects)]
+    df['Date'] = pd.to_datetime(df['Date'], dayfirst=True).dt.date
+    subject = ephys_id[:3]
+    date = pd.to_datetime(ephys_id.split('_')[1]).date()
+    df['RECside'] = df['RECside'].map({'L': 0, 'R': 1})
+    rec_side = df.loc[(df.Subject == subject)&(df.Date == date), 'RECside'].iloc[0]
+    return rec_side
 
 
 # for i in range(len(behavior)):
@@ -211,13 +223,13 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     pred = np.full((n_trials, n_bins), np.nan)
     pred_err = np.full((n_trials, n_bins), np.nan)
     acc = np.full((n_trials, n_bins), np.nan)
-    # acc_null = np.full((n_shuffles, n_bins), np.nan)
-    acc_null = np.zeros((n_shuffles, n_bins))
+    acc_null = np.full((n_shuffles, n_bins), np.nan)
+    # acc_null = np.zeros((n_shuffles, n_bins))  # Initialize with zeros to accumulate accuracy across folds
     weights = np.full((n_splits, n_neurons), np.nan)
     weights_null = np.full((n_splits, n_neurons, n_shuffles), np.nan)
     dv = np.full((n_trials, n_bins), np.nan)
-    # dv_null = np.full((n_trials, n_bins, n_shuffles), np.nan)
-    dv_null = np.zeros((n_trials, n_bins, n_shuffles))
+    dv_null = np.full((n_trials, n_bins, n_shuffles), np.nan)
+    # dv_null = np.zeros((n_trials, n_bins, n_shuffles))  # Initialize with zeros to accumulate accuracy across folds
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
@@ -276,8 +288,10 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
         #         y_pred_null = clf_null.predict(X_test)
         #         y_score_null = clf_null.decision_function(X_test)
         #         # acc_null[i, within_bin] = np.mean((y_pred_null == y_test).astype(int))  # Store null accuracy per trial
+        #         # Overwrite each fold?
         #         acc_null[i, within_bin] += np.mean((y_pred_null == y_test).astype(int)) / n_splits
         #         # dv_null[test_index, within_bin, i] = y_score_null  # Store null decision variable for each test trial at each time within_bin
+        #         # Overwrite each fold?
         #         dv_null[test_index, within_bin, i] += y_score_null / n_splits
 
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
@@ -302,13 +316,13 @@ def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     pred = np.full((n_trials, n_bins, n_bins), np.nan)
     pred_err = np.full((n_trials, n_bins, n_bins), np.nan)
     acc = np.full((n_trials, n_bins, n_bins), np.nan)
-    # acc_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
-    acc_null = np.zeros((n_shuffles, n_bins, n_bins))  # Initialize with zeros to accumulate accuracy across folds
+    acc_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
+    # acc_null = np.zeros((n_shuffles, n_bins, n_bins))  # Initialize with zeros to accumulate accuracy across folds
     weights = np.full((n_splits, n_bins, n_neurons), np.nan)
     weights_null = np.full((n_splits, n_neurons, n_shuffles), np.nan)
     dv = np.full((n_trials, n_bins, n_bins), np.nan)
-    # dv_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
-    dv_null = np.zeros((n_shuffles, n_bins, n_bins))  # Initialize with zeros to accumulate decision variable across folds
+    dv_null = np.full((n_shuffles, n_bins, n_bins), np.nan)
+    # dv_null = np.zeros((n_shuffles, n_bins, n_bins))  # Initialize with zeros to accumulate decision variable across folds
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
@@ -356,29 +370,29 @@ def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
                 weights[fold, bin_train, :] = clf.coef_[0]  # Store decoder weights for each fold and time bin
                 dv[test_index, bin_train, bin_test] = y_score  # Store decision variable for each test trial at each time bin
 
-                # # Compute null distribution by shuffling the labels and evaluating accuracy
-                # y_test_shuffled = y_test.values.copy()
-                # for i in range(n_shuffles):
-                #     np.random.shuffle(y_test_shuffled)
-                #     acc_null[i, bin_train, bin_test] = accuracy_score(y_test_shuffled, y_pred)
+                # Compute null distribution by shuffling the labels and evaluating accuracy
+                y_test_shuffled = y_test.values.copy()
+                for i in range(n_shuffles):
+                    np.random.shuffle(y_test_shuffled)
+                    acc_null[i, bin_train, bin_test] = accuracy_score(y_test_shuffled, y_pred)
 
-            # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
-            for i in tqdm(range(n_shuffles)):
-                y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
-                clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
-                clf_null.fit(X_train, y_train_shuffled)
-                weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
-
-                # Evaluate null decoder on all test bins
-                for bin_test in range(n_bins):
-                    X_test = X[test_index, bin_test]
-                    X_test = scaler.transform(X_test)
-                    y_pred_null = clf_null.predict(X_test)
-                    y_score_null = clf_null.decision_function(X_test)
-                    # acc_null[i, bin_train, bin_test] = accuracy_score(y_test, y_pred_null)
-                    acc_null[i, bin_train, bin_test] += accuracy_score(y_test, y_pred_null) / n_splits
-                    # dv_null[i, bin_train, bin_test] = np.mean(y_score_null)
-                    dv_null[i, bin_train, bin_test] += np.mean(y_score_null) / n_splits
+            # # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
+            # for i in tqdm(range(n_shuffles)):
+            #     y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
+            #     clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
+            #     clf_null.fit(X_train, y_train_shuffled)
+            #     weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
+            #
+            #     # Evaluate null decoder on all test bins
+            #     for bin_test in range(n_bins):
+            #         X_test = X[test_index, bin_test]
+            #         X_test = scaler.transform(X_test)
+            #         y_pred_null = clf_null.predict(X_test)
+            #         y_score_null = clf_null.decision_function(X_test)
+            #         acc_null[i, bin_train, bin_test] = accuracy_score(y_test, y_pred_null)  # Overwrite each fold?
+            #         # acc_null[i, bin_train, bin_test] += accuracy_score(y_test, y_pred_null) / n_splits
+            #         dv_null[i, bin_train, bin_test] = np.mean(y_score_null)  # Overwrite each fold?
+            #         # dv_null[i, bin_train, bin_test] += np.mean(y_score_null) / n_splits
 
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
@@ -417,26 +431,24 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
     scaler = StandardScaler()
 
     # Define epoch of interest
-    # Align to stimulus onset
-    if epoch == 'stim':
-        epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]  # Find index where stim_onset (0) is
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]  # Find index where delay (0.5) is
-    elif epoch == 'delay':
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]  # Find index where delay (0.5) is
-        epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]  # Find index where go cue is in bins
-    elif epoch == 'resp':
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]  # Find index where go cue is in bins
-        epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]  # Find index where go cue is in bins
+    epoch_targets = {
+        'stim': (0.0, 0.1),  # Align to stimulus onset
+        'delay': (0.9, 1.0),  # Align to stimulus onset
+        'resp': (1.9, 2.0),  # Align to stimulus onset
+        'first_lick': (-0.05, 0.0),  # Align to response (first lick)
+        'mid_lick': (0.5, 0.55),  # Align to response (first lick)
+        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'post_lick': (1.5, 1.55)  # Align to response (first lick)
+    }
 
-    # Align to first lick
-    elif epoch == 'first_lick':
-        epoch_start_idx = np.where(np.round(bins, 2) == -0.05)[0][0]  # Find index where first lick is in bins
-        epoch_end_idx = np.where(np.round(bins, 2) == 0)[0][0]  # Find index where first lick is in bins
-    elif epoch == 'mid_lick':
-        epoch_start_idx = np.where(np.round(bins, 2) == 0.5)[0][0]  # Find index where first lick is in bins
-        epoch_end_idx = np.where(np.round(bins, 2) == 0.55)[0][0]  # Find index where first lick is in bins
-    else:
-        raise ValueError("Epoch must be 'stim', 'delay', or 'resp'.")
+    # Compute start/end indices for the requested epoch
+    if epoch not in epoch_targets:
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+
+    start_time, end_time = epoch_targets[epoch]
+    bin_size = bins[1] - bins[0]
+    epoch_start_idx = round((start_time - bins[0]) / bin_size)
+    epoch_end_idx = round((end_time - bins[0]) / bin_size)
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent overfitting)
     for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
@@ -527,32 +539,32 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
     acc = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
     acc_null = [np.full((n_trials, n_bins, n_shuffles), np.nan), np.full((n_trials, n_bins, n_shuffles), np.nan)]
     weights = [np.full((n_splits, n_neurons), np.nan), np.full((n_splits, n_neurons), np.nan)]
+    weights_null = [np.full((n_splits, n_neurons, n_shuffles), np.nan), np.full((n_splits, n_neurons, n_shuffles), np.nan)]
     dv = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    dv_null = [np.full((n_trials, n_bins, n_shuffles), np.nan), np.full((n_trials, n_bins, n_shuffles), np.nan)]
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
 
     # Define epoch of interest
-    # Align to stimulus onset
-    if epoch == 'stim':  # Find index where stim_onset (0-0.5) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]
-    elif epoch == 'delay':  # Find index where delay (0.5-1) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]
-    elif epoch == 'resp':  # Find index where go cue (1-2) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]
+    epoch_targets = {
+        'stim': (0.0, 0.1),  # Align to stimulus onset
+        'delay': (0.9, 1.0),  # Align to stimulus onset
+        'resp': (1.9, 2.0),  # Align to stimulus onset
+        'first_lick': (-0.05, 0.0),  # Align to response (first lick)
+        'mid_lick': (0.5, 0.55),  # Align to response (first lick)
+        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'post_lick': (1.5, 1.55)  # Align to response (first lick)
+    }
 
-    # Align to first lick
-    elif epoch == 'first_lick':
-        epoch_start_idx = np.where(np.round(bins, 2) == -0.05)[0][0]  # Find index where first lick is in bins
-        epoch_end_idx = np.where(np.round(bins, 2) == 0)[0][0]  # Find index where first lick is in bins
-    elif epoch == 'mid_lick':
-        epoch_start_idx = np.where(np.round(bins, 2) == 0.5)[0][0]  # Find index where first lick is in bins
-        epoch_end_idx = np.where(np.round(bins, 2) == 0.55)[0][0]  # Find index where first lick is in bins
-    else:
-        raise ValueError("Epoch must be 'stim', 'delay', or 'resp'.")
+    # Compute start/end indices for the requested epoch
+    if epoch not in epoch_targets:
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+
+    start_time, end_time = epoch_targets[epoch]
+    bin_size = bins[1] - bins[0]
+    epoch_start_idx = round((start_time - bins[0]) / bin_size)
+    epoch_end_idx = round((end_time - bins[0]) / bin_size)
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent over-fitting)
     for fold, (train_index, test_index) in enumerate(skf.split(X, y)):
@@ -644,7 +656,7 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
                 # acc_null[0][test_idx0, bin_test, i] = (y_pred0_null == y_test0).astype(int)
                 # acc_null[1][test_idx1, bin_test, i] = (y_pred1_null == y_test1).astype(int)
 
-    return pred, pred_err, acc, acc_null, weights, dv
+    return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
 
 @timer
@@ -670,32 +682,32 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
     acc = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
     acc_null = [np.full((n_trials, n_bins, n_shuffles), np.nan), np.full((n_trials, n_bins, n_shuffles), np.nan)]
     weights = [np.full((n_splits, n_neurons), np.nan), np.full((n_splits, n_neurons), np.nan)]
+    weights_null = [np.full((n_splits, n_neurons, n_shuffles), np.nan), np.full((n_splits, n_neurons, n_shuffles), np.nan)]
     dv = [np.full((n_trials, n_bins), np.nan), np.full((n_trials, n_bins), np.nan)]
+    dv_null = [np.full((n_trials, n_bins, n_shuffles), np.nan), np.full((n_trials, n_bins, n_shuffles), np.nan)]
 
     # Apply z-scoring normalization across neurons and time bins (per trial)
     scaler = StandardScaler()
 
-    # Align to stimulus onset
     # Define epoch of interest
-    if epoch == 'stim':  # Find index where stim_onset (0-0.5) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 0.1)[0][0]
-    elif epoch == 'delay':  # Find index where delay (0.5-1) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 0.9)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 1)[0][0]
-    elif epoch == 'resp':  # Find index where go cue (1-2) is
-        epoch_start_idx = np.where(np.round(bins, 1) == 1.9)[0][0]
-        epoch_end_idx = np.where(np.round(bins, 1) == 2)[0][0]
+    epoch_targets = {
+        'stim': (0.0, 0.1),  # Align to stimulus onset
+        'delay': (0.9, 1.0),  # Align to stimulus onset
+        'resp': (1.9, 2.0),  # Align to stimulus onset
+        'first_lick': (-0.05, 0.0),  # Align to response (first lick)
+        'mid_lick': (0.5, 0.55),  # Align to response (first lick)
+        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'post_lick': (1.5, 1.55)  # Align to response (first lick)
+    }
 
-    # Align to first lick
-    elif epoch == 'first_lick':
-        epoch_start_idx = np.where(np.round(bins, 2) == -0.05)[0][0]  # Find index where first lick is in bins
-        epoch_end_idx = np.where(np.round(bins, 2) == 0)[0][0]  # Find index where first lick is in bins
-    elif epoch == 'mid_lick':
-        epoch_start_idx = np.where(np.round(bins, 2) == 0.5)[0][0]  # Find index where first lick is in bins
-        epoch_end_idx = np.where(np.round(bins, 2) == 0.55)[0][0]  # Find index where first lick is in bins
-    else:
-        raise ValueError("Epoch must be 'stim', 'delay', or 'resp'.")
+    # Compute start/end indices for the requested epoch
+    if epoch not in epoch_targets:
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+
+    start_time, end_time = epoch_targets[epoch]
+    bin_size = bins[1] - bins[0]
+    epoch_start_idx = round((start_time - bins[0]) / bin_size)
+    epoch_end_idx = round((end_time - bins[0]) / bin_size)
 
     index1 = np.where(split == 1)[0]  # Indices of correct/engaged trials
     index0 = np.where(split == 0)[0]  # Indices of error/disengaged trials (never used for training)
@@ -794,12 +806,13 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
                 # acc_null[0][test_idx0, bin_test, i] = (y_pred0_null == y_test0).astype(int)
                 # acc_null[1][test_idx1, bin_test, i] = (y_pred1_null == y_test1).astype(int)
 
-    return pred, pred_err, acc, acc_null, weights, dv
+    return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
 
 @timer
 def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoch_ortho=None, split_by=None,
-                 drop_miss=True, hit_only=False, engagement=None, group=None, depth=None, n_shuffles=100, save=False):
+                 drop_miss=True, hit_only=False, engagement=None, group=None, depth=None, min_fr=None, max_fano=None,
+                 n_shuffles=100, save=False):
     """
     Perform within time bin decoder across all sessions for one subject.
     :param subject: subject ID (str)
@@ -824,7 +837,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
     elif what == 'choice':
         col = 'Choice'
     else:
-        raise ValueError("'what' (to decode) must be 'stim' or 'choice'.")
+        raise ValueError("'what' (to decode) must be 'stim' or 'choice'")
 
     results = {
         'pred': [],
@@ -866,30 +879,30 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             path_cluster_info = Path('/archive/alexis/ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
             cluster_info = pd.read_csv(path_cluster_info / 'cluster_info.tsv', sep='\t')
             cluster_info = cluster_info[cluster_info['group'] != 'noise'].reset_index(drop=True)  # Drop noise units
-            cluster_info = cluster_info.loc[cluster_info.group.isin(['good', 'mua'])].reset_index(drop=True)
-
+            cluster_info = cluster_info.loc[cluster_info.group.isin(['good', 'mua'])].reset_index(drop=True) # Keep good/mua only
             assert all_psth.shape[2] == len(cluster_info)
-            all_psth, cluster_info = filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=group, depth=depth)
+            all_psth, cluster_info = filter_units(bins, all_psth, cluster_info, min_fr=min_fr, max_fano=max_fano,
+                                                  group=group, depth=depth)
+
+            # Load GLM-HMM fit
+            # path_glmhmm = ((Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / '2AFC_5' / subject)
+            #                .with_suffix('.csv'))  # Fitted all sessions (non-ephys and ephys)
+            path_glmhmm = ((Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / 'Ephys' / subject)
+                           .with_suffix('.csv'))  # Fitted sphys sessions only
+            df_glmhmm = pd.read_csv(path_glmhmm)  # All sessions concatenated
+            session = df_behavior.Session.unique()[0]
+            df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
+
+            # Drop misses (GLM-HMM lack misses)
+            resp_idx = df_behavior[df_behavior.Miss == 0].index
+            df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+            all_psth = all_psth[resp_idx]
+            assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
+            df_behavior = df_glmhmm
+            drop_miss = False  # To not do it twice
 
             state_label = ''
             if engagement is not None:  # Add engaged column to df_behavior
-
-                # Load GLM-HMM fit
-                path_glmhmm = ((Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / '2AFC_5' / subject)
-                               .with_suffix('.csv'))
-                df_glmhmm = pd.read_csv(path_glmhmm)  # All sessions concatenated
-                session = df_behavior.Session.unique()[0]
-                df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
-
-                # Drop misses
-                resp_idx = df_behavior[df_behavior.Miss == 0].index
-                df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
-                all_psth = all_psth[resp_idx]
-
-                assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
-                df_behavior = df_glmhmm
-                drop_miss = False  # To not do it twice
-
                 # Filter by engagement
                 mask = (df_behavior.State == engagement).to_numpy()
                 df_behavior = df_behavior[mask].reset_index(drop=True)
@@ -916,25 +929,25 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             if kind == 'within':
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     within_decoder(all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align} aligned).pkl'
+                filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align}_aligned).pkl'
             elif kind == 'cross':
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     cross_decoder(all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}{hit_label}{state_label}_({align} aligned).pkl'
+                filename = f'{what}_{kind}{hit_label}{state_label}_({align}_aligned).pkl'
             elif kind == 'epoch':
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     epoch_cross_decoder(bins, epoch, all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder_{epoch}{hit_label}{state_label}_({align} aligned).pkl'
+                filename = f'{what}_{kind}_decoder_{epoch}{hit_label}{state_label}_({align}_aligned).pkl'
             elif kind == 'epoch_split':
                 split = df_behavior[split_by]
-                pred, pred_err, acc, acc_null, weights, dv = \
+                pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     epoch_cross_decoder_split(bins, split, epoch, all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder_{epoch}_split_by_{split_by}{hit_label}{state_label}_({align} aligned).pkl'
-            elif kind == 'epoch_generalize':
+                filename = f'{what}_{kind}_decoder_{epoch}_split_by_{split_by}{hit_label}{state_label}_({align}_aligned).pkl'
+            elif kind == 'generalize':
                 split = df_behavior[split_by]
-                pred, pred_err, acc, acc_null, weights, dv = \
+                pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     epoch_cross_decoder_generalize(bins, split, epoch, all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder_{epoch}_generalize_{split_by}{hit_label}{state_label}_({align} aligned).pkl'
+                filename = f'{what}_{kind}_decoder_{epoch}_generalize_{split_by}{hit_label}{state_label}_({align}_aligned).pkl'
 
             # Under construction (use at your own risk)
             elif kind == 'epoch_ortho':
@@ -942,7 +955,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                     epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior[col], n_shuffles)
                 filename = f'epoch_cross_decoder_ORTHO_{epoch}_{state_label}.pkl'
             else:
-                raise ValueError("Kind must be 'within', 'cross', 'epoch', or 'epoch_split'")
+                raise ValueError("Kind must be 'within', 'cross', 'epoch', 'epoch_split' or 'generalize'")
 
             results['pred'].append(pred)
             results['pred_err'].append(pred_err)
@@ -958,7 +971,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
         except Exception as e:
             print(f'An error occurred in session {ephys_ids[i]}: {e}')
             error_sessions.append(ephys_ids[i])
-            # traceback.print_exc()
+            traceback.print_exc()
             continue
 
     if save:
@@ -1004,9 +1017,9 @@ def p_val(acc, acc_null):
 
 def get_selective_units(weights, weights_null, alpha=0.05):
     """
-    Identify selective neurons by comparing real weights to null distribution.
-    :param weights: array (folds x neurons)
-    :param weights_null: array (folds x neurons x shuffles)
+    Identify selective neurons from decoder by comparing real weights to null distribution.
+    :param weights: 2D array (folds x neurons)
+    :param weights_null: 3D array (folds x neurons x shuffles)
     :param alpha: significance level (default 0.05)
     :return: boolean array of shape (neurons) indicating selective neurons
     """
@@ -1014,7 +1027,7 @@ def get_selective_units(weights, weights_null, alpha=0.05):
     # Mean weight (shape: neurons)
     mean_weights = weights.mean(axis=0)
 
-    # Mean Null distribution per neuron across folds (shape: neurons, shuffles)
+    # Mean null distribution per neuron across folds (shape: neurons, shuffles)
     weights_null = weights_null.mean(axis=0)
 
     # Compute percentiles
@@ -1025,6 +1038,198 @@ def get_selective_units(weights, weights_null, alpha=0.05):
     selective_mask = (mean_weights < lower) | (mean_weights > upper)
 
     return selective_mask
+
+
+def get_selectivity(bins, X, y, epoch='stim', alpha=0.05, n_shuffles=100):
+    """
+    Compute neuron-by-neuron Poisson GLM for a given epoch to estimate selectivity.
+    :param bins: 1D array with time bins
+    :param epoch: epoch of interest (str: 'stim', 'delay', 'resp')
+    :param X: 3D array with neural data (trials x time x neurons)
+    :param Y: 1D array with binary stimulus condition
+    :param n_shuffles: number of shuffles to perform
+    :return: params, pvalues, boolean mask for selective_neurons
+    """
+
+    # Define epoch of interest
+    epoch_targets = {
+        'stim': (0.0, 0.1),  # Align to stimulus onset
+        'delay': (0.9, 1.0),  # Align to stimulus onset
+        'resp': (1.9, 2.0),  # Align to stimulus onset
+        'first_lick': (-0.05, 0.0),  # Align to response (first lick)
+        'mid_lick': (0.5, 0.55),  # Align to response (first lick)
+        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'post_lick': (1.5, 1.55)  # Align to response (first lick)
+    }
+
+    # Compute start/end indices for the requested epoch
+    if epoch not in epoch_targets:
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+
+    start_time, end_time = epoch_targets[epoch]
+    bin_size = bins[1] - bins[0]
+    epoch_start_idx = round((start_time - bins[0]) / bin_size)
+    epoch_end_idx = round((end_time - bins[0]) / bin_size)
+
+    n_trials, n_bins, n_neurons = X.shape
+
+    params = np.zeros(n_neurons)
+    pvalues = np.ones(n_neurons)
+
+    # Precompute spike counts per neuron for the epoch
+    X = X[:, epoch_start_idx:epoch_end_idx, :].sum(axis=1)  # trials x neurons
+
+    for neuron in range(n_neurons):
+        X_neuron = X[:, neuron].reshape(-1, 1)
+        X_neuron = sm.add_constant(X_neuron)
+
+        # Fit GLM on real data
+        model = sm.GLM(y, X_neuron, family=sm.families.Poisson())
+        results = model.fit()
+        param = results.params[1]
+        params[neuron] = param
+
+        # Compute p-value
+        if n_shuffles > 0:
+            null_params = np.zeros(n_shuffles)
+            for i in range(n_shuffles):
+                y_shuffled = np.random.permutation(y)
+                model_null = sm.GLM(y_shuffled, X_neuron, family=sm.families.Poisson())
+                results_null = model_null.fit()
+                null_params[i] = results_null.params[1]
+            pvalues[neuron] = np.mean(np.abs(null_params) >= np.abs(param))
+        else:
+            pvalues[neuron] = results.pvalues[1]
+
+    selective_neurons = np.where(pvalues < alpha)[0]
+    selective_mask = pvalues < alpha
+    print(f'{epoch} selectivity: {len(selective_neurons)/n_neurons*100:.1f}% ({len(selective_neurons)}/{n_neurons} neurons)')
+
+    return params, pvalues, selective_mask
+
+
+def mean_selectivity(subject, what='stim', align='stim', epoch=None, group=None, depth=None, min_fr=None, max_fano=None,
+                     alpha=0.05, n_shuffles=0, save=False):
+    """
+    Perform within time bin decoder across all sessions for one subject.
+    :param subject: subject ID (str)
+    :param what: what to decode ('stim' or 'choice'). If correct trials only, they are the same ('choice'='stim')
+    :param align: alignment of neural data ('stim', or 'resp')
+    :param epoch: epoch of interest (str: 'stim', 'delay', 'resp')
+    :param group: 'good' for isolated units, 'mua' for multiunit activity, None for both
+    :param depth: tuple with min and max depth to include (surface = 0 mm, max depth = 4 mm)
+    :param n_shuffles: number of shuffles to perform
+    :param save: whether to save the results as a pickle
+    :return: results (dict)
+    """
+
+    if what == 'stim':
+        col = 'Side'
+    elif what == 'choice':
+        col = 'Choice'
+    else:
+        raise ValueError("'what' (to decode) must be 'stim' or 'choice'")
+
+    selectivity = {
+        'params': [],
+        'pvalues': [],
+        'selective_mask': [],
+        'cluster_info': []
+    }
+
+    folder_parent = Path.home() / 'data' / subject
+    ephys_ids = get_ephys_sessions(subject)
+    error_sessions = []
+
+    for i in range(len(ephys_ids)):
+
+        folder_child = folder_parent / ephys_ids[i]
+
+        try:
+            print(f'Processing session {i + 1}/{len(ephys_ids)}: {ephys_ids[i]}...')
+            filename_behavior = [f for f in os.listdir(folder_child) if f.endswith('.csv')][0]  # Assume only one .csv file
+            path_behavior = folder_child / filename_behavior
+            df_behavior = pd.read_csv(path_behavior)
+            bins = np.load(folder_child / f'bins_{align}.npy')
+            all_psth = np.load(folder_child / f'all_psth_{align}.npy')
+
+            # Filter units
+            # path_cluster_info = Path('/archive/mouse/Alexis ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
+            path_cluster_info = Path('/archive/alexis/ephys/spike_sorting') / subject / ephys_ids[i] / 'phy2'
+            cluster_info = pd.read_csv(path_cluster_info / 'cluster_info.tsv', sep='\t')
+            cluster_info = cluster_info[cluster_info['group'] != 'noise'].reset_index(drop=True)  # Drop noise units
+            cluster_info = cluster_info.loc[cluster_info.group.isin(['good', 'mua'])].reset_index(drop=True) # Keep good/mua only
+            surface = cluster_info.depth.max()
+            cluster_info['depth'] = surface - cluster_info['depth']  # Depth from surface
+            rec_side = get_rec_side(ephys_ids[i])
+            cluster_info['RECside'] = rec_side
+            assert all_psth.shape[2] == len(cluster_info)
+            all_psth, cluster_info = filter_units(bins, all_psth, cluster_info, min_fr=min_fr, max_fano=max_fano,
+                                                  group=group, depth=depth)
+
+            # Load GLM-HMM fit
+            path_glmhmm = ((Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / 'Ephys' / subject)
+                           .with_suffix('.csv'))  # Fitted sphys sessions only
+            df_glmhmm = pd.read_csv(path_glmhmm)  # All sessions concatenated
+            session = df_behavior.Session.unique()[0]
+            df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
+
+            # Drop misses (GLM-HMM lack misses)
+            resp_idx = df_behavior[df_behavior.Miss == 0].index
+            df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+            all_psth = all_psth[resp_idx]
+            assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
+            df_behavior = df_glmhmm
+
+            # Filter only correct engaged trials
+            mask = ((df_behavior.State == 1)&((df_behavior.Hit == 1))).to_numpy()
+            df_behavior = df_behavior[mask].reset_index(drop=True)
+            all_psth = all_psth[mask]
+
+            params, pvalues, selective_mask = get_selectivity(bins, all_psth, df_behavior[col], epoch=epoch, alpha=alpha,
+                                                              n_shuffles=n_shuffles)
+            filename = f'{what}_selectivity_{epoch}_({align}_aligned).pkl'
+            selectivity['params'].append(params)
+            selectivity['pvalues'].append(pvalues)
+            selectivity['selective_mask'].append(selective_mask)
+            selectivity['cluster_info'].append(cluster_info)
+
+        except Exception as e:
+            print(f'An error occurred in session {ephys_ids[i]}: {e}')
+            error_sessions.append(ephys_ids[i])
+            traceback.print_exc()
+            continue
+
+    if save:
+        if filename:
+            os.chdir(folder_parent)
+            with open(filename, 'wb') as f:
+                pickle.dump(selectivity, f)
+
+    return selectivity
+
+
+def add_selectivity_cluster_info(mean_selectivity):
+
+    cluster_info = pd.concat(mean_selectivity['cluster_info'], ignore_index=True)  # Unpack df
+    weights, pvalues, selective_mask, n_selective = [], [], [], []  # Initialize lists
+
+    for p, pv, m in zip(mean_selectivity['params'],
+                    mean_selectivity['pvalues'],
+                    mean_selectivity['selective_mask']):
+        weights.append(p)
+        pvalues.append(pv)
+        selective_mask.append(m)
+        n_selective.append(sum(m))
+
+    weights = np.concatenate(weights)
+    pvalues = np.concatenate(pvalues)
+    selective_mask = np.concatenate(selective_mask)
+    cluster_info['weights'] = weights
+    cluster_info['pvalues'] = pvalues
+    cluster_info['selective_mask'] = selective_mask
+
+    return cluster_info
 
 
 ########################################################################################################################
@@ -1522,6 +1727,10 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
             colors = ('tab:gray', 'darkgreen')
         elif epoch == 'mid_lick':
             colors = ('tab:gray', 'lightgreen')
+        elif epoch == 'late_lick':
+            colors = ('tab:gray', 'tab:green')
+        elif epoch == 'post_lick':
+            colors = ('tab:gray', 'tab:green')
         labels = ('Dis.', 'Eng.')
 
     # plt.figure(constrained_layout=True)
@@ -1571,37 +1780,46 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     sns.despine()
 
 
-def plot_weights_dist(weights, selective_mask):
+def plot_weights_dist(cluster_info, ipsi_contra=False):
+
+    weights = cluster_info['weights']
+    selective_mask = cluster_info['selective_mask']
+
+    # Flip weights for ipsi/contra convention if requested
+    if ipsi_contra:
+        weights = weights * (1 - 2*cluster_info['RECside'])
+        labels = ('Ipsi', 'Contra')
+    else:
+        labels = ('Left', 'Right')
 
     non_selective = ~selective_mask
-    left_selective = selective_mask & (weights < 0)
-    right_selective = selective_mask & (weights > 0)
+    negative_selective = selective_mask & (weights < 0)  # Left/Ipsi
+    positive_selective = selective_mask & (weights > 0)  # Right/Contra
 
     # Plot single histogram, color by selectivity
     plt.figure(figsize=fig_size(n_cols=2), constrained_layout=True)
     bins = np.linspace(-1, 1, 50)
 
     # Plot
-    plt.hist(weights[non_selective], bins=bins, weights=np.ones(non_selective.sum())/len(weights), color='lightgray', edgecolor='k')
-    plt.hist(weights[left_selective], bins=bins, weights=np.ones(left_selective.sum())/len(weights), color='tab:blue', edgecolor='k', label='Left', alpha=0.75)
-    plt.hist(weights[right_selective], bins=bins, weights=np.ones(right_selective.sum())/len(weights), color='tab:orange', edgecolor='k', label='Right', alpha=0.75)
+    plt.hist(weights[non_selective], bins=bins, weights=np.ones(non_selective.sum())/len(weights),
+             color='lightgray', edgecolor='k')
+    plt.hist(weights[negative_selective], bins=bins, weights=np.ones(negative_selective.sum()) / len(weights),
+             color='tab:blue', edgecolor='k', label=labels[0], alpha=0.75)
+    plt.hist(weights[positive_selective], bins=bins, weights=np.ones(positive_selective.sum()) / len(weights),
+             color='tab:orange', edgecolor='k', label=labels[1], alpha=0.75)
 
     plt.axvline(0, color='k', linestyle='--')
     plt.xlim(-1, 1)
     xticks = np.arange(-1, 1.01, 0.5)
     xticklabels = [f'{x:g}' for x in xticks]  # 'g' removes trailing zeros
     plt.xticks(xticks, xticklabels)
-    plt.title(f'{selective_mask.sum() / len(weights) * 100:.0f}% selective units')
-    # plt.xlabel('Mean weight across folds')
+    plt.title(f'{selective_mask.sum() / len(weights) * 100:.0f}%')
     plt.xlabel('Weight')
     plt.ylabel('Density')
     # plt.legend(loc='upper center', ncol=2)
-
-    # Add text labels in axes coordinates
     ylim = plt.gca().get_ylim()[1] * 0.75
-    plt.text(-0.5, ylim, 'Left', color='tab:blue', ha='center', va='center')
-    plt.text(0.5, ylim, 'Right', color='tab:orange', ha='center', va='center')
-
+    plt.text(-0.5, ylim, labels[0], color='tab:blue', ha='center', va='center')
+    plt.text(0.5, ylim, labels[1], color='tab:orange', ha='center', va='center')
     sns.despine()
 
 
@@ -1756,21 +1974,6 @@ def epoch_cross_decoder_ORTHO(bins, epoch=None, epoch_ortho=None, X=np.zeros((1,
             acc = acc_ortho
 
     return pred, pred_err, acc, acc_null
-
-# i = 0
-# path_behavior = get_behavior_id(ephys_ids[i])
-# df_behavior = parse_v2(path_behavior)
-# disengagement = find_disengaged(df_behavior, plot=False)  # Find trial when disengagement happens
-# engaged = (df_behavior.Trial <= disengagement).astype(int)  # Compare trials to disengagement (no need for i)
-# df_behavior['Engaged'] = engaged
-# bins = np.load(folder_parent / ephys_ids[i] / 'bins.npy')
-# all_psth = np.load(folder_parent / ephys_ids[i] / 'all_psth.npy')
-# # Correct trials only
-# correct_idx = df_behavior[df_behavior.Hit == 1].index
-# df_behavior = df_behavior.iloc[correct_idx].reset_index(drop=True)
-# all_psth = all_psth[correct_idx]
-# epoch_cross_decoder_ORTHO(bins, epoch='stim', epoch_ortho='delay', X=all_psth, y=df_behavior.Side,
-#                           n_shuffles=100)
 
 
 # stim_len = df.StimLen.unique()[0]

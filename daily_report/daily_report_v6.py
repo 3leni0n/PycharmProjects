@@ -800,7 +800,7 @@ def daily_report_v6(path, send_slack=False):
         runtime_savepag1 = time_end_savepag1 - time_start_savepag1
         print("'Saving 1st page in pdf' took", round(runtime_savepag1, 2), 'seconds to run')
 
-        plt.close()
+        # plt.close()
 
         ################################################################################################################
         ################################################################################################################
@@ -1316,7 +1316,7 @@ def daily_report_v6(path, send_slack=False):
         runtime_savepag2 = time_end_savepag2 - time_start_savepag2
         print("'Saving 2nd page in pdf' took", round(runtime_savepag2, 2), 'seconds to run')
 
-        plt.close()
+        # plt.close()
 
     ####################################################################################################################
 

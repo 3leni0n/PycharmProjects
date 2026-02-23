@@ -423,10 +423,10 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
             cherries[exp] = subjects
 
     for exp in experiments:
-        if exp == '2AFC_5':
-            subjects = ['000', '001', '002', '003', '004', '005', '006', '007', '008', '009']
-        else:
-            subjects = cherries[exp]
+        # if exp == '2AFC_5':
+        #     subjects = ['000', '001', '002', '003', '004', '005', '006', '007', '008', '009']
+        # else:
+        subjects = cherries[exp]
 
         for i, subj in enumerate(subjects):
             # Load behavioral data
@@ -439,19 +439,19 @@ def fit_all(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_6'], n_states=2, co
             # Ephys animals were usually first trained under '2AFC_5' (regular boxes) before being moved to 'Ephys' (box)
             # Some exist only in one, others exist in both
             # Merge behavioral data from both folders before fitting
-            if exp == '2AFC_5':  # Ephys group
-                try:
-                    df = pd.read_csv(folder_in, low_memory=False)
-                except FileNotFoundError:
-                    df = pd.DataFrame()
-                try:
-                    path_subject_ephys = Path.home() / 'PycharmProjects' / 'glue_sessions' / 'Ephys' / f'{subj}.csv'
-                    df2 = pd.read_csv(path_subject_ephys, low_memory=False)
-                except FileNotFoundError:
-                    df2 = pd.DataFrame()
-                df = pd.concat([df, df2], ignore_index=True)
-            else:
-                df = pd.read_csv(folder_in, low_memory=False)
+            # if exp == '2AFC_5':  # Ephys group
+            #     try:
+            #         df = pd.read_csv(folder_in, low_memory=False)
+            #     except FileNotFoundError:
+            #         df = pd.DataFrame()
+            #     try:
+            #         path_subject_ephys = Path.home() / 'PycharmProjects' / 'glue_sessions' / 'Ephys' / f'{subj}.csv'
+            #         df2 = pd.read_csv(path_subject_ephys, low_memory=False)
+            #     except FileNotFoundError:
+            #         df2 = pd.DataFrame()
+            #     df = pd.concat([df, df2], ignore_index=True)
+            # else:
+            df = pd.read_csv(folder_in, low_memory=False)
 
             try:
                 df_fit = fit_glmhmm(df, n_states=n_states, covariates=covariates, constrain=constrain, drug=drug, save=save)

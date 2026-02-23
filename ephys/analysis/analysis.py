@@ -259,7 +259,10 @@ def plot_raster(df_behavior, peri_event_spikes, cluster, group, colors=None, ax=
     if colors is None:
         colors = ['k'] * len(peri_event_spikes)
 
-    ax.eventplot(peri_event_spikes, lineoffsets=range(len(peri_event_spikes)), colors=colors)
+    # for trial, spikes in enumerate(peri_event_spikes):
+    #     ax.scatter(spikes, np.full_like(spikes, trial), marker='.', color=colors[trial])
+
+    ax.eventplot(peri_event_spikes, orientation='horizontal', lineoffsets=range(len(peri_event_spikes)), colors=colors)
     ax.axvline(0, color='tab:gray', label='Stimulus')
     ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay')
     ax.axvline(go_cue, color='tab:gray', label='Go cue')
