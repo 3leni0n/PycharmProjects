@@ -297,6 +297,58 @@ def within_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
 
+# Mix of within decoder and the epoch split generalize decoder, but only storing the results of the generalization
+@timer
+def within_decoder_generalize(split, X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
+
+    skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    n_splits = skf.get_n_splits()
+
+    n_trials, n_bins, n_neurons = X.shape
+    index1 = np.where(split == 1)[0]
+    index0 = np.where(split == 0)[0]
+    n_trials0 = len(index0)
+
+    pred = np.full((n_trials0, n_bins), np.nan)
+    pred_err = np.full((n_trials0, n_bins), np.nan)
+    acc = np.full((n_trials0, n_bins), np.nan)
+    acc_null = np.full((n_shuffles, n_bins), np.nan)
+    weights = np.full((n_splits, n_neurons), np.nan)
+    weights_null = np.full((n_splits, n_neurons, n_shuffles), np.nan)
+    dv = np.full((n_trials0, n_bins), np.nan)
+    dv_null = np.full((n_trials0, n_bins, n_shuffles), np.nan)
+
+    for fold, (train_index, _) in enumerate(skf.split(X[index1], y[index1])):
+        train_index = index1[train_index]
+        for within_bin in range(n_bins):
+            X_train = X[train_index, within_bin]
+            y_train = y[train_index]
+            scaler = StandardScaler()
+            X_train = scaler.fit_transform(X_train)
+            clf = LogisticRegression(class_weight='balanced')
+            clf.fit(X_train, y_train)
+            weights[fold, :] = clf.coef_[0]
+
+            # ---- TEST ON SPLIT == 0 ----
+            X_test = X[index0, within_bin]
+            y_test = y[index0]
+            X_test = scaler.transform(X_test)
+            y_pred = clf.predict(X_test)
+            y_score = clf.decision_function(X_test)
+            y_acc = (y_pred == y_test).astype(int)
+            pred[:, within_bin] = y_pred
+            pred_err[:, within_bin] = y_pred - y_test
+            acc[:, within_bin] = y_acc
+            dv[:, within_bin] = y_score
+
+            y_test_shuffled = y_test.values.copy()
+            for i in range(n_shuffles):
+                np.random.shuffle(y_test_shuffled)
+                acc_null[i, within_bin] = np.mean((y_pred == y_test_shuffled).astype(int))
+
+    return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
+
+
 @timer
 def cross_decoder(X=np.empty((1, 1, 1)), y=np.empty((1, 1)), n_shuffles=100):
     """
@@ -437,13 +489,13 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
         'resp': (1.9, 2.0),  # Align to stimulus onset
         'first_lick': (-0.05, 0.0),  # Align to response (first lick)
         'mid_lick': (0.5, 0.55),  # Align to response (first lick)
-        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'late_lick': (0.95, 1.0),  # Align to response (first lick)
         'post_lick': (1.5, 1.55)  # Align to response (first lick)
     }
 
     # Compute start/end indices for the requested epoch
     if epoch not in epoch_targets:
-        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick', 'post_lick'.")
 
     start_time, end_time = epoch_targets[epoch]
     bin_size = bins[1] - bins[0]
@@ -491,27 +543,27 @@ def epoch_cross_decoder(bins, epoch=None, X=np.empty((1, 1, 1)), y=np.empty((1, 
             weights[fold, :] = clf.coef_[0]  # Store decoder weights for each fold
             dv[test_index, bin_test] = y_score  # Store decision variable for each test trial at each time bin
 
-            # y_test_shuffled = y_test.values.copy()
-            # for _ in range(n_shuffles):
-            #     np.random.shuffle(y_test_shuffled)
-            #     # acc_null[_, bin_test] = accuracy_score(y_test_shuffled, y_pred)
-            #     acc_null[test_index, bin_test, _] = (y_pred == y_test_shuffled).astype(int)
+            y_test_shuffled = y_test.values.copy()
+            for _ in range(n_shuffles):
+                np.random.shuffle(y_test_shuffled)
+                # acc_null[_, bin_test] = accuracy_score(y_test_shuffled, y_pred)
+                acc_null[test_index, bin_test, _] = (y_pred == y_test_shuffled).astype(int)
 
-        # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
-        for i in tqdm(range(n_shuffles)):
-            y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
-            clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
-            clf_null.fit(X_train, y_train_shuffled)
-            weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
-
-            # Loop over each time bin_train
-            for bin_test in range(n_bins):
-                X_test = X[test_index, bin_test]
-                X_test = scaler.transform(X_test)
-                y_pred_null = clf_null.predict(X_test)
-                y_score_null = clf_null.decision_function(X_test)
-                acc_null[test_index, bin_test, i] = (y_pred_null == y_test).astype(int)  # Store null accuracy per trial
-                dv_null[test_index, bin_test, i] = y_score_null  # Store null decision variable for each test trial at each time bin
+        # # Compute null distribution by shuffling y_train and fitting a null model (slower but best)
+        # for i in tqdm(range(n_shuffles)):
+        #     y_train_shuffled = np.random.permutation(y_train)  # Shuffle training labels
+        #     clf_null = LogisticRegression(class_weight='balanced')  # Fit null model
+        #     clf_null.fit(X_train, y_train_shuffled)
+        #     weights_null[fold, :, i] = clf_null.coef_[0]  # Store null decoder weights for each fold and shuffle
+        #
+        #     # Loop over each time bin_train
+        #     for bin_test in range(n_bins):
+        #         X_test = X[test_index, bin_test]
+        #         X_test = scaler.transform(X_test)
+        #         y_pred_null = clf_null.predict(X_test)
+        #         y_score_null = clf_null.decision_function(X_test)
+        #         acc_null[test_index, bin_test, i] = (y_pred_null == y_test).astype(int)  # Store null accuracy per trial
+        #         dv_null[test_index, bin_test, i] = y_score_null  # Store null decision variable for each test trial at each time bin
 
     return pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null
 
@@ -553,13 +605,13 @@ def epoch_cross_decoder_split(bins, split, epoch=None, X=np.empty((1, 1, 1)), y=
         'resp': (1.9, 2.0),  # Align to stimulus onset
         'first_lick': (-0.05, 0.0),  # Align to response (first lick)
         'mid_lick': (0.5, 0.55),  # Align to response (first lick)
-        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'late_lick': (0.95, 1.0),  # Align to response (first lick)
         'post_lick': (1.5, 1.55)  # Align to response (first lick)
     }
 
     # Compute start/end indices for the requested epoch
     if epoch not in epoch_targets:
-        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick', 'post_lick'.")
 
     start_time, end_time = epoch_targets[epoch]
     bin_size = bins[1] - bins[0]
@@ -696,13 +748,13 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
         'resp': (1.9, 2.0),  # Align to stimulus onset
         'first_lick': (-0.05, 0.0),  # Align to response (first lick)
         'mid_lick': (0.5, 0.55),  # Align to response (first lick)
-        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'late_lick': (0.95, 1.0),  # Align to response (first lick)
         'post_lick': (1.5, 1.55)  # Align to response (first lick)
     }
 
     # Compute start/end indices for the requested epoch
     if epoch not in epoch_targets:
-        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick', 'post_lick'.")
 
     start_time, end_time = epoch_targets[epoch]
     bin_size = bins[1] - bins[0]
@@ -836,8 +888,10 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
         col = 'Side'
     elif what == 'choice':
         col = 'Choice'
+    elif what == 'prev_choice':
+        col = 'PrevChoice'
     else:
-        raise ValueError("'what' (to decode) must be 'stim' or 'choice'")
+        raise ValueError("'what' (to decode) must be 'stim', 'choice' or 'prev_choice'")
 
     results = {
         'pred': [],
@@ -901,6 +955,13 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
             df_behavior = df_glmhmm
             drop_miss = False  # To not do it twice
 
+            # Drop misses in previous choices (NaN in AfterHit)
+            if what == 'prev_choice':
+                df_behavior['PrevChoice'] = df_behavior.groupby('Session')['Choice'].shift(1)
+                resp_idx = df_behavior[df_behavior['PrevChoice'].notna()].index
+                df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+                all_psth = all_psth[resp_idx]
+
             state_label = ''
             if engagement is not None:  # Add engaged column to df_behavior
                 # Filter by engagement
@@ -930,6 +991,11 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     within_decoder(all_psth, df_behavior[col], n_shuffles)
                 filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align}_aligned).pkl'
+            elif kind == 'within_generalize':
+                split = df_behavior[split_by]
+                pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
+                    within_decoder_generalize(split, all_psth, df_behavior[col], n_shuffles)
+                filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align}_aligned).pkl'
             elif kind == 'cross':
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     cross_decoder(all_psth, df_behavior[col], n_shuffles)
@@ -955,7 +1021,7 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                     epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior[col], n_shuffles)
                 filename = f'epoch_cross_decoder_ORTHO_{epoch}_{state_label}.pkl'
             else:
-                raise ValueError("Kind must be 'within', 'cross', 'epoch', 'epoch_split' or 'generalize'")
+                raise ValueError("Kind must be 'within', 'within_generalize', 'cross', 'epoch', 'epoch_split' or 'generalize'")
 
             results['pred'].append(pred)
             results['pred_err'].append(pred_err)
@@ -1058,13 +1124,13 @@ def get_selectivity(bins, X, y, epoch='stim', alpha=0.05, n_shuffles=100):
         'resp': (1.9, 2.0),  # Align to stimulus onset
         'first_lick': (-0.05, 0.0),  # Align to response (first lick)
         'mid_lick': (0.5, 0.55),  # Align to response (first lick)
-        'late_lick': (1.05, 1.1),  # Align to response (first lick)
+        'late_lick': (0.95, 1.0),  # Align to response (first lick)
         'post_lick': (1.5, 1.55)  # Align to response (first lick)
     }
 
     # Compute start/end indices for the requested epoch
     if epoch not in epoch_targets:
-        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick'.")
+        raise ValueError("Epoch must be one of: 'stim', 'delay', 'resp', 'first_lick', 'mid_lick', 'late_lick', 'post_lick'.")
 
     start_time, end_time = epoch_targets[epoch]
     bin_size = bins[1] - bins[0]
@@ -1080,11 +1146,16 @@ def get_selectivity(bins, X, y, epoch='stim', alpha=0.05, n_shuffles=100):
     X = X[:, epoch_start_idx:epoch_end_idx, :].sum(axis=1)  # trials x neurons
 
     for neuron in range(n_neurons):
-        X_neuron = X[:, neuron].reshape(-1, 1)
-        X_neuron = sm.add_constant(X_neuron)
+        X_neuron = X[:, neuron]
+
+        # Skip neurons with no spikes or no variance
+        if np.all(X_neuron == 0) or np.var(X_neuron) == 0:
+            params[neuron] = 0
+            pvalues[neuron] = 1
+            continue
 
         # Fit GLM on real data
-        model = sm.GLM(y, X_neuron, family=sm.families.Poisson())
+        model = sm.GLM(X_neuron, sm.add_constant(y), family=sm.families.Poisson())
         results = model.fit()
         param = results.params[1]
         params[neuron] = param
@@ -1094,7 +1165,8 @@ def get_selectivity(bins, X, y, epoch='stim', alpha=0.05, n_shuffles=100):
             null_params = np.zeros(n_shuffles)
             for i in range(n_shuffles):
                 y_shuffled = np.random.permutation(y)
-                model_null = sm.GLM(y_shuffled, X_neuron, family=sm.families.Poisson())
+                # model_null = sm.GLM(y_shuffled, X_neuron, family=sm.families.Poisson())
+                model_null = sm.GLM(X_neuron, sm.add_constant(y_shuffled), family=sm.families.Poisson())
                 results_null = model_null.fit()
                 null_params[i] = results_null.params[1]
             pvalues[neuron] = np.mean(np.abs(null_params) >= np.abs(param))
@@ -1232,6 +1304,14 @@ def add_selectivity_cluster_info(mean_selectivity):
     return cluster_info
 
 
+def lr2ic(weights, rec_side):
+    """
+    Convert weights from left/right to ipsi/contra. Assumes 0=left and 1=right when fitting the weights.
+    """
+    weights = weights * (2 * rec_side - 1)
+    return weights
+
+
 ########################################################################################################################
 # PLOT DECODERS
 ########################################################################################################################
@@ -1350,6 +1430,7 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
             acc_null_band = (acc_null_mean - acc_null_sem, acc_null_mean + acc_null_sem)
 
         if excess:
+            plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
             acc_mean = acc_mean - acc_null_mean
             acc_band = (acc_band[0] - acc_null_mean, acc_band[1] - acc_null_mean)
             yticks = (0, 0.25, 0.5)
@@ -1458,18 +1539,18 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
     n_trials = np.sum([results['acc'][i].shape[0] for i in range(len(results['acc']))])
     bins = results['bins']
     bin_width = np.diff(bins).mean()
-    extent = [bins[0] - bin_width / 2, bins[-1] + bin_width / 2,
-              bins[0] - bin_width / 2, bins[-1] + bin_width / 2]
+    extent = [bins[0], bins[-1], bins[0], bins[-1]]
     x_min, x_max = extent[0], extent[1]
 
     if z_null:
         z_scores = [null_zscore(results['acc'][i], results['acc_null'][i]) for i in range(len(results['acc']))]
         z_scores_mean = np.mean((z_scores), axis=0)
-        plt.imshow(z_scores_mean, origin='lower', cmap='RdBu_r', norm=CenteredNorm(), extent=extent)
+        norm = CenteredNorm(vcenter=0, halfrange=4)
+        plt.imshow(z_scores_mean, origin='lower', cmap='RdBu_r', norm=norm, extent=extent)
     else:
         plt.imshow(acc_mean, origin='lower', extent=extent)  # abs needed?
 
-    plt.colorbar(label='Z-score', )
+    plt.colorbar(label='Z-score')
 
     color = 'tab:gray'
     plt.axhline(0, color=color, linestyle='-')  # Stimulus / First lick
@@ -1483,36 +1564,38 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
         epochs = {
             'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
             'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
-            'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
+            # 'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
         }
     elif align == 'resp':
         epochs = {
             'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First lick'},
-            'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid lick'},
+            # 'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid lick'},
+            # 'last_lick': {'range': (0.95, 1), 'color': 'green', 'label': 'Last lick'},
+            'post_lick': {'range': (1.5, 1.55), 'color': 'lightgreen', 'label': 'Post lick'}
         }
 
     ax = plt.gca()
     for name, props in epochs.items():
         start, end = props['range']
+        height = end - start
         color = props['color']
         label = props['label']
-
         rect = patches.Rectangle(
             xy=(x_min, start),
             width=x_max - x_min,
-            height=end - start,
+            height=height,
             edgecolor=color,
             facecolor='none',
             zorder=2
         )
         ax.add_patch(rect)
-
         ax.text(
-            x=x_min + 0.15,
-            y=start + 0.15,
+            x=x_min + bin_width,
+            y=start + bin_width*2,
             s=label,
             color=color,
             ha='left',
+            va='bottom'
         )
 
     first_tick = np.ceil(bins[0])  # Round up to the nearest integer
@@ -1588,6 +1671,12 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
     elif epoch == 'mid_lick':
         color = 'lightgreen'
         label = 'Mid lick'
+    elif epoch == 'late_lick':
+        color = 'lightgreen'
+        label = 'Late lick'
+    elif epoch == 'post_lick':
+        color = 'lightgreen'
+        label = 'Post lick'
 
     if engagement is not None:
         if engagement == 0:
@@ -1648,6 +1737,7 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
     plt.plot(bin_centers, acc_mean, color=color, label=label)
     plt.fill_between(bin_centers, acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
     plt.xlim(bins[0], bins[-1])
+    plt.xticks(np.arange(bins[0], bins[-1] + 1, 1))
     plt.xlabel('Time (s)')
     plt.yticks(yticks, yticklabels)
     plt.ylim(ylim)
@@ -1734,7 +1824,6 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
         labels = ('Dis.', 'Eng.')
 
     # plt.figure(constrained_layout=True)
-
     plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus / First lick
     if epoch in ['stim', 'delay', 'resp']:
         plt.axvline(0.5, color='tab:gray', linestyle='--')  # Delay
@@ -1744,6 +1833,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     bin_centers = (bins[:-1] + bins[1:]) / 2
 
     if excess:
+        plt.axhline(0, color='tab:gray', linestyle='--')  # Chance level
         acc0_mean = acc0_mean - acc_null0_mean
         acc1_mean = acc1_mean - acc_null1_mean
         acc0_band = (acc0_band[0] - acc_null0_mean, acc0_band[1] - acc_null0_mean)
@@ -1772,6 +1862,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
                      edgecolor='none', alpha=0.25)
 
     plt.xlim(bins[0], bins[-1])
+    plt.xticks(np.arange(bins[0], bins[-1] + 1, 1))
     # plt.ylim(None, 1)
     plt.xlabel('Time (s)')
     # plt.ylim(ylim)
@@ -1782,13 +1873,14 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
 
 def plot_weights_dist(cluster_info, ipsi_contra=False):
 
-    weights = cluster_info['weights']
-    selective_mask = cluster_info['selective_mask']
+    weights = cluster_info['weights'].to_numpy()
+    selective_mask = cluster_info['selective_mask'].to_numpy()
+    rec_side = cluster_info['RECside'].to_numpy()  # 1 for right, 0 for left
 
     # Flip weights for ipsi/contra convention if requested
     if ipsi_contra:
-        weights = weights * (1 - 2*cluster_info['RECside'])
-        labels = ('Ipsi', 'Contra')
+        weights = lr2ic(weights, rec_side)
+        labels = ('Contra', 'Ipsi')
     else:
         labels = ('Left', 'Right')
 
