@@ -17,4 +17,4 @@ axes.spines.top: False
 
 # Save figure
 savefig.format: svg
-savefig.transparent: True
+savefig.transparent: False

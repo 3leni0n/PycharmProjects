@@ -262,7 +262,8 @@ def plot_raster(df_behavior, peri_event_spikes, cluster, group, colors=None, ax=
     # for trial, spikes in enumerate(peri_event_spikes):
     #     ax.scatter(spikes, np.full_like(spikes, trial), marker='.', color=colors[trial])
 
-    ax.eventplot(peri_event_spikes, orientation='horizontal', lineoffsets=range(len(peri_event_spikes)), colors=colors)
+    ax.eventplot(peri_event_spikes, orientation='horizontal', lineoffsets=range(len(peri_event_spikes)), colors=colors,
+                 rasterized=True)
     ax.axvline(0, color='tab:gray', label='Stimulus')
     ax.axvline(delay, color='tab:gray', linestyle='--', label='Delay')
     ax.axvline(go_cue, color='tab:gray', label='Go cue')
@@ -1012,11 +1013,11 @@ def filter_units(bins, all_psth, cluster_info, min_fr=0.1, max_fano=10, group=No
         mask &= (cluster_info.group == group).to_numpy()
         print(f'Removed {count - mask.sum()} units by group')
 
+    # Compute depth from surface (originally distance from probe tip)
     if depth:
         cluster_info['depth'] /= 1000
         min_depth, max_depth = depth
         surface = cluster_info.depth.max()
-        # Compute depth from surface (originally distance from probe tip)
         depth_from_surface = surface - cluster_info['depth']
         count = mask.sum()
         mask &= (depth_from_surface >= min_depth) & (depth_from_surface <= max_depth)
@@ -1059,6 +1060,9 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
     # df_cluster = df_spikes[df_spikes.cluster == cluster]  # Slice DataFrame of given cluster
     # group = cluster_info[cluster_info.cluster_id == cluster].group.iloc[0]
     depth = cluster_info[cluster_info.cluster_id == cluster].depth.iloc[0]
+    # depth /= 1000
+    # surface = cluster_info.depth.max()
+    # depth = surface - depth  # Depth from surface
     fr = cluster_info[cluster_info.cluster_id == cluster].fr.iloc[0]
 
     peri_event_spikes = get_peri_event_spikes(df_cluster, df_ttl, align, time_win)
@@ -1167,6 +1171,8 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
     ax_dict['LicksChoice'].set_ylim(0, y_max * 1.05)
     ax_dict['LicksOutcome'].set_ylim(0, y_max * 1.05)
     # ax_dict['LicksRepeat'].set_ylim(0, y_max * 1.05)
+    # for ax in ['LicksAll', 'LicksStimulus', 'LicksChoice', 'LicksOutcome']:
+    #     ax_dict[ax].set_xticks(range(-1, 4))
 
     # Remove axes margins
     ax_dict['MFR'].margins(x=0)
@@ -1220,16 +1226,31 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
     ax_dict['LicksOutcome'].legend().remove()
     # ax_dict['LicksRepeat'].legend().remove()
 
+    # Force same xticks in all rasters and PSTHs
+    xticks = np.arange(time_win[0], time_win[1] + 1, 1)
+    for ax_name in [
+        'RasterAll', 'RasterStimulus', 'RasterChoice', 'RasterOutcome',
+        'PSTHAll', 'PSTHStimulus', 'PSTHChoice', 'PSTHOutcome',
+        'LicksAll', 'LicksStimulus', 'LicksChoice', 'LicksOutcome'
+    ]:
+        ax_dict[ax_name].set_xticks(xticks)
+
+    # Force xtick labels only on lick plots (bottom)
+    for ax_name in [
+        'LicksAll', 'LicksStimulus', 'LicksChoice', 'LicksOutcome']:
+        ax_dict[ax_name].set_xticklabels([str(int(t)) for t in xticks])
+
     # Set figure title with cluster info
     isis = plot_isi(df_cluster, spikes=df_cluster, ax=None)
     coeff_var = plot_cv(isis, ax=None)
     fano = fano_factor(peri_event_spikes)
-    fig.suptitle(f'Cluster {cluster}')# ({group}, {round(depth/1000, 2)} mm): '
+    group_label = 'SU' if group == 'good' else 'MUA'
+    fig.suptitle(f'Cluster {cluster} ({group_label})')#, {depth:.2f} mm)')
                  # f'\n'
                  # f'mean FR={round(np.mean(fr), 2)}, '
                  # f'CV={round(coeff_var, 2)}, '
                  # f'Fano factor={round(fano, 2)}')
-    fig.supxlabel('Time (s) from stim. onset', fontsize=plt.rcParams['axes.labelsize'])
+    fig.supxlabel('Time (s) from stimulus onset', fontsize=plt.rcParams['axes.labelsize'])
 
     # fig.tight_layout()
 

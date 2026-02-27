@@ -991,11 +991,6 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     within_decoder(all_psth, df_behavior[col], n_shuffles)
                 filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align}_aligned).pkl'
-            elif kind == 'within_generalize':
-                split = df_behavior[split_by]
-                pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
-                    within_decoder_generalize(split, all_psth, df_behavior[col], n_shuffles)
-                filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align}_aligned).pkl'
             elif kind == 'cross':
                 pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
                     cross_decoder(all_psth, df_behavior[col], n_shuffles)
@@ -1020,6 +1015,11 @@ def mean_decoder(subject, what='stim', align='stim', kind=None, epoch=None, epoc
                 pred, pred_err, acc, acc_null = \
                     epoch_cross_decoder_ORTHO(bins, epoch, epoch_ortho, all_psth, df_behavior[col], n_shuffles)
                 filename = f'epoch_cross_decoder_ORTHO_{epoch}_{state_label}.pkl'
+            elif kind == 'within_generalize':
+                split = df_behavior[split_by]
+                pred, pred_err, acc, acc_null, weights, weights_null, dv, dv_null = \
+                    within_decoder_generalize(split, all_psth, df_behavior[col], n_shuffles)
+                filename = f'{what}_{kind}_decoder{hit_label}{state_label}_({align}_aligned).pkl'
             else:
                 raise ValueError("Kind must be 'within', 'within_generalize', 'cross', 'epoch', 'epoch_split' or 'generalize'")
 
@@ -1306,7 +1306,10 @@ def add_selectivity_cluster_info(mean_selectivity):
 
 def lr2ic(weights, rec_side):
     """
-    Convert weights from left/right to ipsi/contra. Assumes 0=left and 1=right when fitting the weights.
+    Convert weights from left/right to contra/ipsi.
+    Assumes 0=left and 1=right when fitting the weights.
+    Negative weights indicate contra preference, positive weights indicate ipsi preference.
+
     """
     weights = weights * (2 * rec_side - 1)
     return weights
@@ -1468,7 +1471,7 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
     plt.xlim(bins[0], bins[-1])
     plt.yticks(yticks, yticklabels)
     plt.ylim(ylim)
-    plt.xlabel('Time (s)')
+    plt.xlabel('Time (s) from stimulus')
     plt.ylabel(ylabel)
     # plt.title(f"Decoding accuracy\n"
     #           f"{subject}, {len(results['acc'])} sessions, {n_trials} trials")
@@ -1562,17 +1565,25 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
         plt.axhline(0.5, color=color, linestyle='--')  # Delay
         plt.axvline(0.5, color=color, linestyle='--')  # Delay
         epochs = {
-            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
-            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
+            # 'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'Stimulus'},
+            # 'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'Delay'},
+            'stim': {'range': (0, 0.1), 'color': 'tab:blue', 'label': 'S'},
+            'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'D'},
             # 'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
         }
+        xlabel = 'Time (s) from stimulus'
+        ylabel = 'Time (s) from stimulus'
     elif align == 'resp':
         epochs = {
-            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First lick'},
+            # 'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First lick'},
+            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First'},
             # 'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid lick'},
             # 'last_lick': {'range': (0.95, 1), 'color': 'green', 'label': 'Last lick'},
-            'post_lick': {'range': (1.5, 1.55), 'color': 'lightgreen', 'label': 'Post lick'}
+            # 'post_lick': {'range': (1.5, 1.55), 'color': 'lightgreen', 'label': 'Post lick'}
+            'post_lick': {'range': (1.5, 1.55), 'color': 'lightgreen', 'label': 'Post'}
         }
+        xlabel = 'Time (s) from response'
+        ylabel = 'Time (s) from response'
 
     ax = plt.gca()
     for name, props in epochs.items():
@@ -1603,8 +1614,8 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
     ticks = np.arange(first_tick, last_tick + 1, 1)  # Create ticks at every integer value
     plt.xticks(ticks, ticks.astype(int))
     plt.yticks(ticks, ticks.astype(int))
-    plt.xlabel('Test time (s)')
-    plt.ylabel('Train time (s)')
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
     # plt.title(f"Decoding accuracy\n"
     #           f" {subject}, {len(results['acc'])} sessions, {n_trials} trials")
     sns.despine()
@@ -1738,7 +1749,8 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
     plt.fill_between(bin_centers, acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
     plt.xlim(bins[0], bins[-1])
     plt.xticks(np.arange(bins[0], bins[-1] + 1, 1))
-    plt.xlabel('Time (s)')
+    xlabel = 'Time (s) from stimulus' if epoch in ['stim', 'delay'] else 'Time (s) from response'
+    plt.xlabel(xlabel)
     plt.yticks(yticks, yticklabels)
     plt.ylim(ylim)
     plt.ylabel(ylabel)
@@ -1773,7 +1785,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     acc1_sem = sem([np.nanmean(results['acc'][i][1], axis=0) for i in range(len(results['acc']))], axis=0)
     acc_null1_mean = np.nanmean(
         [(np.nanmean(results['acc_null'][i][1], axis=(0, 2))) for i in range(len(results['acc_null']))], axis=0)
-    acc_null1_sem = sem([np.nanmean(results['acc_null'][i][0], axis=(0, 2)) for i in range(len(results['acc_null']))],
+    acc_null1_sem = sem([np.nanmean(results['acc_null'][i][1], axis=(0, 2)) for i in range(len(results['acc_null']))],
                         axis=0)
     acc1_CI = 1.96 * acc1_sem  # 95% confidence interval
     acc_null1_CI = 1.96 * acc_null1_sem  # 95% confidence interval
@@ -1821,7 +1833,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
             colors = ('tab:gray', 'tab:green')
         elif epoch == 'post_lick':
             colors = ('tab:gray', 'tab:green')
-        labels = ('Dis.', 'Eng.')
+        labels = ('Disengaged', 'Engaged')
 
     # plt.figure(constrained_layout=True)
     plt.axvline(0, color='tab:gray', linestyle='-')  # Stimulus / First lick
@@ -1864,7 +1876,8 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     plt.xlim(bins[0], bins[-1])
     plt.xticks(np.arange(bins[0], bins[-1] + 1, 1))
     # plt.ylim(None, 1)
-    plt.xlabel('Time (s)')
+    xlabel = 'Time (s) from stimulus' if epoch in ['stim', 'delay'] else 'Time (s) from response'
+    plt.xlabel(xlabel)
     # plt.ylim(ylim)
     plt.ylabel(ylabel)
     plt.legend(frameon=False)
