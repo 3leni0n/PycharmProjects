@@ -390,7 +390,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
             mean_ILI = df_behavior.ILI.mean()
             std_ILI = df_behavior.ILI.std()
             xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
-            xticks = ([0, 0.1, 0.2], ['0', '0.1', '0.2'])
+            xticks = ([0, 0.05, 0.1, 0.15, 0.2], ['0', '0.05', '0.1', '0.15', '0.2'])
 
         bin_edges = (0, df_behavior.RespWin.unique()[0])
         n_bins = int((bin_edges[1] - bin_edges[0]) / bin_size)
@@ -436,7 +436,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
 
         plt.xlim(xlim)
         plt.xticks(*xticks)
-        plt.ylim(0, None)
+        # plt.ylim(0, None)
         plt.xlabel('Time (s)')
 
     # Discrete variable
@@ -444,7 +444,7 @@ def plot_licks_dist(df_behavior, var='RT', bin_size=0.001, smooth=True, z=False,
         min_val = df_behavior[var].min()
         max_val = df_behavior[var].max()
         bins = np.arange(min_val - 0.5, max_val + 1.5, 1)  # Centers bins on integers
-        plt.hist(df_behavior[var], bins=bins, histtype='step', color=color, density=True, **kwargs)
+        plt.hist(df_behavior[var], bins=bins, histtype='step', color=color, density=True)
         # ax = plt.gca()
         # ax.xaxis.set_major_locator(MaxNLocator(integer=True, prune='both'))  # Automatic integer ticks
         plt.xlim(0, 16)
@@ -518,6 +518,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
 
     # plt.figure(constrained_layout=True, **kwargs)
 
+    ylim = []
     for i in range(2):
 
         split_var = df_behavior[df_behavior[split_var_name] == i][var]
@@ -527,13 +528,13 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
 
             if var == 'RT':
                 xlim = (0, 0.5)
-                xticks = (0, 0.25, 0.5)
+                xticks = (0, 0.1, 0.2, 0.3, 0.4, 0.5)
                 loc = 'upper right'
             elif var == 'ILI':
                 mean_ILI = df_behavior.ILI.mean()
                 std_ILI = df_behavior.ILI.std()
                 xlim = (mean_ILI - std_ILI, mean_ILI + std_ILI)
-                xticks = ([0, 0.1, 0.2], ['0', '0.1', '0.2'])
+                xticks = (0, 0.05, 0.1, 0.15, 0.2)
                 loc = 'lower center'
 
             if kind == 'hist':
@@ -545,8 +546,12 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
                 sns.kdeplot(split_var, color=colors[i], label=labels[i])
                 ylabel = 'Density'
             plt.xlim(xlim)
-            plt.xticks(*xticks)
+            # plt.xticks(*xticks)
+            plt.xticks(xticks, xticks)
             plt.xlabel('Time (s)')
+
+            # Fix y-axis
+            ylim.append(plt.gca().get_ylim()[1])
 
         # Discrete variable
         elif var == 'nLicks':
@@ -574,6 +579,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
             title = (f'{var}\n'
                      f'{df_behavior.Subject.unique()[0]}, {len(df_behavior)/1000:.1f}k trials')
 
+    # plt.ylim(0, max(ylim))  # Set y-axis limit to 10% above the highest peak
     plt.legend(loc=loc, frameon=False)
     # plt.title(title)
     plt.ylabel(ylabel)

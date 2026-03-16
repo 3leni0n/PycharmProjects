@@ -991,23 +991,27 @@ def pval_to_star(pval):
         return '**'
     elif pval <= 0.05:
         return '*'
-    return 'ns'
-    # return ''
+    # return 'ns'
+    return ''
 
 
-def add_stars(pvals, y):
+def add_stars(pvals, y, offset=0.05):
     """
     Add significance stars to individual points in existing plot.
     :param pvals: list of p-values to convert to stars
     :param y: y values of the points to add stars to
+    :param offset: offset to add to the y values to place the stars above the points (as a fraction of the y-axis range)
     """
 
     ylim = plt.gca().get_ylim()  # Get y-axis limits
     ylim_range = ylim[1] - ylim[0]  # Get y-axis range
-    star_offset = ylim_range * 0.05  # 5% of the y-axis range
+    star_offset = ylim_range * offset
+    # y_star = np.max(y)
+    y_star = ylim[1] - ylim_range * offset  # Fixed position below top
+
     for i, pval in enumerate(pvals):
-        plt.text(i, np.max(y) + star_offset, pval_to_star(pval), ha='center', va='center', color='k')
-        # plt.text(i, np.max(y) - star_offset, pval_to_star(pval), ha='center', va='center', color='k')
+        plt.text(i, y_star + star_offset, pval_to_star(pval), ha='center', va='center', color='k')
+        # plt.text(i, y_star - star_offset, pval_to_star(pval), ha='center', va='center', color='k')
         plt.ylim(ylim[0], ylim[1] + star_offset)  # Enlarge ylim to make space for the stars
 
 

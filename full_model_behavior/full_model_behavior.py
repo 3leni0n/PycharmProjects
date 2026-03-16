@@ -27,6 +27,8 @@ FK = namedtuple('FK', [
 
 MeanFK = namedtuple('MeanFK', [
     'params_rminus', 'params_rplus', 'params_session_index', 'params_net_stim', 'params_frames',  # params
+    'params_rminus_single', 'params_rplus_single', 'params_session_index_single', 'params_net_stim_single',
+    'params_frames_single',  # params of single animals
     'std_err_rminus', 'std_err_rplus', 'std_err_session_index', 'std_err_net_stim', 'std_err_frames',  # bse
     'p_values',  # p_values
     'shuffles_rminus', 'shuffles_rplus', 'shuffles_net_stim', 'shuffles_frames',  # shuffles
@@ -579,6 +581,13 @@ def get_mean_fk(experiments=['2AFC_2', '2AFC_3', '2AFC_4'], cherry=True, drug=No
         params_session_index=params_session_index_mean_across_animals,
         params_net_stim=params_net_stim_mean_across_animals,
         params_frames=params_frames_mean_across_animals,
+
+        params_rminus_single=params_rminus_across_animals,
+        params_rplus_single=params_rplus_across_animals,
+        params_session_index_single=params_session_index_across_animals,
+        params_net_stim_single=params_net_stim_across_animals,
+        params_frames_single=params_frames_across_animals,
+
         std_err_rminus=params_rminus_sem_across_animals,
         std_err_rplus=params_rplus_sem_across_animals,
         std_err_session_index=params_session_index_sem_across_animals,
@@ -637,10 +646,11 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     plt.figure(**kwargs, constrained_layout=True)
     n_frames = pk_saline.n_frames
     x = np.arange(1, n_frames + 1)
-
     y_saline = pk_saline.params_frames
     y_drug = pk_drug.params_frames
-    pvals_frames = [ttest_rel(s, d).pvalue for s, d in zip(pk_saline.params_frames, pk_drug.params_frames)]
+    sal = pk_saline.params_frames_single
+    drug = pk_drug.params_frames_single
+    pvals_frames = [ttest_rel(sal[:, i], drug[:, i], nan_policy='omit').pvalue for i in range(sal.shape[1])]
     yerr_saline = pk_saline.std_err_frames
     yerr_drug = pk_drug.std_err_frames
     plt.axhline(0, color='k', ls='--')
@@ -698,7 +708,9 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     x = np.arange(len(pk_saline.params_net_stim.index.astype(int).values))
     y_saline = pk_saline.params_net_stim
     y_drug = pk_drug.params_net_stim
-    pvals_net = [ttest_rel(s, d).pvalue for s, d in zip(pk_saline.params_net_stim, pk_drug.params_net_stim)]
+    sal = pk_saline.params_net_stim_single
+    drug = pk_drug.params_net_stim_single
+    pvals_net = [ttest_rel(sal[:, i], drug[:, i], nan_policy='omit').pvalue for i in range(sal.shape[1])]
     yerr_saline = pk_saline.std_err_net_stim
     yerr_drug = pk_drug.std_err_net_stim
     plt.axhline(0, color='k', ls='--')
@@ -729,6 +741,11 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
 
     # PLOT HISTORY KERNEL
 
+    max_y_hist = max(
+        np.max(pk_saline.params_rminus), np.max(pk_drug.params_rminus),
+        np.max(pk_saline.params_rplus), np.max(pk_drug.params_rplus)
+    )
+
     axes = []
     trial_lag = pk_saline.trial_lag
     for _ in range(1, 3):
@@ -738,8 +755,9 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
             filename = f'{pk_saline.animal} r- HK, trial lag {pk_saline.trial_lag}'
             y_saline = pk_saline.params_rminus
             y_drug = pk_drug.params_rminus
-            pvals_hist = [ttest_rel(s, d).pvalue for s, d in
-                          zip(pk_saline.params_rminus, pk_drug.params_rminus)]
+            sal = pk_saline.params_rminus_single
+            drug = pk_drug.params_rminus_single
+            pvals_hist = [ttest_rel(sal[:, i], drug[:, i], nan_policy='omit').pvalue for i in range(sal.shape[1])]
             yerr_saline = pk_saline.std_err_rminus
             yerr_drug = pk_drug.std_err_rminus
             # shuffles = pk.shuffles_rminus
@@ -749,7 +767,9 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
             filename = f'{pk_saline.animal} r+ HK, trial lag {pk_saline.trial_lag}'
             y_saline = pk_saline.params_rplus
             y_drug = pk_drug.params_rplus
-            pvals_hist = [ttest_rel(s, d).pvalue for s, d in zip(pk_saline.params_rplus, pk_drug.params_rplus)]
+            sal = pk_saline.params_rplus_single
+            drug = pk_drug.params_rplus_single
+            pvals_hist = [ttest_rel(sal[:, i], drug[:, i], nan_policy='omit').pvalue for i in range(sal.shape[1])]
             yerr_saline = pk_saline.std_err_rplus
             yerr_drug = pk_drug.std_err_rplus
             # shuffles = pk.shuffles_rplus
@@ -771,10 +791,14 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
         # plot kernel
         plt.axhline(0, color='k', ls='--')
         plt.plot(x, y_saline, color=color_saline, marker='o', label='Saline')
-        plt.plot(x, y_drug, color=color_drug, marker='o', label='Saline')
+        plt.plot(x, y_drug, color=color_drug, marker='o', label='Drug')
         plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
         plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+        ylim_current = plt.gca().get_ylim()
+        plt.ylim(ylim_current[0], max_y_hist * 1.05)  # 5% offset for visibility
         add_stars(pvals_hist, np.maximum(y_saline, y_drug))
+        for t in plt.gca().texts[-len(pvals_hist):]:  # Shift starts 1 position to the right
+            t.set_x(t.get_position()[0] + 1)
         # plt.title(title)
         # plt.xticks(x, x[::-1])
         plt.xticks(x[::2], x[::-1][::2])  # Show every 2nd tick (reversed)
