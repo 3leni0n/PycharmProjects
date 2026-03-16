@@ -13,7 +13,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import MaxNLocator
 import matplotlib.cm as cm
 import seaborn as sns
-from my_fun.my_fun import fig_size
+from my_fun.my_fun import add_stars, fig_size
 
 
 # Define functions to get lick variables: RTs, N licks, ILI
@@ -863,7 +863,7 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     density = kwargs.get('density', None)
 
     if var == 'RT' or var == 'ILI':
-        title = 'Reaction time' if var == 'RT' else 'Inter-lick interval'
+        title = 'Reaction time' if var == 'RT' else 'Interlick interval'
         supxlabel = 'Time (s)'
     else:
         title = 'Number of licks'
@@ -874,7 +874,7 @@ def plot_licks_per_subject(df_behavior, plot_func, ncols=5, **kwargs):
     # else:
     supylabel = 'Frequency (norm.)'
 
-    # fig.suptitle(title)
+    fig.suptitle(title)
     fig.supxlabel(supxlabel, fontsize=plt.rcParams['axes.labelsize'])
     fig.supylabel(supylabel, fontsize=plt.rcParams['axes.labelsize'])
 
@@ -1027,7 +1027,7 @@ def plot_model_licks(df_params, df_p, **kwargs):
         t_stat, p_val = ttest_1samp(df_params[col], 0, nan_policy='omit')
         p_bonf = min(p_val * n_tests, 1)  # Bonferroni correction (cap at 1)
         t_test_results[col] = {'t': t_stat, 'p': p_val, 'p_bonf': p_bonf}
-        print(f'Test {col}: t = {t_stat:.2f}, p = {p_bonf:.3f}')
+        print(f'Test {col}: t = {t_stat:.2f}, p = {p_bonf:.4f}')
 
     print(t_test_results)
 
@@ -1036,7 +1036,7 @@ def plot_model_licks(df_params, df_p, **kwargs):
 
     # Highlight effects where mean p-value < 0.05
     # colors = ['red' if df_p[col].mean() < 0.05 else 'gray' for col in df_p.columns]
-    colors = ['tab:red' if t_test_results[col]['p_bonf'] < 0.05 else 'tab:gray' for col in df_params.columns]
+    colors = ['tab:pink' if t_test_results[col]['p_bonf'] < 0.05 else 'tab:gray' for col in df_params.columns]
 
     # Define the labels to rename
     label_map = {
@@ -1068,6 +1068,10 @@ def plot_model_licks(df_params, df_p, **kwargs):
                 width=0.5)  # Matplotlib's default, prevent adaptive width
     # plt.xticks(rotation=45, ha='center')
     plt.ylabel('Weights')
+
+    pvals = [t_test_results[col]['p_bonf'] for col in df_params.columns]
+    y = [df_params[col].max() for col in df_params.columns]
+    add_stars(pvals, y)
 
     # # Color the boxes
     # for patch, color in zip(bp['boxes'], colors):

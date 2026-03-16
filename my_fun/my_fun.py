@@ -992,6 +992,7 @@ def pval_to_star(pval):
     elif pval <= 0.05:
         return '*'
     return 'ns'
+    # return ''
 
 
 def add_stars(pvals, y):
@@ -1000,11 +1001,13 @@ def add_stars(pvals, y):
     :param pvals: list of p-values to convert to stars
     :param y: y values of the points to add stars to
     """
+
+    ylim = plt.gca().get_ylim()  # Get y-axis limits
+    ylim_range = ylim[1] - ylim[0]  # Get y-axis range
+    star_offset = ylim_range * 0.05  # 5% of the y-axis range
     for i, pval in enumerate(pvals):
-        ylim = plt.gca().get_ylim()  # Get y-axis limits
-        ylim_range = ylim[1] - ylim[0]  # Get y-axis range
-        star_offset = ylim_range * 0.05  # 5% of the y-axis range
         plt.text(i, np.max(y) + star_offset, pval_to_star(pval), ha='center', va='center', color='k')
+        # plt.text(i, np.max(y) - star_offset, pval_to_star(pval), ha='center', va='center', color='k')
         plt.ylim(ylim[0], ylim[1] + star_offset)  # Enlarge ylim to make space for the stars
 
 

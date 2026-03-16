@@ -95,8 +95,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
 
 
         # Annotation params
-        lower_lapse = 'LR_R='
-        upper_lapse = 'LR_L='
+        lower_lapse = '$LR_{right}$='
+        upper_lapse = '$LR_{left}$='
         xy = (psych_curve.xdata[0], 1)
         xytext = (psych_curve.xdata[0], 1)
         va = 'top'
@@ -123,8 +123,8 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
         # ylabel = 'P. rep.'
 
         # Annotate params
-        lower_lapse = 'LR_Rep='
-        upper_lapse = 'LR_Alt='
+        lower_lapse = '$LR_{rep}$='
+        upper_lapse = '$LR_{alt}$='
         xy = (psych_curve.xdata[-1], 0)
         xytext = (psych_curve.xdata[-1], 0)
         va = 'bottom'
@@ -141,12 +141,12 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
                  fmt='o', mfc=color)
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-    #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
-    #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-    #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-    #              xy=xy, xytext=xytext, color=color,
-    #              va=va, ha=ha)
+    plt.annotate('$S$=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                 '$B$=' + str(round(bias, 2)) + '\n' +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                 xy=xy, xytext=xytext, color=color,
+                 va=va, ha=ha)
 
     # plt.title(f'Mouse {df.Setup.unique()[0]}, {len(df)} trials')
     plt.title(f'#{df.Setup.unique()[0]}')
@@ -422,8 +422,8 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper left'
-        lower_lapse = 'LR_R='
-        upper_lapse = 'LR_L='
+        lower_lapse = '$LR_{right}$='
+        upper_lapse = '$LR_{left}$='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:gray'
@@ -431,8 +431,8 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
         ylabel = 'Prob. choose repeat'
         loc = 'lower right'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
-        lower_lapse = 'LR_Rep='
-        upper_lapse = 'LR_Alt='
+        lower_lapse = '$LR_{rep}$='
+        upper_lapse = '$LR_{alt}$='
 
     df_params = pd.DataFrame(columns=columns)
     plt.figure(constrained_layout=True, **kwargs)
@@ -476,7 +476,8 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
         plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+        plt.annotate(label + ':' + '\n' +
+                     'S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
                      'B=' + str(round(bias, 2)) + '\n' +  # Bias
                      lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                      upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
@@ -519,8 +520,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         xlabel = 'Stimulus ILD (dB)'
         ylabel = 'Prob. choose right'
         loc = 'upper left'
-        lower_lapse = 'LR_R='
-        upper_lapse = 'LR_L='
+        lower_lapse = '$LR_{right}$='
+        upper_lapse = '$LR_{left}$='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:gray'
@@ -528,8 +529,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         ylabel = 'Prob. choose repeat'
         loc = 'lower right'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
-        lower_lapse = 'LR_Rep='
-        upper_lapse = 'LR_Alt='
+        lower_lapse = '$LR_{rep}$='
+        upper_lapse = '$LR_{alt}$='
 
     df_params = pd.DataFrame(columns=columns)
     plt.figure(constrained_layout=True, **kwargs)
@@ -543,11 +544,18 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         if drug == 0:
             label = 'Saline'
 
-            # Annotation params
-            xy = (psych_curve.xdata[0], 1)
-            xytext = (psych_curve.xdata[0], 1)
-            va = 'top'
+            # # Annotation params
+            # xy = (psych_curve.xdata[0], 1)
+            # xytext = (psych_curve.xdata[0], 1)
+            # va = 'top'
+            # ha = 'left'
+
+            # Annotate params
+            xy = (psych_curve.xdata[0], 0)
+            xytext = (psych_curve.xdata[0], 0)
+            va = 'bottom'
             ha = 'left'
+
         elif drug == 1:
             color = 'tab:pink'
             label = 'Drug'  # (MK-801)
@@ -571,7 +579,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         plt.errorbar(psych_curve.xdata, psych_curve.ydata, yerr=psych_curve.fit_error, color=color, fmt='o', mfc=color)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-        plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+        plt.annotate(label + ':' + '\n' +
+                     'S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
                      'B=' + str(round(bias, 2)) + '\n' +  # Bias
                      lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                      upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
@@ -665,8 +674,8 @@ def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kw
         ylabel = 'Prob. choose right'
 
         # Annotation params
-        lower_lapse = 'LR_R='
-        upper_lapse = 'LR_L='
+        lower_lapse = '$LR_{right}$='
+        upper_lapse = '$LR_{left}$='
         # xy = (ilds[0], 1)
         # xytext = (ilds[0], 1)
         xy = (-20, 1)
@@ -685,8 +694,8 @@ def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kw
         ylabel = 'Prob. choose repeat'
 
         # Annotate params
-        lower_lapse = 'LR_Rep='
-        upper_lapse = 'LR_Alt='
+        lower_lapse = '$LR_{rep}$='
+        upper_lapse = '$LR_{alt}$='
         # xy = (ilds[-1], 0)
         # xytext = (ilds[-1], 0)
         xy = (20, 0)
@@ -725,12 +734,12 @@ def plot_pc_across_batches(experiments=None, kind='prob_right', save=False, **kw
     plt.gca().spines['right'].set_visible(False)
 
     sensitivity, bias, lr_lower, lr_upper = psych_curve.params
-    # plt.annotate('S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-    #              'B=' + str(round(bias, 2)) + '\n' +  # Bias
-    #              lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
-    #              upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
-    #              xy=xy, xytext=xytext, color=color,
-    #              va=va, ha=ha)
+    plt.annotate('$S$=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                 '$B$=' + str(round(bias, 2)) + '\n' +  # Bias
+                 lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
+                 upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
+                 xy=xy, xytext=xytext, color=color,
+                 va=va, ha=ha)
 
     if save:
         folder_out = Path.home() / 'Documentos/psychometric curves/' / experiment

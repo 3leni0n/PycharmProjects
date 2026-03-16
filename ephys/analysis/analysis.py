@@ -10,6 +10,7 @@ from scipy.stats import sem
 import warnings
 warnings.filterwarnings('ignore')
 from datetime import datetime
+from tqdm.auto import tqdm
 
 # Ephys specific libraries
 from quantities import ms, s
@@ -1245,7 +1246,7 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
     coeff_var = plot_cv(isis, ax=None)
     fano = fano_factor(peri_event_spikes)
     group_label = 'SU' if group == 'good' else 'MUA'
-    fig.suptitle(f'Cluster {cluster} ({group_label})')#, {depth:.2f} mm)')
+    fig.suptitle(f'Cluster {cluster} ({group_label}), {depth:.2f} mm)')
                  # f'\n'
                  # f'mean FR={round(np.mean(fr), 2)}, '
                  # f'CV={round(coeff_var, 2)}, '
@@ -1260,17 +1261,16 @@ def cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align='stim', 
             subject = df_behavior.Subject.unique()[0]
             session = df_behavior.Session.unique()[0]
             date = session[-15:-7]
-
             dt = datetime.strptime(date, '%Y%m%d')
             ephys_id = f'{subject}_{dt.strftime("%Y-%m-%d")}'
-            path = Path.home() / 'data' / subject
+            path = Path('/archive/alexis/ephys/cluster_reports') / subject
             folders = [p.name for p in path.iterdir() if p.is_dir()]
             ephys_id = [f for f in folders if ephys_id in f]
             ephys_id = ephys_id[0]
-            path = Path.home() / 'data' / subject / ephys_id / 'cluster reports' / group
+            path = path / ephys_id / group
 
-        path.mkdir(exist_ok=True)
-        plt.savefig(path / f'cluster {cluster}.png')
+        path.mkdir(parents=True, exist_ok=True)
+        plt.savefig(path / f'cluster {cluster}.pdf', format='pdf')
         plt.close()
 
 
@@ -1304,6 +1304,96 @@ def do_cluster_reports(ephys_id, align='stim', time_win=[-1, 3], bin_size=0.1, g
         df_cluster = df_spikes[df_spikes.cluster == cluster]
         cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align=align, time_win=time_win, bin_size=bin_size,
                        save=True)
+
+
+def plot_selective_units(ephys_id, align='stim', time_win=[-1, 3], bin_size=0.1, epoch='stim', side=None, group='good', depth=None, save=True):
+    from ephys.decoder import get_selectivity  # Here to avoid circular import
+
+    subject = ephys_id[:3]
+    preprocessed = preprocess(ephys_id)
+    cluster_info = preprocessed.cluster_info
+    df_spikes = preprocessed.df_spikes
+    df_ttl = preprocessed.df_ttl
+    df_behavior = preprocessed.df_behavior
+
+    folder_parent = Path.home() / 'data' / subject
+    folder_child = folder_parent / ephys_id
+    bins = np.load(folder_child / f'bins_{align}.npy')
+    all_psth = np.load(folder_child / f'all_psth_{align}.npy')
+
+    # Load GLM-HMM fit
+    path_glmhmm = ((Path.home() / 'PycharmProjects' / 'glmhmm' / 'TEST' / '2s_3cov' / 'Ephys' / subject)
+                   .with_suffix('.csv'))  # Fitted sphys sessions only
+    df_glmhmm = pd.read_csv(path_glmhmm)  # All sessions concatenated
+    session = df_behavior.Session.unique()[0]
+    df_glmhmm = df_glmhmm[df_glmhmm.Session == session].reset_index(drop=True)
+
+    # Drop misses (GLM-HMM lack misses)
+    resp_idx = df_behavior[df_behavior.Miss == 0].index
+    df_behavior = df_behavior.iloc[resp_idx].reset_index(drop=True)
+    all_psth = all_psth[resp_idx]
+    df_ttl = df_ttl.iloc[resp_idx].reset_index(drop=True)
+    assert len(df_glmhmm) == len(df_behavior)  # Check sessions match
+    df_behavior = df_glmhmm
+    print(f'Length original df: {len(df_behavior)}')
+
+    # Drop disengaged trials
+    eng_idx = df_behavior.index[df_behavior['State'] == 1].to_numpy()
+    df_behavior = df_behavior.loc[eng_idx].reset_index(drop=True)
+    all_psth = all_psth[eng_idx, :, :]
+    df_ttl = df_ttl.iloc[eng_idx].reset_index(drop=True)
+
+    df_behavior['Trial'] = np.arange(len(df_behavior))  # Otherwise peri_event_spikes won't work
+    print(f'N = {len(df_behavior)} engaged trials')
+
+    # Add selectivity from all clusters before any filtering
+    params, pvalues, selective_mask = get_selectivity(bins, all_psth, df_behavior.Side.values, epoch=epoch, n_shuffles=0)
+    cluster_info['weights'] = params
+    cluster_info['pvalues'] = pvalues
+    cluster_info['selective_mask'] = selective_mask
+
+    # Filter units
+    if group is not None or depth is not None:
+        all_psth, cluster_info = filter_units(bins, all_psth, cluster_info, min_fr=None, max_fano=None, group=group, depth=depth)
+
+    # Keep only selective units
+    cluster_info = cluster_info[cluster_info.selective_mask]
+
+    # Keep only left selective units (negative params)
+    if side is not None:
+        if side == 'left':
+            cluster_info = cluster_info[cluster_info.weights < 0]
+        elif side == 'right':
+            cluster_info = cluster_info[cluster_info.weights > 0]
+
+    # Sort by selectivity (pvalue)
+    cluster_info = cluster_info.sort_values(by='pvalues', ascending=True)
+    clusters = cluster_info['cluster_id'].tolist()
+
+    path = Path('/archive/alexis/ephys/cluster_reports/') / subject / ephys_id / epoch
+    if group is not None:
+        path = path / group
+    path.mkdir(parents=True, exist_ok=True)
+
+    for cluster in tqdm(clusters):
+        df_cluster = df_spikes[df_spikes.cluster == cluster]
+        cluster_report(df_cluster, cluster_info, df_ttl, df_behavior, align=align, time_win=time_win, bin_size=bin_size, save=False)
+        if save:
+            plt.savefig(path / f'cluster_{cluster}.pdf', format='pdf')
+            # plt.savefig(path / f'cluster_{cluster}.svg', format='svg')
+            # plt.savefig(path / f'cluster_{cluster}.png', format='png')
+            plt.close()
+
+
+def plot_all_selective_units(subject, align='stim', time_win=[-1, 3], bin_size=0.1, epoch='stim'):
+    ephys_ids = get_ephys_sessions(subject)
+    for ephys_id in ephys_ids:
+        try:
+            plot_selective_units(ephys_id, align=align, time_win=time_win, bin_size=bin_size, epoch=epoch, side=None,
+                                 group='good', depth=None, save=True)
+        except Exception as e:
+            print(f'Error processing {ephys_id}: {e}')
+            continue
 
 
 ########################################################################################################################

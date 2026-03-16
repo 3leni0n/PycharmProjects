@@ -1471,7 +1471,7 @@ def plot_mean_within_decoder(results, errorbar='ci', z_null=False, excess=True):
     plt.xlim(bins[0], bins[-1])
     plt.yticks(yticks, yticklabels)
     plt.ylim(ylim)
-    plt.xlabel('Time (s) from stimulus')
+    plt.xlabel('Time (s) from stimulus onset')
     plt.ylabel(ylabel)
     # plt.title(f"Decoding accuracy\n"
     #           f"{subject}, {len(results['acc'])} sessions, {n_trials} trials")
@@ -1571,12 +1571,12 @@ def plot_mean_cross_decoder(results, align='stim', z_null=True):
             'delay': {'range': (0.9, 1), 'color': 'tab:orange', 'label': 'D'},
             # 'resp': {'range': (1.85, 1.95), 'color': 'tab:green', 'label': 'Response'}
         }
-        xlabel = 'Time (s) from stimulus'
-        ylabel = 'Time (s) from stimulus'
+        xlabel = 'Time (s) from stimulus onset'
+        ylabel = 'Time (s) from stimulus onset'
     elif align == 'resp':
         epochs = {
             # 'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First lick'},
-            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'First'},
+            'first_lick': {'range': (-0.05, 0), 'color': 'darkgreen', 'label': 'Resp.'},
             # 'mid_lick': {'range': (0.5, 0.55), 'color': 'lightgreen', 'label': 'Mid lick'},
             # 'last_lick': {'range': (0.95, 1), 'color': 'green', 'label': 'Last lick'},
             # 'post_lick': {'range': (1.5, 1.55), 'color': 'lightgreen', 'label': 'Post lick'}
@@ -1678,7 +1678,7 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
         label = 'Response'
     elif epoch == 'first_lick':
         color = 'darkgreen'
-        label = 'First lick'
+        label = 'Resp.'
     elif epoch == 'mid_lick':
         color = 'lightgreen'
         label = 'Mid lick'
@@ -1687,7 +1687,7 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
         label = 'Late lick'
     elif epoch == 'post_lick':
         color = 'lightgreen'
-        label = 'Post lick'
+        label = 'Post'
 
     if engagement is not None:
         if engagement == 0:
@@ -1749,7 +1749,7 @@ def plot_mean_epoch_cross_decoder(results, epoch=None, engagement=None, excess=F
     plt.fill_between(bin_centers, acc_band[0], acc_band[1], color=color, edgecolor='none', alpha=0.25)
     plt.xlim(bins[0], bins[-1])
     plt.xticks(np.arange(bins[0], bins[-1] + 1, 1))
-    xlabel = 'Time (s) from stimulus' if epoch in ['stim', 'delay'] else 'Time (s) from response'
+    xlabel = 'Time (s) from stimulus onset' if epoch in ['stim', 'delay'] else 'Time (s) from response'
     plt.xlabel(xlabel)
     plt.yticks(yticks, yticklabels)
     plt.ylim(ylim)
@@ -1876,7 +1876,7 @@ def plot_mean_epoch_cross_decoder_split(results, what='stim', epoch=None, split=
     plt.xlim(bins[0], bins[-1])
     plt.xticks(np.arange(bins[0], bins[-1] + 1, 1))
     # plt.ylim(None, 1)
-    xlabel = 'Time (s) from stimulus' if epoch in ['stim', 'delay'] else 'Time (s) from response'
+    xlabel = 'Time (s) from stimulus onset' if epoch in ['stim', 'delay'] else 'Time (s) from response'
     plt.xlabel(xlabel)
     # plt.ylim(ylim)
     plt.ylabel(ylabel)

@@ -8,9 +8,10 @@ import statsmodels.api as sm
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import stats
+from scipy.stats import ttest_rel
 import seaborn as sns
 from collections import namedtuple
-from my_fun.my_fun import get_experiment, get_animal, save_fig, timer, filter_drug_sessions, filter_behavior
+from my_fun.my_fun import get_experiment, get_animal, save_fig, timer, filter_drug_sessions, filter_behavior, add_stars
 from cherry.cherry import *
 from kernels.kernels_tools import *
 
@@ -639,12 +640,14 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
 
     y_saline = pk_saline.params_frames
     y_drug = pk_drug.params_frames
+    pvals_frames = [ttest_rel(s, d).pvalue for s, d in zip(pk_saline.params_frames, pk_drug.params_frames)]
     yerr_saline = pk_saline.std_err_frames
     yerr_drug = pk_drug.std_err_frames
     plt.axhline(0, color='k', ls='--')
     # plt.plot(x, y_saline, color=color_saline, marker='o', label=label)
     plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', label='Saline')
     plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', label='Drug')
+    add_stars(pvals_frames, np.maximum(y_saline, y_drug))
     # plt.title(title)
     ax = plt.gca()
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
@@ -695,12 +698,14 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     x = np.arange(len(pk_saline.params_net_stim.index.astype(int).values))
     y_saline = pk_saline.params_net_stim
     y_drug = pk_drug.params_net_stim
+    pvals_net = [ttest_rel(s, d).pvalue for s, d in zip(pk_saline.params_net_stim, pk_drug.params_net_stim)]
     yerr_saline = pk_saline.std_err_net_stim
     yerr_drug = pk_drug.std_err_net_stim
     plt.axhline(0, color='k', ls='--')
     # plt.plot(x, y, color=color, marker='o')
     plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o')
     plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o')
+    add_stars(pvals_net, np.maximum(y_saline, y_drug))
     # plt.title(title)
     plt.xlabel('Net stimuli (dB)')
     plt.ylabel('Weight')
@@ -733,6 +738,8 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
             filename = f'{pk_saline.animal} r- HK, trial lag {pk_saline.trial_lag}'
             y_saline = pk_saline.params_rminus
             y_drug = pk_drug.params_rminus
+            pvals_hist = [ttest_rel(s, d).pvalue for s, d in
+                          zip(pk_saline.params_rminus, pk_drug.params_rminus)]
             yerr_saline = pk_saline.std_err_rminus
             yerr_drug = pk_drug.std_err_rminus
             # shuffles = pk.shuffles_rminus
@@ -742,6 +749,7 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
             filename = f'{pk_saline.animal} r+ HK, trial lag {pk_saline.trial_lag}'
             y_saline = pk_saline.params_rplus
             y_drug = pk_drug.params_rplus
+            pvals_hist = [ttest_rel(s, d).pvalue for s, d in zip(pk_saline.params_rplus, pk_drug.params_rplus)]
             yerr_saline = pk_saline.std_err_rplus
             yerr_drug = pk_drug.std_err_rplus
             # shuffles = pk.shuffles_rplus
@@ -766,6 +774,7 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
         plt.plot(x, y_drug, color=color_drug, marker='o', label='Saline')
         plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', fmt='none', mec='none', ms=0)
         plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', fmt='none', mec='none', ms=0)
+        add_stars(pvals_hist, np.maximum(y_saline, y_drug))
         # plt.title(title)
         # plt.xticks(x, x[::-1])
         plt.xticks(x[::2], x[::-1][::2])  # Show every 2nd tick (reversed)
@@ -796,3 +805,5 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     ylim = (min(ymins), max(ymaxs))
     for ax in axes:
         ax.set_ylim(ylim)
+
+    return pk_saline, pk_drug
