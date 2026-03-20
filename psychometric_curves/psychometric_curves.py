@@ -544,17 +544,17 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         if drug == 0:
             label = 'Saline'
 
-            # # Annotation params
-            # xy = (psych_curve.xdata[0], 1)
-            # xytext = (psych_curve.xdata[0], 1)
-            # va = 'top'
-            # ha = 'left'
-
-            # Annotate params
-            xy = (psych_curve.xdata[0], 0)
-            xytext = (psych_curve.xdata[0], 0)
-            va = 'bottom'
+            # Annotation params
+            xy = (psych_curve.xdata[0], 1)
+            xytext = (psych_curve.xdata[0], 1)
+            va = 'top'
             ha = 'left'
+
+            # # Annotate params
+            # xy = (psych_curve.xdata[0], 0)
+            # xytext = (psych_curve.xdata[0], 0)
+            # va = 'bottom'
+            # ha = 'left'
 
         elif drug == 1:
             color = 'tab:pink'

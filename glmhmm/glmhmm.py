@@ -1,7 +1,7 @@
 import os
 from scipy.stats import sem, ttest_1samp, ttest_rel
 import pickle
-import ssm
+# import ssm
 from matplotlib import cm
 
 from my_fun import get_experiment, add_stars, add_star_between, filter_drug_sessions, filter_behavior, fig_size, timer
@@ -645,6 +645,9 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
     plt.axhline(0, color='tab:gray', linestyle='--')
     ax = sns.boxplot(x='Covariate', y='Weight', hue=hue, data=data, palette=palette, showfliers=False, showcaps=False,
                      fill=False)
+
+    # plt.grid(axis='y', ls='-', color='tab:gray', alpha=0.5, zorder=0)
+    plt.ylim(-1, 5)
 
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('')

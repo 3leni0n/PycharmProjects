@@ -8,6 +8,7 @@ import statsmodels.api as sm
 from matplotlib import pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from scipy import stats
+from scipy.optimize import curve_fit  # For fitting exponential to history kernels
 from scipy.stats import ttest_rel
 import seaborn as sns
 from collections import namedtuple
@@ -25,6 +26,15 @@ FK = namedtuple('FK', [
     'n_trials', 'trial_lag', 'experiment', 'animal', 'drug', 'iterations', 'n_frames'  # metadata
 ])
 
+# # Old, needed for unpickle old mean model results
+# MeanFK = namedtuple('MeanFK', [
+#     'params_rminus', 'params_rplus', 'params_session_index', 'params_net_stim', 'params_frames',  # params
+#     'std_err_rminus', 'std_err_rplus', 'std_err_session_index', 'std_err_net_stim', 'std_err_frames',  # bse
+#     'p_values',  # p_values
+#     'shuffles_rminus', 'shuffles_rplus', 'shuffles_net_stim', 'shuffles_frames',  # shuffles
+#     'n_trials', 'experiment', 'animal', 'drug', 'trial_lag', 'iterations', 'n_frames'  # metadata
+# ])
+
 MeanFK = namedtuple('MeanFK', [
     'params_rminus', 'params_rplus', 'params_session_index', 'params_net_stim', 'params_frames',  # params
     'params_rminus_single', 'params_rplus_single', 'params_session_index_single', 'params_net_stim_single',
@@ -34,6 +44,10 @@ MeanFK = namedtuple('MeanFK', [
     'shuffles_rminus', 'shuffles_rplus', 'shuffles_net_stim', 'shuffles_frames',  # shuffles
     'n_trials', 'experiment', 'animal', 'drug', 'trial_lag', 'iterations', 'n_frames'  # metadata
 ])
+
+# Exponential function
+def exp_func(t, A, tau, C):
+    return A * np.exp(t / tau) + C  # use -t/tau for decay
 
 
 @timer
@@ -263,7 +277,7 @@ def plot_fk(fk, save=False, **kwargs):
     plt.plot(x, y, color=color, marker='o', label=label)
     plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
     plt.xticks([2, 4, 6, 8, 10], ['2', '4', '6', '8', '10'])
-    # plt.title(title)
+    plt.title('Psychophysical kernel')
     plt.xlabel('Stimulus frame')
     plt.ylabel('Weight')
     sns.despine()
@@ -306,7 +320,7 @@ def plot_fk(fk, save=False, **kwargs):
     yerr = fk.std_err_net_stim
     plt.plot(x, y, color=color, marker='o')
     plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
-    # plt.title(title)
+    plt.title('Net stimulus kernel')
     plt.xlabel('Net stimuli (dB)')
     plt.ylabel('Weight')
     plt.xticks(x, ['2', '4', '8', '70'])
@@ -331,6 +345,8 @@ def plot_fk(fk, save=False, **kwargs):
             y = fk.params_rminus
             yerr = fk.std_err_rminus
             shuffles = fk.shuffles_rminus
+            title = 'History kernel ($r^{-}$)'
+            color_fit = 'tab:red'
         elif _ == 2:  # R-
             xlabel = 'Trial lag (' + '$r^{+}$)'
             # params_indexes = np.arange(trial_lag, trial_lag * _)
@@ -338,6 +354,8 @@ def plot_fk(fk, save=False, **kwargs):
             y = fk.params_rplus
             yerr = fk.std_err_rplus
             shuffles = fk.shuffles_rplus
+            title = title = 'History kernel ($r^{+}$)'
+            color_fit = 'tab:green'
 
         plt.figure(**kwargs, constrained_layout=True)
         ax = plt.gca()
@@ -354,17 +372,29 @@ def plot_fk(fk, save=False, **kwargs):
         plt.plot(x, percentiles97dot5, color=color_upper_shuffle, ls=':')
 
         # plot kernel
-        plt.plot(x, y, color=color, marker='o', label=label)
+        # plt.plot(x, y, color=color, marker='o', label=label)
+        plt.plot(x, y, color=color, marker='o', linestyle='', label=label)
         plt.errorbar(x, y, yerr=yerr, color=color, marker='o', fmt='none', mec='none', ms=0)
         # plt.title(title)
         # plt.xticks(x, x[::-1])  # Reverse ticks
         plt.xticks(x[::2], x[::-1][::2])  # Show every 2nd tick (reversed)
         # plt.xticks(x[::5], x[::-1][::5])
         # plt.xticks([2, 4, 6, 8, 10], ['2', '4', '6', '8', '10'])
-        plt.xlabel(xlabel)
+        plt.xlabel('Trial lag')
+        plt.title(title)
         ylabel = 'Weight'
         plt.ylabel(ylabel)
         sns.despine()
+
+        # Plot exponential
+        plt.plot(x, y, color=color, marker='o', linestyle='', label='data')
+        popt, pcov = curve_fit(exp_func, x, y, p0=(0.1, 1, 0.1))
+        A_fit, tau_fit, C_fit = popt
+        print('Fitted tau:', tau_fit)
+        x_fit = np.linspace(x.min(), x.max(), 100)
+        y_fit = exp_func(x_fit, A_fit, tau_fit, C_fit)
+        plt.plot(x_fit, y_fit, color=color_fit, label=rf'fit ($\tau$={tau_fit:.2f})')
+        plt.legend(frameon=False)
 
         # yticks = plt.gca().get_yticks()  # Get current axis yticks for the significance annotations
         # if fk.p_values is not None:
@@ -658,7 +688,7 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o', label='Saline')
     plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o', label='Drug')
     add_stars(pvals_frames, np.maximum(y_saline, y_drug))
-    # plt.title(title)
+    plt.title('Psychophysical kernel')
     ax = plt.gca()
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     plt.xlabel('Stimulus frame')
@@ -718,7 +748,7 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     plt.errorbar(x, y_saline, yerr=yerr_saline, color=color_saline, marker='o')
     plt.errorbar(x, y_drug, yerr=yerr_drug, color=color_drug, marker='o')
     add_stars(pvals_net, np.maximum(y_saline, y_drug))
-    # plt.title(title)
+    plt.title('Net stimulus kernel')
     plt.xlabel('Net stimuli (dB)')
     plt.ylabel('Weight')
     plt.legend(frameon=False)
@@ -750,7 +780,7 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
     trial_lag = pk_saline.trial_lag
     for _ in range(1, 3):
         if _ == 1:  # R+
-            xlabel = 'Trial lag (' + '$r^{-}$)'
+            title = 'History kernel ($r^{-}$)'
             # params_indexes = np.arange(trial_lag * _)
             filename = f'{pk_saline.animal} r- HK, trial lag {pk_saline.trial_lag}'
             y_saline = pk_saline.params_rminus
@@ -762,7 +792,7 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
             yerr_drug = pk_drug.std_err_rminus
             # shuffles = pk.shuffles_rminus
         elif _ == 2:  # R-
-            xlabel = 'Trial lag (' + '$r^{+}$)'
+            title = 'History kernel ($r^{+}$)'
             # params_indexes = np.arange(trial_lag, trial_lag * _)
             filename = f'{pk_saline.animal} r+ HK, trial lag {pk_saline.trial_lag}'
             y_saline = pk_saline.params_rplus
@@ -803,7 +833,8 @@ def plot_drug_fk(experiment=['2AFC_6'], animal=None, iterations=1000, save=False
         # plt.xticks(x, x[::-1])
         plt.xticks(x[::2], x[::-1][::2])  # Show every 2nd tick (reversed)
         # plt.xticks(x[::5], x[::-1][::5])
-        plt.xlabel(xlabel)
+        plt.xlabel('Trial lag')
+        plt.title(title)
         ylabel = 'Weight'
         plt.ylabel(ylabel)
         sns.despine()

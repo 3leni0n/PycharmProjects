@@ -515,6 +515,10 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
         split_var_name = 'Drug'
         colors = ['tab:gray', 'tab:pink']
         labels = ['Saline', 'Drug']
+    elif split == 'state':
+        split_var_name = 'State'
+        colors = ['tab:gray', 'k']
+        labels = ['Dis.', 'Eng.']
 
     # plt.figure(constrained_layout=True, **kwargs)
 

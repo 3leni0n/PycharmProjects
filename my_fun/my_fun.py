@@ -991,8 +991,8 @@ def pval_to_star(pval):
         return '**'
     elif pval <= 0.05:
         return '*'
-    # return 'ns'
-    return ''
+    return 'ns'
+    # return ''
 
 
 def add_stars(pvals, y, offset=0.05):
