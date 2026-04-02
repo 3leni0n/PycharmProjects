@@ -647,7 +647,7 @@ def plot_paired_boxplot_GLMHMM_kernel(data, drug=False, **kwargs):
                      fill=False)
 
     # plt.grid(axis='y', ls='-', color='tab:gray', alpha=0.5, zorder=0)
-    plt.ylim(-1, 5)
+    plt.ylim(-1, 4)
 
     plt.xticks(np.arange(len(cov_names)), cov_names)
     plt.xlabel('')

@@ -274,7 +274,7 @@ def plot_raster(df_behavior, peri_event_spikes, cluster, group, colors=None, ax=
     ax.legend(loc='upper left', frameon=False)
 
 
-def plot_raster_split(df_behavior, df_cluster, df_ttl, condition='outcome', ax=None):
+def plot_raster_split(df_behavior, df_cluster, df_ttl, condition='outcome', align='stim', ax=None):
     """
     Plot a raster plot of a given cluster aligned to a specific event split by condition.
     """
@@ -300,7 +300,7 @@ def plot_raster_split(df_behavior, df_cluster, df_ttl, condition='outcome', ax=N
 
     for _ in range(len(indexes)):
         peri_event_spikes.append(
-            get_peri_event_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True)))
+            get_peri_event_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), align))
 
     peri_event_spikes = peri_event_spikes[0] + peri_event_spikes[1]  # Concatenate lists
     colors = [colors[0]] * len(indexes[0]) + [colors[1]] * len(indexes[1])  # Concatenate colors
@@ -526,6 +526,10 @@ def plot_psth_split(df_behavior, df_cluster, df_ttl, condition='outcome', over='
     Plot a PSTH of a given cluster aligned to a specific event split by condition.
     """
 
+    if align == 'resp':
+        bin_size = 0.05  # To resolve activity related to single licks
+        event = 'RespWinEnd'
+
     if ax is None:
         fig, ax = plt.subplots()
         cluster = df_cluster.cluster.unique()[0]
@@ -538,20 +542,20 @@ def plot_psth_split(df_behavior, df_cluster, df_ttl, condition='outcome', over='
 
     if condition == 'outcome':
         color = ['tab:red', 'tab:green']
-        # labels = ['Error', 'Correct']
-        labels = ['E', 'C']
+        labels = ['Error', 'Correct']
+        # labels = ['E', 'C']
     elif condition == 'choice':
         color = ['tab:blue', 'tab:orange']
-        # labels = ['Left', 'Right']
-        labels = ['L', 'R']
+        labels = ['Left', 'Right']
+        # labels = ['L', 'R']
     elif condition == 'stimulus':
         color = ['tab:blue', 'tab:orange']
-        # labels = ['Left', 'Right']
-        labels = ['L', 'R']
+        labels = ['Left', 'Right']
+        # labels = ['L', 'R']
     elif condition == 'repeat':
         color = ['tab:purple', 'tab:brown']
-        # labels = ['Alternate', 'Repeat']
-        labels = ['A', 'R']
+        labels = ['Alternate', 'Repeat']
+        # labels = ['A', 'R']
 
     for _ in range(len(indexes)):
 
@@ -559,10 +563,10 @@ def plot_psth_split(df_behavior, df_cluster, df_ttl, condition='outcome', over='
             peri_stim = get_peri_event_spikes(df_cluster, df_ttl.iloc[indexes[_]].reset_index(drop=True), align, time_win)
             ylabel = 'Firing rate'
         elif over == 'licks':
-            peri_stim = get_peri_event_licks(df_behavior.iloc[indexes[_]].reset_index(drop=True))
+            peri_stim = get_peri_event_licks(df_behavior.iloc[indexes[_]].reset_index(drop=True), event=event)
             ylabel = 'Lick rate'
 
-        bins, psth = compute_psth(peri_stim)
+        bins, psth = compute_psth(peri_stim, time_win=time_win, bin_size=bin_size)
         plot_psth(bins, psth, bin_size, color=color[_], label=labels[_], ax=ax)
         # plot_psth(bins, psth, psth_shuffles, bin_size, color=color[_], label=labels[_], ax=ax)
 
@@ -604,7 +608,7 @@ def plot_raster_psth(df_cluster, df_behavior, df_ttl, time_win=[-1, 3], bin_size
     # plt.tight_layout()
 
 
-def plot_raster_psth_split(df_behavior, df_cluster, df_ttl, condition='outcome', ax=[None, None]):
+def plot_raster_psth_split(df_behavior, df_cluster, df_ttl, condition='outcome', align='stim', ax=[None, None]):
     """
     Plot a raster and a PSTH split by a condition.
     """
@@ -617,8 +621,8 @@ def plot_raster_psth_split(df_behavior, df_cluster, df_ttl, condition='outcome',
     else:
         title = ''
 
-    plot_raster_split(df_behavior, df_cluster, df_ttl, condition=condition, ax=ax[0])
-    plot_psth_split(df_behavior, df_cluster, df_ttl, condition=condition, ax=ax[1])
+    plot_raster_split(df_behavior, df_cluster, df_ttl, condition=condition, align=align, ax=ax[0])
+    plot_psth_split(df_behavior, df_cluster, df_ttl, condition=condition, align=align, ax=ax[1])
     ax[0].set_title('')
     ax[1].set_title('')
     ax[0].set_xlabel('')

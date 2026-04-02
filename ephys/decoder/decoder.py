@@ -761,8 +761,11 @@ def epoch_cross_decoder_generalize(bins, split, epoch=None, X=np.empty((1, 1, 1)
     epoch_start_idx = round((start_time - bins[0]) / bin_size)
     epoch_end_idx = round((end_time - bins[0]) / bin_size)
 
-    index1 = np.where(split == 1)[0]  # Indices of correct/engaged trials
-    index0 = np.where(split == 0)[0]  # Indices of error/disengaged trials (never used for training)
+    # index1 = np.where(split == 1)[0]  # Indices of correct/engaged trials
+    # index0 = np.where(split == 0)[0]  # Indices of error/disengaged trials (never used for training)
+
+    index1 = np.where(split == 0)[0]  # Indices of correct/engaged trials
+    index0 = np.where(split == 1)[0]  # Indices of error/disengaged trials (never used for training)
 
     # Split trials into training and testing sets (each fold gets a unique test set to prevent over-fitting)
     for fold, (train_index, test_index) in enumerate(skf.split(X[index1], y[index1])):

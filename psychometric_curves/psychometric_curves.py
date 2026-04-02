@@ -420,15 +420,17 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
     if kind == 'prob_right':
         color = 'tab:gray'
         xlabel = 'Stimulus ILD (dB)'
-        ylabel = 'Prob. choose right'
+        # ylabel = 'Prob. choose right'
+        ylabel = '$p$(right)'
         loc = 'upper left'
         lower_lapse = '$LR_{right}$='
         upper_lapse = '$LR_{left}$='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:gray'
-        xlabel = 'Rep. stim. ILD (dB)'
-        ylabel = 'Prob. choose repeat'
+        xlabel = 'Repeating stimulus ILD (dB)'
+        # ylabel = 'Prob. choose repeat'
+        ylabel = '$p$(repeat)'
         loc = 'lower right'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
         lower_lapse = '$LR_{rep}$='
@@ -439,7 +441,7 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
 
     for drug in range(2):
 
-        psych_curve = plot_pc(experiment=experiment, animal=animal, kind='prob_right', drug=drug, save=False, **kwargs)
+        psych_curve = plot_pc(experiment=experiment, animal=animal, kind=kind, drug=drug, save=False, **kwargs)
 
         params = psych_curve.params
         plt.close()
@@ -447,11 +449,18 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
         if drug == 0:
             label = 'Saline'
 
-            # Annotation params
-            xy = (psych_curve.xdata[0], 1)
-            xytext = (psych_curve.xdata[0], 1)
-            va = 'top'
+            # # Annotation params
+            # xy = (psych_curve.xdata[0], 1)
+            # xytext = (psych_curve.xdata[0], 1)
+            # va = 'top'
+            # ha = 'left'
+
+            # Annotate params
+            xy = (psych_curve.xdata[0], 0)
+            xytext = (psych_curve.xdata[0], 0)
+            va = 'bottom'
             ha = 'left'
+
         elif drug == 1:
             color = 'tab:pink'
             label = 'Drug'  # (MK-801)
@@ -477,8 +486,8 @@ def plot_pc_drug(experiment='2AFC_6', animal='016', kind='prob_right', **kwargs)
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
         plt.annotate(label + ':' + '\n' +
-                     'S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                     '$S$=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                     '$B$=' + str(round(bias, 2)) + '\n' +  # Bias
                      lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                      upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                      xy=xy, xytext=xytext, color=color,
@@ -518,15 +527,17 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
     if kind == 'prob_right':
         color = 'tab:gray'
         xlabel = 'Stimulus ILD (dB)'
-        ylabel = 'Prob. choose right'
+        # ylabel = 'Prob. choose right'
+        ylabel = '$p$(right)'
         loc = 'upper left'
         lower_lapse = '$LR_{right}$='
         upper_lapse = '$LR_{left}$='
         columns = ['sensitivity', 'bias', 'lr_right', 'lr_left', 'drug']
     elif kind == 'prob_rep':
         color = 'tab:gray'
-        xlabel = 'Rep. stim. ILD (dB)'
-        ylabel = 'Prob. choose repeat'
+        xlabel = 'Repeating stimulus ILD (dB)'
+        # ylabel = 'Prob. choose repeat'
+        ylabel = '$p$(repeat)'
         loc = 'lower right'
         columns = ['sensitivity', 'bias', 'lr_rep', 'lr_alt', 'drug']
         lower_lapse = '$LR_{rep}$='
@@ -544,17 +555,17 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
         if drug == 0:
             label = 'Saline'
 
-            # Annotation params
-            xy = (psych_curve.xdata[0], 1)
-            xytext = (psych_curve.xdata[0], 1)
-            va = 'top'
-            ha = 'left'
-
-            # # Annotate params
-            # xy = (psych_curve.xdata[0], 0)
-            # xytext = (psych_curve.xdata[0], 0)
-            # va = 'bottom'
+            # # Annotation params
+            # xy = (psych_curve.xdata[0], 1)
+            # xytext = (psych_curve.xdata[0], 1)
+            # va = 'top'
             # ha = 'left'
+
+            # Annotate params
+            xy = (psych_curve.xdata[0], 0)
+            xytext = (psych_curve.xdata[0], 0)
+            va = 'bottom'
+            ha = 'left'
 
         elif drug == 1:
             color = 'tab:pink'
@@ -580,8 +591,8 @@ def plot_mean_pc_drug(experiment='2AFC_6', animals=None, kind='prob_right', **kw
 
         sensitivity, bias, lr_lower, lr_upper = psych_curve.params
         plt.annotate(label + ':' + '\n' +
-                     'S=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
-                     'B=' + str(round(bias, 2)) + '\n' +  # Bias
+                     '$S$=' + str(round(sensitivity, 2)) + '\n' +  # Sensitivity
+                     '$B$=' + str(round(bias, 2)) + '\n' +  # Bias
                      lower_lapse + str(round(lr_lower, 2)) + '\n' +  # Upper lapse rate
                      upper_lapse + str(round(lr_upper, 2)),  # Lower lapse rate
                      xy=xy, xytext=xytext, color=color,

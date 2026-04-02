@@ -517,7 +517,7 @@ def plot_licks_split(df_behavior, var='RT', split='outcome', kind='hist', **kwar
         labels = ['Saline', 'Drug']
     elif split == 'state':
         split_var_name = 'State'
-        colors = ['tab:gray', 'k']
+        colors = ['tab:gray', 'tab:green']
         labels = ['Dis.', 'Eng.']
 
     # plt.figure(constrained_layout=True, **kwargs)
@@ -710,7 +710,7 @@ def plot_ild_dist(df_behavior, var='RT', insets=False, **kwargs):
         # sns.despine(ax=ax_inset)
 
 
-def plot_ild_dist_mean(df_behavior, var='RT', **kwargs):
+def plot_ild_dist_mean(df_behavior, var='RT', jitter=0, **kwargs):
     """
     Plot the mean ± SEM of a variable for each absolute ILD level as a categorical bar plot.
     """
@@ -759,7 +759,7 @@ def plot_ild_dist_mean(df_behavior, var='RT', **kwargs):
     # plt.bar(x, centers, yerr=errors, color=palette)
     # # plt.bar(x, centers - y_min, bottom=y_min, yerr=errors, color=palette)
 
-    plt.errorbar(x, centers, errors , marker='o', color=color, label=label)
+    plt.errorbar(x + jitter, centers, errors , marker='o', color=color, label=label)
 
     # plt.ylim(y_min, None)
     plt.xticks(x, abs_ilds)  # ILD values as category labels
@@ -809,8 +809,13 @@ def plot_ild_dist_mean_split(df_behavior, var='RT', split='outcome', **kwargs):
         labels = ['Saline', 'Drug']
 
     for _ in range(2):
+        if _ == 0:
+            jitter = 0
+        else:
+            jitter = 00
+
         df_split = df_behavior[df_behavior[split_var_name] == _]
-        plot_ild_dist_mean(df_split, var=var, color=colors[_], label=labels[_])
+        plot_ild_dist_mean(df_split, var=var, jitter=jitter, color=colors[_], label=labels[_])
 
     plt.legend()
 
