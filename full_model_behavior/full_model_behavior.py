@@ -45,6 +45,7 @@ MeanFK = namedtuple('MeanFK', [
     'n_trials', 'experiment', 'animal', 'drug', 'trial_lag', 'iterations', 'n_frames'  # metadata
 ])
 
+
 # Exponential function
 def exp_func(t, A, tau, C):
     return A * np.exp(t / tau) + C  # use -t/tau for decay
