@@ -132,6 +132,10 @@ def load_oe_data(directory, sync=True, stream='AP'):
         # for c in recording.continuous:
         #     c.metadata = vars(c.metadata)
 
+        # Convert to dict for backward compatibility
+        for c in recording.continuous:
+            c.metadata = vars(c.metadata)
+
         # recording.compute_global_timestamps()  # Generate new global timestamps column
         recording.compute_global_timestamps(overwrite=True)  # Overwrite existing timestamps
         # recording.events.sort_values('global_timestamp', inplace=True)  # Sort events by global timestamp
