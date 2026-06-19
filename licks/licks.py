@@ -1,8 +1,8 @@
 import pandas as pd
 import numpy as np
 import ast
-import statsmodels.api as sm
-import statsmodels.formula.api as smf
+# import statsmodels.api as sm
+# import statsmodels.formula.api as smf
 from scipy.ndimage import gaussian_filter1d
 from scipy.stats import sem
 from scipy.stats import ttest_1samp

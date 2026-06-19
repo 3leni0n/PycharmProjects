@@ -7,6 +7,8 @@ from parse.parse import parse
 from parse.parse_v2 import parse_v2
 import csv
 from my_fun.my_fun import *
+from cherry.cherry import *
+
 # To do:
 # Add training day index column to df
 
@@ -240,6 +242,23 @@ def glue_groups(experiments=['2AFC_2', '2AFC_3', '2AFC_4', '2AFC_5', '2AFC_6'], 
         df = pd.concat([df, df_groups])  # Add parsed session to the bottom of the DataFrame
     df.reset_index(drop=True, inplace=True)
 
+    return df
+
+
+def filter_by_cherries(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
+    """
+    Filter data by cherries (only selected subjects).
+    :param experiments: Groups of animals to glue together
+    :return: pandas DataFrame with the filtered data
+    """
+
+    df = glue_groups(experiments=experiments, path_session='glue_sessions')
+    df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
+    df.Subject = df.Subject.astype(int).astype(str).str.zfill(3)  # 0 pad subjects for consistent XXX ID format
+    cherries_dict = main(experiments)  # Cherry pick
+    cherries = [a for expt in experiments for a in cherries_dict[expt]]  # Unpack cherries
+    print(f'{len(cherries)} mice: {cherries}')
+    df = df[df['Subject'].isin(cherries)].reset_index(drop=True)  # Filter cherries
     return df
 
 

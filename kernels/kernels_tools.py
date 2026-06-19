@@ -68,7 +68,7 @@ def make_choice_history_dm(df, k=10):
     return design_matrix
 
 
-def make_session_index_dm(df, column='Date'):
+def z(df, column='Date'):
     """
     # Make a design matrix in which there are as many columns as unique dates. Then, for each column, there is a 1 if
     the trial belongs to that session and a 0 otherwise

@@ -762,7 +762,7 @@ def compute_psych_curve(x, y, n_points=100):
 
     info = coherence_dataframe.groupby(['evidence'])['r_resp'].mean()
     ydata = [np.around(elem, 3) for elem in info.values]
-    xdata = info.index.values
+    xdata = info.index.values.copy()
     fit_error = [np.around(elem, 3) for elem in coherence_dataframe.groupby(['evidence'])['r_resp'].sem().values]
 
     initial_guess = np.array([1, 1, 0, 0])
@@ -1215,7 +1215,7 @@ def add_columns_behavior(df):
     from licks.licks import add_lick_data
 
     # Add session index per trial
-    session_index = (df.groupby('subject')['Session'].transform(lambda x: pd.factorize(x)[0]))
+    session_index = (df.groupby('Subject')['Session'].transform(lambda x: pd.factorize(x)[0]))
     loc = df.columns.get_loc('Session') + 1  # To the right of Session column
     df.insert(loc, 'SessionIndex', session_index)  # Add session index column
 
@@ -1240,31 +1240,34 @@ def fig_size(n_cols=1, ratio=None):
     :return:
     """
 
-    sns.set_style('ticks')
-    sns.set_context('notebook')
-
     if ratio is None:
         default_figsize = np.array(plt.rcParams['figure.figsize'])
-        default_ratio = default_figsize[0] / default_figsize[1]
-        ratio = default_ratio  # 4:3
+        ratio = default_figsize[0] / default_figsize[1]  # 4:3
+
+    mm_per_inch = 25.4
 
     # All measurements are in inches
-    A4_size = np.array((8.27, 11.69))  # A4 measurements
-    margins = 2  # On both dimension
+    # A4_size = np.array((8.27, 11.69))  # A4 measurements
+    A4_size = np.array((210, 297))  # A4 measurements
+
+    # margins = 2  # On both dimensions
+    margins = 50.8  # 2 inches on each dimension
+
     size = A4_size - margins  # Effective size after margins removal (2 per dimension)
-    width = size[0]
-    height = size[1]
+    width, height = size
 
-    # Full page (minus margins)
+    # Full page
     if n_cols == 0:
-        # Full A4 minus margins
-        figsize = (width, height)
+        figsize = np.array((width, height))
         if ratio == 1:  # Square
-            figsize = (size[0], size[0])
-        return figsize
+            figsize = np.array((size[0], size[0]))
+        # return figsize
 
+    # Full page / N columns width
     else:
         fig_width = width / n_cols
         fig_height = fig_width / ratio
-        figsize = (fig_width, fig_height)
-        return figsize
+        figsize = np.array((fig_width, fig_height))
+        # return figsize
+
+    return tuple(figsize / mm_per_inch)

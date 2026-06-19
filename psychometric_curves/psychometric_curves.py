@@ -93,7 +93,6 @@ def plot_pc(experiment='2AFC_6', animal=None, kind='prob_right', drug=None, save
         ylabel = 'Prob. choose right'
         # ylabel = 'P. right'
 
-
         # Annotation params
         lower_lapse = '$LR_{right}$='
         upper_lapse = '$LR_{left}$='
