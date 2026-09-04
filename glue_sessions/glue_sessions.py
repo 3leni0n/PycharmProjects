@@ -7,7 +7,7 @@ from parse.parse import parse
 from parse.parse_v2 import parse_v2
 import csv
 from my_fun.my_fun import *
-from cherry.cherry import *
+# from cherry.cherry import *  # Circular import
 
 # To do:
 # Add training day index column to df
@@ -251,6 +251,8 @@ def filter_by_cherries(experiments=['2AFC_2', '2AFC_3', '2AFC_4']):
     :param experiments: Groups of animals to glue together
     :return: pandas DataFrame with the filtered data
     """
+
+    from cherry.cherry import main
 
     df = glue_groups(experiments=experiments, path_session='glue_sessions')
     df = filter_behavior(df, drop_miss=True, clean_start=True, filter_drug=False)
